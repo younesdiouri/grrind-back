@@ -55,4 +55,9 @@ final readonly class DoctrineUserRepository implements UserRepository
             throw new EmailAlreadyUsed($user->email());
         }
     }
+
+    public function commit(): void
+    {
+        $this->entityManager->flush();
+    }
 }

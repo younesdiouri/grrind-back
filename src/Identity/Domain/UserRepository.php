@@ -26,4 +26,9 @@ interface UserRepository
      * @throws Exception\EmailAlreadyUsed
      */
     public function add(User $user): void;
+
+    /**
+     * Écrit les modifications d'un compte déjà connu (renommage, fuseau, rehash).
+     */
+    public function commit(): void;
 }

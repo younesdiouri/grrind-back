@@ -2,3 +2,11 @@ lexik_jwt_authentication:
     secret_key: '%env(resolve:JWT_SECRET_KEY)%'
     public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
     pass_phrase: '%env(JWT_PASSPHRASE)%'
+
+    # Court par construction : un JWT ne se révoque pas. Ce qui tient la session
+    # dans la durée, c'est le refresh token, lui révocable.
+    token_ttl: '%env(int:JWT_TTL)%'
+
+    # L'identité est portée par `sub`, pas par `username` : c'est un UUID, pas un
+    # nom, et le claim standard évite d'avoir à l'expliquer au client iOS.
+    user_id_claim: sub

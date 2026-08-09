@@ -22,15 +22,16 @@ final class RegisterTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_CREATED, $response->getStatusCode());
 
-        $body = self::decode($response);
+        $user = self::decode($response)['user'];
+        self::assertIsArray($user);
 
-        self::assertSame('bob@grrind.app', $body['email']);
-        self::assertSame('Bob', $body['displayName']);
-        self::assertSame('Europe/Paris', $body['timezone']);
-        self::assertIsString($body['id']);
-        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $body['id']);
-        self::assertArrayNotHasKey('password', $body);
-        self::assertArrayNotHasKey('passwordHash', $body);
+        self::assertSame('bob@grrind.app', $user['email']);
+        self::assertSame('Bob', $user['displayName']);
+        self::assertSame('Europe/Paris', $user['timezone']);
+        self::assertIsString($user['id']);
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $user['id']);
+        self::assertArrayNotHasKey('password', $user);
+        self::assertArrayNotHasKey('passwordHash', $user);
     }
 
     public function testNormalisesTheEmailBeforeStoringIt(): void
@@ -38,7 +39,9 @@ final class RegisterTest extends ApiTestCase
         $response = $this->post('/api/auth/register', [...self::VALID, 'email' => '  Bob@GRRIND.app ']);
 
         self::assertSame(Response::HTTP_CREATED, $response->getStatusCode());
-        self::assertSame('bob@grrind.app', self::decode($response)['email']);
+        $user = self::decode($response)['user'];
+        self::assertIsArray($user);
+        self::assertSame('bob@grrind.app', $user['email']);
     }
 
     public function testRefusesAnAddressAlreadyTakenEvenSpeltDifferently(): void

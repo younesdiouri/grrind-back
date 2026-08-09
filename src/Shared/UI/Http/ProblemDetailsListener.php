@@ -8,6 +8,7 @@ use App\Shared\Domain\Exception\ConflictError;
 use App\Shared\Domain\Exception\DomainError;
 use App\Shared\Domain\Exception\NotFoundError;
 use App\Shared\Domain\Exception\RuleViolationError;
+use App\Shared\Domain\Exception\UnauthorizedError;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -80,6 +81,7 @@ final readonly class ProblemDetailsListener
     private static function statusOf(DomainError $error): int
     {
         return match (true) {
+            $error instanceof UnauthorizedError => Response::HTTP_UNAUTHORIZED,
             $error instanceof NotFoundError => Response::HTTP_NOT_FOUND,
             $error instanceof ConflictError => Response::HTTP_CONFLICT,
             $error instanceof RuleViolationError => Response::HTTP_UNPROCESSABLE_ENTITY,
