@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Identity\Infrastructure\Security;
 
 use App\Identity\Domain\PasswordHasher;
+use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\PasswordHasher\Hasher\PasswordHasherFactoryInterface;
 
 /**
  * L'algorithme et son coût sont pilotés par `security.password_hashers` — donc
  * réduits en test, où un argon2id complet coûterait des secondes par cas.
  */
+#[AsAlias(PasswordHasher::class)]
 final readonly class SymfonyPasswordHasher implements PasswordHasher
 {
     public function __construct(private PasswordHasherFactoryInterface $factory)
