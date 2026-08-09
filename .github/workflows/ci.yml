@@ -20,6 +20,10 @@ jobs:
       - name: Dépendances
         run: make composer c="install --no-interaction --no-progress"
 
+      # Les clés JWT ne sont pas versionnées : la CI génère les siennes.
+      - name: Clés JWT
+        run: make jwt-keys
+
       # Les barrières tournent dans la même image que le poste de dev :
       # pas de divergence possible entre "ça passe chez moi" et la CI.
       - name: Analyse statique

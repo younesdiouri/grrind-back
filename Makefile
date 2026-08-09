@@ -11,7 +11,7 @@ RUN_DB  := $(DC) run --rm php
 RUN_TEST := $(DC) run --rm -e APP_ENV=test php
 
 .DEFAULT_GOAL := help
-.PHONY: help build up down restart logs sh composer console cc migration migrate db-reset test qa phpstan cs cs-fix deptrac install
+.PHONY: help build up down restart logs sh composer console cc jwt-keys migration migrate db-reset test qa phpstan cs cs-fix deptrac install
 
 help: ## Liste les commandes disponibles
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -34,8 +34,9 @@ logs: ## Suit les logs (s=service)
 sh: ## Ouvre un shell dans le conteneur php
 	$(DC) exec php sh
 
-install: build ## Installation initiale : images, dépendances, base
+install: build ## Installation initiale : images, dépendances, clés, base
 	$(RUN) composer install
+	$(MAKE) jwt-keys
 	$(MAKE) up
 	$(MAKE) db-reset
 
@@ -48,6 +49,9 @@ console: ## Console Symfony (c="cache:clear")
 
 cc: ## Vide le cache
 	$(RUN) bin/console cache:clear
+
+jwt-keys: ## (Re)génère la paire de clés JWT — jamais versionnée, à refaire à chaque poste
+	$(RUN) bin/console lexik:jwt:generate-keypair --overwrite --no-interaction
 
 ## —— Base de données ——————————————————————————————————————————————————————
 migration: ## Génère une migration (à relire à la main avant de l'appliquer)
