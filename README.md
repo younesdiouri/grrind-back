@@ -8,7 +8,7 @@ compétences, loot, streak, ligues. Le client SwiftUI vit dans un dépôt sépar
 Rien à installer à part Docker. Aucun PHP, Composer ou Symfony CLI n'est requis sur l'hôte.
 
 ```bash
-make install       # images, dépendances, base
+make install       # images, dépendances, clés JWT, base
 make up            # http://localhost:8080
 curl localhost:8080/health
 ```
@@ -32,3 +32,4 @@ Un module ne connaît que `Shared` — Deptrac le vérifie en CI.
 
 Les invariants de conception (le serveur possède l'horloge, l'XP est un ledger append-only, un seul
 vocabulaire de modificateurs, RNG serveur auditable) sont détaillés dans [CLAUDE.md](CLAUDE.md).
+L'avancement lot par lot est dans [PROGRESS.md](PROGRESS.md).

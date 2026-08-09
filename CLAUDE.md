@@ -16,6 +16,7 @@ make up            # démarre la stack (http://localhost:8080)
 make sh            # shell dans le conteneur php
 make composer c="require foo/bar"
 make console c="debug:router"
+make jwt-keys      # (re)génère la paire de clés JWT — jamais versionnée
 make migration     # génère une migration (à relire avant de l'appliquer)
 make migrate       # applique les migrations
 make test          # phpunit (crée et migre la base de test au passage)
@@ -143,17 +144,37 @@ Les rendements décroissants suppriment l'intérêt de tricher tout en étant un
 - Migrations Doctrine relues à la main, jamais générées-appliquées à l'aveugle.
 - Réponses d'erreur en RFC 7807 (problem+details).
 
+## Authentification
+
+Le client détient deux jetons de nature différente :
+
+- un **JWT** signé RS256, 15 minutes, identité portée par le claim `sub` (l'UUID du compte).
+  Il ne se révoque pas — c'est pour ça qu'il est court.
+- un **refresh token** de 30 jours, à usage unique, **rotatif**, groupé par *famille*. Une famille
+  correspond à un appareil connecté ; s'en déconnecter la révoque entièrement.
+
+Seul le SHA-256 du refresh token est stocké. Le rejeu d'un jeton déjà consommé révoque toute la
+famille : on ne peut pas distinguer le voleur du vrai client qui a été doublé, donc on coupe.
+
+L'entité `User` n'implémente pas `UserInterface` — `SecurityUser` sert d'adaptateur, et le domaine
+ignore les rôles Symfony. Les contrôleurs authentifiés reçoivent le `User` du domaine directement,
+résolu depuis le jeton : **aucune route ne prend d'identifiant de compte en paramètre.**
+
 ## État d'avancement
 
 **Lot 0 — socle : fait.** FrankenPHP 8.4 + Symfony 7.4 + Postgres 17 sous Docker, Makefile comme
 point d'entrée unique, `GET /health` qui sonde la base, PHPStan niveau max, PHP-CS-Fixer,
 Deptrac et PHPUnit câblés et verts, workflow CI qui rejoue les mêmes barrières dans la même image.
-Aucune entité, aucune migration : `src/Shared/Domain` est vide et sert d'ancrage au mapping Doctrine.
 
-Reste : Lot 1 Identity → Lot 2 Training → Lot 3 moteur Progression → **Lot 4 RewardSummary (premier
-jouable)** → Lot 5 Streak → Lot 6 Loot → Lot 7 Arbres → Lot 8 Classements → Lot 9 durcissement.
+**Lot 1 — Identity : fait.** Inscription, login, refresh/logout, `GET` et `PATCH /api/me`.
+Erreurs en problem+json (RFC 9457) dans `Shared`, y compris les échecs d'authentification.
+`StringValueType` persiste n'importe quel value object qui sait se dire en une chaîne.
+
+Reste : Lot 2 Training → Lot 3 moteur Progression → **Lot 4 RewardSummary (premier jouable)** →
+Lot 5 Streak → Lot 6 Loot → Lot 7 Arbres → Lot 8 Classements → Lot 9 durcissement.
 Strava arrive après, comme simple adapter d'`ActivitySource`.
 
-Le mapping Doctrine n'a **pas** d'`auto_mapping` : chaque module déclare le sien dans
-`config/packages/doctrine.yaml` au moment de son lot. Idem pour les layers Deptrac, déjà déclarés
-dans `deptrac.yaml` pour les six modules.
+Le journal de bord détaillé — décisions, pièges rencontrés, prochaine étape — est dans
+[PROGRESS.md](PROGRESS.md). Le mapping Doctrine n'a **pas** d'`auto_mapping` : chaque module
+déclare le sien dans `config/packages/doctrine.yaml` au moment de son lot. Idem pour les layers
+Deptrac, déjà déclarés dans `deptrac.yaml` pour les six modules.
