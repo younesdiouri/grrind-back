@@ -9,6 +9,7 @@ doctrine:
         # écrit dans les #[Column] : il fait partie du schéma, il ne bouge plus.
         types:
             timezone: App\Shared\Infrastructure\Doctrine\Type\TimezoneType
+            email: App\Identity\Infrastructure\Doctrine\Type\EmailType
     orm:
         validate_xml_mapping: true
         naming_strategy: doctrine.orm.naming_strategy.underscore
@@ -24,6 +25,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Shared/Domain'
                 prefix: 'App\Shared\Domain'
                 alias: Shared
+            Identity:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Identity/Domain'
+                prefix: 'App\Identity\Domain'
+                alias: Identity
 
 when@test:
     doctrine:
