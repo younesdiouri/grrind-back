@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: Qualité et tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build de l'image dev
+        run: docker compose build
+
+      # Le target dev ne fige pas les dépendances dans l'image : le code arrive
+      # par bind mount, donc vendor/ doit être installé ici comme en local.
+      - name: Dépendances
+        run: make composer c="install --no-interaction --no-progress"
+
+      # Les barrières tournent dans la même image que le poste de dev :
+      # pas de divergence possible entre "ça passe chez moi" et la CI.
+      - name: Analyse statique
+        run: make phpstan
+
+      - name: Style
+        run: make cs
+
+      - name: Frontières entre modules
+        run: make deptrac
+
+      - name: Tests
+        run: make test
+
+      - name: Arrêt de la stack
+        if: always()
+        run: make down

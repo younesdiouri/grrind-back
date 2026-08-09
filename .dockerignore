@@ -1,0 +1,16 @@
+**/.git
+**/.DS_Store
+**/.idea
+**/.vscode
+var/
+vendor/
+tests/
+compose*.yaml
+Makefile
+CLAUDE.md
+README.md
+.github/
+# docker/ n'est pas exclu : le Dockerfile y prend les php.ini.
+.env.local
+.env.*.local
+.phpunit.cache/

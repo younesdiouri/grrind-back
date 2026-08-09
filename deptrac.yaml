@@ -1,0 +1,51 @@
+# Frontières entre modules. La règle : un module ne connaît que Shared.
+# Toute communication inter-modules passe par un événement de domaine ou un port
+# explicite — jamais par un import direct.
+deptrac:
+  paths:
+    - ./src
+
+  layers:
+    - name: Shared
+      collectors:
+        - type: directory
+          value: src/Shared/.*
+
+    - name: Identity
+      collectors:
+        - type: directory
+          value: src/Identity/.*
+
+    - name: Training
+      collectors:
+        - type: directory
+          value: src/Training/.*
+
+    - name: Progression
+      collectors:
+        - type: directory
+          value: src/Progression/.*
+
+    - name: Rewards
+      collectors:
+        - type: directory
+          value: src/Rewards/.*
+
+    - name: Engagement
+      collectors:
+        - type: directory
+          value: src/Engagement/.*
+
+  ruleset:
+    # Shared ne dépend d'aucun module métier : c'est ce qui le garde partageable.
+    Shared: ~
+    Identity:
+      - Shared
+    Training:
+      - Shared
+    Progression:
+      - Shared
+    Rewards:
+      - Shared
+    Engagement:
+      - Shared

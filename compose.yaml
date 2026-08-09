@@ -1,0 +1,43 @@
+services:
+  php:
+    build:
+      context: .
+      target: dev
+    environment:
+      APP_ENV: dev
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
+      SERVER_NAME: ':80'
+      # FrankenPHP sert en HTTP nu en local : le TLS est du ressort de l'ingress.
+      DATABASE_URL: 'postgresql://grrind:grrind@database:5432/grrind?serverVersion=17&charset=utf8'
+    volumes:
+      - .:/app
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - '${HTTP_PORT:-8080}:80'
+    depends_on:
+      database:
+        condition: service_healthy
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: grrind
+      POSTGRES_USER: grrind
+      POSTGRES_PASSWORD: grrind
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - '${DB_PORT:-5433}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U grrind -d grrind']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

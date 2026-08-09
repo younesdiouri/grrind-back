@@ -1,0 +1,82 @@
+## GRRIND backend — point d'entrée unique.
+## Aucun PHP/Composer sur l'hôte : tout passe par Docker.
+## Si une commande te manque, ajoute-la ici — ne contourne pas.
+
+DC      := docker compose
+# Sans dépendance : ni base ni serveur nécessaires (composer, analyse statique).
+RUN     := $(DC) run --rm --no-deps php
+# Avec dépendances : la base est démarrée automatiquement (console, migrations).
+RUN_DB  := $(DC) run --rm php
+# Tests : APP_ENV forcé côté conteneur, sinon le APP_ENV=dev de compose.yaml gagne.
+RUN_TEST := $(DC) run --rm -e APP_ENV=test php
+
+.DEFAULT_GOAL := help
+.PHONY: help build up down restart logs sh composer console cc migration migrate db-reset test qa phpstan cs cs-fix deptrac install
+
+help: ## Liste les commandes disponibles
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+
+## —— Stack ————————————————————————————————————————————————————————————————
+build: ## Construit les images
+	$(DC) build --pull
+
+up: ## Démarre la stack en arrière-plan
+	$(DC) up -d --wait
+
+down: ## Arrête la stack
+	$(DC) down --remove-orphans
+
+restart: down up ## Redémarre la stack
+
+logs: ## Suit les logs (s=service)
+	$(DC) logs -f $(s)
+
+sh: ## Ouvre un shell dans le conteneur php
+	$(DC) exec php sh
+
+install: build ## Installation initiale : images, dépendances, base
+	$(RUN) composer install
+	$(MAKE) up
+	$(MAKE) db-reset
+
+## —— PHP ——————————————————————————————————————————————————————————————————
+composer: ## Composer (c="require foo/bar")
+	$(RUN) composer $(c)
+
+console: ## Console Symfony (c="cache:clear")
+	$(RUN_DB) bin/console $(c)
+
+cc: ## Vide le cache
+	$(RUN) bin/console cache:clear
+
+## —— Base de données ——————————————————————————————————————————————————————
+migration: ## Génère une migration (à relire à la main avant de l'appliquer)
+	$(RUN_DB) bin/console doctrine:migrations:diff
+
+migrate: ## Applique les migrations
+	$(RUN_DB) bin/console doctrine:migrations:migrate --no-interaction
+
+db-reset: ## Recrée la base et rejoue toutes les migrations
+	$(RUN_DB) bin/console doctrine:database:drop --if-exists --force
+	$(RUN_DB) bin/console doctrine:database:create
+	$(RUN_DB) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+
+## —— Qualité ——————————————————————————————————————————————————————————————
+test: ## Suite de tests (base de test créée/migrée au passage)
+	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \
+		&& bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration \
+		&& vendor/bin/phpunit $(c)"
+
+qa: phpstan cs deptrac ## Toutes les barrières qualité
+
+phpstan: ## Analyse statique (le cache dev alimente l'extension Symfony)
+	$(RUN) sh -c "bin/console cache:warmup --env=dev && vendor/bin/phpstan analyse --memory-limit=1G"
+
+cs: ## Vérifie le style (sans modifier)
+	$(RUN) vendor/bin/php-cs-fixer check --diff
+
+cs-fix: ## Corrige le style
+	$(RUN) vendor/bin/php-cs-fixer fix
+
+deptrac: ## Vérifie les frontières entre modules
+	$(RUN) vendor/bin/deptrac analyse
