@@ -4,6 +4,11 @@ doctrine:
 
         server_version: '17'
         profiling_collect_backtrace: '%kernel.debug%'
+
+        # Un type par value object persistable. Le nom du type est celui qu'on
+        # écrit dans les #[Column] : il fait partie du schéma, il ne bouge plus.
+        types:
+            timezone: App\Shared\Infrastructure\Doctrine\Type\TimezoneType
     orm:
         validate_xml_mapping: true
         naming_strategy: doctrine.orm.naming_strategy.underscore
