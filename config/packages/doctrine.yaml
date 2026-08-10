@@ -30,6 +30,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Identity/Domain'
                 prefix: 'App\Identity\Domain'
                 alias: Identity
+            Training:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Training/Domain'
+                prefix: 'App\Training\Domain'
+                alias: Training
 
 when@test:
     doctrine:

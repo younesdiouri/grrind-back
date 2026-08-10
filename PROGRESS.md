@@ -128,6 +128,21 @@ le sien. On renvoie 409 et on laisse le vrai propriétaire se connecter par mot 
 documenté par Flex ; le sortir du dépôt aurait cassé une convention pour rien. Ce qui change,
 c'est que les valeurs sensibles n'y sont plus : `make secrets` les génère hors du suivi.
 
+**Lot 2 — le vocabulaire d'activité vit dans `Shared`, pas dans `Training`.** `Discipline`,
+`SessionSource` et `TrustLevel` seront lus par quatre modules — plafond d'XP par discipline,
+portée des modificateurs, tables de loot, classements — et Deptrac interdit qu'un module importe
+l'enum d'un autre. `SessionStatus` reste dans `Training` : personne d'autre n'inspecte le statut
+d'une séance, les autres réagissent à l'événement de clôture.
+
+**Lot 2 — six disciplines, et pas de valeur « autre ».** Chacune coûte une courbe à équilibrer,
+une table de loot et une ligne dans l'écran de sélection iOS ; en ouvrir une se décide par un
+ticket. Un fourre-tout « autre » deviendrait le contournement immédiat du plafond d'XP quotidien
+par discipline.
+
+**Lot 2 — le crédit d'une séance se dérive de sa source.** `SessionSource::defaultTrust()` plutôt
+que deux paramètres indépendants : ça rend impossible `MANUAL_TIMER` + `PROVIDER_VERIFIED`, la
+combinaison dont personne n'a besoin et que tout le monde finit par écrire.
+
 **Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
 ne le relisait pas.
