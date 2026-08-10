@@ -1,11 +1,15 @@
-# Journal de progression
+# Journal de bord
 
-Ce fichier existe pour qu'une session interrompue puisse reprendre sans rien redemander.
-Il dit **où on en est**, **ce qui vient ensuite**, et **pourquoi certains choix ont été faits**.
-Les invariants de conception, eux, vivent dans [CLAUDE.md](CLAUDE.md) — pas de doublon ici.
+**L'avancement ne se suit plus ici.** Il vit sur le tableau GitHub :
+👉 **https://github.com/users/younesdiouri/projects/1**
 
-À tenir à jour au fil des commits : une ligne par lot terminé, et la section « En cours » vidée
-dès qu'un lot est bouclé.
+Un ticket par feature, un jalon par lot, un label par module. C'est la seule source de vérité sur
+« ce qui reste à faire » — ce fichier ne duplique plus la feuille de route, il ne garderait pas le
+rythme.
+
+Ce qui reste ici est ce qu'un tableau ne sait pas porter : **pourquoi** certains choix ont été
+faits, et **sur quoi on s'est déjà cassé les dents**. Les invariants de conception, eux, vivent
+dans [CLAUDE.md](CLAUDE.md).
 
 ## Reprendre en une minute
 
@@ -15,43 +19,32 @@ make jwt-keys                  # les clés ne sont pas versionnées
 make up                        # stack sur http://localhost:8080
 curl localhost:8080/health     # {"status":"ok","checks":{"database":"up"}}
 make test && make qa           # tout doit être vert avant d'écrire une ligne
-git log --oneline              # les commits racontent l'ordre d'implémentation
+gh issue list --milestone "Lot 2 — Training"   # ce sur quoi on travaille
 ```
 
-`make install` enchaîne tout ça. La règle qui prime sur les autres est en tête de
+`make install` enchaîne les quatre premières. La règle qui prime sur les autres est en tête de
 [CLAUDE.md](CLAUDE.md) : **on utilise ce que Symfony fournit**, et en cas de doute on demande.
 
-## Feuille de route
+## Comment on travaille
 
-| Lot | Contenu | État |
-|---|---|---|
-| 0 | Socle dockerisé, CI, barrières qualité, `GET /health` | ✅ |
-| 1 | **Identity** — inscription, login JWT, refresh tokens, profil + timezone | ✅ |
-| 1bis | Secrets purgés, Symfony 8.1, auth rendue au framework, social sign-in | ✅ |
-| 2 | **Training** — déclarer / démarrer / compléter une session, garde-fous | ⬜ |
-| 3 | **Progression** — ledger XP, courbe de niveaux, titres | ⬜ |
-| 4 | **RewardSummary** — premier jouable de bout en bout | ⬜ |
-| 5 | Streak | ⬜ |
-| 6 | Loot | ⬜ |
-| 7 | Arbres de compétences | ⬜ |
-| 8 | Classements | ⬜ |
-| 9 | Durcissement (rate limiting, observabilité, OpenAPI publié) | ⬜ |
+Une feature = un ticket = une branche = une PR qui ferme le ticket (`Closes #42`). On prend un
+ticket à la fois, dans le jalon courant. Les lots restent l'ordre général — Training avant
+Progression avant RewardSummary — mais l'unité de travail est le ticket, pas le lot.
+
+Un choix structurant tranché en cours de route se note **ici**, dans « Décisions prises ». Un
+piège qui a coûté une heure se note **ici**, dans « Pièges déjà rencontrés ». Le reste (état,
+priorité, périmètre) reste sur le tableau.
+
+| Jalon | Module dominant |
+|---|---|
+| Lot 0 — Socle · Lot 1 — Identity | ✅ terminés |
+| Lot 2 — Training | `Training`, `Shared` (idempotence) |
+| Lot 3 — Progression | `Progression` |
+| Lot 4 — RewardSummary | premier jouable de bout en bout |
+| Lot 5 — Streak · Lot 6 — Loot · Lot 7 — Arbres · Lot 8 — Classements | `Engagement`, `Rewards`, `Progression` |
+| Lot 9 — Durcissement | transverse, plus les deux dettes du Lot 1bis |
 
 Strava arrive après, comme simple adapter d'`ActivitySource` — jamais avant.
-
-## En cours
-
-Rien. Prochain lot à démarrer : **Lot 2 — Training**.
-
-Deux dettes ouvertes, petites et connues :
-
-- **Timing du login.** L'ancien `LogInHandler` hachait à vide sur adresse inconnue pour égaliser
-  les temps de réponse. `json_login` ne le fait pas : le corps et le statut restent
-  indistinguables, la durée non. À traiter au Lot 9 (durcissement), probablement avec le rate
-  limiter, qui rend la mesure statistique bien plus coûteuse.
-- **Aucun appel réel à Google ni Apple n'a été fait.** Le flux est testé de bout en bout contre
-  un stub ; il reste à poser de vrais `client_id` et la clé `.p8`, et à valider une fois avec
-  l'app iOS.
 
 ## Surface d'API
 
@@ -69,9 +62,9 @@ Deux dettes ouvertes, petites et connues :
 `register`, `login` et `social` rendent tous le même `AuthResource` : le client iOS n'a qu'un
 seul chemin de traitement.
 
-Toute erreur sort en `application/problem+json`, avec un `type` stable en
-kebab-case sous `https://grrind.app/problems/` — c'est là-dessus que le client iOS
-branche ses messages, jamais sur le `detail`.
+Toute erreur sort en `application/problem+json`, avec un `type` stable en kebab-case sous
+`https://grrind.app/problems/` — c'est là-dessus que le client iOS branche ses messages, jamais
+sur le `detail`.
 
 ## Décisions prises
 
@@ -100,7 +93,7 @@ Messenger arrivera pour l'asynchrone (classements, notifications), pas pour ajou
 indirection synchrone.
 
 **Lot 1 — pas d'`UnitOfWork` partagé.** Les repositories flushent eux-mêmes tant qu'une seule
-agrégat est touché. La transaction explicite arrivera au Lot 3, avec la complétion de session
+agrégat est touché. La transaction explicite arrivera au Lot 4, avec la complétion de session
 qui en a réellement besoin (verrou pessimiste, écritures multiples).
 
 **Lot 1bis — priorité à l'écosystème Symfony, et en cas de doute on demande.** C'est devenu la
@@ -134,6 +127,10 @@ le sien. On renvoie 409 et on laisse le vrai propriétaire se connecter par mot 
 **Lot 1bis — `.env` reste versionné, mais vide de tout secret.** C'est le fichier de défauts
 documenté par Flex ; le sortir du dépôt aurait cassé une convention pour rien. Ce qui change,
 c'est que les valeurs sensibles n'y sont plus : `make secrets` les génère hors du suivi.
+
+**Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
+module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
+ne le relisait pas.
 
 ## Pièges déjà rencontrés
 

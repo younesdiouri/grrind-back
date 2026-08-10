@@ -40,4 +40,9 @@ Un module ne connaît que `Shared` — Deptrac le vérifie en CI.
 
 Les invariants de conception (le serveur possède l'horloge, l'XP est un ledger append-only, un seul
 vocabulaire de modificateurs, RNG serveur auditable) sont détaillés dans [CLAUDE.md](CLAUDE.md).
-L'avancement lot par lot est dans [PROGRESS.md](PROGRESS.md).
+
+## Avancement
+
+Le suivi vit sur le [tableau GitHub](https://github.com/users/younesdiouri/projects/1) : un ticket
+par feature, un jalon par lot, un label par module. [PROGRESS.md](PROGRESS.md) garde ce qu'un
+tableau ne sait pas porter — les décisions structurantes et les pièges déjà rencontrés.

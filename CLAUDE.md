@@ -214,25 +214,34 @@ d'autorisation et envoie le code ; le serveur seul l'échange. La clé de liaiso
 **certifie** l'adresse — sinon c'est une prise de contrôle en une requête. Un compte créé ainsi
 n'a pas de mot de passe et ne peut pas passer par `/api/auth/login`.
 
-## État d'avancement
+## Suivi du travail : le tableau GitHub, pas un fichier
 
-**Lot 0 — socle : fait.** FrankenPHP 8.4 + Symfony 7.4 + Postgres 17 sous Docker, Makefile comme
-point d'entrée unique, `GET /health` qui sonde la base, PHPStan niveau max, PHP-CS-Fixer,
-Deptrac et PHPUnit câblés et verts, workflow CI qui rejoue les mêmes barrières dans la même image.
+**L'avancement se suit sur https://github.com/users/younesdiouri/projects/1.** C'est la seule
+source de vérité sur ce qui reste à faire. Un ticket par feature, un **jalon** par lot, un
+**label** par module (`identity`, `training`, `progression`, `rewards`, `engagement`, `shared`,
+`infra`) et par nature (`dette`, `securite`, `contrat-api`).
 
-**Lot 1 — Identity : fait.** Inscription, login, refresh/logout, `GET` et `PATCH /api/me`,
-social sign-in Google et Apple. Erreurs en problem+json (RFC 9457) dans `Shared`, y compris les
-échecs d'authentification. `StringValueType` persiste n'importe quel value object qui sait se
-dire en une chaîne.
+Le CLI `gh` est disponible et c'est par lui que ça se passe :
 
-**Lot 1bis — remise à plat : fait.** Secrets purgés du dépôt et de son historique, montée en
-Symfony 8.1, authentification rendue au framework, social sign-in. Voir PROGRESS.md.
+```bash
+gh issue list --milestone "Lot 2 — Training"   # le jalon courant
+gh issue view 42                               # le périmètre exact d'un ticket
+gh issue list --label dette                    # ce qu'on s'est promis de rembourser
+```
 
-Reste : Lot 2 Training → Lot 3 moteur Progression → **Lot 4 RewardSummary (premier jouable)** →
-Lot 5 Streak → Lot 6 Loot → Lot 7 Arbres → Lot 8 Classements → Lot 9 durcissement.
-Strava arrive après, comme simple adapter d'`ActivitySource`.
+**On travaille ticket par ticket.** Avant d'écrire du code : lire le ticket, et si le périmètre a
+bougé, le mettre à jour plutôt que de dévier en silence. Une feature = un ticket = une branche =
+une PR qui le ferme (`Closes #42`). Ne pas ouvrir un chantier qui n'a pas de ticket — en créer un
+d'abord, avec le même soin que les autres.
 
-Le journal de bord détaillé — décisions, pièges rencontrés, prochaine étape — est dans
-[PROGRESS.md](PROGRESS.md). Le mapping Doctrine n'a **pas** d'`auto_mapping` : chaque module
-déclare le sien dans `config/packages/doctrine.yaml` au moment de son lot. Idem pour les layers
-Deptrac, déjà déclarés dans `deptrac.yaml` pour les six modules.
+Lots 0 et 1 (Identity) faits ; le reste est ouvert sur le tableau, dans l'ordre Training →
+Progression → **RewardSummary (premier jouable)** → Streak → Loot → Arbres → Classements →
+durcissement. Strava arrive après, comme simple adapter d'`ActivitySource`.
+
+[PROGRESS.md](PROGRESS.md) ne porte plus la feuille de route : il ne garde que ce qu'un tableau ne
+sait pas porter — les **décisions** structurantes et les **pièges** déjà rencontrés. Les deux
+sections se mettent à jour au fil de l'eau ; c'est là que va un choix tranché en cours de route.
+
+Le mapping Doctrine n'a **pas** d'`auto_mapping` : chaque module déclare le sien dans
+`config/packages/doctrine.yaml` au moment de son lot. Idem pour les layers Deptrac, déjà déclarés
+dans `deptrac.yaml` pour les six modules.
