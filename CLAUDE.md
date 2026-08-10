@@ -4,6 +4,42 @@ API du produit GRRIND : une app qui transforme le sport en RPG (XP, niveaux, tit
 compétences, loot, streak, ligues). Ce dépôt ne contient **que le back**. Le client est une app
 SwiftUI (dépôt/dossier séparé).
 
+## Règle n°0 : priorité à l'écosystème Symfony
+
+**Ce que Symfony fournit ne se réécrit pas.** Avant d'écrire une classe, la question est
+« le framework, ou un bundle de référence, sait-il déjà faire ça ? ». La réponse est oui plus
+souvent qu'on ne croit, et une abstraction maison par-dessus une abstraction du framework
+n'achète rien : elle coûte une classe à maintenir et une indirection à lire.
+
+L'ordre de préférence, sans exception tacite :
+
+1. **Le composant Symfony**, configuré. Security (firewalls, authenticators, providers, voters,
+   hachage), Validator, Serializer, Messenger, HttpClient, RateLimiter, Clock, Uid, Lock.
+2. **Le bundle de référence** de l'écosystème : Doctrine, LexikJWTAuthenticationBundle,
+   MakerBundle. `make console c="list make"` avant d'écrire un squelette à la main.
+3. **Le point d'extension prévu** quand le comportement standard ne suffit pas —
+   `UserLoaderInterface` sur un dépôt, un value resolver, un normalizer, un event listener.
+   Il y en a presque toujours un ; le chercher est plus rapide que le contourner.
+4. **Du code à nous**, en dernier, et alors on écrit *pourquoi* dans le fichier.
+
+**En cas de doute, demander.** Si deux chemins se valent (`json_login` contre un authenticator
+sur mesure, un port contre une dépendance directe), poser la question avec le compromis explicite
+plutôt que de trancher seul. C'est une règle, pas une politesse.
+
+Le skill **`symfony-docs`** (`.claude/skills/symfony-docs/SKILL.md`) existe pour ça : il consulte
+`symfony.com/doc/current` avant d'écrire, plutôt que de s'en remettre à des souvenirs de version.
+Les noms de services changent entre majeures, et les inventer échoue silencieusement.
+
+Ce que cette règle a déjà coûté quand on l'a ignorée, au Lot 1 : un value object `Email` avec
+`filter_var` là où `#[Assert\Email]` suffisait, un port `PasswordHasher` enveloppant
+`UserPasswordHasherInterface`, un `LogInHandler` vérifiant le mot de passe à la main au lieu de
+`json_login`, un `getRoles()` en dur. Quatorze classes supprimées à la refonte, aucun
+comportement perdu.
+
+Les rares ports qui restent se justifient un par un dans leur docblock. Il n'y en a qu'un dans
+Identity — `SocialProfileResolver`, parce qu'aucun test ne peut appeler Google et qu'aucune
+bibliothèque n'abstrait « code d'autorisation → profil ».
+
 ## Règle n°1 : tout passe par Docker
 
 Il n'y a **pas de PHP, Composer ou Symfony CLI installés sur la machine hôte**. Aucune commande
@@ -16,6 +52,7 @@ make up            # démarre la stack (http://localhost:8080)
 make sh            # shell dans le conteneur php
 make composer c="require foo/bar"
 make console c="debug:router"
+make secrets       # génère .env.local et .env.test.local — jamais versionnés
 make jwt-keys      # (re)génère la paire de clés JWT — jamais versionnée
 make migration     # génère une migration (à relire avant de l'appliquer)
 make migrate       # applique les migrations
@@ -31,10 +68,10 @@ Si une commande manque au Makefile, on l'ajoute au Makefile — on ne contourne 
 | Brique | Choix |
 |---|---|
 | Runtime | FrankenPHP (PHP 8.4), mode worker en prod |
-| Framework | Symfony 7.4 LTS |
+| Framework | Symfony 8.1 (on suit la stable courante, pas la LTS) |
 | Persistance | PostgreSQL 17 + Doctrine ORM 3 (migrations versionnées, jamais de `schema:update`) |
 | Async | Symfony Messenger, transport Doctrine (pattern outbox) |
-| Auth | JWT (LexikJWTAuthenticationBundle) + refresh tokens |
+| Auth | Firewall Symfony + JWT (LexikJWTAuthenticationBundle) + refresh tokens maison, social sign-in Google/Apple (league/oauth2-client) |
 | HTTP | Contrôleurs fins + DTO + Serializer. OpenAPI généré (source de vérité du contrat client iOS) |
 | Tests | PHPUnit — le moteur de jeu est testable sans aucune infra |
 | Qualité | PHPStan niveau max, PHP-CS-Fixer, Deptrac (frontières entre modules) |
@@ -141,8 +178,14 @@ Les rendements décroissants suppriment l'intérêt de tricher tout en étant un
   est un attribut de profil, pas une déduction.
 - Argent/ratios : jamais de float sur des valeurs de jeu persistées ; entiers ou décimaux.
 - Enums PHP natifs, backed, sur toutes les valeurs fermées.
-- Migrations Doctrine relues à la main, jamais générées-appliquées à l'aveugle.
+- Migrations Doctrine relues à la main, jamais générées-appliquées à l'aveugle. Le diff se
+  trompe : il propose `DROP` + `ADD` là où il faut un `RENAME`, et des `NOT NULL` sans défaut
+  qui échouent sur une table peuplée.
 - Réponses d'erreur en RFC 7807 (problem+details).
+- **Aucun secret versionné.** `.env` porte les défauts non sensibles et reste committé ; les
+  valeurs réelles vivent dans `.env.local` / `.env.test.local` (`make secrets`) en dev, et dans
+  l'environnement en prod. Les clés JWT et la clé `.p8` d'Apple ne sont ni versionnées ni
+  incluses dans l'image.
 
 ## Authentification
 
@@ -156,9 +199,20 @@ Le client détient deux jetons de nature différente :
 Seul le SHA-256 du refresh token est stocké. Le rejeu d'un jeton déjà consommé révoque toute la
 famille : on ne peut pas distinguer le voleur du vrai client qui a été doublé, donc on coupe.
 
-L'entité `User` n'implémente pas `UserInterface` — `SecurityUser` sert d'adaptateur, et le domaine
-ignore les rôles Symfony. Les contrôleurs authentifiés reçoivent le `User` du domaine directement,
-résolu depuis le jeton : **aucune route ne prend d'identifiant de compte en paramètre.**
+L'entité `User` **est** le `UserInterface` du firewall : pas d'adaptateur, une colonne `roles`,
+un enum `Role`. Le login passe par `json_login` — vérification du mot de passe, protection contre
+l'énumération de comptes et rehash opportuniste viennent du composant, pas de nous.
+
+L'identifiant de sécurité reste l'UUID et non l'e-mail : changer d'adresse n'invalide aucun jeton.
+C'est `UserLoaderInterface` sur le dépôt qui sert les deux firewalls — l'UUID du claim `sub` pour
+`^/api`, l'adresse normalisée pour le login. Les contrôleurs authentifiés reçoivent le `User` par
+`#[CurrentUser]` : **aucune route ne prend d'identifiant de compte en paramètre.**
+
+**Social sign-in.** `POST /api/auth/social/{google|apple}`. Le client natif mène l'écran
+d'autorisation et envoie le code ; le serveur seul l'échange. La clé de liaison est le couple
+(fournisseur, `sub`), jamais l'adresse. Rattacher un compte préexistant exige que le fournisseur
+**certifie** l'adresse — sinon c'est une prise de contrôle en une requête. Un compte créé ainsi
+n'a pas de mot de passe et ne peut pas passer par `/api/auth/login`.
 
 ## État d'avancement
 
@@ -166,9 +220,13 @@ résolu depuis le jeton : **aucune route ne prend d'identifiant de compte en par
 point d'entrée unique, `GET /health` qui sonde la base, PHPStan niveau max, PHP-CS-Fixer,
 Deptrac et PHPUnit câblés et verts, workflow CI qui rejoue les mêmes barrières dans la même image.
 
-**Lot 1 — Identity : fait.** Inscription, login, refresh/logout, `GET` et `PATCH /api/me`.
-Erreurs en problem+json (RFC 9457) dans `Shared`, y compris les échecs d'authentification.
-`StringValueType` persiste n'importe quel value object qui sait se dire en une chaîne.
+**Lot 1 — Identity : fait.** Inscription, login, refresh/logout, `GET` et `PATCH /api/me`,
+social sign-in Google et Apple. Erreurs en problem+json (RFC 9457) dans `Shared`, y compris les
+échecs d'authentification. `StringValueType` persiste n'importe quel value object qui sait se
+dire en une chaîne.
+
+**Lot 1bis — remise à plat : fait.** Secrets purgés du dépôt et de son historique, montée en
+Symfony 8.1, authentification rendue au framework, social sign-in. Voir PROGRESS.md.
 
 Reste : Lot 2 Training → Lot 3 moteur Progression → **Lot 4 RewardSummary (premier jouable)** →
 Lot 5 Streak → Lot 6 Loot → Lot 7 Arbres → Lot 8 Classements → Lot 9 durcissement.

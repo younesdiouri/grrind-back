@@ -8,10 +8,14 @@ compétences, loot, streak, ligues. Le client SwiftUI vit dans un dépôt sépar
 Rien à installer à part Docker. Aucun PHP, Composer ou Symfony CLI n'est requis sur l'hôte.
 
 ```bash
-make install       # images, dépendances, clés JWT, base
+make install       # images, dépendances, secrets locaux, clés JWT, base
 make up            # http://localhost:8080
 curl localhost:8080/health
 ```
+
+Aucun secret n'est versionné. `make install` appelle `make secrets`, qui génère un
+`.env.local` et un `.env.test.local` propres à ton poste ; les clés JWT viennent de
+`make jwt-keys`. En production, tout cela arrive par l'environnement ou un secret monté.
 
 ```bash
 make               # liste toutes les cibles
@@ -22,8 +26,12 @@ make down
 
 ## Stack
 
-FrankenPHP (PHP 8.4) · Symfony 7.4 LTS · PostgreSQL 17 · Doctrine ORM 3 · PHPStan niveau max ·
+FrankenPHP (PHP 8.4) · Symfony 8.1 · PostgreSQL 17 · Doctrine ORM 3 · PHPStan niveau max ·
 Deptrac pour les frontières entre modules.
+
+La règle qui prime sur toutes les autres : **on utilise ce que Symfony fournit.** Un mécanisme
+qui existe dans le framework ou dans un bundle de référence ne se réécrit pas — voir la section
+correspondante de [CLAUDE.md](CLAUDE.md).
 
 ## Architecture
 
