@@ -1,0 +1,7 @@
+# La sonde d'idempotence n'est routée qu'en test : elle ne fait pas partie de l'API.
+# Sa raison d'être est dans la classe — le mécanisme est transverse et n'a pas encore
+# d'écriture métier à protéger.
+when@test:
+    test_idempotent_probe:
+        resource: '../../tests/Support/Http/'
+        type: attribute
