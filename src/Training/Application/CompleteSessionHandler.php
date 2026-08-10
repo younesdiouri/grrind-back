@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Training\Application;
 
+use App\Shared\Domain\Event\DomainEvent;
+use App\Shared\Domain\Event\TrainingSessionCompleted;
 use App\Training\Domain\Exception\SessionNotActive;
 use App\Training\Domain\Exception\SessionNotFound;
 use App\Training\Domain\Exception\SessionTooShort;
@@ -11,6 +13,7 @@ use App\Training\Domain\TrainingRules;
 use App\Training\Domain\TrainingSession;
 use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
 use Psr\Clock\ClockInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Clôt la séance et fige sa durée. C'est le moment qui compte du produit, et pour
@@ -28,6 +31,7 @@ final readonly class CompleteSessionHandler
         private TrainingSessionRepository $sessions,
         private ClockInterface $clock,
         private TrainingRules $rules,
+        private MessageBusInterface $events,
     ) {
     }
 
@@ -45,8 +49,40 @@ final readonly class CompleteSessionHandler
         // et le client apprend pourquoi dans le corps de l'erreur.
         $session->complete($this->clock->now(), $this->rules);
 
-        $this->sessions->commit();
+        // La séance et son événement dans un seul COMMIT : c'est l'outbox. Publier
+        // après coup perdrait l'événement si le processus meurt entre les deux ;
+        // publier avant annoncerait un fait encore annulable.
+        $this->sessions->transactional(function () use ($session): void {
+            $this->sessions->commit();
+            $this->events->dispatch(self::completionOf($session));
+        });
 
         return $session;
+    }
+
+    /**
+     * L'événement se construit ici, dans le module qui détient le fait — mais la classe
+     * vit dans `Shared`, sans quoi aucun autre module ne pourrait s'y abonner sans
+     * importer `Training`. C'est toute la convention, voir {@see DomainEvent}.
+     */
+    private static function completionOf(TrainingSession $session): TrainingSessionCompleted
+    {
+        $endedAt = $session->endedAt();
+        $durationSeconds = $session->durationSeconds();
+
+        // Une séance qui vient d'être complétée les porte toutes les deux ; les lire
+        // sans le dire laisserait un `null` filer dans le payload d'un abonné.
+        \assert(null !== $endedAt && null !== $durationSeconds);
+
+        return new TrainingSessionCompleted(
+            $session->id(),
+            $session->userId(),
+            $session->discipline(),
+            $session->startedAt(),
+            $endedAt,
+            $durationSeconds,
+            $session->source(),
+            $session->trust(),
+        );
     }
 }

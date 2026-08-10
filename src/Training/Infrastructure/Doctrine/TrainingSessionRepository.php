@@ -149,4 +149,22 @@ class TrainingSessionRepository extends ServiceEntityRepository
     {
         $this->getEntityManager()->flush();
     }
+
+    /**
+     * Exécute le travail dans une transaction unique.
+     *
+     * C'est ce qui rend l'outbox atomique : l'`INSERT` de l'événement, écrit par le
+     * transport Doctrine sur cette même connexion, partage le `COMMIT` de la séance. Un
+     * échec n'en laisse ni l'un ni l'autre.
+     *
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    public function transactional(callable $work): mixed
+    {
+        return $this->getEntityManager()->wrapInTransaction(static fn (): mixed => $work());
+    }
 }

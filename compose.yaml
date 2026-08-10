@@ -21,6 +21,26 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
 
+  # Le consommateur de l'outbox. Même image que `php` : c'est le même code, dans un autre
+  # rôle. `--time-limit` plutôt qu'un processus éternel — un worker PHP finit toujours par
+  # garder de la mémoire, et se faire relancer toutes les heures coûte moins cher que de
+  # chercher pourquoi. La stack le redémarre, y compris tant que `messenger_messages`
+  # n'existe pas : sur une installation neuve il boucle jusqu'au `make migrate`.
+  worker:
+    build:
+      context: .
+      target: dev
+    command: ['php', 'bin/console', 'messenger:consume', 'outbox', '--time-limit=3600', '-v']
+    environment:
+      APP_ENV: dev
+      DATABASE_URL: 'postgresql://grrind:grrind@database:5432/grrind?serverVersion=17&charset=utf8'
+    volumes:
+      - .:/app
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+
   database:
     image: postgres:17-alpine
     environment:
