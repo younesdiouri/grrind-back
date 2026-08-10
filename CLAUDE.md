@@ -231,8 +231,40 @@ gh issue list --label dette                    # ce qu'on s'est promis de rembou
 
 **On travaille ticket par ticket.** Avant d'écrire du code : lire le ticket, et si le périmètre a
 bougé, le mettre à jour plutôt que de dévier en silence. Une feature = un ticket = une branche =
-une PR qui le ferme (`Closes #42`). Ne pas ouvrir un chantier qui n'a pas de ticket — en créer un
-d'abord, avec le même soin que les autres.
+une PR qui le ferme. Ne pas ouvrir un chantier qui n'a pas de ticket — en créer un d'abord, avec
+le même soin que les autres.
+
+### Tout commit référence son ticket
+
+**Aucun commit sans numéro de ticket.** C'est ce qui relie le code à son intention : dans six mois,
+`git log` seul ne dira jamais *pourquoi*, le ticket si.
+
+Le dernier commit d'une feature porte un **mot-clé de fermeture**, pour que GitHub close le ticket
+tout seul à l'arrivée sur `main` — et le tableau le déplace en `Done` dans la foulée, le workflow
+« Item closed » du projet est actif.
+
+```
+feat(training): démarre une session sur l'horloge serveur
+
+Le client n'envoie que la discipline : startedAt vient de Shared\Clock,
+sinon l'antidatage est trivial.
+
+Closes #6
+```
+
+- **Mots-clés qui ferment** : `Closes`, `Fixes`, `Resolves` (+ leurs variantes `close`/`fixed`/…),
+  suivis de `#42`. Un par ticket fermé — `Closes #6, #7` ne ferme que le premier, il faut
+  `Closes #6` puis `Closes #7` sur des lignes séparées.
+- **La fermeture n'a lieu qu'à l'arrivée sur la branche par défaut.** Sur une branche de feature,
+  le mot-clé ne fait rien tant que ce n'est pas mergé dans `main` — c'est normal, pas un bug.
+- **Commit intermédiaire qui n'achève pas le ticket** : le référencer sans mot-clé, `Refs #6`. Il
+  apparaîtra dans le fil du ticket sans le fermer.
+- **Toucher à autre chose en passant** reste interdit : si ça n'est pas dans le ticket, ça mérite
+  son propre ticket, pas une ligne discrète dans un commit qui parle d'autre chose.
+
+Le format reste le conventionnel déjà en place — `feat(module):`, `fix(module):`, `refactor:`,
+`chore:`, `docs:`, `test:` — corps en français, à l'impératif, qui explique le *pourquoi* et pas
+le *quoi* (le diff le dit déjà).
 
 Lots 0 et 1 (Identity) faits ; le reste est ouvert sur le tableau, dans l'ordre Training →
 Progression → **RewardSummary (premier jouable)** → Streak → Loot → Arbres → Classements →
