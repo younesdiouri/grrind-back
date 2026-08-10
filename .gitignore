@@ -34,6 +34,10 @@ phpstan.neon
 /config/jwt/*.pem
 ###< lexik/jwt-authentication-bundle ###
 
+# Clé de signature Sign in with Apple. Comme les clés JWT : jamais versionnée,
+# montée depuis un secret en prod.
+/config/apple/*.p8
+
 ###> deptrac/deptrac ###
 /.deptrac.cache
 ###< deptrac/deptrac ###
