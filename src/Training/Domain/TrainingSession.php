@@ -8,6 +8,7 @@ use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\SessionSource;
 use App\Shared\Domain\Activity\TrustLevel;
 use App\Training\Domain\Exception\SessionNotActive;
+use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -31,7 +32,7 @@ use Symfony\Component\Uid\Uuid;
  * des *autres* séances du joueur et de la configuration de jeu ; ils s'appliquent une
  * couche au-dessus.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: TrainingSessionRepository::class)]
 #[ORM\Table(name: 'training_session')]
 #[ORM\Index(name: 'idx_training_session_user_started', columns: ['user_id', 'started_at'])]
 class TrainingSession

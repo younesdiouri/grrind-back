@@ -58,6 +58,7 @@ Strava arrive après, comme simple adapter d'`ActivitySource` — jamais avant.
 | `POST /api/auth/social/{google\|apple}` | code d'autorisation | 200, compte + jetons |
 | `GET /api/me` | Bearer | profil |
 | `PATCH /api/me` | Bearer | profil mis à jour |
+| `POST /api/training/sessions` | Bearer | 201, séance ouverte |
 
 `register`, `login` et `social` rendent tous le même `AuthResource` : le client iOS n'a qu'un
 seul chemin de traitement.
@@ -160,6 +161,23 @@ un 409 est un résultat, pas un incident.
 joueurs peuvent tirer la même valeur, et surtout une clé interceptée ne doit jamais rendre la
 réponse de quelqu'un d'autre. `Shared` obtient l'UUID du joueur par `getUserIdentifier()`, sans
 rien connaître d'`Identity`.
+
+**Lot 2 — un contrôleur de `Training` reçoit un `UserInterface`, pas un `User`.** Deptrac interdit
+à `Training` d'importer une entité d'`Identity`, et `#[CurrentUser]` accepte n'importe quelle
+implémentation de `UserInterface`. L'identifiant de sécurité étant l'UUID du compte, un
+`Uuid::fromString($user->getUserIdentifier())` suffit à savoir qui écrit — même mécanique que
+`IdempotencyListener` dans `Shared`, sans port ni dépendance croisée.
+
+L'autre chemin — un value resolver `#[CurrentPlayer]` injectant directement l'`Uuid` — n'est pas
+écarté, il est **différé** (#46). C'est le point d'extension prévu par Symfony, donc légitime au
+sens de la règle n°0, et l'invariant est déjà réécrit à deux endroits. Mais sur un seul contrôleur
+la classe coûterait plus à lire que la ligne qu'elle remplace : le déclencheur, c'est le deuxième
+ou troisième contrôleur de module de jeu, pas le premier.
+
+**Lot 2 — un champ de DTO à valeurs fermées se type par son enum, pas par `#[Assert\Choice]`.**
+Le Serializer refuse une valeur inconnue et `#[MapRequestPayload]` convertit cet échec de
+dénormalisation en violation, donc en 422 nommant le champ fautif — le contrat d'erreur du reste
+de l'API, sans dupliquer la liste des cas à côté de l'enum qui la porte déjà.
 
 **Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
