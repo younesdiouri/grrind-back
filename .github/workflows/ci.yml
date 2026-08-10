@@ -20,7 +20,10 @@ jobs:
       - name: Dépendances
         run: make composer c="install --no-interaction --no-progress"
 
-      # Les clés JWT ne sont pas versionnées : la CI génère les siennes.
+      # Aucun secret n'est versionné : la CI génère les siens, jetables, à chaque run.
+      - name: Secrets éphémères
+        run: make secrets
+
       - name: Clés JWT
         run: make jwt-keys
 

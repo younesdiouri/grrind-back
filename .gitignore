@@ -1,6 +1,12 @@
 .DS_Store
 /compose.override.yaml
 
+# Réglages d'IDE : propres à un poste, jamais partagés.
+/.idea/
+/.vscode/
+/.fleet/
+/nbproject/
+
 ###> symfony/framework-bundle ###
 /.env.local
 /.env.local.php

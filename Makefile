@@ -11,7 +11,7 @@ RUN_DB  := $(DC) run --rm php
 RUN_TEST := $(DC) run --rm -e APP_ENV=test php
 
 .DEFAULT_GOAL := help
-.PHONY: help build up down restart logs sh composer console cc jwt-keys migration migrate db-reset test qa phpstan cs cs-fix deptrac install
+.PHONY: help build up down restart logs sh composer console cc secrets jwt-keys migration migrate db-reset test qa phpstan cs cs-fix deptrac install
 
 help: ## Liste les commandes disponibles
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -34,8 +34,9 @@ logs: ## Suit les logs (s=service)
 sh: ## Ouvre un shell dans le conteneur php
 	$(DC) exec php sh
 
-install: build ## Installation initiale : images, dépendances, clés, base
+install: build ## Installation initiale : images, dépendances, secrets, clés, base
 	$(RUN) composer install
+	$(MAKE) secrets
 	$(MAKE) jwt-keys
 	$(MAKE) up
 	$(MAKE) db-reset
@@ -49,6 +50,21 @@ console: ## Console Symfony (c="cache:clear")
 
 cc: ## Vide le cache
 	$(RUN) bin/console cache:clear
+
+# Deux fichiers et pas un : Symfony ignore délibérément .env.local dans l'environnement
+# `test`, pour que la suite donne le même résultat chez tout le monde. Sans son pendant
+# .env.test.local, les tests tourneraient avec une passphrase vide et des clés chiffrées.
+# Les deux sont couverts par /.env.local et /.env.*.local dans .gitignore.
+secrets: ## Génère .env.local et .env.test.local (APP_SECRET, JWT_PASSPHRASE) — un jeu par poste
+	@if [ -f .env.local ]; then \
+		echo "  .env.local existe déjà — supprime-le (et .env.test.local) pour tout regénérer."; \
+	else \
+		app=$$(openssl rand -hex 16); jwt=$$(openssl rand -hex 32); \
+		for f in .env.local .env.test.local; do \
+			printf '# Généré par `make secrets`. Jamais versionné, jamais partagé.\n# Valeurs de développement : la prod fournit les siennes par l'"'"'environnement.\nAPP_SECRET=%s\nJWT_PASSPHRASE=%s\n' "$$app" "$$jwt" > $$f; \
+		done; \
+		echo "  .env.local et .env.test.local écrits. Enchaîne avec 'make jwt-keys' : la passphrase a changé."; \
+	fi
 
 jwt-keys: ## (Re)génère la paire de clés JWT — jamais versionnée, à refaire à chaque poste
 	$(RUN) bin/console lexik:jwt:generate-keypair --overwrite --no-interaction
