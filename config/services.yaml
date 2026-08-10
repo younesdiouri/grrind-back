@@ -4,6 +4,12 @@
 # Files in the packages/ subdirectory configure your dependencies.
 # See also https://symfony.com/doc/current/service_container/import.html
 
+# L'équilibrage du jeu est du config-as-code : il se relit et se modifie sans ouvrir de
+# PHP. `v1` est figé — au Lot 3, tout ce dossier sera hashé pour produire le
+# `rulesetVersion` stocké avec chaque transaction d'XP.
+imports:
+    - { resource: game/v1/training.yaml }
+
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
@@ -27,6 +33,15 @@ services:
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
+
+    # Les seuils d'une séance, depuis config/game/v1/training.yaml. Un paramètre absent
+    # casse la compilation du conteneur — l'équilibrage se valide au démarrage, pas à
+    # la première requête d'un joueur.
+    App\Training\Domain\TrainingRules:
+        arguments:
+            $minimumDurationSeconds: '%game.training.minimum_duration_seconds%'
+            $maximumDurationSeconds: '%game.training.maximum_duration_seconds%'
+            $cooldownSeconds: '%game.training.cooldown_seconds%'
 
     # Providers league/oauth2-client du social sign-in, câblés directement : le
     # bundle KnpU n'apporte que le flux de redirection en session, dont une API

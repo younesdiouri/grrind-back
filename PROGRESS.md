@@ -230,11 +230,49 @@ il découpe les pages. La séance active n'en a pas — son contrôleur appelle 
 parce qu'une classe qui relaierait un `findOneBy` est exactement l'indirection que la règle n°0
 demande de ne pas écrire.
 
+**Lot 2 — une clôture trop courte est refusée, pas requalifiée en abandon.** C'était la question
+ouverte du ticket #10. Refuser laisse la séance en cours : le joueur continue, ou renonce par
+`/abandon`, qui existe exactement pour ça. Requalifier déciderait à sa place et détruirait une
+séance qu'un appui malheureux à 4 min 59 aurait suffi à faire disparaître — entre deux options,
+celle qui ne détruit rien. L'erreur porte le temps restant, le client affiche « encore 2 min ».
+
+**Lot 2 — le plafond écrête, il ne rejette pas.** Un chrono oublié rend quatre heures créditées
+au lieu de tout perdre. Conséquence à connaître : `durationSeconds` peut être plus petit que
+`endedAt - startedAt`, et c'est lui qui fait foi — c'est ce que la séance *vaut*, pas ce que la
+montre a affiché.
+
+**Lot 2 — l'unicité de la séance active est garantie par un index unique partiel, pas par le
+contrôle applicatif.** `CREATE UNIQUE INDEX ... ON training_session (user_id) WHERE status =
+'ACTIVE'`. Entre le `SELECT` qui ne trouve rien et l'`INSERT`, deux requêtes simultanées passent
+toutes les deux : le contrôle applicatif ne sert qu'à rendre une erreur lisible dans le cas
+courant. Le perdant de la course est rattrapé sur `UniqueConstraintViolationException` et reçoit
+la même erreur — mais l'identifiant de la séance gagnante se relit **hors ORM**, l'échec du flush
+ayant fermé l'`EntityManager`.
+
+**Lot 2 — l'équilibrage vit en YAML dès maintenant.** `config/game/v1/training.yaml`, importé
+comme paramètres de conteneur et injecté dans `TrainingRules`. C'est le minimum qui tienne la
+promesse « pas de constantes en dur » sans écrire de chargeur : Symfony sait déjà lire du YAML, et
+un paramètre absent casse la compilation du conteneur plutôt que la première requête. Le vrai
+chargeur — validation, hash, `rulesetVersion` — arrive au Lot 3 et n'aura rien à déplacer.
+
 **Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
 ne le relisait pas.
 
 ## Pièges déjà rencontrés
+
+**Un index partiel se déclare tel que PostgreSQL le *relit*, casts compris.** Écrire
+`options: ['where' => "(status = 'ACTIVE')"]` dans le mapping produit un index correct, mais
+PostgreSQL stocke le prédicat normalisé — `((status)::text = 'ACTIVE'::text)` — et
+`doctrine:migrations:diff` compare deux chaînes : chaque diff reproposait un `DROP` + `CREATE`
+identique. La forme normalisée est dans le mapping, la forme lisible dans la migration. Vérifier
+qu'un diff est bien vide **après** avoir ajouté un index partiel.
+
+**Une horloge serveur qui ne se contourne pas rend les tests dépendants du temps réel.** Aucune
+route ne permet d'antidater, et les garde-fous parlent en minutes : impossible de clôturer une
+séance dans la seconde. La suite ne simule pas l'horloge — elle recule la séance *déjà écrite* en
+base (`TrainingSessions::ageSession()`). Le serveur continue de dater ce qu'il date ; on ne déplace
+que le passé, ce qui prouve le comportement avec la vraie heure plutôt qu'avec une fausse.
 
 **`.dockerignore` et le contexte de build.** `docker/` avait été exclu alors que le Dockerfile y
 prend les `php.ini` : le build cassait. Un `.dockerignore` écrit après un build réussi ne prouve
