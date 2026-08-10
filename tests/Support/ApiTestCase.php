@@ -8,6 +8,7 @@ use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Base des tests d'API. Chaque test part d'une base vide : les tables sont
@@ -61,6 +62,34 @@ abstract class ApiTestCase extends WebTestCase
         );
 
         return $this->client->getResponse();
+    }
+
+    /**
+     * Ouvre un compte et rend de quoi écrire en son nom. Passe par la vraie route
+     * d'inscription : un test d'écriture doit partir d'un jeton que le firewall
+     * accepte pour de bon, pas d'un utilisateur posé dans le conteneur.
+     */
+    protected function openAccount(string $email = 'bob@grrind.app', string $displayName = 'Bob'): Account
+    {
+        $response = $this->post('/api/auth/register', [
+            'email' => $email,
+            'password' => 'un-mot-de-passe-assez-long',
+            'displayName' => $displayName,
+            'timezone' => 'Europe/Paris',
+        ]);
+
+        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
+
+        $body = self::decode($response);
+        self::assertIsArray($body['user']);
+        self::assertIsArray($body['tokens']);
+        self::assertIsString($body['user']['id']);
+        self::assertIsString($body['tokens']['accessToken']);
+
+        return new Account(
+            Uuid::fromString($body['user']['id']),
+            ['Authorization' => 'Bearer '.$body['tokens']['accessToken']],
+        );
     }
 
     /**

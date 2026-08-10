@@ -61,3 +61,8 @@ when@test:
         # profil du code d'autorisation lui-même — voir la classe pour le pourquoi.
         App\Tests\Support\StubSocialProfileResolver: ~
         App\Identity\Application\SocialProfileResolver: '@App\Tests\Support\StubSocialProfileResolver'
+
+        # La sonde de l'idempotence : une route protégée pour la tester tant qu'aucune
+        # écriture métier ne l'est. Routée par config/routes/idempotency_probe.yaml.
+        App\Tests\Support\Http\:
+            resource: '../tests/Support/Http/'

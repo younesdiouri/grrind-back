@@ -143,6 +143,24 @@ par discipline.
 que deux paramètres indépendants : ça rend impossible `MANUAL_TIMER` + `PROVIDER_VERIFIED`, la
 combinaison dont personne n'a besoin et que tout le monde finit par écrire.
 
+**Lot 2 — la réservation d'une clé d'idempotence tient en une seule requête SQL.**
+`INSERT … ON CONFLICT … WHERE expires_at <= EXCLUDED.created_at`, avec `RETURNING`. Un `SELECT`
+puis un `INSERT` laisserait deux requêtes concurrentes passer toutes les deux, et la clause
+`WHERE` recycle une clé périmée sur place — sans elle, il faudrait qu'une purge soit passée avant
+qu'un client puisse réutiliser une clé. Écriture en DBAL et non par l'ORM : une violation de
+contrainte au `flush()` ferme l'EntityManager, et la requête métier qui suit ne pourrait plus
+rien écrire.
+
+**Lot 2 — une panne libère la clé, un refus métier la conserve.** Au-dessus de 500 on efface la
+réservation : garder une clé sur une action qui n'a rien écrit condamnerait le joueur à la même
+erreur pendant vingt-quatre heures. En dessous, la réponse est figée et rejouée telle quelle —
+un 409 est un résultat, pas un incident.
+
+**Lot 2 — la clé d'idempotence est scopée au compte.** L'unicité porte sur (user, clé) : deux
+joueurs peuvent tirer la même valeur, et surtout une clé interceptée ne doit jamais rendre la
+réponse de quelqu'un d'autre. `Shared` obtient l'UUID du joueur par `getUserIdentifier()`, sans
+rien connaître d'`Identity`.
+
 **Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
 ne le relisait pas.
@@ -198,6 +216,16 @@ ne la voie. D'où un `LoginController` qui ne fait que lever — il n'est jamais
 **Le diff Doctrine ne sait pas renommer une colonne.** Il propose `DROP` puis `ADD`, ce qui aurait
 effacé tous les hachages de mots de passe, et un `ADD … NOT NULL` sans défaut qui échoue sur une
 table peuplée. Relire chaque migration avant de l'appliquer n'est pas une précaution de style.
+
+**Les chemins de `config/routes/*.yaml` n'interpolent pas les paramètres du conteneur.**
+`%kernel.project_dir%/tests/…` y reste littéral et échoue en « file does not exist » — le loader
+de routes résout relativement au fichier qui importe, donc `../../tests/…`.
+
+**phpstan-doctrine ne tient pas une propriété d'entité pour écrite par l'ORM.** Une entité
+hydratée mais jamais construite en PHP déclenche un `property.onlyRead` par champ, au niveau max.
+Brancher `doctrine.objectManagerLoader` n'y change rien : l'extension attend que le code écrive
+ses entités. Le remède est un constructeur — ce qui, au passage, remet les règles (identifiant,
+péremption) dans l'entité plutôt que dans la requête SQL qui l'écrit.
 
 **Le `KernelBrowser` redémarre le noyau entre deux requêtes.** Un service bouchon programmé
 depuis le test est donc remis à zéro avant d'être consommé. Pour le social sign-in, le stub
