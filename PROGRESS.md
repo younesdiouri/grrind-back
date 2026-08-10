@@ -59,6 +59,7 @@ Strava arrive après, comme simple adapter d'`ActivitySource` — jamais avant.
 | `GET /api/me` | Bearer | profil |
 | `PATCH /api/me` | Bearer | profil mis à jour |
 | `POST /api/training/sessions` | Bearer | 201, séance ouverte |
+| `POST /api/training/sessions/{id}/complete` | Bearer + `Idempotency-Key` | 200, séance close |
 
 `register`, `login` et `social` rendent tous le même `AuthResource` : le client iOS n'a qu'un
 seul chemin de traitement.
@@ -179,6 +180,18 @@ Le Serializer refuse une valeur inconnue et `#[MapRequestPayload]` convertit cet
 dénormalisation en violation, donc en 422 nommant le champ fautif — le contrat d'erreur du reste
 de l'API, sans dupliquer la liste des cas à côté de l'enum qui la porte déjà.
 
+**Lot 2 — une séance ouverte et une séance close sont une seule forme.** `endedAt` et
+`durationSeconds` sont dans `TrainingSessionResource` dès l'ouverture, à `null`, toujours présents
+et jamais omis. Le client iOS décode un seul type ; deux DTO auraient divergé, et un champ qui
+apparaît et disparaît finit lu de travers. C'est le même argument que pour `source` et `trust`.
+Ce que le Lot 4 ajoutera décrit une *récompense*, pas une séance : ça ira dans `RewardSummary`.
+
+**Lot 2 — le propriétaire est une condition de la recherche, pas un contrôle qui suit.**
+`TrainingSessionRepository::ofPlayer(userId, sessionId)` : aucun chemin de code ne charge la séance
+d'un autre compte avant de se demander s'il en avait le droit, donc aucun ne peut oublier de
+vérifier. Et la séance d'autrui rend 404, pas 403 — un 403 confirmerait son existence, et un
+identifiant s'essaie en boucle.
+
 **Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
 ne le relisait pas.
@@ -244,6 +257,13 @@ hydratée mais jamais construite en PHP déclenche un `property.onlyRead` par ch
 Brancher `doctrine.objectManagerLoader` n'y change rien : l'extension attend que le code écrive
 ses entités. Le remède est un constructeur — ce qui, au passage, remet les règles (identifiant,
 péremption) dans l'entité plutôt que dans la requête SQL qui l'écrit.
+
+**Un problem details a déjà un membre `status`, et les extensions ne l'écrasent pas.**
+`SessionNotActive` mettait le statut de la séance sous la clé `status` : le `+` de `ProblemDetails`
+donne la priorité aux membres standard, donc le `409` gagnait et le statut réel disparaissait
+silencieusement de la réponse — exactement ce que l'erreur était censée apprendre au client. La
+clé s'appelle `sessionStatus`. Le test de domaine ne pouvait pas le voir : la collision n'existe
+qu'une fois l'exception sérialisée. Vérifier le **corps** d'une erreur, pas seulement son code.
 
 **Le `KernelBrowser` redémarre le noyau entre deux requêtes.** Un service bouchon programmé
 depuis le test est donc remis à zéro avant d'être consommé. Pour le social sign-in, le stub

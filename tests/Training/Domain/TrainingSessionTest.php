@@ -118,7 +118,7 @@ final class TrainingSessionTest extends TestCase
             self::fail('Une séance close ne peut plus changer d\'état.');
         } catch (SessionNotActive $error) {
             self::assertSame('session-not-active', $error->type());
-            self::assertSame($status->value, $error->context()['status']);
+            self::assertSame($status->value, $error->context()['sessionStatus']);
         }
 
         // Le refus ne laisse rien derrière lui : ni date de fin réécrite, ni statut modifié.
