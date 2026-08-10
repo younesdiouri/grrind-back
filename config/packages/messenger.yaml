@@ -1,0 +1,31 @@
+# L'outbox : les événements de domaine partent en base, dans la transaction qui écrit le
+# fait, et un worker les distribue ensuite.
+#
+# Le transport Doctrine n'est pas un pis-aller en attendant « un vrai broker ». C'est
+# précisément ce qui rend la publication atomique : un `INSERT` dans `messenger_messages`
+# participe au `COMMIT` de la séance. Avec un broker externe, publier après le commit
+# perd l'événement si le processus meurt entre les deux, et publier avant l'annonce un
+# fait qui peut encore être annulé. Ici, les deux tiennent ou aucun.
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            outbox:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                # Une séance terminée reste vraie : ce qui échoue mérite d'être retenté,
+                # avec une attente qui double pour laisser passer une panne de base.
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 3
+
+            # Après trois échecs, le message est mis de côté plutôt que perdu :
+            # `messenger:failed:show` dit ce qui s'est passé, `:retry` le rejoue.
+            failed: 'doctrine://default?queue_name=failed&auto_setup=0'
+
+        routing:
+            # Par l'interface, jamais classe par classe : un événement ajouté dans
+            # `Shared\Domain\Event` est routé du seul fait qu'il l'implémente, et on ne
+            # découvre pas trois lots plus tard qu'un message est resté synchrone.
+            App\Shared\Domain\Event\DomainEvent: outbox

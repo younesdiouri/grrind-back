@@ -81,3 +81,8 @@ when@test:
         # écriture métier ne l'est. Routée par config/routes/idempotency_probe.yaml.
         App\Tests\Support\Http\:
             resource: '../tests/Support/Http/'
+
+        # Le module tiers de service : un abonné aux événements de domaine qui ne
+        # connaît pas leur émetteur. Il vérifie que la chaîne complète tient.
+        App\Tests\Support\Messaging\:
+            resource: '../tests/Support/Messaging/'

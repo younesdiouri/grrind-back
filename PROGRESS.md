@@ -255,6 +255,21 @@ promesse « pas de constantes en dur » sans écrire de chargeur : Symfony sait 
 un paramètre absent casse la compilation du conteneur plutôt que la première requête. Le vrai
 chargeur — validation, hash, `rulesetVersion` — arrive au Lot 3 et n'aura rien à déplacer.
 
+**Lot 2 — les événements de domaine vivent dans `Shared`, pas chez leur émetteur.** Un événement
+qui franchit une frontière de module *est* le contrat entre les deux : le laisser dans
+`Training\Domain\Event` obligerait `Progression` à importer une classe de `Training`, exactement la
+dépendance que Deptrac refuse. Convention complète — nommage au passé, payload de scalaires et
+d'enums, abonnement par `#[AsMessageHandler]` — dans le docblock de `Shared\Domain\Event\DomainEvent`.
+Le routage Messenger porte sur **l'interface** : un événement ajouté est routé du seul fait qu'il
+l'implémente, plutôt qu'on découvre trois lots plus tard qu'il est resté synchrone.
+
+**Lot 2 — l'outbox est en base parce que c'est ce qui la rend atomique.** Le transport Doctrine
+n'est pas un pis-aller en attendant un vrai broker : l'`INSERT` du message partage la transaction
+et le `COMMIT` de la séance. Publier après le commit perd l'événement si le processus meurt entre
+les deux ; publier avant annonce un fait encore annulable. `TrainingSessionRepository::transactional()`
+enveloppe les deux écritures, et `auto_setup=0` — la table vient d'une migration relue, la règle
+vaut aussi pour les tables qu'on n'écrit pas soi-même.
+
 **Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
 ne le relisait pas.
@@ -267,6 +282,10 @@ PostgreSQL stocke le prédicat normalisé — `((status)::text = 'ACTIVE'::text)
 `doctrine:migrations:diff` compare deux chaînes : chaque diff reproposait un `DROP` + `CREATE`
 identique. La forme normalisée est dans le mapping, la forme lisible dans la migration. Vérifier
 qu'un diff est bien vide **après** avoir ajouté un index partiel.
+
+**Le worker redémarre en boucle tant que `messenger_messages` n'existe pas.** Le service `worker`
+de `compose.yaml` démarre avec la stack ; sur une base fraîche, `make up` avant `make migrate` le
+laisse en `Restarting`. Ce n'est pas une panne — il se stabilise dès la migration appliquée.
 
 **Une horloge serveur qui ne se contourne pas rend les tests dépendants du temps réel.** Aucune
 route ne permet d'antidater, et les garde-fous parlent en minutes : impossible de clôturer une
