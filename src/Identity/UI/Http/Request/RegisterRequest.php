@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Identity\UI\Http\Request;
 
-use App\Identity\Domain\Email;
 use App\Identity\Domain\User;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -21,7 +20,7 @@ final readonly class RegisterRequest
         // rien demander : refuser l'adresse pour ça serait un bug de notre côté.
         #[Assert\NotBlank(normalizer: 'trim')]
         #[Assert\Email(normalizer: 'trim')]
-        #[Assert\Length(max: Email::MAX_LENGTH, normalizer: 'trim')]
+        #[Assert\Length(max: User::EMAIL_MAX_LENGTH, normalizer: 'trim')]
         public string $email = '',
         // La longueur est le facteur qui compte vraiment ; le plafond n'est là que
         // pour qu'un mot de passe d'un mégaoctet ne parte pas au hachage.

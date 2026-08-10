@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
-use App\Identity\Domain\RefreshTokenRepository;
 use App\Identity\Domain\RefreshTokenSecret;
+use App\Identity\Infrastructure\Doctrine\RefreshTokenRepository;
 use InvalidArgumentException;
 use Psr\Clock\ClockInterface;
 

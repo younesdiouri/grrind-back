@@ -4,25 +4,28 @@ declare(strict_types=1);
 
 namespace App\Identity\UI\Http;
 
-use App\Identity\Application\LogIn;
-use App\Identity\Application\LogInHandler;
-use App\Identity\UI\Http\Request\LoginRequest;
-use App\Identity\UI\Http\Response\AuthResource;
+use LogicException;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 
+/**
+ * Le login n'a pas de code : il est entièrement traité par l'authenticator
+ * `json_login` du firewall (voir config/packages/security.yaml). Vérification du
+ * mot de passe, protection contre l'énumération, rehash opportuniste et réponse
+ * d'erreur viennent du composant Security — c'est exactement ce qu'on ne veut
+ * pas réécrire.
+ *
+ * La route existe quand même parce que le routeur passe *avant* le firewall
+ * (priorité 32 contre 8) : sans elle, la requête finirait en 404 avant que
+ * l'authenticator ne la voie. C'est le montage documenté par Symfony.
+ *
+ * La réponse en cas de succès est composée par `AuthenticationResponseListener`.
+ */
 final readonly class LoginController
 {
-    public function __construct(private LogInHandler $logIn)
-    {
-    }
-
     #[Route('/api/auth/login', name: 'identity_login', methods: ['POST'])]
-    public function __invoke(#[MapRequestPayload] LoginRequest $request): JsonResponse
+    public function __invoke(): JsonResponse
     {
-        $authenticated = ($this->logIn)(new LogIn($request->email, $request->password));
-
-        return new JsonResponse(AuthResource::from($authenticated)->toArray());
+        throw new LogicException('Cette route est interceptée par le firewall « login » : le contrôleur ne doit jamais être atteint.');
     }
 }

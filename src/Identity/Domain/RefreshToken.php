@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Domain;
 
+use App\Identity\Infrastructure\Doctrine\RefreshTokenRepository;
 use DateInterval;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
@@ -23,7 +24,7 @@ use Symfony\Component\Uid\Uuid;
  * aucun moyen de les distinguer. La seule réponse sûre est de révoquer la famille
  * et de forcer un vrai login.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: RefreshTokenRepository::class)]
 #[ORM\Table(name: 'identity_refresh_token')]
 #[ORM\UniqueConstraint(name: 'uniq_identity_refresh_token_hash', columns: ['token_hash'])]
 #[ORM\Index(name: 'idx_identity_refresh_token_family', columns: ['family_id'])]

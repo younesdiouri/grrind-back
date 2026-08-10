@@ -5,43 +5,42 @@ declare(strict_types=1);
 namespace App\Identity\Infrastructure\Doctrine;
 
 use App\Identity\Domain\RefreshToken;
-use App\Identity\Domain\RefreshTokenRepository;
 use App\Identity\Domain\RefreshTokenSecret;
 use DateTimeImmutable;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\EntityRepository;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bridge\Doctrine\Types\UuidType;
-use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\Uid\Uuid;
 
-#[AsAlias(RefreshTokenRepository::class)]
-final readonly class DoctrineRefreshTokenRepository implements RefreshTokenRepository
+/**
+ * @extends ServiceEntityRepository<RefreshToken>
+ */
+class RefreshTokenRepository extends ServiceEntityRepository
 {
-    /**
-     * @var EntityRepository<RefreshToken>
-     */
-    private EntityRepository $repository;
-
-    public function __construct(private EntityManagerInterface $entityManager)
+    public function __construct(ManagerRegistry $registry)
     {
-        $this->repository = $entityManager->getRepository(RefreshToken::class);
+        parent::__construct($registry, RefreshToken::class);
     }
 
     public function ofSecret(RefreshTokenSecret $secret): ?RefreshToken
     {
-        return $this->repository->findOneBy(['tokenHash' => $secret->hash()]);
+        return $this->findOneBy(['tokenHash' => $secret->hash()]);
     }
 
     public function add(RefreshToken $token): void
     {
-        $this->entityManager->persist($token);
+        $this->getEntityManager()->persist($token);
     }
 
+    /**
+     * Révoque toute la lignée d'un appareil. Appelé à la déconnexion, et sur
+     * détection de rejeu.
+     */
     public function revokeFamily(Uuid $familyId, DateTimeImmutable $now): void
     {
         // En DQL plutôt qu'en chargeant la famille : une famille ancienne peut
         // compter des dizaines de rotations, et on n'a rien à en faire ici.
-        $this->entityManager->createQuery(
+        $this->getEntityManager()->createQuery(
             'UPDATE '.RefreshToken::class.' t
              SET t.revokedAt = :now
              WHERE t.familyId = :family AND t.revokedAt IS NULL'
@@ -51,8 +50,12 @@ final readonly class DoctrineRefreshTokenRepository implements RefreshTokenRepos
             ->execute();
     }
 
+    /**
+     * Écrit les modifications en attente. La rotation touche deux jetons — celui
+     * qu'on consomme et celui qu'on émet — et doit être atomique.
+     */
     public function commit(): void
     {
-        $this->entityManager->flush();
+        $this->getEntityManager()->flush();
     }
 }

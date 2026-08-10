@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Identity\Domain\Exception;
 
-use App\Identity\Domain\Email;
 use App\Shared\Domain\Exception\ConflictError;
 
 final class EmailAlreadyUsed extends ConflictError
 {
-    public function __construct(Email $email)
+    public function __construct(string $email)
     {
-        parent::__construct(\sprintf('L\'adresse "%s" est déjà utilisée.', $email->toString()));
+        parent::__construct(\sprintf('L\'adresse "%s" est déjà utilisée.', $email));
     }
 
     public function type(): string

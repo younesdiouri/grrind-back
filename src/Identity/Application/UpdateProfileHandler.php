@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Identity\Application;
 
 use App\Identity\Domain\User;
-use App\Identity\Domain\UserRepository;
+use App\Identity\Infrastructure\Doctrine\UserRepository;
 use App\Shared\Domain\Timezone;
 
 final readonly class UpdateProfileHandler

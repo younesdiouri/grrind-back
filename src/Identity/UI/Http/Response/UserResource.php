@@ -26,7 +26,7 @@ final readonly class UserResource
     {
         return new self(
             $user->id()->toRfc4122(),
-            $user->email()->toString(),
+            $user->email(),
             $user->displayName(),
             $user->timezone()->toString(),
             $user->registeredAt()->format(DateTimeInterface::ATOM),

@@ -12,11 +12,15 @@ use App\Identity\UI\Http\Response\UserResource;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Le `User` est injecté par CurrentUserResolver à partir du jeton : aucune route
- * ne prend d'identifiant de compte en paramètre, donc aucune ne peut être détournée
- * pour lire le profil d'un autre.
+ * Le `User` vient de `#[CurrentUser]`, donc du jeton : aucune route ne prend
+ * d'identifiant de compte en paramètre, donc aucune ne peut être détournée pour
+ * lire le profil d'un autre.
+ *
+ * Le compte est relu à chaque requête par le provider — le firewall est stateless,
+ * rien n'est mis en session — donc un profil modifié entre deux appels est à jour.
  */
 final readonly class MeController
 {
@@ -25,13 +29,13 @@ final readonly class MeController
     }
 
     #[Route('/api/me', name: 'identity_me', methods: ['GET'])]
-    public function show(User $user): JsonResponse
+    public function show(#[CurrentUser] User $user): JsonResponse
     {
         return new JsonResponse(UserResource::from($user)->toArray());
     }
 
     #[Route('/api/me', name: 'identity_me_update', methods: ['PATCH'])]
-    public function update(User $user, #[MapRequestPayload] UpdateProfileRequest $request): JsonResponse
+    public function update(#[CurrentUser] User $user, #[MapRequestPayload] UpdateProfileRequest $request): JsonResponse
     {
         $updated = ($this->updateProfile)($user, new UpdateProfile($request->displayName, $request->timezone));
 

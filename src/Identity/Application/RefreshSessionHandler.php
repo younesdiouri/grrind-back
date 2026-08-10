@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
-use App\Identity\Domain\AccessTokenIssuer;
 use App\Identity\Domain\Exception\InvalidRefreshToken;
 use App\Identity\Domain\RefreshToken;
-use App\Identity\Domain\RefreshTokenRepository;
 use App\Identity\Domain\RefreshTokenSecret;
+use App\Identity\Infrastructure\Doctrine\RefreshTokenRepository;
 use InvalidArgumentException;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Psr\Clock\ClockInterface;
 
 final readonly class RefreshSessionHandler
 {
     public function __construct(
         private RefreshTokenRepository $refreshTokens,
-        private AccessTokenIssuer $accessTokens,
+        private JWTTokenManagerInterface $jwt,
         private ClockInterface $clock,
+        private int $accessTokenTtl,
     ) {
     }
 
@@ -59,8 +60,8 @@ final readonly class RefreshSessionHandler
         $user = $presented->user();
 
         return new AuthenticatedUser($user, new TokenPair(
-            $this->accessTokens->issueFor($user),
-            $this->accessTokens->lifetimeInSeconds(),
+            $this->jwt->create($user),
+            $this->accessTokenTtl,
             $secret->value,
             $rotated->expiresAt(),
         ));

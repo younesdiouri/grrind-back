@@ -9,7 +9,6 @@ doctrine:
         # écrit dans les #[Column] : il fait partie du schéma, il ne bouge plus.
         types:
             timezone: App\Shared\Infrastructure\Doctrine\Type\TimezoneType
-            email: App\Identity\Infrastructure\Doctrine\Type\EmailType
     orm:
         validate_xml_mapping: true
         naming_strategy: doctrine.orm.naming_strategy.underscore
