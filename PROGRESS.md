@@ -60,6 +60,7 @@ Strava arrive après, comme simple adapter d'`ActivitySource` — jamais avant.
 | `PATCH /api/me` | Bearer | profil mis à jour |
 | `POST /api/training/sessions` | Bearer | 201, séance ouverte |
 | `POST /api/training/sessions/{id}/complete` | Bearer + `Idempotency-Key` | 200, séance close |
+| `POST /api/training/sessions/{id}/abandon` | Bearer + `Idempotency-Key` | 200, séance abandonnée |
 
 `register`, `login` et `social` rendent tous le même `AuthResource` : le client iOS n'a qu'un
 seul chemin de traitement.
@@ -191,6 +192,20 @@ Ce que le Lot 4 ajoutera décrit une *récompense*, pas une séance : ça ira da
 d'un autre compte avant de se demander s'il en avait le droit, donc aucun ne peut oublier de
 vérifier. Et la séance d'autrui rend 404, pas 403 — un 403 confirmerait son existence, et un
 identifiant s'essaie en boucle.
+
+**Lot 2 — un abandon compte dans le cooldown, sauf sous la durée plancher.** C'était la question
+ouverte du ticket #8. Ne jamais le compter ferait de l'abandon le contournement du cooldown ; le
+compter toujours punirait le chronomètre lancé par erreur, qui est précisément ce que la route
+existe pour réparer. Donc : une séance abandonnée sous le plancher n'a jamais eu lieu et
+n'enclenche rien, au-delà elle enclenche le cooldown comme une séance complétée. Ça ne se triche
+pas — sous le plancher, il n'y avait rien à gagner. L'implémentation est au ticket #10, avec le
+reste des garde-fous ; la décision est prise ici pour qu'il n'ait plus qu'à l'appliquer.
+
+**Lot 2 — l'abandon est idempotent comme la clôture, alors même que rien ne se double.** Le ticket
+ne l'exigeait pas et l'abandon n'accorde rien : le doublon ne coûte rien au jeu. Il coûte au
+client. Sans clé, une requête perdue en route puis renvoyée rend un `409` — un échec affiché pour
+une action réussie. La clé fait de ce cas la non-opération qu'il est, et rend au `409` son seul
+sens utile : *une autre* requête a fermé cette séance entre-temps.
 
 **Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
