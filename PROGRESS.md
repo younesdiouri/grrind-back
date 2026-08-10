@@ -61,6 +61,8 @@ Strava arrive après, comme simple adapter d'`ActivitySource` — jamais avant.
 | `POST /api/training/sessions` | Bearer | 201, séance ouverte |
 | `POST /api/training/sessions/{id}/complete` | Bearer + `Idempotency-Key` | 200, séance close |
 | `POST /api/training/sessions/{id}/abandon` | Bearer + `Idempotency-Key` | 200, séance abandonnée |
+| `GET /api/training/sessions` | Bearer | 200, page d'historique + `nextCursor` |
+| `GET /api/training/sessions/active` | Bearer | 200 séance en cours, ou 204 |
 
 `register`, `login` et `social` rendent tous le même `AuthResource` : le client iOS n'a qu'un
 seul chemin de traitement.
@@ -206,6 +208,27 @@ ne l'exigeait pas et l'abandon n'accorde rien : le doublon ne coûte rien au jeu
 client. Sans clé, une requête perdue en route puis renvoyée rend un `409` — un échec affiché pour
 une action réussie. La clé fait de ce cas la non-opération qu'il est, et rend au `409` son seul
 sens utile : *une autre* requête a fermé cette séance entre-temps.
+
+**Lot 2 — la séance en cours a sa propre route, pas un champ de l'historique.**
+`GET /api/training/sessions/active`. Ce sont deux écrans, deux fréquences et deux tailles de
+réponse : adosser la séance active à la liste obligerait à charger une page d'historique au
+démarrage de l'app pour savoir si un chronomètre tourne, et poserait la question de ce que
+devient ce champ quand la liste est filtrée. Elle rend **204** quand rien ne tourne, pas 404 :
+n'avoir aucune séance en cours est l'état normal du joueur, et un 404 le ferait traiter dans la
+branche d'échec du client, où il se confondrait avec le vrai 404 des routes voisines.
+
+**Lot 2 — pagination par curseur sur l'UUID v7, sans total.** `?cursor=<uuid>&limit=n`, ordre
+`id DESC`, une ligne lue en plus pour savoir s'il y a une suite. C'est la raison d'être du choix
+de l'UUID v7 : l'ordre est dans l'identifiant, donc `id < :cursor` suffit — ni colonne d'ordre,
+ni `OFFSET` qui décalerait la page dès qu'une séance s'ouvre pendant le défilement. Pas de total
+non plus : un `COUNT(*)` par page pour une information dont un défilement infini n'a aucun usage.
+Le jour où une activité s'importera après coup (Strava), `startedAt` cessera de suivre l'ordre des
+identifiants et il faudra un curseur composite `(startedAt, id)`.
+
+**Lot 2 — la lecture n'a pas de handler quand elle n'a pas de règle.** L'historique en a un :
+il découpe les pages. La séance active n'en a pas — son contrôleur appelle le dépôt directement,
+parce qu'une classe qui relaierait un `findOneBy` est exactement l'indirection que la règle n°0
+demande de ne pas écrire.
 
 **Le suivi passe sur le tableau GitHub.** Un ticket par feature, un jalon par lot, un label par
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
