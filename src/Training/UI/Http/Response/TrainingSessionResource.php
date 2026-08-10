@@ -15,8 +15,14 @@ use DateTimeInterface;
  * `MANUAL_TIMER` / `DECLARED` : le client iOS doit apprendre à les lire maintenant,
  * pour que l'arrivée de Strava n'ajoute pas de champ au contrat.
  *
- * Ce que la clôture produira — durée, XP, loot — n'a pas sa place ici : à l'ouverture,
- * ces valeurs n'existent pas encore.
+ * Le même argument vaut pour `endedAt` et `durationSeconds`, `null` tant que la séance
+ * court : une séance ouverte et une séance close sont **une seule forme**, décodée par
+ * un seul type côté client, plutôt que deux à tenir en phase. Les champs sont toujours
+ * présents, jamais omis — un champ qui apparaît et disparaît est un champ qu'on finit
+ * par lire de travers.
+ *
+ * Ce que le Lot 4 ajoutera — XP, level ups, loot, streak — n'a rien à faire ici : ça
+ * décrit une *récompense*, pas une séance, et ça partira dans son propre `RewardSummary`.
  */
 final readonly class TrainingSessionResource
 {
@@ -27,6 +33,8 @@ final readonly class TrainingSessionResource
         public string $source,
         public string $trust,
         public string $startedAt,
+        public ?string $endedAt,
+        public ?int $durationSeconds,
     ) {
     }
 
@@ -39,11 +47,13 @@ final readonly class TrainingSessionResource
             $session->source()->value,
             $session->trust()->value,
             $session->startedAt()->format(DateTimeInterface::ATOM),
+            $session->endedAt()?->format(DateTimeInterface::ATOM),
+            $session->durationSeconds(),
         );
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, string|int|null>
      */
     public function toArray(): array
     {
@@ -54,6 +64,8 @@ final readonly class TrainingSessionResource
             'source' => $this->source,
             'trust' => $this->trust,
             'startedAt' => $this->startedAt,
+            'endedAt' => $this->endedAt,
+            'durationSeconds' => $this->durationSeconds,
         ];
     }
 }
