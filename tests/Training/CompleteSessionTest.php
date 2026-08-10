@@ -7,32 +7,38 @@ namespace App\Tests\Training;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\TrainingSessions;
 use DateTimeImmutable;
 use DateTimeInterface;
-use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
 final class CompleteSessionTest extends ApiTestCase
 {
+    use TrainingSessions;
+
     private const string KEY = 'd0f6b2c4-7a11-4e3c-9b8f-5c2a1e7d4406';
+
+    /**
+     * Une demi-heure de séance, comptée par le serveur seul.
+     */
+    private const int ELAPSED = 1800;
 
     public function testClosesTheSessionOnTheServerClock(): void
     {
         $bob = $this->openAccount();
-        $session = $this->startSession($bob);
+        $session = $this->runningSession($bob);
 
         $before = new DateTimeImmutable();
-        $response = $this->complete($bob, $session['id']);
+        $response = $this->complete($bob, $session);
         $after = new DateTimeImmutable();
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 
         $body = self::decode($response);
 
-        self::assertSame($session['id'], $body['id']);
+        self::assertSame($session, $body['id']);
         self::assertSame('COMPLETED', $body['status']);
-        self::assertSame($session['startedAt'], $body['startedAt']);
 
         self::assertIsString($body['endedAt']);
         $endedAt = DateTimeImmutable::createFromFormat(DateTimeInterface::ATOM, $body['endedAt']);
@@ -40,10 +46,11 @@ final class CompleteSessionTest extends ApiTestCase
         self::assertGreaterThanOrEqual($before->getTimestamp(), $endedAt->getTimestamp());
         self::assertLessThanOrEqual($after->getTimestamp(), $endedAt->getTimestamp());
 
-        // Ouverte et fermée dans la même seconde : la durée est mesurée, pas déclarée.
-        self::assertIsInt($body['durationSeconds']);
-        self::assertGreaterThanOrEqual(0, $body['durationSeconds']);
-        self::assertLessThanOrEqual($after->getTimestamp() - $before->getTimestamp() + 1, $body['durationSeconds']);
+        // La durée est celle que le serveur a mesurée entre ses deux dates à lui.
+        self::assertIsString($body['startedAt']);
+        $startedAt = new DateTimeImmutable($body['startedAt']);
+        self::assertSame($endedAt->getTimestamp() - $startedAt->getTimestamp(), $body['durationSeconds']);
+        self::assertEqualsWithDelta(self::ELAPSED, $body['durationSeconds'], 2);
     }
 
     /**
@@ -53,9 +60,9 @@ final class CompleteSessionTest extends ApiTestCase
     public function testIgnoresADurationSentByTheClient(): void
     {
         $bob = $this->openAccount();
-        $session = $this->startSession($bob);
+        $session = $this->runningSession($bob);
 
-        $response = $this->complete($bob, $session['id'], [
+        $response = $this->complete($bob, $session, [
             'durationSeconds' => 86400,
             'endedAt' => '2030-01-01T00:00:00+00:00',
         ]);
@@ -63,8 +70,7 @@ final class CompleteSessionTest extends ApiTestCase
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 
         $body = self::decode($response);
-        self::assertIsInt($body['durationSeconds']);
-        self::assertLessThan(60, $body['durationSeconds']);
+        self::assertEqualsWithDelta(self::ELAPSED, $body['durationSeconds'], 2);
         self::assertIsString($body['endedAt']);
         self::assertStringStartsNotWith('2030', $body['endedAt']);
     }
@@ -76,10 +82,10 @@ final class CompleteSessionTest extends ApiTestCase
     public function testReplayingTheSameKeyDoesNotCloseTheSessionTwice(): void
     {
         $bob = $this->openAccount();
-        $session = $this->startSession($bob);
+        $session = $this->runningSession($bob);
 
-        $first = $this->complete($bob, $session['id']);
-        $replayed = $this->complete($bob, $session['id']);
+        $first = $this->complete($bob, $session);
+        $replayed = $this->complete($bob, $session);
 
         self::assertSame(Response::HTTP_OK, $first->getStatusCode());
         self::assertSame(Response::HTTP_OK, $replayed->getStatusCode());
@@ -94,9 +100,9 @@ final class CompleteSessionTest extends ApiTestCase
     public function testDemandsTheIdempotencyKey(): void
     {
         $bob = $this->openAccount();
-        $session = $this->startSession($bob);
+        $session = $this->runningSession($bob);
 
-        $response = $this->post(\sprintf('/api/training/sessions/%s/complete', $session['id']), [], $bob->headers);
+        $response = $this->post(\sprintf('/api/training/sessions/%s/complete', $session), [], $bob->headers);
 
         self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
         self::assertProblem($response, 'idempotency-key-required');
@@ -109,10 +115,10 @@ final class CompleteSessionTest extends ApiTestCase
     public function testRefusesToCompleteAnAlreadyClosedSession(): void
     {
         $bob = $this->openAccount();
-        $session = $this->startSession($bob);
+        $session = $this->runningSession($bob);
 
-        $this->complete($bob, $session['id']);
-        $response = $this->complete($bob, $session['id'], key: 'une-autre-cle');
+        $this->complete($bob, $session);
+        $response = $this->complete($bob, $session, key: 'une-autre-cle');
 
         self::assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
         self::assertProblem($response, 'session-not-active');
@@ -122,7 +128,7 @@ final class CompleteSessionTest extends ApiTestCase
         $body = self::decode($response);
         self::assertSame(Response::HTTP_CONFLICT, $body['status']);
         self::assertSame('COMPLETED', $body['sessionStatus']);
-        self::assertSame($session['id'], $body['sessionId']);
+        self::assertSame($session, $body['sessionId']);
     }
 
     /**
@@ -134,19 +140,14 @@ final class CompleteSessionTest extends ApiTestCase
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
         $bob = $this->openAccount();
 
-        $hers = $this->startSession($alice);
-        $response = $this->complete($bob, $hers['id']);
+        $hers = $this->runningSession($alice);
+        $response = $this->complete($bob, $hers);
 
         self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
         self::assertProblem($response, 'session-not-found');
 
         // Et la séance d'Alice n'a pas bougé.
-        $connection = self::getContainer()->get('doctrine.dbal.default_connection');
-        self::assertInstanceOf(Connection::class, $connection);
-        self::assertSame(
-            'ACTIVE',
-            $connection->fetchOne('SELECT status FROM training_session WHERE id = :id', ['id' => $hers['id']]),
-        );
+        self::assertSame('ACTIVE', $this->statusOf($hers));
     }
 
     public function testAnUnknownSessionIsNotFound(): void
@@ -171,23 +172,16 @@ final class CompleteSessionTest extends ApiTestCase
     }
 
     /**
-     * @return array{id: string, startedAt: string}
+     * Une séance en cours depuis une demi-heure : au-dessus de la durée plancher, donc
+     * clôturable. Aucune route ne permet d'antidater — c'est le stockage qu'on recule,
+     * pas le comportement qu'on contourne. Voir {@see TrainingSessions}.
      */
-    private function startSession(Account $account): array
+    private function runningSession(Account $account): string
     {
-        $response = $this->post('/api/training/sessions', ['discipline' => 'RUNNING'], $account->headers);
-        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
+        $id = $this->startSession($account);
+        $this->ageSession($id, self::ELAPSED);
 
-        $session = self::decode($response);
-        self::assertIsString($session['id']);
-        self::assertIsString($session['startedAt']);
-
-        // Une séance qui court porte déjà les deux champs de clôture, à `null` : la
-        // forme ne change pas entre l'ouverture et la fermeture, seules les valeurs.
-        self::assertNull($session['endedAt']);
-        self::assertNull($session['durationSeconds']);
-
-        return ['id' => $session['id'], 'startedAt' => $session['startedAt']];
+        return $id;
     }
 
     /**

@@ -7,14 +7,16 @@ namespace App\Tests\Training;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\TrainingSessions;
 use DateTimeImmutable;
 use DateTimeInterface;
-use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
 final class AbandonSessionTest extends ApiTestCase
 {
+    use TrainingSessions;
+
     private const string KEY = '6a1c8f30-5d24-4b91-8e07-3f9b2d64c115';
 
     public function testClosesTheSessionWithoutCountingIt(): void
@@ -23,15 +25,14 @@ final class AbandonSessionTest extends ApiTestCase
         $session = $this->startSession($bob);
 
         $before = new DateTimeImmutable();
-        $response = $this->abandon($bob, $session['id']);
+        $response = $this->abandon($bob, $session);
         $after = new DateTimeImmutable();
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 
         $body = self::decode($response);
-        self::assertSame($session['id'], $body['id']);
+        self::assertSame($session, $body['id']);
         self::assertSame('ABANDONED', $body['status']);
-        self::assertSame($session['startedAt'], $body['startedAt']);
 
         self::assertIsString($body['endedAt']);
         $endedAt = DateTimeImmutable::createFromFormat(DateTimeInterface::ATOM, $body['endedAt']);
@@ -39,8 +40,8 @@ final class AbandonSessionTest extends ApiTestCase
         self::assertGreaterThanOrEqual($before->getTimestamp(), $endedAt->getTimestamp());
         self::assertLessThanOrEqual($after->getTimestamp(), $endedAt->getTimestamp());
 
-        // La durée est renseignée même sans XP à la clé : c'est elle qui dira, au Lot 2
-        // suivant, si l'abandon déclenche le cooldown ou s'il est passé sous le plancher.
+        // La durée est renseignée même sans XP à la clé : c'est elle qui dira si
+        // l'abandon enclenche le cooldown ou s'il est passé sous le plancher.
         self::assertIsInt($body['durationSeconds']);
         self::assertGreaterThanOrEqual(0, $body['durationSeconds']);
     }
@@ -54,14 +55,9 @@ final class AbandonSessionTest extends ApiTestCase
         $bob = $this->openAccount();
         $session = $this->startSession($bob);
 
-        $this->abandon($bob, $session['id']);
+        $this->abandon($bob, $session);
 
-        $connection = self::getContainer()->get('doctrine.dbal.default_connection');
-        self::assertInstanceOf(Connection::class, $connection);
-        self::assertSame(
-            'ABANDONED',
-            $connection->fetchOne('SELECT status FROM training_session WHERE id = :id', ['id' => $session['id']]),
-        );
+        self::assertSame('ABANDONED', $this->statusOf($session));
     }
 
     /**
@@ -73,8 +69,8 @@ final class AbandonSessionTest extends ApiTestCase
         $bob = $this->openAccount();
         $session = $this->startSession($bob);
 
-        $first = $this->abandon($bob, $session['id']);
-        $replayed = $this->abandon($bob, $session['id']);
+        $first = $this->abandon($bob, $session);
+        $replayed = $this->abandon($bob, $session);
 
         self::assertSame(Response::HTTP_OK, $first->getStatusCode());
         self::assertSame(Response::HTTP_OK, $replayed->getStatusCode());
@@ -88,7 +84,7 @@ final class AbandonSessionTest extends ApiTestCase
         $bob = $this->openAccount();
         $session = $this->startSession($bob);
 
-        $response = $this->post(\sprintf('/api/training/sessions/%s/abandon', $session['id']), [], $bob->headers);
+        $response = $this->post(\sprintf('/api/training/sessions/%s/abandon', $session), [], $bob->headers);
 
         self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
         self::assertProblem($response, 'idempotency-key-required');
@@ -102,29 +98,31 @@ final class AbandonSessionTest extends ApiTestCase
     {
         $bob = $this->openAccount();
         $session = $this->startSession($bob);
+        $this->ageSession($session, 1800);
 
-        $this->complete($bob, $session['id']);
-        $response = $this->abandon($bob, $session['id'], key: 'une-autre-cle');
+        self::assertSame(Response::HTTP_OK, $this->completeSession($bob, $session)->getStatusCode());
+        $response = $this->abandon($bob, $session, key: 'une-autre-cle');
 
         self::assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
         self::assertProblem($response, 'session-not-active');
 
         $body = self::decode($response);
         self::assertSame('COMPLETED', $body['sessionStatus']);
-        self::assertSame($session['id'], $body['sessionId']);
+        self::assertSame($session, $body['sessionId']);
     }
 
     /**
-     * L'inverse, qui compte tout autant : abandonner ne laisse pas la porte ouverte à une
-     * clôture tardive qui, elle, rapporterait de l'XP au Lot 4.
+     * L'inverse, qui compte tout autant : abandonner ne laisse pas la porte ouverte à
+     * une clôture tardive qui, elle, rapporterait de l'XP au Lot 4. Le refus vient du
+     * statut et non de la durée — l'ordre des contrôles compte.
      */
     public function testAnAbandonedSessionCannotBeCompletedAfterwards(): void
     {
         $bob = $this->openAccount();
         $session = $this->startSession($bob);
 
-        $this->abandon($bob, $session['id']);
-        $response = $this->complete($bob, $session['id'], key: 'une-autre-cle');
+        $this->abandon($bob, $session);
+        $response = $this->completeSession($bob, $session);
 
         self::assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
         self::assertProblem($response, 'session-not-active');
@@ -141,17 +139,11 @@ final class AbandonSessionTest extends ApiTestCase
         $bob = $this->openAccount();
 
         $hers = $this->startSession($alice);
-        $response = $this->abandon($bob, $hers['id']);
+        $response = $this->abandon($bob, $hers);
 
         self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
         self::assertProblem($response, 'session-not-found');
-
-        $connection = self::getContainer()->get('doctrine.dbal.default_connection');
-        self::assertInstanceOf(Connection::class, $connection);
-        self::assertSame(
-            'ACTIVE',
-            $connection->fetchOne('SELECT status FROM training_session WHERE id = :id', ['id' => $hers['id']]),
-        );
+        self::assertSame('ACTIVE', $this->statusOf($hers));
     }
 
     public function testAnUnknownSessionIsNotFound(): void
@@ -176,34 +168,13 @@ final class AbandonSessionTest extends ApiTestCase
     }
 
     /**
-     * @return array{id: string, startedAt: string}
+     * Clé fixe, contrairement à {@see TrainingSessions::abandonSession()} : c'est ici
+     * le sujet du test, le rejeu comme le recyclage de clé doivent être observables.
      */
-    private function startSession(Account $account): array
-    {
-        $response = $this->post('/api/training/sessions', ['discipline' => 'RUNNING'], $account->headers);
-        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
-
-        $session = self::decode($response);
-        self::assertIsString($session['id']);
-        self::assertIsString($session['startedAt']);
-
-        return ['id' => $session['id'], 'startedAt' => $session['startedAt']];
-    }
-
     private function abandon(Account $account, string $sessionId, string $key = self::KEY): Response
     {
-        return $this->close($account, $sessionId, 'abandon', $key);
-    }
-
-    private function complete(Account $account, string $sessionId, string $key = self::KEY): Response
-    {
-        return $this->close($account, $sessionId, 'complete', $key);
-    }
-
-    private function close(Account $account, string $sessionId, string $action, string $key): Response
-    {
         return $this->post(
-            \sprintf('/api/training/sessions/%s/%s', $sessionId, $action),
+            \sprintf('/api/training/sessions/%s/abandon', $sessionId),
             [],
             $account->headers + ['Idempotency-Key' => $key],
         );

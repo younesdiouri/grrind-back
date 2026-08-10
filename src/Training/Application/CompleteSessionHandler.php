@@ -6,6 +6,8 @@ namespace App\Training\Application;
 
 use App\Training\Domain\Exception\SessionNotActive;
 use App\Training\Domain\Exception\SessionNotFound;
+use App\Training\Domain\Exception\SessionTooShort;
+use App\Training\Domain\TrainingRules;
 use App\Training\Domain\TrainingSession;
 use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
 use Psr\Clock\ClockInterface;
@@ -25,21 +27,23 @@ final readonly class CompleteSessionHandler
     public function __construct(
         private TrainingSessionRepository $sessions,
         private ClockInterface $clock,
+        private TrainingRules $rules,
     ) {
     }
 
     /**
      * @throws SessionNotFound  la séance n'existe pas, ou n'est pas celle de ce joueur
      * @throws SessionNotActive la séance est déjà close
+     * @throws SessionTooShort  la séance n'a pas atteint la durée plancher
      */
     public function __invoke(CompleteSession $command): TrainingSession
     {
         $session = $this->sessions->ofPlayer($command->userId, $command->sessionId)
             ?? throw new SessionNotFound($command->sessionId);
 
-        // L'agrégat valide la transition ; s'il refuse, rien n'est écrit et le client
-        // apprend le statut réel dans le corps de l'erreur.
-        $session->complete($this->clock->now());
+        // L'agrégat valide la transition et les seuils ; s'il refuse, rien n'est écrit
+        // et le client apprend pourquoi dans le corps de l'erreur.
+        $session->complete($this->clock->now(), $this->rules);
 
         $this->sessions->commit();
 

@@ -8,7 +8,9 @@ use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\SessionSource;
 use App\Shared\Domain\Activity\TrustLevel;
 use App\Training\Domain\Exception\SessionNotActive;
+use App\Training\Domain\Exception\SessionTooShort;
 use App\Training\Domain\SessionStatus;
+use App\Training\Domain\TrainingRules;
 use App\Training\Domain\TrainingSession;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -65,7 +67,7 @@ final class TrainingSessionTest extends TestCase
     public function testCompletingFreezesTheDurationMeasuredByTheServer(): void
     {
         $session = self::started();
-        $session->complete(new DateTimeImmutable('2026-08-10T09:45:30+02:00'));
+        $session->complete(new DateTimeImmutable('2026-08-10T09:45:30+02:00'), self::rules());
 
         self::assertSame(SessionStatus::Completed, $session->status());
         self::assertSame(2730, $session->durationSeconds());
@@ -75,7 +77,7 @@ final class TrainingSessionTest extends TestCase
     public function testAbandoningClosesTheSessionWithoutErasingIt(): void
     {
         $session = self::started();
-        $session->abandon(new DateTimeImmutable('2026-08-10T09:02:00+02:00'));
+        $session->abandon(new DateTimeImmutable('2026-08-10T09:02:00+02:00'), self::rules());
 
         self::assertSame(SessionStatus::Abandoned, $session->status());
         // La durée est renseignée même sans XP à la clé : c'est elle qui dira si le
@@ -88,17 +90,69 @@ final class TrainingSessionTest extends TestCase
     {
         // Même instant écrit dans un autre fuseau : la durée ne bouge pas.
         $session = self::started();
-        $session->complete(new DateTimeImmutable('2026-08-10T07:30:00+00:00'));
+        $session->complete(new DateTimeImmutable('2026-08-10T07:30:00+00:00'), self::rules());
 
         self::assertSame(1800, $session->durationSeconds());
     }
 
+    /**
+     * Par l'abandon, seule voie sans plancher : c'est la seule façon d'observer une
+     * durée nulle, et le point à vérifier est qu'elle ne devienne jamais négative.
+     */
     public function testAClockGoingBackwardsCannotProduceANegativeDuration(): void
     {
         $session = self::started();
-        $session->complete(new DateTimeImmutable('2026-08-10T08:59:00+02:00'));
+        $session->abandon(new DateTimeImmutable('2026-08-10T08:59:00+02:00'), self::rules());
 
         self::assertSame(0, $session->durationSeconds());
+    }
+
+    /**
+     * Sous le plancher, la clôture est refusée et la séance reste intacte : le joueur
+     * continue ou renonce, mais rien n'est décidé à sa place.
+     */
+    public function testACompletionUnderTheFloorChangesNothing(): void
+    {
+        $session = self::started();
+
+        try {
+            $session->complete(new DateTimeImmutable('2026-08-10T09:04:00+02:00'), self::rules());
+            self::fail('Une séance sous le plancher ne peut pas être clôturée.');
+        } catch (SessionTooShort $error) {
+            self::assertSame('session-too-short', $error->type());
+            self::assertSame(240, $error->context()['elapsedSeconds']);
+            self::assertSame(60, $error->context()['remainingSeconds']);
+        }
+
+        self::assertSame(SessionStatus::Active, $session->status());
+        self::assertNull($session->endedAt());
+        self::assertNull($session->durationSeconds());
+    }
+
+    public function testTheDurationIsClippedAtTheCeilingRatherThanRejected(): void
+    {
+        $session = self::started();
+        $session->complete(new DateTimeImmutable('2026-08-11T09:00:00+02:00'), self::rules());
+
+        self::assertSame(SessionStatus::Completed, $session->status());
+        // Vingt-quatre heures de chronomètre oublié, quatre heures créditées — et la
+        // date de fin reste celle du serveur : c'est la durée retenue qui est écrêtée.
+        self::assertSame(14400, $session->durationSeconds());
+        self::assertEquals(new DateTimeImmutable('2026-08-11T09:00:00+02:00'), $session->endedAt());
+    }
+
+    public function testOnlyASessionAboveTheFloorCountsTowardTheCooldown(): void
+    {
+        $short = self::started();
+        $short->abandon(new DateTimeImmutable('2026-08-10T09:01:00+02:00'), self::rules());
+
+        $real = self::started();
+        $real->abandon(new DateTimeImmutable('2026-08-10T09:30:00+02:00'), self::rules());
+
+        self::assertFalse($short->countsTowardCooldown(self::rules()));
+        self::assertTrue($real->countsTowardCooldown(self::rules()));
+        // Une séance en cours n'a pas de durée, donc rien à compter.
+        self::assertFalse(self::started()->countsTowardCooldown(self::rules()));
     }
 
     /**
@@ -131,8 +185,8 @@ final class TrainingSessionTest extends TestCase
      */
     public static function closedTwice(): iterable
     {
-        $complete = static fn (TrainingSession $s, DateTimeImmutable $at) => $s->complete($at);
-        $abandon = static fn (TrainingSession $s, DateTimeImmutable $at) => $s->abandon($at);
+        $complete = static fn (TrainingSession $s, DateTimeImmutable $at) => $s->complete($at, self::rules());
+        $abandon = static fn (TrainingSession $s, DateTimeImmutable $at) => $s->abandon($at, self::rules());
 
         yield 'complétée puis complétée' => [$complete, $complete];
         yield 'complétée puis abandonnée' => [$complete, $abandon];
@@ -148,6 +202,16 @@ final class TrainingSessionTest extends TestCase
         $second = self::started()->id();
 
         self::assertLessThan(0, strcmp($first->toRfc4122(), $second->toRfc4122()));
+    }
+
+    /**
+     * Les seuils de `config/game/v1/training.yaml`, réaffirmés en dur : un test qui
+     * relit la configuration qu'il vérifie ne vérifie rien. Un rééquilibrage doit
+     * faire échouer cette suite et forcer à relire ce qu'il change.
+     */
+    private static function rules(): TrainingRules
+    {
+        return new TrainingRules(300, 14400, 900);
     }
 
     private static function started(): TrainingSession

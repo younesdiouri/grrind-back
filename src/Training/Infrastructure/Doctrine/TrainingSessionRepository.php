@@ -52,6 +52,52 @@ class TrainingSessionRepository extends ServiceEntityRepository
     }
 
     /**
+     * L'identifiant de la séance en cours, lu **hors ORM**.
+     *
+     * Cette méthode n'existe que pour le perdant d'une course : deux `POST /sessions`
+     * simultanés, l'index unique partiel en rejette un, et Doctrine ferme
+     * l'`EntityManager` sur l'échec du flush. Plus rien ne peut être chargé par lui —
+     * mais la connexion, elle, reste utilisable, et le client a besoin de l'identifiant
+     * de la séance gagnante pour s'y rebrancher.
+     */
+    public function activeIdOf(Uuid $userId): ?Uuid
+    {
+        $id = $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT id FROM training_session WHERE user_id = :userId AND status = :status',
+            ['userId' => $userId->toRfc4122(), 'status' => SessionStatus::Active->value],
+        );
+
+        return \is_string($id) ? Uuid::fromString($id) : null;
+    }
+
+    /**
+     * La dernière séance close **qui compte** pour le cooldown, ou `null`.
+     *
+     * Le filtre sur la durée est ce qui traduit la décision du ticket #8 : une séance
+     * abandonnée sous le plancher n'a pas eu lieu et n'enclenche pas d'attente. Il
+     * couvre aussi les complétions sans les nommer — une séance complétée est au-dessus
+     * du plancher par construction, la clôture l'exige.
+     */
+    public function lastCountedClosure(Uuid $userId, int $minimumDurationSeconds): ?TrainingSession
+    {
+        $previous = $this->createQueryBuilder('s')
+            ->where('s.userId = :userId')
+            ->andWhere('s.status != :active')
+            ->andWhere('s.durationSeconds >= :minimum')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->setParameter('active', SessionStatus::Active)
+            ->setParameter('minimum', $minimumDurationSeconds)
+            ->orderBy('s.endedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        \assert(null === $previous || $previous instanceof TrainingSession);
+
+        return $previous;
+    }
+
+    /**
      * L'historique du joueur, du plus récent au plus ancien, à partir du curseur.
      *
      * L'ordre est celui de l'UUID v7, triable par construction : c'est la raison du

@@ -6,12 +6,13 @@ namespace App\Tests\Training;
 
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
-use Doctrine\DBAL\Connection;
+use App\Tests\Support\TrainingSessions;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Uid\Uuid;
 
 final class ListSessionsTest extends ApiTestCase
 {
+    use TrainingSessions;
+
     public function testAnEmptyHistoryIsAnEmptyListAndNotAnError(): void
     {
         $bob = $this->openAccount();
@@ -25,9 +26,9 @@ final class ListSessionsTest extends ApiTestCase
     public function testTheMostRecentComeFirst(): void
     {
         $bob = $this->openAccount();
-        $first = $this->start($bob);
-        $second = $this->start($bob);
-        $third = $this->start($bob);
+        $first = $this->pastSession($bob);
+        $second = $this->pastSession($bob);
+        $third = $this->startSession($bob);
 
         self::assertSame([$third, $second, $first], $this->idsOf($this->history($bob)));
     }
@@ -40,14 +41,14 @@ final class ListSessionsTest extends ApiTestCase
     public function testWalksThePagesWithoutRepeatingNorSkipping(): void
     {
         $bob = $this->openAccount();
-        $all = array_reverse(array_map(fn (): string => $this->start($bob), range(1, 5)));
+        $all = array_reverse(array_map(fn (): string => $this->pastSession($bob), range(1, 5)));
 
         $firstPage = $this->history($bob, ['limit' => 2]);
         self::assertSame(\array_slice($all, 0, 2), $this->idsOf($firstPage));
         self::assertIsString($firstPage['nextCursor']);
         self::assertSame($all[1], $firstPage['nextCursor']);
 
-        $this->start($bob);
+        $this->startSession($bob);
 
         $secondPage = $this->history($bob, ['limit' => 2, 'cursor' => $firstPage['nextCursor']]);
         self::assertSame(\array_slice($all, 2, 2), $this->idsOf($secondPage));
@@ -62,12 +63,13 @@ final class ListSessionsTest extends ApiTestCase
 
     public function testFiltersOnStatus(): void
     {
+        // Dans cet ordre, et pas un autre : une seule séance tourne à la fois, donc
+        // celle qui reste ACTIVE est forcément la dernière ouverte.
         $bob = $this->openAccount();
-        $running = $this->start($bob);
-        $done = $this->start($bob);
-        $this->close($bob, $done, 'complete');
-        $dropped = $this->start($bob);
-        $this->close($bob, $dropped, 'abandon');
+        $done = $this->pastSession($bob);
+        $dropped = $this->startSession($bob);
+        $this->abandonSession($bob, $dropped);
+        $running = $this->startSession($bob);
 
         self::assertSame([$done], $this->idsOf($this->history($bob, ['status' => 'COMPLETED'])));
         self::assertSame([$dropped], $this->idsOf($this->history($bob, ['status' => 'ABANDONED'])));
@@ -77,8 +79,8 @@ final class ListSessionsTest extends ApiTestCase
     public function testFiltersOnDiscipline(): void
     {
         $bob = $this->openAccount();
-        $run = $this->start($bob);
-        $ride = $this->start($bob, 'CYCLING');
+        $run = $this->pastSession($bob);
+        $ride = $this->startSession($bob, 'CYCLING');
 
         self::assertSame([$run], $this->idsOf($this->history($bob, ['discipline' => 'RUNNING'])));
         self::assertSame([$ride], $this->idsOf($this->history($bob, ['discipline' => 'CYCLING'])));
@@ -92,8 +94,8 @@ final class ListSessionsTest extends ApiTestCase
     public function testFiltersOnADateWindow(): void
     {
         $bob = $this->openAccount();
-        $july = $this->start($bob);
-        $today = $this->start($bob);
+        $july = $this->pastSession($bob);
+        $today = $this->startSession($bob);
 
         $this->backdate($july, '2026-07-15T10:00:00+02:00');
 
@@ -113,8 +115,8 @@ final class ListSessionsTest extends ApiTestCase
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
         $bob = $this->openAccount();
 
-        $hers = $this->start($alice);
-        $his = $this->start($bob);
+        $hers = $this->startSession($alice);
+        $his = $this->startSession($bob);
 
         self::assertSame([$his], $this->idsOf($this->history($bob)));
         self::assertSame([$hers], $this->idsOf($this->history($alice)));
@@ -150,7 +152,7 @@ final class ListSessionsTest extends ApiTestCase
     public function testTheRunningSessionIsFoundInOneRequest(): void
     {
         $bob = $this->openAccount();
-        $session = $this->start($bob);
+        $session = $this->startSession($bob);
 
         $response = $this->get('/api/training/sessions/active', $bob->headers);
 
@@ -172,8 +174,9 @@ final class ListSessionsTest extends ApiTestCase
         self::assertSame(Response::HTTP_NO_CONTENT, $empty->getStatusCode());
         self::assertSame('', $empty->getContent());
 
-        $session = $this->start($bob);
-        $this->close($bob, $session, 'complete');
+        $session = $this->startSession($bob);
+        $this->ageSession($session, 1800);
+        $this->completeSession($bob, $session);
 
         // Close, elle ne « tourne » plus : le chronomètre du client ne doit pas repartir.
         self::assertSame(Response::HTTP_NO_CONTENT, $this->get('/api/training/sessions/active', $bob->headers)->getStatusCode());
@@ -184,7 +187,7 @@ final class ListSessionsTest extends ApiTestCase
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
         $bob = $this->openAccount();
 
-        $this->start($alice);
+        $this->startSession($alice);
 
         self::assertSame(Response::HTTP_NO_CONTENT, $this->get('/api/training/sessions/active', $bob->headers)->getStatusCode());
     }
@@ -228,36 +231,13 @@ final class ListSessionsTest extends ApiTestCase
         }, $page['sessions']);
     }
 
-    private function start(Account $account, string $discipline = 'RUNNING'): string
-    {
-        $response = $this->post('/api/training/sessions', ['discipline' => $discipline], $account->headers);
-        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
-
-        $id = self::decode($response)['id'];
-        self::assertIsString($id);
-
-        return $id;
-    }
-
-    private function close(Account $account, string $sessionId, string $action): void
-    {
-        $response = $this->post(
-            \sprintf('/api/training/sessions/%s/%s', $sessionId, $action),
-            [],
-            // Une clé neuve par appel : l'empreinte d'idempotence porte sur le chemin,
-            // donc recycler la même clé d'une séance à l'autre serait un abus de clé.
-            $account->headers + ['Idempotency-Key' => Uuid::v4()->toRfc4122()],
-        );
-
-        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
-    }
-
+    /**
+     * Une date de début absolue, là où {@see TrainingSessions::ageSession()} déplace
+     * relativement : la fenêtre se teste sur un mois nommé, pas sur « il y a longtemps ».
+     */
     private function backdate(string $sessionId, string $startedAt): void
     {
-        $connection = self::getContainer()->get('doctrine.dbal.default_connection');
-        self::assertInstanceOf(Connection::class, $connection);
-
-        $connection->executeStatement(
+        $this->connection()->executeStatement(
             'UPDATE training_session SET started_at = :startedAt WHERE id = :id',
             ['startedAt' => $startedAt, 'id' => $sessionId],
         );

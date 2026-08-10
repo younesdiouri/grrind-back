@@ -6,6 +6,7 @@ namespace App\Training\Application;
 
 use App\Training\Domain\Exception\SessionNotActive;
 use App\Training\Domain\Exception\SessionNotFound;
+use App\Training\Domain\TrainingRules;
 use App\Training\Domain\TrainingSession;
 use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
 use Psr\Clock\ClockInterface;
@@ -25,6 +26,7 @@ final readonly class AbandonSessionHandler
     public function __construct(
         private TrainingSessionRepository $sessions,
         private ClockInterface $clock,
+        private TrainingRules $rules,
     ) {
     }
 
@@ -37,7 +39,7 @@ final readonly class AbandonSessionHandler
         $session = $this->sessions->ofPlayer($command->userId, $command->sessionId)
             ?? throw new SessionNotFound($command->sessionId);
 
-        $session->abandon($this->clock->now());
+        $session->abandon($this->clock->now(), $this->rules);
 
         $this->sessions->commit();
 
