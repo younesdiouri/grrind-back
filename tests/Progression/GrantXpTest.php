@@ -17,7 +17,11 @@ use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
 use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Modifier\Modifier;
+use App\Shared\Domain\Modifier\ModifierSource;
+use App\Shared\Domain\Modifier\ModifierType;
 use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\ProgrammableModifiers;
 use DateTimeImmutable;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -32,8 +36,10 @@ use Symfony\Component\Uid\Uuid;
  * la ligne se crée d'elle-même au premier crédit, et que le verrou refuse de s'exécuter hors
  * transaction, où il ne verrouillerait rien.
  *
- * Le compte vient de la vraie route d'inscription : `DailyLoadProvider` a besoin d'un fuseau,
- * et il le lit à travers le port `PlayerTimezones`.
+ * C'est aussi ici que se prouvent les deux ports que le calcul traverse, parce qu'aucun test
+ * unitaire ne le peut : `PlayerTimezones`, dont `DailyLoadProvider` tire le fuseau du joueur,
+ * et `ModifierContributor`, par lequel les modules accordent leurs bonus. Le compte vient donc
+ * de la vraie route d'inscription plutôt que d'un utilisateur posé dans le conteneur.
  */
 final class GrantXpTest extends ApiTestCase
 {
@@ -139,6 +145,52 @@ final class GrantXpTest extends ApiTestCase
         self::assertSame(range(2, self::curve()->maxLevel()), $granted->levelsReached);
         self::assertSame($granted->snapshot->earnedSkillPoints(), $granted->skillPointsGranted);
         self::assertNull($granted->snapshot->xpToNextLevel());
+    }
+
+    public function testTheActiveModifiersCrossThePortAndReachTheLedger(): void
+    {
+        $player = $this->openAccount()->id;
+
+        // Ce qu'un module accordera au Lot 5 : le contributeur de test est tagué par la
+        // seule vertu d'implémenter le port, sans être câblé nulle part. C'est le
+        // branchement qui est éprouvé ici — un tag mal orthographié ne casse rien, il rend
+        // un ensemble vide, et le joueur est sous-payé en silence.
+        ProgrammableModifiers::grant(new Modifier(ModifierType::XpMultiplier, 20, ModifierSource::Streak));
+
+        $granted = ($this->grantXp)(new GrantXp($player, $sessionId = Uuid::v7(), Discipline::Running, 3600));
+
+        $lines = $granted->award->breakdown->lines;
+        self::assertSame(XpBreakdownSource::Base, $lines[0]->source);
+        self::assertSame(
+            [XpBreakdownSource::Streak, intdiv($lines[0]->amount * 20, 100)],
+            [$lines[1]->source, $lines[1]->amount],
+        );
+
+        // Et le détail est au ledger tel quel : le montant est déjà écrit, la ligne qui
+        // l'explique aussi. Le client la lira pour animer « +18 grâce à ta série ».
+        $this->entityManager->clear();
+        $credit = $this->ledger->recordedFor($sessionId, XpReason::SessionCompleted);
+        self::assertInstanceOf(XpTransaction::class, $credit);
+        self::assertSame($granted->award->amount(), $credit->amount());
+        self::assertSame(
+            [[XpBreakdownSource::Base, $lines[0]->amount], [XpBreakdownSource::Streak, $lines[1]->amount]],
+            array_map(
+                static fn (XpBreakdownLine $line): array => [$line->source, $line->amount],
+                $credit->breakdown()->lines,
+            ),
+        );
+    }
+
+    public function testWithoutAnyContributorTheSessionIsWorthItsBaseAlone(): void
+    {
+        // L'état du Lot 3 : aucun module n'accorde encore de modificateur, et c'est un cas
+        // normal — pas une raison de refuser une séance ni de créditer zéro.
+        $granted = ($this->grantXp)(new GrantXp($this->openAccount()->id, Uuid::v7(), Discipline::Running, 3600));
+
+        self::assertSame([XpBreakdownSource::Base], array_map(
+            static fn (XpBreakdownLine $line): XpBreakdownSource => $line->source,
+            $granted->award->breakdown->lines,
+        ));
     }
 
     public function testASessionAlreadyCreditedCannotBeCreditedAgain(): void

@@ -61,7 +61,7 @@ final readonly class XpCalculator
 
     /**
      * @param int            $durationSeconds la durée **retenue**, déjà écrêtée par `Training`
-     * @param list<Modifier> $modifiers       l'ensemble actif du joueur, tel que le resolver (#18) le rendra
+     * @param list<Modifier> $modifiers       l'ensemble actif du joueur, tel que `ModifierResolver` le rend
      * @param DailyLoad      $today           ce que le joueur a déjà fait dans **sa** journée
      */
     public function calculate(Discipline $discipline, int $durationSeconds, array $modifiers, DailyLoad $today): XpAward

@@ -7,7 +7,8 @@ namespace App\Shared\Domain\Modifier;
 /**
  * **Un seul vocabulaire de modificateurs.** Compétences, objets équipés, streak et ligue
  * ne produisent pas chacun leur bonus maison : ils produisent tous un `Modifier` de l'un
- * de ces types, et un unique resolver (#18) en calcule l'ensemble actif.
+ * de ces types, et un unique {@see \App\Shared\Application\ModifierResolver} en calcule
+ * l'ensemble actif.
  *
  * C'est ce qui empêche le moteur de pourrir. Sans ce vocabulaire, chaque nouvelle source
  * de bonus ajoute une branche dans le calcul d'XP, une autre dans le tirage de loot, et

@@ -14,6 +14,9 @@ use Symfony\Component\Uid\Uuid;
  * Base des tests d'API. Chaque test part d'une base vide : les tables sont
  * découvertes dans le schéma plutôt qu'énumérées, pour qu'un nouveau module
  * n'oblige pas à revenir ici.
+ *
+ * Et d'un joueur sans aucun modificateur actif : {@see ProgrammableModifiers} porte un état
+ * statique, que la suite entière partagerait sinon.
  */
 abstract class ApiTestCase extends WebTestCase
 {
@@ -23,6 +26,7 @@ abstract class ApiTestCase extends WebTestCase
     {
         $this->client = self::createClient();
         $this->truncateEverything();
+        ProgrammableModifiers::grantNothing();
     }
 
     /**

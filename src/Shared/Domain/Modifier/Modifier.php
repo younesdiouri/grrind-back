@@ -18,8 +18,9 @@ use App\Shared\Domain\Activity\Discipline;
  * « uniquement pour cette discipline ». C'est ce qui permet des bottes de course qui ne
  * servent à rien en natation sans que le calcul ait à connaître les objets.
  *
- * Value object pur, dans `Shared` : le resolver (#18) en produira, `XpCalculator` et
- * `LootRoller` en consommeront, et aucun de ces modules ne connaît les autres.
+ * Value object pur, dans `Shared` : {@see \App\Shared\Application\ModifierResolver} en
+ * agrège, `XpCalculator` et le futur `LootRoller` en consomment, et aucun de ces modules ne
+ * connaît les autres.
  */
 final readonly class Modifier
 {

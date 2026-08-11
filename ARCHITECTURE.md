@@ -78,9 +78,42 @@ L'événement quand le destinataire peut attendre et n'a rien à répondre. Le p
 réponse est nécessaire tout de suite — le fuseau du joueur ne peut pas arriver en différé,
 sinon un changement de fuseau suivi d'une séance compterait sur l'ancien.
 
-Un port se justifie **un par un** dans son docblock. Il y en a trois en tout, et c'est
-volontaire : `PlayerTimezones`, `PlayerTitles`, et `SocialProfileResolver` (aucun test ne peut
-appeler Google).
+Un port se justifie **un par un** dans son docblock. Il y en a quatre en tout, et c'est
+volontaire : `PlayerTimezones`, `PlayerTitles`, `SocialProfileResolver` (aucun test ne peut
+appeler Google), et `ModifierContributor`.
+
+Ce dernier est le seul **en éventail** — plusieurs implémentations, un seul consommateur :
+
+```mermaid
+flowchart LR
+    p["Progression<br/><i>compétences</i>"] -.->|"implémente<br/>ModifierContributor"| tag{{"tag<br/>app.modifier_contributor"}}
+    r["Rewards<br/><i>objets équipés</i>"] -.-> tag
+    e["Engagement<br/><i>streak · ligue</i>"] -.-> tag
+    tag -->|"AutowireIterator"| res["<b>ModifierResolver</b><br/><i>agrège, ordonne, ne compose rien</i>"]
+    res --> xp["XpCalculator"]
+    res -.-> loot["LootRoller"]
+
+    classDef todo stroke-dasharray:4 4,opacity:0.5
+    class p,r,e,loot todo
+```
+
+C'est ce qui tient l'invariant **« un seul vocabulaire de modificateurs »** : compétences,
+objets, streak et ligue ne produisent pas chacun leur bonus maison, ils produisent tous un
+`Modifier` typé. Ouvrir une source, c'est une classe qui implémente le port — rien à câbler,
+personne à prévenir, aucune branche de plus dans le calcul d'XP.
+
+Le resolver **n'additionne rien** : filtrer par discipline et par type sont des décisions de
+consommateur, et elles diffèrent — `XpCalculator` groupe par source pour son détail animé, le
+`LootRoller` ne lira que `LOOT_LUCK`. Il garantit une seule chose en plus de l'agrégation :
+l'ordre, tiré de `ModifierSource` et non de l'ordre dans lequel le conteneur a rangé les
+services. Un ensemble résolu finit dans un breakdown affiché et dans un tirage audité ; le
+faire dépendre d'un ordre de compilation, c'est accepter que deux calculs identiques laissent
+deux traces différentes.
+
+**Aucune source ne contribue encore** — le streak arrive au Lot 5, les objets au Lot 6, les
+compétences au Lot 7. Le resolver rend donc un ensemble vide, et c'est le branchement qui est
+éprouvé en test : un tag mal orthographié ne casse rien, il rend un ensemble vide, et le
+joueur serait sous-payé sans que personne le voie.
 
 ---
 
@@ -161,7 +194,8 @@ flowchart TB
 
     lock["🔒 <b>verrou pessimiste</b> sur la ligne<br/>de progression du joueur"]
     lock --> load["lire la charge du jour<br/><i>après le verrou, donc en voyant<br/>ce que la requête concurrente a écrit</i>"]
-    load --> calc["<b>XpCalculator</b> — fonction pure<br/>socle → rendements décroissants<br/>→ bonus → plafond quotidien"]
+    load --> mods["résoudre les <b>modificateurs actifs</b><br/><i>après le verrou pour la même raison :<br/>le streak change dans cette transaction-là</i>"]
+    mods --> calc["<b>XpCalculator</b> — fonction pure<br/>socle → rendements décroissants<br/>→ bonus → plafond quotidien"]
     calc --> ledger["écrire l'<b>XpTransaction</b><br/><i>montant + rulesetVersion + détail ligne à ligne</i>"]
     ledger --> snap["reprojeter le <b>snapshot</b><br/><i>sur SUM(ledger), jamais un +=</i>"]
     snap --> titles["évaluer les <b>titres</b><br/><i>après l'écriture : la séance qui vient<br/>d'être créditée compte pour son titre</i>"]
@@ -184,8 +218,9 @@ Pourquoi cet ordre, en trois phrases :
 - **Le verrou d'abord.** Il porte sur *une ligne* — deux joueurs ne s'attendent jamais. Sans
   lui, deux complétions simultanées lisent le même total, calculent le même niveau et
   s'écrasent l'une l'autre.
-- **La lecture du jour après le verrou.** Sinon les rendements décroissants se contourneraient
-  en clôturant deux séances à la même seconde.
+- **La lecture du jour et des modificateurs après le verrou.** Sinon les rendements
+  décroissants se contourneraient en clôturant deux séances à la même seconde, et un ensemble
+  de bonus lu avant la transaction créditerait un streak déjà périmé.
 - **Le snapshot relit le ledger, il ne s'incrémente pas.** Un `+=` transformerait chaque
   divergence en dette permanente ; là, un écart se résorbe tout seul au crédit suivant.
 
@@ -196,7 +231,7 @@ flowchart LR
     d["durée retenue<br/>+ discipline"] --> base["socle<br/><i>durée × xp_par_heure / 3600</i>"]
     base --> dim["− rendements décroissants<br/><i>selon le temps déjà fait aujourd'hui</i>"]
     dim --> bonus["+ bonus<br/><i>en % du socle raboté, additifs</i>"]
-    mods["modificateurs actifs<br/>streak · objets · compétences · ligue"] --> bonus
+    mods["modificateurs actifs<br/><i>ModifierResolver</i>"] --> bonus
     bonus --> cap["− dépassement du plafond<br/>quotidien de la discipline"]
     cap --> out["<b>XpAward</b><br/>montant + rulesetVersion<br/>+ le détail de chaque ligne"]
 ```
@@ -453,6 +488,9 @@ défaire. Le raisonnement complet est dans le docblock du fichier concerné.
   ligne ; un verrou distribué serait un affaiblissement.
 - **Pas de valeur « autre » dans `Discipline`**, ni de « correction manuelle » dans `XpReason`.
   Une valeur qu'aucun code n'écrit est une porte qu'on finit par pousser.
+- **Le `ModifierResolver` agrège, il ne compose pas.** Additionner ou filtrer chez lui
+  obligerait ses deux consommateurs, qui ne veulent ni le même type ni la même portée, à
+  défaire son travail.
 
 ---
 
@@ -478,3 +516,7 @@ Les pièges qui se reproduisent. Les autres sont datés, corrigés, et vivent da
   `#[AsEventListener(event: JWTNotFoundEvent::class)]` ne se déclenche jamais, sans erreur.
 - **Vérifier le corps d'une erreur, pas seulement son code.** Un membre d'extension nommé comme
   un membre standard de problem+json disparaît silencieusement de la réponse.
+- **Un service tagué qui n'est pas ramassé ne lève rien.** Tag mal orthographié,
+  autoconfiguration coupée, service retiré parce qu'inutilisé : l'itérateur est simplement
+  vide. Un contributeur de modificateurs qui se tait sous-paie un joueur en silence, et
+  l'écriture est au ledger — donc chaque port en éventail se prouve contre le vrai conteneur.

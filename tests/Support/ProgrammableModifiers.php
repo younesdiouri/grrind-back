@@ -1,0 +1,52 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Support;
+
+use App\Shared\Application\ModifierContributor;
+use App\Shared\Domain\Modifier\Modifier;
+use Symfony\Component\Uid\Uuid;
+
+/**
+ * Le seul contributeur de modificateurs de l'environnement de test, tant qu'aucun module
+ * n'en accorde pour de vrai — le streak arrive au Lot 5, les objets au Lot 6, les
+ * compétences au Lot 7.
+ *
+ * Il existe pour prouver le **branchement** : que le tag posé sur `ModifierContributor`
+ * est bien celui qu'attend `ModifierResolver`, et que ce qu'un module accorde traverse
+ * jusqu'au ledger. C'est la seule chose qu'un test unitaire ne peut pas dire, et la panne
+ * qu'elle attrape est silencieuse — un tag mal orthographié ne casse rien, il rend
+ * simplement un ensemble vide, et le joueur est sous-payé sans que personne le voie.
+ *
+ * **L'état est statique**, à l'encontre de l'habitude. Deux raisons, et elles se cumulent :
+ * le KernelBrowser redémarre le noyau entre deux requêtes HTTP, donc un état porté par
+ * l'instance serait remis à zéro entre le test qui le programme et le service qui le lit ;
+ * et le test n'a alors rien à aller chercher dans le conteneur, ce qui est heureux
+ * puisqu'un service déclaré sous `when@test` n'existe pas dans le conteneur `dev` que
+ * PHPStan analyse.
+ *
+ * Le prix est un état qui survit d'un test à l'autre — la suite tourne dans un seul
+ * processus. {@see ApiTestCase::setUp()} le remet à zéro, au même titre que les tables : il
+ * n'accorde rien par défaut, et les autres suites raisonnent donc sur le socle seul.
+ */
+final class ProgrammableModifiers implements ModifierContributor
+{
+    /** @var list<Modifier> */
+    private static array $granted = [];
+
+    public static function grant(Modifier ...$modifiers): void
+    {
+        self::$granted = array_values($modifiers);
+    }
+
+    public static function grantNothing(): void
+    {
+        self::$granted = [];
+    }
+
+    public function modifiersOf(Uuid $userId): array
+    {
+        return self::$granted;
+    }
+}
