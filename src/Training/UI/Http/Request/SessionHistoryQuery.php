@@ -11,28 +11,18 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Les paramètres de `GET /api/training/sessions`, tous facultatifs : sans aucun d'eux,
- * le joueur reçoit sa première page d'historique complet.
+ * Les paramètres de `GET /api/training/sessions`, tous facultatifs.
  *
- * Rien n'est validé à la main. Les valeurs fermées sont typées par leur enum, le curseur
- * par `Uuid` et la fenêtre par `DateTimeImmutable` : le Serializer refuse ce qui n'entre
- * pas dans le type, et `#[MapQueryString]` transforme ce refus en 422 nommant le
- * paramètre fautif. C'est le même contrat d'erreur que les payloads JSON du reste de
- * l'API, sans une ligne de contrôle en plus.
+ * Rien n'est validé à la main : le typage suffit, `#[MapQueryString]` transformant le
+ * refus du Serializer en 422 nommant le paramètre fautif.
  *
  * Les bornes sont des **instants**, pas des dates : le client envoie son décalage
- * (`2026-07-01T00:00:00+02:00`). Une date nue serait lue à minuit UTC, ce qui décalerait
- * la fenêtre d'un joueur parisien de deux heures — le fuseau du joueur sert au streak,
- * pas à réinterpréter ce qu'il a explicitement demandé.
- *
- * @see https://symfony.com/doc/current/controller.html#mapping-query-parameters-individually
+ * (`2026-07-01T00:00:00+02:00`). Une date nue serait lue à minuit UTC et décalerait la
+ * fenêtre d'un joueur parisien de deux heures.
  */
 final readonly class SessionHistoryQuery
 {
-    /**
-     * Une page pleine tient un écran de profil ; le plafond existe pour qu'un client
-     * ne puisse pas demander tout l'historique en une requête.
-     */
+    /** Pour qu'un client ne puisse pas demander tout l'historique en une requête. */
     public const int MAX_LIMIT = 50;
 
     public function __construct(

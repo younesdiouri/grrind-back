@@ -15,12 +15,9 @@ use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Ouvre la séance, si les garde-fous le permettent.
- *
- * Ils sont ici et non dans l'agrégat parce qu'ils ont besoin des *autres* séances du
- * joueur : l'unicité de la séance active et le cooldown sont des règles sur son
- * historique, pas sur la séance qu'il ouvre. Les poser dans le contrôleur les rendrait
- * intestables sans HTTP.
+ * Ouvre la séance, si les garde-fous le permettent. Ils sont ici et non dans l'agrégat
+ * parce qu'ils portent sur les *autres* séances du joueur — unicité de l'active et
+ * cooldown sont des règles sur son historique.
  */
 final readonly class StartSessionHandler
 {
@@ -55,10 +52,8 @@ final readonly class StartSessionHandler
         try {
             $this->sessions->commit();
         } catch (UniqueConstraintViolationException $collision) {
-            // Deux ouvertures simultanées : le contrôle ci-dessus les a laissées passer
-            // toutes les deux, l'index unique partiel n'en garde qu'une. Le perdant
-            // reçoit la même erreur que s'il était arrivé en second — c'est le cas, à
-            // quelques millisecondes près.
+            // Deux ouvertures simultanées : l'index partiel n'en garde qu'une, et le
+            // perdant reçoit la même erreur que s'il était arrivé en second.
             $this->logger->info('Ouverture de séance concurrente rejetée par l\'index unique.', [
                 'userId' => $command->userId->toRfc4122(),
                 'exception' => $collision,

@@ -13,22 +13,17 @@ use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le dépôt des clés d'idempotence. Il lit par l'ORM et écrit en DBAL, et ce n'est pas
- * une coquetterie :
+ * Lit par l'ORM, écrit en DBAL. Trois raisons, toutes contraignantes :
  *
- *  - **La réservation doit être atomique.** Deux requêtes concurrentes portant la même
- *    clé arrivent en même temps ; il faut qu'une seule reparte avec le droit d'écrire.
- *    Un `SELECT` puis un `INSERT` laisse la fenêtre ouverte ; seul le `INSERT … ON
- *    CONFLICT` de PostgreSQL la ferme, et l'ORM ne sait pas l'exprimer.
- *  - **Un échec ne doit pas emporter l'EntityManager.** En ORM, une violation de
- *    contrainte au `flush()` ferme l'EntityManager : la requête métier qui suit ne
- *    pourrait plus rien écrire. En DBAL, la collision est une valeur de retour.
- *  - **La libération doit survivre à un rollback.** Quand la transaction métier casse,
- *    il faut effacer la réservation pour que le client puisse réessayer — donc écrire
- *    en dehors de l'unité de travail qui vient d'échouer.
+ *  - **la réservation doit être atomique** — un `SELECT` puis un `INSERT` laisse passer
+ *    deux requêtes concurrentes ; seul `INSERT … ON CONFLICT` ferme la fenêtre, et
+ *    l'ORM ne sait pas l'exprimer ;
+ *  - **un échec ne doit pas emporter l'EntityManager** — une violation de contrainte au
+ *    `flush()` le ferme, et la requête métier qui suit ne pourrait plus rien écrire ;
+ *  - **la libération doit survivre à un rollback**, donc s'écrire hors de l'unité de
+ *    travail qui vient d'échouer.
  *
- * L'entité, elle, reste mappée : c'est elle qui décrit le schéma, alimente
- * `doctrine:migrations:diff` et sert d'objet de lecture.
+ * L'entité reste mappée : elle décrit le schéma et sert d'objet de lecture.
  *
  * @extends ServiceEntityRepository<IdempotencyRecord>
  */
@@ -40,19 +35,17 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
     }
 
     /**
-     * Réserve la clé pour cette requête. Rend l'identifiant de la réservation si elle
-     * nous revient, `null` si une autre requête la tient déjà — à l'appelant, alors,
-     * de lire ce qu'elle est devenue.
+     * Rend l'identifiant de la réservation si elle nous revient, `null` si une autre
+     * requête la tient déjà.
      *
-     * Le `WHERE` sur la clause de conflit fait le tri : une réservation encore vivante
-     * n'est pas touchée (aucune ligne rendue), une réservation périmée est recyclée sur
-     * place. C'est ce qui évite d'avoir à purger avant de pouvoir réutiliser une clé.
+     * Le `WHERE` de la clause de conflit fait le tri : une réservation vivante n'est pas
+     * touchée (aucune ligne rendue), une périmée est recyclée sur place — sans quoi il
+     * faudrait une purge avant de pouvoir réutiliser une clé.
      */
     public function claim(Uuid $userId, string $key, string $requestFingerprint, DateTimeImmutable $now): ?Uuid
     {
-        // L'entité décide de l'identifiant et de la péremption ; le dépôt ne fait que
-        // les écrire. Composer l'INSERT à partir de ses valeurs plutôt que de les
-        // recalculer ici évite d'avoir deux définitions de la rétention.
+        // Composer l'INSERT depuis l'entité plutôt que recalculer ici : une seule
+        // définition de la rétention.
         $reservation = IdempotencyRecord::reserve($userId, $key, $requestFingerprint, $now);
 
         $claimed = $this->getEntityManager()->getConnection()->fetchOne(
@@ -89,17 +82,15 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
         return \is_string($claimed) ? Uuid::fromString($claimed) : null;
     }
 
-    /**
-     * La réservation vivante que `claim()` a refusé de nous donner.
-     */
+    /** La réservation vivante que `claim()` a refusé de nous donner. */
     public function ofKey(Uuid $userId, string $key): ?IdempotencyRecord
     {
         return $this->findOneBy(['userId' => $userId, 'key' => $key]);
     }
 
     /**
-     * Fige la réponse : à partir d'ici, tout rejeu de la même requête recevra celle-là,
-     * à l'identique, sans que le contrôleur soit rappelé.
+     * Fige la réponse : tout rejeu de la même requête recevra celle-là, sans que le
+     * contrôleur soit rappelé.
      *
      * @param array<string, string> $headers
      */
@@ -124,9 +115,8 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
     }
 
     /**
-     * Rend la clé au client. Une tentative qui a échoué n'est pas un résultat à rejouer :
-     * la garder condamnerait le joueur à recevoir la même erreur pendant vingt-quatre
-     * heures, sur une action qui, elle, n'a rien écrit.
+     * Une tentative qui a échoué n'est pas un résultat à rejouer : garder la clé
+     * condamnerait le joueur à la même erreur pendant vingt-quatre heures.
      */
     public function release(Uuid $id): void
     {

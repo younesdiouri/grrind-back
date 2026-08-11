@@ -17,6 +17,12 @@
 /vendor/
 ###< symfony/framework-bundle ###
 
+# Dump généré par FrameworkBundle à chaque compilation du conteneur : les array-shapes
+# de la config des bundles, pour l'autocomplétion des fichiers de config *PHP*. Toute
+# la config d'ici est en YAML, donc il ne sert à rien — et 1 600 lignes régénérées à
+# chaque `cache:clear` noient le diff des PR qui touchent aux dépendances.
+/config/reference.php
+
 ###> friendsofphp/php-cs-fixer ###
 /.php-cs-fixer.php
 /.php-cs-fixer.cache

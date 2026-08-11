@@ -7,15 +7,10 @@ namespace App\Training\UI\Http\Response;
 use App\Training\Application\SessionPage;
 
 /**
- * Une page d'historique telle que le client la lit : la liste, et de quoi demander la
- * suite.
+ * L'enveloppe n'est pas décorative : un tableau nu à la racine interdirait d'ajouter
+ * quoi que ce soit plus tard sans casser le décodage du client.
  *
- * L'enveloppe n'est pas décorative. Rendre un tableau nu à la racine interdirait
- * d'ajouter quoi que ce soit plus tard sans casser le décodage du client — et il y aura
- * un « plus tard », ne serait-ce que pour les totaux d'un écran de statistiques.
- *
- * `nextCursor` à `null` signifie « il n'y a plus rien après » : le client s'arrête là,
- * sans avoir eu besoin d'un total.
+ * `nextCursor` à `null` signifie « plus rien après » — le client s'arrête là, sans total.
  */
 final readonly class SessionPageResource
 {

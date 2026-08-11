@@ -1,53 +1,39 @@
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
-# This file is the entry point to configure your own services.
-# Files in the packages/ subdirectory configure your dependencies.
-# See also https://symfony.com/doc/current/service_container/import.html
-
-# L'équilibrage du jeu est du config-as-code : il se relit et se modifie sans ouvrir de
-# PHP. `v1` est figé — au Lot 3, tout ce dossier sera hashé pour produire le
-# `rulesetVersion` stocké avec chaque transaction d'XP.
+# L'équilibrage du jeu est du config-as-code. `v1` est figé — au Lot 3, tout le dossier
+# sera hashé pour produire le `rulesetVersion` stocké avec chaque transaction d'XP.
 imports:
     - { resource: game/v1/training.yaml }
 
-# Put parameters here that don't need to change on each machine where the app is deployed
-# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
 
 services:
-    # default configuration for services in *this* file
     _defaults:
-        autowire: true      # Automatically injects dependencies in your services.
-        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        autowire: true
+        autoconfigure: true
         bind:
             bool $debug: '%kernel.debug%'
             # Même source que lexik_jwt_authentication.token_ttl : la durée annoncée
             # au client ne peut pas diverger de celle réellement signée.
             int $accessTokenTtl: '%env(int:JWT_TTL)%'
 
-    # makes classes in src/ available to be used as services
-    # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
 
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
 
-    # Les seuils d'une séance, depuis config/game/v1/training.yaml. Un paramètre absent
-    # casse la compilation du conteneur — l'équilibrage se valide au démarrage, pas à
-    # la première requête d'un joueur.
+    # Un paramètre absent casse la compilation du conteneur : l'équilibrage se valide au
+    # démarrage, pas à la première requête d'un joueur.
     App\Training\Domain\TrainingRules:
         arguments:
             $minimumDurationSeconds: '%game.training.minimum_duration_seconds%'
             $maximumDurationSeconds: '%game.training.maximum_duration_seconds%'
             $cooldownSeconds: '%game.training.cooldown_seconds%'
 
-    # Providers league/oauth2-client du social sign-in, câblés directement : le
-    # bundle KnpU n'apporte que le flux de redirection en session, dont une API
-    # stateless n'a que faire. Ils sont derrière un service locator dans le
-    # résolveur, donc construits à la demande — le constructeur d'Apple refuse une
-    # configuration vide, et un poste sans clé Apple doit pouvoir servir Google.
+    # Providers league/oauth2-client câblés directement : KnpUOAuth2ClientBundle a été
+    # écarté (décision Lot 1bis). Ils sont derrière un service locator dans le résolveur,
+    # donc construits à la demande — le constructeur d'Apple refuse une configuration
+    # vide, et un poste sans clé Apple doit pouvoir servir Google.
     oauth2.provider.google:
         class: League\OAuth2\Client\Provider\Google
         arguments:
@@ -72,17 +58,15 @@ when@test:
             autowire: true
             autoconfigure: true
 
-        # Aucune suite de tests ne peut appeler Google ni Apple. Le stub dérive le
-        # profil du code d'autorisation lui-même — voir la classe pour le pourquoi.
+        # Aucune suite de tests ne peut appeler Google ni Apple.
         App\Tests\Support\StubSocialProfileResolver: ~
         App\Identity\Application\SocialProfileResolver: '@App\Tests\Support\StubSocialProfileResolver'
 
-        # La sonde de l'idempotence : une route protégée pour la tester tant qu'aucune
-        # écriture métier ne l'est. Routée par config/routes/idempotency_probe.yaml.
+        # Route protégée qui sert de sonde à l'idempotence.
         App\Tests\Support\Http\:
             resource: '../tests/Support/Http/'
 
-        # Le module tiers de service : un abonné aux événements de domaine qui ne
-        # connaît pas leur émetteur. Il vérifie que la chaîne complète tient.
+        # Un abonné aux événements de domaine qui ne connaît pas leur émetteur : il
+        # vérifie que la chaîne complète tient.
         App\Tests\Support\Messaging\:
             resource: '../tests/Support/Messaging/'

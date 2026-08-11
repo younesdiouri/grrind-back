@@ -32,14 +32,11 @@ class RefreshTokenRepository extends ServiceEntityRepository
         $this->getEntityManager()->persist($token);
     }
 
-    /**
-     * Révoque toute la lignée d'un appareil. Appelé à la déconnexion, et sur
-     * détection de rejeu.
-     */
+    /** Toute la lignée d'un appareil. Appelé à la déconnexion et sur rejeu détecté. */
     public function revokeFamily(Uuid $familyId, DateTimeImmutable $now): void
     {
-        // En DQL plutôt qu'en chargeant la famille : une famille ancienne peut
-        // compter des dizaines de rotations, et on n'a rien à en faire ici.
+        // En DQL : une famille ancienne compte des dizaines de rotations dont on n'a
+        // rien à faire ici.
         $this->getEntityManager()->createQuery(
             'UPDATE '.RefreshToken::class.' t
              SET t.revokedAt = :now
@@ -50,10 +47,7 @@ class RefreshTokenRepository extends ServiceEntityRepository
             ->execute();
     }
 
-    /**
-     * Écrit les modifications en attente. La rotation touche deux jetons — celui
-     * qu'on consomme et celui qu'on émet — et doit être atomique.
-     */
+    /** La rotation touche deux jetons — consommé et émis — et doit être atomique. */
     public function commit(): void
     {
         $this->getEntityManager()->flush();

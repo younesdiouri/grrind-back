@@ -16,18 +16,13 @@ use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le dépôt des comptes, et le user provider du firewall.
+ * Le dépôt des comptes, et le user provider du firewall. `UserLoaderInterface` plutôt
+ * qu'un `entity.property`, pour deux raisons qu'une colonne ne couvre pas :
  *
- * `UserLoaderInterface` est le point d'extension prévu par Symfony pour charger un
- * compte autrement que par un `findOneBy` sur une colonne
- * (https://symfony.com/doc/current/security/user_providers.html). On s'en sert ici
- * pour deux raisons qu'un `entity.property` ne saurait pas couvrir :
- *
- *  - deux firewalls, deux natures d'identifiant. `^/api/auth/login` présente une
- *    adresse e-mail ; `^/api` présente l'UUID lu dans le claim `sub`. Un seul
- *    provider les sert tous les deux.
- *  - l'adresse est normalisée avant lecture, comme elle l'a été avant écriture.
- *    Sans ça, « BOB@Grrind.app » ne retrouverait pas le compte de « bob@grrind.app ».
+ *  - **deux firewalls, deux natures d'identifiant** — `^/api/auth/login` présente une
+ *    adresse, `^/api` l'UUID du claim `sub`, et un seul provider les sert ;
+ *  - **l'adresse est normalisée avant lecture**, comme avant écriture, sans quoi
+ *    « BOB@Grrind.app » ne retrouverait pas « bob@grrind.app ».
  *
  * @extends ServiceEntityRepository<User>
  */
@@ -40,8 +35,8 @@ class UserRepository extends ServiceEntityRepository implements UserLoaderInterf
 
     public function loadUserByIdentifier(string $identifier): ?User
     {
-        // Un UUID vient forcément d'un jeton que nous avons signé ; une adresse
-        // vient du corps d'un login. Les deux formes ne se recouvrent pas.
+        // Un UUID vient d'un jeton que nous avons signé, une adresse du corps d'un
+        // login : les deux formes ne se recouvrent pas.
         if (Uuid::isValid($identifier)) {
             return $this->ofId(Uuid::fromString($identifier));
         }
@@ -65,9 +60,8 @@ class UserRepository extends ServiceEntityRepository implements UserLoaderInterf
     }
 
     /**
-     * Écrit le compte immédiatement. L'unicité de l'adresse est un invariant du
-     * dépôt : c'est lui qui possède l'index unique, donc c'est lui qui traduit une
-     * collision en erreur métier plutôt que de laisser fuir une exception SQL.
+     * Le dépôt possède l'index unique, donc c'est lui qui traduit une collision en
+     * erreur métier plutôt que de laisser fuir une exception SQL.
      *
      * @throws EmailAlreadyUsed
      */
@@ -79,25 +73,21 @@ class UserRepository extends ServiceEntityRepository implements UserLoaderInterf
         try {
             $entityManager->flush();
         } catch (UniqueConstraintViolationException) {
-            // Deux inscriptions simultanées sur la même adresse : la vérification
-            // applicative les a laissées passer toutes les deux, l'index unique
-            // tranche. C'est le seul endroit qui sait ce que la contrainte protège.
+            // Deux inscriptions simultanées : la vérification applicative les a laissées
+            // passer toutes les deux, l'index unique tranche.
             throw new EmailAlreadyUsed($user->email());
         }
     }
 
-    /**
-     * Écrit les modifications d'un compte déjà connu (renommage, fuseau, rehash).
-     */
+    /** Écrit les modifications d'un compte déjà connu (renommage, fuseau, rehash). */
     public function commit(): void
     {
         $this->getEntityManager()->flush();
     }
 
     /**
-     * Rehash opportuniste, appelé par Symfony après un login réussi quand
-     * l'algorithme ou le coût configurés ont évolué. Le mot de passe en clair ne
-     * repassera pas de sitôt : c'est la seule occasion de rattraper un vieux hash.
+     * Rehash opportuniste, appelé par Symfony après un login réussi quand l'algorithme a
+     * évolué : le clair ne repassera pas de sitôt, c'est la seule occasion.
      */
     public function upgradePassword(PasswordAuthenticatedUserInterface $user, string $newHashedPassword): void
     {

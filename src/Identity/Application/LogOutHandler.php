@@ -10,13 +10,10 @@ use InvalidArgumentException;
 use Psr\Clock\ClockInterface;
 
 /**
- * Déconnecte l'appareil dont vient le jeton, et lui seul : les autres sessions du
- * même compte continuent.
+ * Déconnecte l'appareil dont vient le jeton, et lui seul.
  *
- * Idempotent et silencieux — un jeton inconnu ne produit pas d'erreur. Se
- * déconnecter deux fois, ou avec un jeton déjà expiré, doit aboutir au même état
- * qu'une déconnexion réussie, et répondre autrement dirait à un inconnu si le
- * jeton qu'il tient existe.
+ * Idempotent et silencieux : un jeton inconnu ne produit pas d'erreur. Répondre
+ * autrement dirait à un inconnu si le jeton qu'il tient existe.
  */
 final readonly class LogOutHandler
 {

@@ -14,12 +14,8 @@ use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Connexion par Google ou Apple. Une seule route pour se connecter *et* s'inscrire :
- * côté client c'est un seul bouton, et lui demander de savoir à l'avance si le
- * compte existe n'aurait aucun sens.
- *
- * La réponse est le même `AuthResource` que le login et l'inscription classiques —
- * un seul chemin de traitement côté iOS.
+ * Une seule route pour se connecter *et* s'inscrire : côté client c'est un seul bouton,
+ * et la réponse est le même `AuthResource` que le login classique.
  *
  * `SocialProvider` est résolu depuis l'URL par le résolveur d'enum de Symfony : un
  * fournisseur inconnu donne un 404 avant d'atteindre le contrôleur.

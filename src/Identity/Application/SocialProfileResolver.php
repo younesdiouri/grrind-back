@@ -10,12 +10,9 @@ use App\Identity\Domain\SocialProvider;
 /**
  * Échange un code d'autorisation contre un profil normalisé.
  *
- * C'est l'un des rares ports que le projet garde, et pour deux raisons précises :
- * ni Symfony ni league/oauth2-client ne proposent d'abstraction « code → profil »
- * (`AbstractProvider` s'arrête au jeton, et chaque fournisseur décrit son
- * utilisateur à sa façon), et surtout un test ne peut pas appeler Google.
- * L'implémentation réelle vit dans Infrastructure\OAuth ; l'environnement de test
- * en substitue une autre — voir la section `when@test` de config/services.yaml.
+ * Le seul port du module, et il se justifie deux fois : aucune bibliothèque n'abstrait
+ * « code → profil » (`AbstractProvider` s'arrête au jeton), et aucun test ne peut
+ * appeler Google. Le stub est en `when@test` dans config/services.yaml.
  */
 interface SocialProfileResolver
 {

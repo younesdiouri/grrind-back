@@ -16,17 +16,14 @@ use Psr\Clock\ClockInterface;
 
 /**
  * Connexion — ou inscription, c'est le même geste côté client — par Google ou Apple.
+ * Trois cas, et l'ordre compte :
  *
- * Trois cas, dans cet ordre, et l'ordre compte :
+ *  1. **(fournisseur, sub) déjà connu** : on reconnaît le joueur, sans consulter
+ *     l'adresse, qui a pu changer chez le fournisseur ;
+ *  2. **adresse vérifiée correspondant à un compte existant** : on relie ;
+ *  3. sinon, nouveau compte sans mot de passe.
  *
- *  1. Le couple (fournisseur, sub) est déjà connu : on reconnaît le joueur. Rien
- *     d'autre n'est consulté, surtout pas l'adresse — elle a pu changer chez le
- *     fournisseur sans que ce soit un nouveau compte.
- *  2. Adresse **vérifiée** correspondant à un compte existant : on relie. C'est ce
- *     qui évite le doublon du joueur inscrit par mot de passe qui revient par Google.
- *  3. Sinon : nouveau compte, sans mot de passe.
- *
- * Une adresse non vérifiée ne relie jamais rien : ce serait offrir la prise de
+ * Une adresse **non vérifiée** ne relie jamais rien : ce serait offrir la prise de
  * contrôle d'un compte à quiconque sait créer une adresse chez le fournisseur.
  */
 final readonly class SignInWithProviderHandler
@@ -105,8 +102,7 @@ final readonly class SignInWithProviderHandler
             $this->clock->now(),
         );
 
-        // Pas de setPassword() : ce compte n'en a pas et n'en aura pas tant que son
-        // propriétaire n'en définira pas un. `/api/auth/login` le refusera, c'est voulu.
+        // Pas de setPassword() : `/api/auth/login` refusera ce compte, c'est voulu.
         $this->users->add($user);
         $this->link($user, $profile);
 
@@ -126,9 +122,8 @@ final readonly class SignInWithProviderHandler
     }
 
     /**
-     * Google donne un nom complet ; Apple ne le donne qu'à la toute première
-     * autorisation, et jamais ensuite. La partie locale de l'adresse est un
-     * repli acceptable — le joueur le changera dans son profil.
+     * Apple ne donne le nom qu'à la toute première autorisation, jamais ensuite. La
+     * partie locale de l'adresse est un repli acceptable.
      */
     private static function displayNameFor(SocialProfile $profile): string
     {

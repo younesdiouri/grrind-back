@@ -1,11 +1,5 @@
-framework:
-    validation:
-        # Enables validator auto-mapping support.
-        # For instance, basic validation constraints will be inferred from Doctrine's metadata.
-        #auto_mapping:
-        #    App\Entity\: []
-
 when@test:
     framework:
         validation:
+            # L'appel à haveibeenpwned n'a rien à faire dans une suite de tests.
             not_compromised_password: false

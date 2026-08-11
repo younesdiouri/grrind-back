@@ -8,13 +8,9 @@ use App\Identity\Domain\SocialProvider;
 use App\Shared\Domain\Exception\RuleViolationError;
 
 /**
- * Le fournisseur a bien authentifié quelqu'un, mais sans adresse e-mail — et un
- * compte GRRIND en exige une.
- *
- * Le cas se produit chez Apple quand l'utilisateur a révoqué le partage de son
- * relais privé : Apple ne renvoie alors l'adresse qu'à la toute première
- * autorisation. La sortie est côté utilisateur — retirer l'app dans les réglages
- * Apple puis recommencer — pas côté serveur.
+ * Authentification réussie, mais sans adresse e-mail. Le cas se produit chez Apple, qui
+ * ne renvoie l'adresse qu'à la toute première autorisation : la sortie est côté
+ * utilisateur — retirer l'app dans les réglages Apple, puis recommencer.
  */
 final class SocialProfileIncomplete extends RuleViolationError
 {

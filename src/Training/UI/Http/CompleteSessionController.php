@@ -17,19 +17,12 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Le joueur appuie sur « terminer » ; le serveur date la fin et fige la durée.
  *
- * `#[Idempotent]` n'est pas une précaution : c'est la première écriture métier du
- * produit, et un client mobile rejoue. Au Lot 4 cette requête accordera de l'XP et
- * tirera du loot — une seconde exécution doublerait les gains. L'en-tête est donc
- * obligatoire dès maintenant, pendant que la réponse est encore anodine, plutôt qu'à
- * l'instant où il deviendra coûteux de l'imposer à un client déjà déployé.
+ * `#[Idempotent]` est imposé dès maintenant, pendant que la réponse est encore anodine :
+ * au Lot 4 cette requête accordera de l'XP et tirera du loot, et il serait alors coûteux
+ * de l'exiger d'un client déjà déployé.
  *
- * L'identifiant de la séance est dans l'URL, celui du compte n'y est pas : il vient de
- * `#[CurrentUser]`. C'est ce qui rend la route inoffensive à énumérer — l'identifiant
- * d'autrui ne mène qu'à un 404, cf. {@see \App\Training\Domain\Exception\SessionNotFound}.
- *
- * Le `Uuid` en paramètre est résolu par l'`UidValueResolver` du framework, qui rend déjà
- * un 404 sur une chaîne malformée : un identifiant illisible et un identifiant inconnu
- * sont le même non-résultat, il n'y a rien à écrire de plus.
+ * Le `Uuid` en paramètre est résolu par l'`UidValueResolver`, qui rend déjà un 404 sur
+ * une chaîne malformée — illisible et inconnu sont le même non-résultat.
  */
 final readonly class CompleteSessionController
 {

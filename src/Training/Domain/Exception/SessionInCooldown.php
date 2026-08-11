@@ -9,15 +9,10 @@ use DateTimeImmutable;
 use DateTimeInterface;
 
 /**
- * Trop tôt après la précédente séance.
+ * Trop tôt après la précédente séance — et seulement après une séance qui **compte**.
  *
- * Le cooldown existe pour qu'enchaîner des séances plancher ne soit pas une stratégie.
- * Il ne se déclenche qu'après une séance qui **compte** — une séance abandonnée sous
- * le plancher n'a jamais eu lieu, et ne doit pas punir le joueur qui a lancé son
- * chronomètre par erreur.
- *
- * L'instant de disponibilité accompagne le temps restant : le client peut afficher un
- * décompte sans le recalculer de son côté, et sans dépendre de l'heure de l'appareil.
+ * `readyAt` accompagne `remainingSeconds` pour que le client affiche un décompte sans
+ * dépendre de l'heure de l'appareil.
  */
 final class SessionInCooldown extends ConflictError
 {

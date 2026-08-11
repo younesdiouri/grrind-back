@@ -8,13 +8,9 @@ use App\Shared\Domain\Exception\DomainError;
 use App\Shared\Domain\Idempotency\IdempotencyRecord;
 
 /**
- * L'en-tête `Idempotency-Key` manque, est vide ou dépasse la longueur admise —
- * autrement dit, le client n'a pas fourni de quoi reconnaître un rejeu. 400 : la
- * requête est mal formée, personne n'a encore rien écrit.
- *
- * Un seul type d'erreur pour les trois cas, parce que le correctif côté client est
- * le même : envoyer un identifiant exploitable, généré une fois par action de
- * l'utilisateur et réutilisé tel quel à chaque tentative.
+ * L'en-tête manque, est vide, ou dépasse la longueur admise. Un seul type d'erreur pour
+ * les trois : le correctif côté client est le même — un identifiant généré une fois par
+ * action et réutilisé tel quel à chaque tentative.
  */
 final class IdempotencyKeyRequired extends DomainError
 {

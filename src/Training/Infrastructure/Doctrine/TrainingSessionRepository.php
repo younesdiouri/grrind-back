@@ -28,9 +28,8 @@ class TrainingSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * La séance de ce joueur, ou `null`. Le propriétaire est une **condition de la
-     * recherche** et non un contrôle qui suivrait : on ne charge jamais la séance d'un
-     * autre compte, donc aucun code d'appel ne peut oublier de vérifier à qui elle est.
+     * Le propriétaire est une **condition de la recherche**, pas un contrôle qui suit :
+     * aucun appelant ne peut oublier de vérifier à qui est la séance.
      */
     public function ofPlayer(Uuid $userId, Uuid $sessionId): ?TrainingSession
     {
@@ -38,10 +37,8 @@ class TrainingSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * La séance en cours du joueur, ou `null`. L'unicité de la séance active est une
-     * règle du jeu — garde-fou du ticket #10 — et non une garantie du schéma : tant
-     * qu'elle n'est pas posée, on rend la plus récente plutôt que d'échouer sur un
-     * doublon qui ne devrait pas exister.
+     * La séance en cours du joueur, ou `null`. L'unicité est garantie par
+     * `uniq_training_session_active` ; l'ordre ne sert qu'à rester déterministe.
      */
     public function activeOf(Uuid $userId): ?TrainingSession
     {
@@ -52,13 +49,10 @@ class TrainingSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * L'identifiant de la séance en cours, lu **hors ORM**.
-     *
-     * Cette méthode n'existe que pour le perdant d'une course : deux `POST /sessions`
-     * simultanés, l'index unique partiel en rejette un, et Doctrine ferme
-     * l'`EntityManager` sur l'échec du flush. Plus rien ne peut être chargé par lui —
-     * mais la connexion, elle, reste utilisable, et le client a besoin de l'identifiant
-     * de la séance gagnante pour s'y rebrancher.
+     * Lu **hors ORM**, et seulement pour le perdant d'une course : l'index partiel
+     * rejette son INSERT, Doctrine ferme l'`EntityManager` sur l'échec du flush, plus
+     * rien ne peut être chargé par lui. La connexion, elle, reste utilisable — et le
+     * client a besoin de l'identifiant de la séance gagnante pour s'y rebrancher.
      */
     public function activeIdOf(Uuid $userId): ?Uuid
     {
@@ -71,12 +65,9 @@ class TrainingSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * La dernière séance close **qui compte** pour le cooldown, ou `null`.
-     *
-     * Le filtre sur la durée est ce qui traduit la décision du ticket #8 : une séance
-     * abandonnée sous le plancher n'a pas eu lieu et n'enclenche pas d'attente. Il
-     * couvre aussi les complétions sans les nommer — une séance complétée est au-dessus
-     * du plancher par construction, la clôture l'exige.
+     * La dernière séance close **qui compte** pour le cooldown. Le filtre sur la durée
+     * traduit la décision du ticket #8 : abandonnée sous le plancher, elle n'a pas eu
+     * lieu. Il couvre aussi les complétions, au-dessus du plancher par construction.
      */
     public function lastCountedClosure(Uuid $userId, int $minimumDurationSeconds): ?TrainingSession
     {
@@ -98,16 +89,13 @@ class TrainingSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * L'historique du joueur, du plus récent au plus ancien, à partir du curseur.
+     * L'ordre est celui de l'UUID v7, triable par construction : `id < :cursor` tient
+     * lieu de pagination, sans colonne d'ordre ni `OFFSET`. Il coïncide avec `startedAt`
+     * tant que tout vient du chronomètre ; le jour où une activité s'importera après
+     * coup, il faudra un curseur composite `(startedAt, id)`.
      *
-     * L'ordre est celui de l'UUID v7, triable par construction : c'est la raison du
-     * choix de cette version, et ce qui permet à `id < :cursor` de tenir lieu de
-     * pagination sans colonne d'ordre ni `OFFSET`. Il coïncide avec l'ordre de
-     * `startedAt` tant que toutes les séances viennent du chronomètre ; le jour où une
-     * activité s'importera après coup, il faudra un curseur composite `(startedAt, id)`.
-     *
-     * `$take` est distinct de `$query->limit` : l'appelant en demande une de plus pour
-     * savoir s'il existe une page suivante, et c'est à lui de ne pas la rendre.
+     * `$take` est volontairement plus grand que `$query->limit` : l'appelant lit une
+     * ligne de plus pour savoir s'il existe une page suivante, et ne la rend pas.
      *
      * @return list<TrainingSession>
      */
@@ -151,11 +139,8 @@ class TrainingSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Exécute le travail dans une transaction unique.
-     *
-     * C'est ce qui rend l'outbox atomique : l'`INSERT` de l'événement, écrit par le
-     * transport Doctrine sur cette même connexion, partage le `COMMIT` de la séance. Un
-     * échec n'en laisse ni l'un ni l'autre.
+     * Ce qui rend l'outbox atomique : l'`INSERT` de l'événement, écrit par le transport
+     * Doctrine sur cette connexion, partage le `COMMIT` de la séance.
      *
      * @template T
      *
