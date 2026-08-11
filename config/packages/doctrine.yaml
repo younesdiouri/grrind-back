@@ -36,6 +36,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Training/Domain'
                 prefix: 'App\Training\Domain'
                 alias: Training
+            Progression:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Progression/Domain'
+                prefix: 'App\Progression\Domain'
+                alias: Progression
 
 when@test:
     doctrine:
