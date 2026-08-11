@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Progression\Infrastructure\Config\LevelsSection;
 use App\Progression\Infrastructure\Config\XpSection;
 use App\Shared\Infrastructure\Config\GameBalancePass;
 use App\Training\Infrastructure\Config\TrainingSection;
@@ -30,6 +31,7 @@ class Kernel extends BaseKernel
             $this->getProjectDir().'/config/game/v1',
             new TrainingSection(),
             new XpSection(),
+            new LevelsSection(),
         ));
     }
 }

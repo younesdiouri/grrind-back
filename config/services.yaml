@@ -42,6 +42,10 @@ services:
         arguments:
             $disciplines: '%game.xp.disciplines%'
 
+    App\Progression\Domain\LevelCurve:
+        arguments:
+            $levels: '%game.levels.levels%'
+
     App\Progression\Domain\DiminishingReturns:
         arguments:
             $brackets: '%game.xp.diminishing_returns%'
@@ -88,6 +92,9 @@ when@test:
         # qui permet de prouver dès maintenant que le port `PlayerTimezones` est bien câblé
         # sur `Identity`, plutôt que de le découvrir au Lot 4.
         App\Progression\Application\DailyLoadProvider:
+            public: true
+
+        App\Progression\Application\GrantXpHandler:
             public: true
 
         # Route protégée qui sert de sonde à l'idempotence.
