@@ -22,15 +22,24 @@ services:
       - 'host.docker.internal:host-gateway'
 
   # Le consommateur de l'outbox. Même image que `php` : c'est le même code, dans un autre
-  # rôle. `--time-limit` plutôt qu'un processus éternel — un worker PHP finit toujours par
-  # garder de la mémoire, et se faire relancer toutes les heures coûte moins cher que de
-  # chercher pourquoi. La stack le redémarre, y compris tant que `messenger_messages`
-  # n'existe pas : sur une installation neuve il boucle jusqu'au `make migrate`.
+  # rôle. La stack le redémarre, y compris tant que `messenger_messages` n'existe pas :
+  # sur une installation neuve il boucle jusqu'au `make migrate`.
   worker:
     build:
       context: .
       target: dev
-    command: ['php', 'bin/console', 'messenger:consume', 'outbox', '--time-limit=3600', '-v']
+    # `--memory-limit` d'abord : c'est la vraie raison de recycler le processus, un
+    # worker PHP finissant toujours par garder de la mémoire. `--time-limit` reste en
+    # filet, mais l'horloge n'est pas ce qui devrait décider — sur ECS, un processus qui
+    # sort en boucle fait tourner le compteur de redémarrages du service.
+    command:
+      - php
+      - bin/console
+      - messenger:consume
+      - outbox
+      - --memory-limit=128M
+      - --time-limit=3600
+      - -v
     environment:
       APP_ENV: dev
       DATABASE_URL: 'postgresql://grrind:grrind@database:5432/grrind?serverVersion=17&charset=utf8'
@@ -40,6 +49,15 @@ services:
       database:
         condition: service_healthy
     restart: unless-stopped
+    # L'image FrankenPHP embarque une sonde HTTP. Le worker n'écoute sur aucun port :
+    # elle échouait donc indéfiniment, le conteneur restait `unhealthy` alors qu'il
+    # consommait très bien, et le `--wait` de `make up` sortait en erreur.
+    #
+    # On la désactive plutôt que d'en inventer une fausse : la santé d'un worker se
+    # mesure à la profondeur de sa file, pas à un port ouvert. Cette sonde-là est
+    # ticketée avec les métriques (#57).
+    healthcheck:
+      disable: true
 
   database:
     image: postgres:17-alpine
