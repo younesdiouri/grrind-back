@@ -16,8 +16,8 @@ use Doctrine\Migrations\AbstractMigration;
  * `Training`. `SUM(duration_seconds)` et `SUM(amount) … WHERE discipline = ?` sur l'index
  * `(user_id, created_at)` suffisent.
  *
- * **`NOT NULL` sans valeur par défaut, et c'est voulu.** PROGRESS.md note que c'est
- * habituellement le piège d'un diff Doctrine sur une table peuplée. Ici c'est la garde :
+ * **`NOT NULL` sans valeur par défaut, et c'est voulu.** C'est habituellement le piège d'un
+ * diff Doctrine sur une table peuplée. Ici c'est la garde :
  * il n'existe aucune valeur honnête à écrire dans une ligne existante — on ne devine pas la
  * discipline d'une XP déjà accordée — donc l'`ALTER` doit échouer si la table n'est pas
  * vide. Elle l'est, et le restera jusqu'au Lot 4 : rien n'écrit encore au ledger, le
