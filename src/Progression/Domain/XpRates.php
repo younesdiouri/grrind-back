@@ -23,12 +23,16 @@ final readonly class XpRates
     /** @var array<string, int> valeur de discipline → XP par heure */
     private array $perHour;
 
+    /** @var array<string, int> valeur de discipline → plafond d'XP quotidien */
+    private array $dailyCap;
+
     /**
-     * @param list<array{discipline: string, xp_per_hour: int}> $disciplines
+     * @param list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}> $disciplines
      */
     public function __construct(array $disciplines)
     {
         $perHour = [];
+        $dailyCap = [];
 
         foreach ($disciplines as $rate) {
             $discipline = Discipline::tryFrom($rate['discipline'])
@@ -42,23 +46,38 @@ final readonly class XpRates
                 throw new InvalidArgumentException(\sprintf('Une heure de "%s" doit valoir au moins 1 XP.', $discipline->value));
             }
 
+            // Un plafond sous ce qu'une seule heure rapporte ferait du garde-fou le
+            // limiteur principal, à la place des rendements décroissants — et le joueur
+            // buterait dessus tous les jours sans comprendre pourquoi.
+            if ($rate['daily_cap_xp'] < $rate['xp_per_hour']) {
+                throw new InvalidArgumentException(\sprintf('Le plafond quotidien de "%s" (%d) est sous ce qu\'une heure rapporte (%d).', $discipline->value, $rate['daily_cap_xp'], $rate['xp_per_hour']));
+            }
+
             $perHour[$discipline->value] = $rate['xp_per_hour'];
+            $dailyCap[$discipline->value] = $rate['daily_cap_xp'];
         }
 
         // Une discipline sans barème rapporterait zéro en silence — un joueur découvrirait
         // le trou, pas nous. On préfère ne pas démarrer.
         foreach (Discipline::cases() as $discipline) {
-            if (!isset($perHour[$discipline->value])) {
+            if (!isset($perHour[$discipline->value], $dailyCap[$discipline->value])) {
                 throw new InvalidArgumentException(\sprintf('Aucun barème d\'XP pour la discipline "%s".', $discipline->value));
             }
         }
 
         $this->perHour = $perHour;
+        $this->dailyCap = $dailyCap;
     }
 
     public function perHourOf(Discipline $discipline): int
     {
         return $this->perHour[$discipline->value];
+    }
+
+    /** Le maximum d'XP que cette discipline peut accorder sur une journée du joueur. */
+    public function dailyCapOf(Discipline $discipline): int
+    {
+        return $this->dailyCap[$discipline->value];
     }
 
     /**

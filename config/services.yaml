@@ -42,6 +42,15 @@ services:
         arguments:
             $disciplines: '%game.xp.disciplines%'
 
+    App\Progression\Domain\DiminishingReturns:
+        arguments:
+            $brackets: '%game.xp.diminishing_returns%'
+            $beyondWeightPercent: '%game.xp.diminishing_returns_beyond_percent%'
+
+    # Le fuseau du joueur traverse la frontière des modules par ce seul point : `Identity`
+    # implémente le port, `Progression` et `Engagement` ne connaissent que l'interface.
+    App\Shared\Application\PlayerTimezones: '@App\Identity\Infrastructure\Doctrine\UserRepository'
+
     # Providers league/oauth2-client câblés directement : KnpUOAuth2ClientBundle a été
     # écarté (décision Lot 1bis). Ils sont derrière un service locator dans le résolveur,
     # donc construits à la demande — le constructeur d'Apple refuse une configuration
@@ -73,6 +82,13 @@ when@test:
         # Aucune suite de tests ne peut appeler Google ni Apple.
         App\Tests\Support\StubSocialProfileResolver: ~
         App\Identity\Application\SocialProfileResolver: '@App\Tests\Support\StubSocialProfileResolver'
+
+        # Rien ne consomme encore ce service — le premier appelant sera la transaction de
+        # complétion (#21) — donc le conteneur le retire. Le rendre public en test est ce
+        # qui permet de prouver dès maintenant que le port `PlayerTimezones` est bien câblé
+        # sur `Identity`, plutôt que de le découvrir au Lot 4.
+        App\Progression\Application\DailyLoadProvider:
+            public: true
 
         # Route protégée qui sert de sonde à l'idempotence.
         App\Tests\Support\Http\:

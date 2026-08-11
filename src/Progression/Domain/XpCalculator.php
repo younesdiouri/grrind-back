@@ -33,16 +33,28 @@ use App\Shared\Domain\Modifier\ModifierType;
  * ouvrent assez de nœuds pour que le total des bonus dépasse +100 %, on mesure et on
  * décide. Les garde-fous de #15 bornent déjà la journée, qui est la vraie surface d'abus.
  *
- * ## Ce que ce calcul ne fait pas encore
+ * ## L'ordre des opérations
  *
- * Les rendements décroissants et le plafond quotidien par discipline (#15) sont des lignes
- * négatives qui s'ajouteront ici, après les bonus. Ils ont besoin du contexte de la
- * journée — donc du fuseau du joueur — que cette signature ne prend pas encore.
+ * 1. **le socle**, au prorata de la durée retenue ;
+ * 2. **les rendements décroissants**, qui rabotent le socle selon ce que le joueur a déjà
+ *    accumulé aujourd'hui ;
+ * 3. **les bonus**, en pourcentage du socle **après** rabotage ;
+ * 4. **le plafond quotidien** de la discipline, qui écrête le total.
+ *
+ * Placer les rendements décroissants avant les bonus plutôt qu'après donne exactement le
+ * même montant — les deux opérations sont linéaires — mais une arithmétique entière plus
+ * simple, une seule troncature au lieu d'un ratio appliqué à un sous-total, et surtout une
+ * narration que le joueur suit : « 90 de base, −40 parce que tu as déjà beaucoup couru
+ * aujourd'hui, +10 grâce à ta série ».
+ *
+ * Le breakdown **montre ce qui a été rogné** au lieu de livrer un total amaigri sans
+ * explication : c'est ce qui fait la différence entre une mécanique et une punition.
  */
 final readonly class XpCalculator
 {
     public function __construct(
         private XpRates $rates,
+        private DiminishingReturns $diminishing,
         private string $rulesetVersion,
     ) {
     }
@@ -50,11 +62,18 @@ final readonly class XpCalculator
     /**
      * @param int            $durationSeconds la durée **retenue**, déjà écrêtée par `Training`
      * @param list<Modifier> $modifiers       l'ensemble actif du joueur, tel que le resolver (#18) le rendra
+     * @param DailyLoad      $today           ce que le joueur a déjà fait dans **sa** journée
      */
-    public function calculate(Discipline $discipline, int $durationSeconds, array $modifiers): XpAward
+    public function calculate(Discipline $discipline, int $durationSeconds, array $modifiers, DailyLoad $today): XpAward
     {
-        $base = $this->rates->baseFor($discipline, $durationSeconds);
-        $lines = [new XpBreakdownLine(XpBreakdownSource::Base, $base)];
+        $fullBase = $this->rates->baseFor($discipline, $durationSeconds);
+        $base = $this->rates->baseFor($discipline, $this->diminishing->retain($today->secondsSoFar, $durationSeconds));
+
+        $lines = [new XpBreakdownLine(XpBreakdownSource::Base, $fullBase)];
+
+        if ($base !== $fullBase) {
+            $lines[] = new XpBreakdownLine(XpBreakdownSource::Diminishing, $base - $fullBase);
+        }
 
         foreach (self::bonusPercentages($discipline, $modifiers) as $source => $percentage) {
             // Le total de la source d'abord, l'arrondi ensuite : deux objets à +10 % et
@@ -69,7 +88,34 @@ final readonly class XpCalculator
             }
         }
 
-        return new XpAward(new XpBreakdown(...$lines), $this->rulesetVersion);
+        $breakdown = new XpBreakdown(...$lines);
+
+        if (null !== $overflow = $this->overflowOf($discipline, $breakdown->total(), $today)) {
+            $lines[] = $overflow;
+            $breakdown = new XpBreakdown(...$lines);
+        }
+
+        return new XpAward($breakdown, $this->rulesetVersion);
+    }
+
+    /**
+     * Ce qui dépasse le plafond quotidien de la discipline, en négatif, ou `null` si rien
+     * ne dépasse.
+     *
+     * Le plafond écrête, il ne rejette pas — même geste qu'au plafond de durée d'une
+     * séance : le joueur garde ce qu'il peut garder. Et le reste de la journée est déjà
+     * consommé, donc un joueur au plafond voit `-tout`, avec la ligne qui le dit.
+     */
+    private function overflowOf(Discipline $discipline, int $earned, DailyLoad $today): ?XpBreakdownLine
+    {
+        // Négatif si le plafond a été baissé par un rééquilibrage alors qu'un joueur
+        // l'avait déjà dépassé : il ne perd rien de ce qui est au ledger, il ne gagne
+        // simplement plus rien aujourd'hui.
+        $allowance = max(0, $this->rates->dailyCapOf($discipline) - $today->xpSoFarInDiscipline);
+
+        return $earned > $allowance
+            ? new XpBreakdownLine(XpBreakdownSource::DailyCap, $allowance - $earned)
+            : null;
     }
 
     /**

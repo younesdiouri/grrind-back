@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Progression\Infrastructure\Doctrine;
 
+use App\Progression\Domain\DailyLoad;
 use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
+use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\LocalDay;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bridge\Doctrine\Types\UuidType;
@@ -58,6 +61,43 @@ class XpTransactionRepository extends ServiceEntityRepository
     public function recordedFor(Uuid $sourceId, XpReason $reason): ?XpTransaction
     {
         return $this->findOneBy(['sourceId' => $sourceId, 'reason' => $reason]);
+    }
+
+    /**
+     * Ce que le joueur a déjà fait dans **sa** journée : le temps cumulé toutes disciplines
+     * confondues, et l'XP déjà accordée dans celle-ci.
+     *
+     * Les deux portées diffèrent parce que les deux garde-fous ne visent pas la même chose
+     * — le temps décroît sur le volume d'entraînement total, le plafond empêche de tout
+     * concentrer sur la discipline la mieux payée.
+     *
+     * Une simple somme suffit à solder les annulations : leurs montants **et** leurs durées
+     * sont négatifs, donc une séance invalidée s'annule d'elle-même dans les deux
+     * compteurs, sans que la requête ait à filtrer sur les raisons.
+     */
+    public function dailyLoadOf(Uuid $userId, Discipline $discipline, LocalDay $day): DailyLoad
+    {
+        $row = $this->createQueryBuilder('t')
+            ->select('COALESCE(SUM(t.durationSeconds), 0) AS seconds')
+            // Le CASE porte la restriction à la discipline plutôt qu'un second appel :
+            // une seule lecture de la journée, un seul parcours d'index.
+            ->addSelect('COALESCE(SUM(CASE WHEN t.discipline = :discipline THEN t.amount ELSE 0 END), 0) AS xp')
+            ->where('t.userId = :userId')
+            ->andWhere('t.createdAt >= :startsAt')
+            ->andWhere('t.createdAt < :endsAt')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->setParameter('discipline', $discipline)
+            ->setParameter('startsAt', $day->startsAt)
+            ->setParameter('endsAt', $day->endsAt)
+            ->getQuery()
+            ->getSingleResult();
+
+        \assert(\is_array($row) && is_numeric($row['seconds']) && is_numeric($row['xp']));
+
+        // Un cumul négatif n'a pas de sens pour placer une séance sur la courbe : il
+        // signifierait qu'on a annulé plus que ce qui avait été crédité ce jour-là, ce que
+        // seule une annulation datée d'un autre jour peut produire.
+        return new DailyLoad(max(0, (int) $row['seconds']), (int) $row['xp']);
     }
 
     public function commit(): void

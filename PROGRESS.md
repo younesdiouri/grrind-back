@@ -405,6 +405,41 @@ reste un paramètre unique, et ouvrir une discipline ne demande pas de recâbler
 Une discipline non couverte fait échouer le démarrage — sinon elle rapporterait zéro en silence,
 et c'est un joueur qui découvrirait le trou.
 
+**Lot 3 — le fuseau du joueur traverse la frontière des modules par un port dans `Shared`.**
+`Shared\Application\PlayerTimezones` : `Identity\UserRepository` l'implémente, `Progression` le
+consomme, aucune flèche ne va de l'un à l'autre. C'est le premier port de ce genre, et il est
+justifié un par un comme le veut la règle n°0 : le fuseau est un attribut de profil, le plafond
+quotidien et le streak se calculent dedans, et aucun composant Symfony ne répond à une frontière
+de *notre* découpage. `Engagement` le réutilisera tel quel au #24. La réplication par événement a
+été écartée : elle est asynchrone, et un joueur qui change de fuseau puis clôture une séance dans
+la seconde serait compté sur l'ancien. Un compte introuvable rend `UTC` plutôt que de lever — c'est
+le pire découpage possible pour le joueur, jamais le plus avantageux, donc ça ne se triche pas.
+
+**Lot 3 — les garde-fous quotidiens s'appliquent au temps, puis au total.** Socle → rendements
+décroissants (qui rabotent le socle) → bonus (en % du socle **raboté**) → plafond quotidien (qui
+écrête le total). Placer les rendements avant les bonus donne exactement le même montant qu'après
+— les deux opérations sont linéaires — mais une seule troncature entière au lieu d'un ratio
+appliqué à un sous-total, et une narration que le joueur suit : « 90 de base, −40 parce que tu as
+déjà beaucoup couru, +10 grâce à ta série ». Les deux garde-fous ont chacun **leur ligne dans le
+breakdown** : montrer ce qui a été rogné est ce qui sépare une mécanique d'une punition.
+
+**Lot 3 — le découpage des rendements est par tranche, pas par palier global.** Un palier global
+(« au-delà d'une heure, tout vaut 60 % ») ferait perdre à la 61ᵉ minute de l'XP déjà acquise, et
+le joueur apprendrait à s'arrêter à 59. Par tranche, découper sa journée en trois séances ou en
+faire une seule donne le même total — c'est testé, sans quoi le découpage deviendrait une stratégie.
+
+**Lot 3 — `duration_seconds` est signée au ledger, comme le montant.** L'annulation d'une séance
+porte une durée négative, donc les deux compteurs de la journée se soldent par simple somme : une
+séance invalidée cesse de peser sur les rendements décroissants exactement comme elle cesse de
+compter en XP, sans que la requête ait à filtrer sur les raisons.
+
+**Lot 3 — le plafond quotidien est un filet, pas une laisse.** Deux heures de barème par
+discipline, au-dessus des ~130 XP de socle qu'une journée permet une fois les rendements passés :
+il ne se fait sentir que quand les bonus s'empilent. Un plafond serré aurait rogné tous les jours
+les bonus que le joueur a investi pour obtenir, et un bonus qui ne sert jamais est un bonus qu'on
+regrette d'avoir acheté. `XpRates` refuse un plafond sous le taux horaire — ce serait faire du
+backstop le limiteur principal.
+
 ## Pièges déjà rencontrés
 
 **Un index partiel se déclare tel que PostgreSQL le *relit*, casts compris.** Écrire
@@ -490,6 +525,14 @@ donne la priorité aux membres standard, donc le `409` gagnait et le statut rée
 silencieusement de la réponse — exactement ce que l'erreur était censée apprendre au client. La
 clé s'appelle `sessionStatus`. Le test de domaine ne pouvait pas le voir : la collision n'existe
 qu'une fois l'exception sérialisée. Vérifier le **corps** d'une erreur, pas seulement son code.
+
+**Doctrine hydrate une projection de champ à travers son type.** `->select('u.timezone')` ne rend
+pas une chaîne mais un `Timezone` — le type Doctrine s'applique aussi aux sélections scalaires.
+Le code attendait une chaîne et retombait sur son repli `UTC` **sans rien signaler** : le pire des
+cas, puisqu'un joueur se serait simplement vu compter sa journée de travers. Seul le test
+d'intégration l'a vu, en comparant deux fenêtres autour de minuit à Paris ; aucun test unitaire du
+domaine n'aurait pu. Vérifier le *type réel* de ce que rend une projection, et se méfier de tout
+repli silencieux sur une valeur par défaut plausible.
 
 **Le `KernelBrowser` redémarre le noyau entre deux requêtes.** Un service bouchon programmé
 depuis le test est donc remis à zéro avant d'être consommé. Pour le social sign-in, le stub

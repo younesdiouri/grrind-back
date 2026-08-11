@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Domain;
 
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Domain\Activity\Discipline;
 use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -66,6 +67,28 @@ class XpTransaction
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $sourceId;
 
+    /**
+     * La discipline et la durée que cette écriture valorise. Dénormalisées ici plutôt que
+     * relues chez `Training` : ce sont les deux entrées des garde-fous quotidiens
+     * (rendements décroissants sur le temps cumulé, plafond d'XP par discipline), et
+     * `Progression` doit pouvoir y répondre sans franchir une frontière de module.
+     *
+     * Elles rendent surtout le ledger auto-suffisant : « à cette date, pour cette
+     * discipline, cette durée, tu as reçu tant sous ces règles » est ce qu'une piste
+     * d'audit doit savoir dire seule.
+     */
+    #[ORM\Column(length: 32, enumType: Discipline::class)]
+    private Discipline $discipline;
+
+    /**
+     * **Signée**, comme le montant. L'annulation d'une séance porte une durée négative :
+     * les deux compteurs de la journée se soldent alors par simple somme, sans que la
+     * requête ait à connaître les raisons — une séance invalidée cesse de peser sur les
+     * rendements décroissants exactement comme elle cesse de compter en XP.
+     */
+    #[ORM\Column]
+    private int $durationSeconds;
+
     #[ORM\Column(length: 32)]
     private string $rulesetVersion;
 
@@ -83,6 +106,8 @@ class XpTransaction
         Uuid $userId,
         XpReason $reason,
         Uuid $sourceId,
+        Discipline $discipline,
+        int $durationSeconds,
         XpBreakdown $breakdown,
         string $rulesetVersion,
         DateTimeImmutable $now,
@@ -91,6 +116,8 @@ class XpTransaction
         $this->userId = $userId;
         $this->reason = $reason;
         $this->sourceId = $sourceId;
+        $this->discipline = $discipline;
+        $this->durationSeconds = $durationSeconds;
         $this->rulesetVersion = $rulesetVersion;
         $this->amount = $breakdown->total();
         $this->createdAt = $now;
@@ -109,11 +136,21 @@ class XpTransaction
     public static function creditFor(
         Uuid $userId,
         Uuid $sessionId,
-        XpBreakdown $breakdown,
-        string $rulesetVersion,
+        Discipline $discipline,
+        int $durationSeconds,
+        XpAward $award,
         DateTimeImmutable $now,
     ): self {
-        return new self($userId, XpReason::SessionCompleted, $sessionId, $breakdown, $rulesetVersion, $now);
+        return new self(
+            $userId,
+            XpReason::SessionCompleted,
+            $sessionId,
+            $discipline,
+            $durationSeconds,
+            $award->breakdown,
+            $award->rulesetVersion,
+            $now,
+        );
     }
 
     /**
@@ -128,6 +165,11 @@ class XpTransaction
             $credit->userId,
             XpReason::SessionInvalidated,
             $credit->sourceId,
+            $credit->discipline,
+            // Négative, comme le montant : la séance annulée cesse de peser sur les
+            // rendements décroissants de sa journée exactement comme elle cesse de compter
+            // en XP, et la somme du jour s'en charge sans cas particulier.
+            -$credit->durationSeconds,
             $credit->breakdown()->negated(),
             $credit->rulesetVersion,
             $now,
@@ -157,6 +199,16 @@ class XpTransaction
     public function sourceId(): Uuid
     {
         return $this->sourceId;
+    }
+
+    public function discipline(): Discipline
+    {
+        return $this->discipline;
+    }
+
+    public function durationSeconds(): int
+    {
+        return $this->durationSeconds;
     }
 
     public function rulesetVersion(): string

@@ -2,8 +2,8 @@
 #
 # Le socle est linéaire au prorata de la durée retenue : `durée × xp_per_hour ÷ 3600`, en
 # arithmétique entière, tronqué vers le bas — une séance ne peut jamais rapporter plus que
-# ce que le barème annonce. La courbe non linéaire ne vient pas d'ici : ce sont les
-# rendements décroissants de la journée (#15), qui s'expriment en tranches de minutes.
+# ce que le barème annonce. La courbe non linéaire vient des rendements décroissants,
+# déclarés plus bas.
 #
 # Les six disciplines doivent être couvertes, chacune une fois. Une discipline oubliée fait
 # échouer le démarrage plutôt que de rapporter zéro à un joueur.
@@ -11,10 +11,37 @@
 # L'équilibrage tient en une phrase par ligne : « une heure de natation vaut 100 XP ».
 # Les écarts traduisent l'intensité, pas la préférence — la mobilité est un entretien, la
 # natation coûte cher, la musculation se compte moins bien à la minute que le reste.
+#
+# `daily_cap_xp` est un **filet, pas une laisse** : deux heures de barème, donc au-dessus
+# des ~130 XP de socle qu'un joueur peut atteindre en une journée une fois les rendements
+# décroissants passés. Il ne se fait sentir que quand les bonus s'empilent. Le limiteur qui
+# se ressent, et qui est une vraie mécanique de jeu, ce sont les tranches ci-dessous.
 disciplines:
-    - { discipline: RUNNING, xp_per_hour: 90 }
-    - { discipline: CYCLING, xp_per_hour: 70 }
-    - { discipline: SWIMMING, xp_per_hour: 100 }
-    - { discipline: STRENGTH, xp_per_hour: 80 }
-    - { discipline: MOBILITY, xp_per_hour: 50 }
-    - { discipline: CLIMBING, xp_per_hour: 85 }
+    - { discipline: RUNNING, xp_per_hour: 90, daily_cap_xp: 180 }
+    - { discipline: CYCLING, xp_per_hour: 70, daily_cap_xp: 140 }
+    - { discipline: SWIMMING, xp_per_hour: 100, daily_cap_xp: 200 }
+    - { discipline: STRENGTH, xp_per_hour: 80, daily_cap_xp: 160 }
+    - { discipline: MOBILITY, xp_per_hour: 50, daily_cap_xp: 100 }
+    - { discipline: CLIMBING, xp_per_hour: 85, daily_cap_xp: 170 }
+
+# Rendements décroissants sur le **cumul de la journée**, toutes disciplines confondues, et
+# dans le fuseau du joueur. C'est le garde-fou anti-abus qui ne se ressent pas comme une
+# punition : au-delà d'un certain temps d'entraînement quotidien, continuer rapporte de
+# moins en moins, ce qui supprime l'intérêt de tricher tout en restant une règle de jeu
+# qu'un sportif trouve juste.
+#
+# Le découpage est **par tranche**, pas par palier global : une séance à cheval sur deux
+# tranches est coupée en deux, chaque morceau à son propre poids. Une séance de 20 min
+# commencée à la 50ᵉ minute de la journée compte 10 min à 100 % puis 10 min à 60 %.
+#
+# `up_to_minutes` est la borne haute du cumul quotidien, `weight_percent` ce que vaut la
+# minute passée dans cette tranche. Les poids doivent décroître — c'est le nom de la
+# mécanique, et un poids qui remonterait rendrait rentable d'attendre.
+diminishing_returns:
+    - { up_to_minutes: 60, weight_percent: 100 }
+    - { up_to_minutes: 90, weight_percent: 60 }
+    - { up_to_minutes: 120, weight_percent: 30 }
+
+# Au-delà de la dernière tranche : plus rien. La séance existe, elle compte pour le streak
+# et pour l'historique, mais elle ne rapporte plus d'XP.
+diminishing_returns_beyond_percent: 0
