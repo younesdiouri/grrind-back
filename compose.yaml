@@ -41,6 +41,31 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # L'image de prod, uniquement pour y jouer les migrations du déploiement.
+  #
+  # `profiles` la tient hors de `make up` : elle ne fait pas partie de la stack de
+  # travail, c'est une tâche ponctuelle qu'on invoque par `make migrate-prod`. C'est
+  # l'équivalent local de la tâche ECS one-off qui devra tourner **avant** que les
+  # nouvelles tâches prennent du trafic.
+  #
+  # Elle ne connaît que `DATABASE_URL` — ni clés JWT, ni secrets OAuth. Migrer ne
+  # demande rien d'autre, et une étape de déploiement qui exige tous les secrets de
+  # l'application est une étape qui échouera pour une mauvaise raison.
+  php-prod:
+    build:
+      context: .
+      target: prod
+    profiles: ['deploy']
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: '0'
+      # Surchargeable depuis l'environnement : en prod, l'URL vient du gestionnaire
+      # de secrets et pointe sur RDS.
+      DATABASE_URL: '${DATABASE_URL:-postgresql://grrind:grrind@database:5432/grrind?serverVersion=17&charset=utf8}'
+    depends_on:
+      database:
+        condition: service_healthy
+
   database:
     image: postgres:17-alpine
     environment:

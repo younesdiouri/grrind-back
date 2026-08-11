@@ -41,6 +41,32 @@ Un module ne connaît que `Shared` — Deptrac le vérifie en CI.
 Les invariants de conception (le serveur possède l'horloge, l'XP est un ledger append-only, un seul
 vocabulaire de modificateurs, RNG serveur auditable) sont détaillés dans [CLAUDE.md](CLAUDE.md).
 
+## Déploiement
+
+Rien n'est déployé à ce jour ; la cible visée est ECS Fargate — un service pour l'API en mode
+worker FrankenPHP, un service pour le consommateur Messenger, RDS PostgreSQL 17.
+
+**Les migrations sont une étape de déploiement à part entière, jouée avant que les nouvelles
+tâches prennent du trafic.** Elle tourne dans l'image de prod, pour que ce qui migre la base soit
+exactement le code qui va la lire :
+
+```bash
+DATABASE_URL="postgresql://…" make migrate-prod
+```
+
+La commande sort en code non nul si une migration échoue — c'est ce qui doit interrompre le
+déploiement. Elle ne dépend que de `DATABASE_URL` : ni clés JWT, ni secrets OAuth. En local elle
+vise la base de la stack ; sur ECS, c'est une tâche one-off dans la même définition de tâche que
+l'API, lancée avant la bascule.
+
+Deux points à trancher avant le premier déploiement, ticketés sur le jalon *Lot 9 — Durcissement* :
+**RDS Proxy est incompatible avec le `LISTEN/NOTIFY`** dont dépend l'outbox ([#56]), et les clés
+JWT sont aujourd'hui référencées par *chemin de fichier* alors qu'un gestionnaire de secrets
+injecte une valeur ([#54]).
+
+[#54]: https://github.com/younesdiouri/grrind-back/issues/54
+[#56]: https://github.com/younesdiouri/grrind-back/issues/56
+
 ## Avancement
 
 Le suivi vit sur le [tableau GitHub](https://github.com/users/younesdiouri/projects/1) : un ticket
