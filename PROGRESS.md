@@ -375,6 +375,36 @@ courantes ferait de chaque rééquilibrage une redistribution silencieuse sur to
 Et pas de valeur « correction manuelle » dans `XpReason` : aucune route ni commande n'en crédite,
 et une valeur qu'aucun code n'écrit est une porte qu'on finit par pousser.
 
+**Lot 3 — les modificateurs se composent en additif sur le socle, et il n'y a pas de plafond.**
+C'était la question ouverte du #18, tranchée en #14 parce que c'est de l'arithmétique. Un socle de
+90 avec +20 % de streak et +15 % d'objets vaut `90 + 18 + 13 = 121`, pas `90 × 1,20 × 1,15`. Trois
+raisons : **chaque ligne du breakdown reste vraie isolément** (en multiplicatif, la contribution
+d'un objet dépend de ce qui a été appliqué avant, donc l'ordre devient porteur de sens et perdre
+son streak ferait aussi baisser la ligne « objets ») ; **la croissance est linéaire**, alors que
+c'est l'empilement multiplicatif qui explose et oblige à un plafond ; **le rééquilibrage est
+local**. D'où l'absence de plafond, qui n'est pas un oubli : le déclencheur est écrit, c'est le
+jour où les arbres (#31) ouvrent assez de nœuds pour dépasser +100 % de bonus cumulé. Les
+garde-fous de #15 bornent déjà la journée, qui est la vraie surface d'abus.
+
+**Lot 3 — le breakdown groupe par source, et le cumul précède l'arrondi.** Deux objets à +5 %
+donnent une ligne `ITEM` à +9 sur un socle de 90, pas deux lignes à +4. Deux raisons : deux
+troncatures successives perdent des points au joueur sans que rien ne l'explique, et **grouper rend
+le breakdown déterministe** — le même ensemble de modificateurs donne le même détail quel que soit
+l'ordre dans lequel le resolver les a produits, sans quoi deux calculs identiques écriraient deux
+lignes de ledger différentes. Conséquence assumée : pas d'attribution par objet (« +13 bottes »
+devient « +13 objets ») tant que la colonne d'origine laissée ouverte au #13 n'existe pas. Une
+contribution qui s'arrondit à zéro n'occupe aucune ligne : elle n'explique rien.
+
+**Lot 3 — le socle est linéaire, par heure et par discipline.** `intdiv(durée × xp_per_hour, 3600)`,
+tronqué vers le bas, donc une séance ne rapporte jamais plus que ce que le barème annonce.
+L'équilibrage se lit comme une phrase — « une heure de natation vaut 100 XP » — et la courbe non
+linéaire vient d'ailleurs : les rendements décroissants de #15 s'expriment en tranches de minutes,
+les deux morceaux s'emboîtent sans se recouvrir. `xp.yaml` déclare les disciplines en **liste** et
+non en table indexée, parce que le chargeur ne descend pas dans les listes : `game.xp.disciplines`
+reste un paramètre unique, et ouvrir une discipline ne demande pas de recâbler `services.yaml`.
+Une discipline non couverte fait échouer le démarrage — sinon elle rapporterait zéro en silence,
+et c'est un joueur qui découvrirait le trou.
+
 ## Pièges déjà rencontrés
 
 **Un index partiel se déclare tel que PostgreSQL le *relit*, casts compris.** Écrire

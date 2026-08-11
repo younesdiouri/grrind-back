@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Progression\Infrastructure\Config\XpSection;
 use App\Shared\Infrastructure\Config\GameBalancePass;
 use App\Training\Infrastructure\Config\TrainingSection;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
@@ -28,6 +29,7 @@ class Kernel extends BaseKernel
         $container->addCompilerPass(new GameBalancePass(
             $this->getProjectDir().'/config/game/v1',
             new TrainingSection(),
+            new XpSection(),
         ));
     }
 }

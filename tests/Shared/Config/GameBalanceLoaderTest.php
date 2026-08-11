@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared\Config;
 
+use App\Progression\Infrastructure\Config\XpSection;
 use App\Shared\Infrastructure\Config\GameBalance;
 use App\Shared\Infrastructure\Config\GameBalanceLoader;
 use App\Training\Infrastructure\Config\TrainingSection;
@@ -19,20 +20,22 @@ final class GameBalanceLoaderTest extends TestCase
 {
     public function testLoadsTheShippedBalance(): void
     {
-        $balance = self::load(\dirname(__DIR__, 3).'/config/game/v1');
+        $balance = self::loadShipped();
 
         self::assertSame(
             ['minimum_duration_seconds' => 300, 'maximum_duration_seconds' => 14400, 'cooldown_seconds' => 900],
             $balance->sections['training'],
         );
+
+        // Toutes les sections déclarées, et rien d'autre : c'est la garde contre le
+        // fichier oublié qui l'affirme, section par section.
+        self::assertSame(['training', 'xp'], array_keys($balance->sections));
     }
 
     public function testDerivesTheRulesetVersionFromTheFolderAndItsContent(): void
     {
-        $version = self::load(\dirname(__DIR__, 3).'/config/game/v1')->version;
-
         // Le préfixe dit d'où vient la balance, le hash ce qu'elle vaut.
-        self::assertMatchesRegularExpression('/^v1-[0-9a-f]{12}$/', $version);
+        self::assertMatchesRegularExpression('/^v1-[0-9a-f]{12}$/', self::loadShipped()->version);
     }
 
     public function testTheRulesetVersionIsStable(): void
@@ -80,6 +83,18 @@ final class GameBalanceLoaderTest extends TestCase
         yield 'fichier absent' => ['missing', '/absent/'];
     }
 
+    /**
+     * L'équilibrage réellement livré, avec toutes ses sections — la liste doit rester
+     * celle de `App\Kernel::build()`, sinon la garde contre les fichiers sans schéma se
+     * déclenche et le test le dit tout de suite.
+     */
+    private static function loadShipped(): GameBalance
+    {
+        return new GameBalanceLoader(\dirname(__DIR__, 3).'/config/game/v1')
+            ->load(new TrainingSection(), new XpSection());
+    }
+
+    /** Les fixtures ne contiennent qu'un `training.yaml` : une seule section à déclarer. */
     private static function load(string $directory): GameBalance
     {
         return new GameBalanceLoader($directory)->load(new TrainingSection());
