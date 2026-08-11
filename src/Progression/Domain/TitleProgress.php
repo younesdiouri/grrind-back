@@ -31,6 +31,25 @@ final readonly class TitleProgress
         return new self($title, $title->condition->progressOf($record));
     }
 
+    /**
+     * Un titre acquis, sans relever le joueur.
+     *
+     * **Un déblocage est définitif, donc sa barre est pleine, quoi que dise le relevé.**
+     * Une séance invalidée peut ramener un compteur sous son seuil ; la ligne dans
+     * `player_title`, elle, reste, et afficher une barre incomplète sur un titre qu'on
+     * porte serait la promesse qu'on peut le perdre. C'est aussi le contrat déjà écrit
+     * dans {@see \App\Shared\Application\PlayerTitle} : sur un titre acquis, `current`
+     * vaut `target`.
+     *
+     * Ce qui se gagne au passage n'est pas cosmétique : lister les titres d'un joueur ne
+     * demande plus de relire le ledger, donc `GET /api/progression` tient sur le seul
+     * snapshot et deux lectures indexées.
+     */
+    public static function completed(Title $title): self
+    {
+        return new self($title, $title->condition->threshold);
+    }
+
     public function unit(): ProgressUnit
     {
         return $this->title->condition->requirement->unit();
