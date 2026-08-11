@@ -63,9 +63,16 @@ Strava arrive après, comme simple adapter d'`ActivitySource` — jamais avant.
 | `POST /api/training/sessions/{id}/abandon` | Bearer + `Idempotency-Key` | 200, séance abandonnée |
 | `GET /api/training/sessions` | Bearer | 200, page d'historique + `nextCursor` |
 | `GET /api/training/sessions/active` | Bearer | 200 séance en cours, ou 204 |
+| `GET /api/titles` | Bearer | 200, catalogue situé + titre porté |
+| `PUT /api/titles/active` | Bearer | 200, catalogue situé après changement |
 
 `register`, `login` et `social` rendent tous le même `AuthResource` : le client iOS n'a qu'un
 seul chemin de traitement.
+
+Un titre a **une seule forme JSON** dans toute l'API — `id`, `name`, `hint`, `unlocked`,
+`unlockedAt`, `progress {current, target, unit}` — que ce soit dans `title` et `nextTitle` du
+profil ou dans le catalogue. Les libellés suivent l'`Accept-Language` du client, `en` par défaut
+et en repli.
 
 Toute erreur sort en `application/problem+json`, avec un `type` stable en kebab-case sous
 `https://grrind.app/problems/` — c'est là-dessus que le client iOS branche ses messages, jamais
@@ -474,6 +481,57 @@ revient après une pause en gagne deux ou trois d'un coup, et le client les anim
 booléen « a monté de niveau » les lui ferait avaler en silence. À l'inverse, une annulation qui
 fait redescendre le niveau ne produit aucune annonce : le joueur revient à son niveau réel, mais
 il n'y a rien à célébrer ni à animer.
+
+**Lot 3 — les libellés des titres sortent de l'équilibrage, et passent par le composant
+Translation.** `config/game/v1/titles.yaml` ne porte que l'identifiant et la condition ;
+`translations/titles.{fr,en}.yaml` porte les mots, servis dans la langue de l'`Accept-Language`
+(`framework.set_locale_from_accept_language`). Le raisonnement est celui du `rulesetVersion` :
+corriger une faute d'orthographe n'a pas à faire croire que la balance a bougé, alors qu'un seuil
+abaissé, si. La contrepartie est que le lien entre les deux fichiers n'est plus structurel —
+`TitleTranslationsTest` le rétablit en refusant un titre sans libellé, sinon le traducteur
+enverrait `veteran.name` au joueur, en silence. Les seuils passent en paramètre (`%threshold%`,
+`%hours%`) plutôt qu'écrits dans la phrase : un rééquilibrage ne doit pas pouvoir laisser une
+consigne qui ment.
+
+**Lot 3 — quatre types de condition, tous lisibles du seul ledger.** `level_reached`,
+`total_xp`, `session_count` (globale ou par discipline) et `discipline_seconds`. Le critère
+n'est pas le game design mais la frontière : une condition qui obligerait `Progression` à
+interroger `Training` ou `Engagement` n'entre pas. Le ledger porte déjà `discipline` et
+`duration_seconds` dénormalisés, et les compteurs sont **nets** — l'annulation écrit `-1` séance
+comme elle écrit une durée négative, donc une séance invalidée disparaît du relevé sans cas
+particulier. Les titres de streak attendront `Engagement` (#24).
+
+**Lot 3 — le titre acquis vit dans une table, le titre affiché dans une autre.** `player_title`
+enregistre un fait définitif — aucun code ne sait en retirer une ligne, c'est ce qui porte « un
+titre débloqué ne se reprend jamais », y compris quand une séance annulée fait repasser le relevé
+sous le seuil. `player_active_title` enregistre une préférence, remplacée d'un
+`INSERT … ON CONFLICT`. Les mêler imposerait un index partiel et deux `UPDATE` ordonnés. Une clé
+étrangère **composée** relie les deux : afficher un titre non débloqué est impossible au niveau
+de la base, pas seulement du code.
+
+**Lot 3 — l'évaluation des titres vient *après* l'écriture au ledger, dans la transaction.** La
+séance qui vient d'être créditée compte donc dans la condition qu'elle satisfait ; évaluer avant
+décalerait chaque déblocage d'une séance, ce que personne ne comprend et que tout le monde
+remarque. Le verrou déjà posé sur la ligne de progression sérialise l'évaluation avec le reste.
+Effet de bord voulu : un titre ajouté au catalogue est **rétroactif** sans reprise de données —
+le prochain entraînement l'accorde à qui remplissait déjà sa condition.
+
+**Lot 3 — le prochain titre se classe en proportion du chemin *restant*, pas de la cible.** Les
+unités ne se comparent pas (40 000 XP sur 50 000 contre 8 séances sur 25), seul le ratio les met
+sur la même échelle — en produit en croix entier, un flottant créerait des ex æquo qui n'en sont
+pas. Les conditions de niveau partent de 1 et non de 0 (`TitleRequirement::origin()`) : sans
+cette origine, « atteindre le niveau 5 » paraîtrait entamé à 20 % dès l'inscription et raflerait
+l'objectif proposé à une condition réellement à une séance d'aboutir. L'origine sert au
+classement, pas à l'affichage, qui continue de dire « niveau 1 sur 5 ».
+
+**Lot 3 — `Identity` lit les titres par un port dans `Shared`, symétrique de `PlayerTimezones`.**
+Le ticket veut le titre actif dans `GET /api/me`, parce que le client a besoin de l'état du
+joueur en une requête à l'ouverture ; Deptrac interdit à `Identity` d'importer `Progression`.
+`PlayerTitles` rend deux titres **déjà traduits et déjà situés**, donc `Identity` n'apprend ni ce
+qu'est une condition ni comment on désigne le prochain titre. Conséquence assumée : `AuthResource`
+sert la même forme, donc le login et le rafraîchissement portent aussi le titre — un `user` qui
+changerait de forme selon la route obligerait le client à rendre ses champs optionnels des deux
+côtés.
 
 ## Pièges déjà rencontrés
 

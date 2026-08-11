@@ -9,6 +9,7 @@ use App\Identity\Application\SignInWithProviderHandler;
 use App\Identity\Domain\SocialProvider;
 use App\Identity\UI\Http\Request\SocialSignInRequest;
 use App\Identity\UI\Http\Response\AuthResource;
+use App\Shared\Application\PlayerTitles;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -22,8 +23,10 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final readonly class SocialSignInController
 {
-    public function __construct(private SignInWithProviderHandler $signIn)
-    {
+    public function __construct(
+        private SignInWithProviderHandler $signIn,
+        private PlayerTitles $titles,
+    ) {
     }
 
     #[Route(
@@ -42,6 +45,6 @@ final readonly class SocialSignInController
             $request->timezone,
         ));
 
-        return new JsonResponse(AuthResource::from($authenticated)->toArray());
+        return new JsonResponse(AuthResource::from($authenticated, $this->titles->of($authenticated->user->id()))->toArray());
     }
 }

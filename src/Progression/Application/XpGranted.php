@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Application;
 
 use App\Progression\Domain\ProgressionSnapshot;
+use App\Progression\Domain\Title;
 use App\Progression\Domain\XpAward;
 
 /**
@@ -18,7 +19,8 @@ use App\Progression\Domain\XpAward;
 final readonly class XpGranted
 {
     /**
-     * @param list<int> $levelsReached vide si aucun niveau n'a été franchi
+     * @param list<int>   $levelsReached  vide si aucun niveau n'a été franchi
+     * @param list<Title> $titlesUnlocked vide le plus souvent : un titre est un événement rare, c'est ce qui en fait un
      */
     public function __construct(
         public XpAward $award,
@@ -26,6 +28,7 @@ final readonly class XpGranted
         public array $levelsReached,
         /** Les points de compétence que ces niveaux ont accordés. */
         public int $skillPointsGranted,
+        public array $titlesUnlocked = [],
     ) {
     }
 }

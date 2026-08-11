@@ -46,6 +46,13 @@ services:
         arguments:
             $levels: '%game.levels.levels%'
 
+    # Le catalogue des titres, d'un bloc pour la même raison que le barème : c'est une
+    # liste, et son ordre — qui départage les ex æquo au moment de désigner le prochain
+    # titre — doit survivre au conteneur compilé.
+    App\Progression\Domain\TitleCatalog:
+        arguments:
+            $titles: '%game.titles.titles%'
+
     App\Progression\Domain\DiminishingReturns:
         arguments:
             $brackets: '%game.xp.diminishing_returns%'
@@ -54,6 +61,10 @@ services:
     # Le fuseau du joueur traverse la frontière des modules par ce seul point : `Identity`
     # implémente le port, `Progression` et `Engagement` ne connaissent que l'interface.
     App\Shared\Application\PlayerTimezones: '@App\Identity\Infrastructure\Doctrine\UserRepository'
+
+    # Le pendant exact, dans l'autre sens : `Progression` possède les titres, `Identity` les
+    # affiche dans le profil sans jamais connaître ni le catalogue ni la table.
+    App\Shared\Application\PlayerTitles: '@App\Progression\Infrastructure\Translation\TranslatedPlayerTitles'
 
     # Providers league/oauth2-client câblés directement : KnpUOAuth2ClientBundle a été
     # écarté (décision Lot 1bis). Ils sont derrière un service locator dans le résolveur,

@@ -8,6 +8,7 @@ use App\Identity\Application\AuthenticatedUser;
 use App\Identity\Application\IssueTokens;
 use App\Identity\Domain\User;
 use App\Identity\UI\Http\Response\AuthResource;
+use App\Shared\Application\PlayerTitles;
 use App\Shared\UI\Http\ProblemDetails;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationFailureEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationSuccessEvent;
@@ -29,8 +30,10 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final readonly class AuthenticationResponseListener
 {
-    public function __construct(private IssueTokens $issueTokens)
-    {
+    public function __construct(
+        private IssueTokens $issueTokens,
+        private PlayerTitles $titles,
+    ) {
     }
 
     /**
@@ -56,7 +59,7 @@ final readonly class AuthenticationResponseListener
 
         $tokens = $this->issueTokens->alongside($user, $accessToken);
 
-        $event->setData(AuthResource::from(new AuthenticatedUser($user, $tokens))->toArray());
+        $event->setData(AuthResource::from(new AuthenticatedUser($user, $tokens), $this->titles->of($user->id()))->toArray());
     }
 
     /**

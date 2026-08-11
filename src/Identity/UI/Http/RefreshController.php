@@ -8,14 +8,17 @@ use App\Identity\Application\RefreshSession;
 use App\Identity\Application\RefreshSessionHandler;
 use App\Identity\UI\Http\Request\RefreshTokenRequest;
 use App\Identity\UI\Http\Response\AuthResource;
+use App\Shared\Application\PlayerTitles;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 
 final readonly class RefreshController
 {
-    public function __construct(private RefreshSessionHandler $refresh)
-    {
+    public function __construct(
+        private RefreshSessionHandler $refresh,
+        private PlayerTitles $titles,
+    ) {
     }
 
     #[Route('/api/auth/refresh', name: 'identity_refresh', methods: ['POST'])]
@@ -23,6 +26,6 @@ final readonly class RefreshController
     {
         $authenticated = ($this->refresh)(new RefreshSession($request->refreshToken));
 
-        return new JsonResponse(AuthResource::from($authenticated)->toArray());
+        return new JsonResponse(AuthResource::from($authenticated, $this->titles->of($authenticated->user->id()))->toArray());
     }
 }

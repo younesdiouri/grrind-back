@@ -9,6 +9,7 @@ use App\Identity\Application\UpdateProfileHandler;
 use App\Identity\Domain\User;
 use App\Identity\UI\Http\Request\UpdateProfileRequest;
 use App\Identity\UI\Http\Response\UserResource;
+use App\Shared\Application\PlayerTitles;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -23,14 +24,17 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  */
 final readonly class MeController
 {
-    public function __construct(private UpdateProfileHandler $updateProfile)
-    {
+    public function __construct(
+        private UpdateProfileHandler $updateProfile,
+        /** Le port : `Identity` ne connaît ni le catalogue des titres ni la table des déblocages. */
+        private PlayerTitles $titles,
+    ) {
     }
 
     #[Route('/api/me', name: 'identity_me', methods: ['GET'])]
     public function show(#[CurrentUser] User $user): JsonResponse
     {
-        return new JsonResponse(UserResource::from($user)->toArray());
+        return new JsonResponse(UserResource::from($user, $this->titles->of($user->id()))->toArray());
     }
 
     #[Route('/api/me', name: 'identity_me_update', methods: ['PATCH'])]
@@ -38,6 +42,6 @@ final readonly class MeController
     {
         $updated = ($this->updateProfile)($user, new UpdateProfile($request->displayName, $request->timezone));
 
-        return new JsonResponse(UserResource::from($updated)->toArray());
+        return new JsonResponse(UserResource::from($updated, $this->titles->of($updated->id()))->toArray());
     }
 }
