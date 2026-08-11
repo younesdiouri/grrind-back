@@ -98,6 +98,11 @@ when@test:
         App\Tests\Support\StubSocialProfileResolver: ~
         App\Identity\Application\SocialProfileResolver: '@App\Tests\Support\StubSocialProfileResolver'
 
+        # Le seul contributeur de modificateurs tant qu'aucun module n'en accorde. Rien ne
+        # le câble au resolver : l'autoconfiguration le tague parce qu'il implémente
+        # `ModifierContributor`, et c'est précisément ce qu'il sert à démontrer.
+        App\Tests\Support\ProgrammableModifiers: ~
+
         # Rien ne consomme encore ce service — le premier appelant sera la transaction de
         # complétion (#21) — donc le conteneur le retire. Le rendre public en test est ce
         # qui permet de prouver dès maintenant que le port `PlayerTimezones` est bien câblé

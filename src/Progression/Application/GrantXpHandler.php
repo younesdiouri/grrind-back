@@ -9,6 +9,7 @@ use App\Progression\Domain\XpCalculator;
 use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Application\ModifierResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 
@@ -17,7 +18,7 @@ use Psr\Clock\ClockInterface;
  *
  * C'est le cœur de ce qui deviendra la transaction de complétion (#21) : celle-ci
  * l'entourera du loot, du streak et de l'outbox, mais la séquence écrite ici ne bougera
- * pas. Elle tient en cinq gestes, dans cet ordre et pas un autre :
+ * pas. Elle tient en six gestes, dans cet ordre et pas un autre :
  *
  * 1. **verrouiller la ligne de progression du joueur.** Sans ça, deux complétions
  *    simultanées lisent le même total, calculent le même niveau et s'écrasent l'une
@@ -25,9 +26,12 @@ use Psr\Clock\ClockInterface;
  * 2. **lire la charge du jour** — après le verrou, donc en voyant ce que la transaction
  *    concurrente a déjà écrit, sans quoi les rendements décroissants se contourneraient
  *    en clôturant deux séances à la même seconde ;
- * 3. **calculer**, purement, et écrire l'XpTransaction ;
- * 4. **reprojeter** le snapshot sur le nouveau total ;
- * 5. **évaluer les titres**, une fois l'écriture faite, pour que la séance qui vient d'être
+ * 3. **résoudre les modificateurs actifs**, après le verrou pour la même raison : le
+ *    streak et les objets équipés changent à l'intérieur de cette transaction-là, et un
+ *    ensemble lu avant elle créditerait des bonus déjà périmés ;
+ * 4. **calculer**, purement, et écrire l'XpTransaction ;
+ * 5. **reprojeter** le snapshot sur le nouveau total ;
+ * 6. **évaluer les titres**, une fois l'écriture faite, pour que la séance qui vient d'être
  *    créditée compte dans la condition qu'elle satisfait.
  *
  * Le total reprojeté est **relu au ledger** plutôt qu'additionné au snapshot : c'est ce
@@ -40,6 +44,7 @@ final readonly class GrantXpHandler
         private XpTransactionRepository $ledger,
         private ProgressionSnapshotRepository $snapshots,
         private DailyLoadProvider $dailyLoad,
+        private ModifierResolver $modifiers,
         private XpCalculator $calculator,
         private TitleUnlocker $titles,
         private LevelCurve $curve,
@@ -58,7 +63,7 @@ final readonly class GrantXpHandler
             $award = $this->calculator->calculate(
                 $command->discipline,
                 $command->durationSeconds,
-                $command->modifiers,
+                $this->modifiers->of($command->userId),
                 $this->dailyLoad->of($command->userId, $command->discipline, $now),
             );
 
