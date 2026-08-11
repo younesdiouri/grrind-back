@@ -274,6 +274,44 @@ vaut aussi pour les tables qu'on n'écrit pas soi-même.
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
 ne le relisait pas.
 
+**Lot 3 — l'équilibrage est lu à la compilation du conteneur, jamais à l'exécution.** Un
+`CompilerPass` (`GameBalancePass`) lit `config/game/v1/`, valide chaque fichier contre son schéma
+et pose le résultat en paramètres. C'est ce qui tient les deux exigences d'un coup : en mode
+worker FrankenPHP aucune requête ne rouvre un YAML, et un fichier incohérent fait échouer le
+`cache:warmup` du build — donc la CI et l'image — plutôt que la première requête d'un joueur.
+Le prix est qu'un rééquilibrage demande un redéploiement, ce qui est exactement la promesse du
+config-as-code : ça se rééquilibre par un commit et une relecture, pas par un `UPDATE`.
+
+**Lot 3 — un schéma par fichier, dans le module qui le lit, déclaré dans `Kernel::build()`.**
+`training.yaml` → `App\Training\Infrastructure\Config\TrainingSection`. Le schéma ne peut pas
+vivre dans `Shared` : il a besoin du module pour déléguer ses règles de cohérence à l'objet du
+domaine qui les porte — `TrainingSection` construit un `TrainingRules` et convertit son refus,
+plutôt que de réécrire « plafond ≥ plancher » une seconde fois. Et la liste des sections ne peut
+pas vivre dans le pass, qui est dans `Shared` : elle est dans `Kernel`, seul endroit qui
+n'appartient à aucune couche. Même geste que les mappings Doctrine, un module à la fois.
+
+**Lot 3 — un YAML posé dans `config/game/v1/` sans schéma casse la compilation.** Sans cette
+garde, c'est du réglage que personne ne lit, que rien ne valide et qui n'entre pas dans le
+`rulesetVersion` : le silence complet. Mieux vaut casser le jour où le fichier apparaît que
+chercher six mois plus tard pourquoi un rééquilibrage n'a rien changé. Corollaire : le pass suit
+le **dossier** (`DirectoryResource`) et pas seulement les fichiers connus, sinon en dev la garde
+ne se déclencherait qu'au prochain `cache:clear`.
+
+**Lot 3 — l'équilibrage sort du pass en paramètres scalaires, pas en tableau.**
+`game.training.minimum_duration_seconds` plutôt que `game.training` : c'est ce qu'un argument de
+service sait consommer, donc `TrainingRules` reste construit avec trois entiers et un réglage
+renommé casse la compilation *en nommant le service* qui l'attendait. Le domaine ne voit jamais un
+tableau d'équilibrage. Effet de bord voulu de la migration : les noms de paramètres n'ont pas
+changé, le câblage de `Training` est resté tel quel.
+
+**Lot 3 — le `rulesetVersion` hashe la configuration normalisée, pas les octets des fichiers.**
+`v1-fe4edd019948` : le préfixe est le dossier, les douze hex un SHA-256 du résultat *après*
+validation et défauts appliqués, tables de clés triées et listes laissées dans leur ordre (l'ordre
+des paliers d'une courbe *est* la donnée). Donc reformater un YAML ou y écrire un commentaire ne
+date pas un rééquilibrage, alors qu'un défaut de schéma qui bouge, si — c'est bien l'équilibrage
+effectif qu'on date. Disponible partout par le bind `string $rulesetVersion`, sans VO : il n'y a
+rien à valider qu'un `Timezone` ferait, et le composant a déjà tout refusé.
+
 **Checkpoint #53 — pas de Redis en v1, et le déclencheur est écrit.** Rien dans le code ne dépend
 d'un état partagé entre processus : `cache.app` est en filesystem, il n'y a ni `LockFactory`, ni
 `RateLimiter`, ni `CacheInterface` injecté nulle part. Le verrou de la complétion sera pessimiste

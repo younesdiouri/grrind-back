@@ -1,0 +1,4 @@
+# Mêmes valeurs, autre ordre : le rulesetVersion ne doit pas bouger.
+cooldown_seconds: 900
+minimum_duration_seconds: 300
+maximum_duration_seconds: 14400

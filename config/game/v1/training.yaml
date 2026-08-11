@@ -1,15 +1,19 @@
 # Les garde-fous d'une séance. Ces valeurs sont de l'équilibrage, pas du code : elles
-# bougeront après les premiers joueurs. Lues comme paramètres de conteneur et injectées
-# dans App\Training\Domain\TrainingRules.
-parameters:
-    # Sous ce seuil, une séance ne se clôt pas : le client affiche le temps restant et le
-    # joueur continue — ou renonce par /abandon, qui existe pour ça.
-    game.training.minimum_duration_seconds: 300
+# bougeront après les premiers joueurs.
+#
+# Ce fichier est de la donnée, pas de la configuration Symfony : il est lu et validé à la
+# compilation du conteneur par App\Training\Infrastructure\Config\TrainingSection, et il
+# entre dans le `rulesetVersion` stocké avec chaque transaction d'XP. Une clé inconnue ou
+# un seuil incohérent fait échouer le démarrage.
 
-    # Au-delà, la durée est écrêtée, pas rejetée : le chrono oublié rend quatre heures
-    # créditées au lieu de tout perdre.
-    game.training.maximum_duration_seconds: 14400
+# Sous ce seuil, une séance ne se clôt pas : le client affiche le temps restant et le
+# joueur continue — ou renonce par /abandon, qui existe pour ça.
+minimum_duration_seconds: 300
 
-    # Assez court pour ne pas gêner deux entraînements dans la journée, assez long pour
-    # qu'enchaîner des séances plancher ne soit pas une stratégie.
-    game.training.cooldown_seconds: 900
+# Au-delà, la durée est écrêtée, pas rejetée : le chrono oublié rend quatre heures
+# créditées au lieu de tout perdre.
+maximum_duration_seconds: 14400
+
+# Assez court pour ne pas gêner deux entraînements dans la journée, assez long pour
+# qu'enchaîner des séances plancher ne soit pas une stratégie.
+cooldown_seconds: 900

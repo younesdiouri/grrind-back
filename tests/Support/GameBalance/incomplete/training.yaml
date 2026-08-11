@@ -1,0 +1,3 @@
+# Le cooldown manque.
+minimum_duration_seconds: 300
+maximum_duration_seconds: 14400
