@@ -1,9 +1,9 @@
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
-# L'équilibrage du jeu est du config-as-code. `v1` est figé — au Lot 3, tout le dossier
-# sera hashé pour produire le `rulesetVersion` stocké avec chaque transaction d'XP.
-imports:
-    - { resource: game/v1/training.yaml }
+# L'équilibrage du jeu est du config-as-code, sous `config/game/v1/`. Il n'est pas importé
+# ici : ce n'est pas de la configuration Symfony mais de la donnée, lue et validée à la
+# compilation par App\Shared\Infrastructure\Config\GameBalancePass, qui en tire les
+# paramètres `game.*` utilisés plus bas et le `rulesetVersion` du dossier.
 
 parameters:
 
@@ -16,14 +16,19 @@ services:
             # Même source que lexik_jwt_authentication.token_ttl : la durée annoncée
             # au client ne peut pas diverger de celle réellement signée.
             int $accessTokenTtl: '%env(int:JWT_TTL)%'
+            # Le hash de l'équilibrage chargé. Il se stocke avec chaque transaction d'XP :
+            # c'est ce qui permet de rééquilibrer sans corrompre l'historique.
+            string $rulesetVersion: '%game.ruleset_version%'
 
     App\:
         resource: '../src/'
 
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
 
-    # Un paramètre absent casse la compilation du conteneur : l'équilibrage se valide au
-    # démarrage, pas à la première requête d'un joueur.
+    # L'objet typé que le domaine consomme, construit depuis les paramètres tirés de
+    # `game/v1/training.yaml`. Un paramètre absent casse la compilation du conteneur en
+    # nommant ce service : l'équilibrage se valide au démarrage, pas à la première
+    # requête d'un joueur.
     App\Training\Domain\TrainingRules:
         arguments:
             $minimumDurationSeconds: '%game.training.minimum_duration_seconds%'
