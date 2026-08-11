@@ -53,6 +53,9 @@ final class XpRatesTest extends TestCase
         self::assertSame(90, $rates->perHourOf(Discipline::Running));
         self::assertSame(50, $rates->perHourOf(Discipline::Mobility));
         self::assertSame(25, $rates->baseFor(Discipline::Mobility, 1800));
+
+        self::assertSame(180, $rates->dailyCapOf(Discipline::Running));
+        self::assertSame(100, $rates->dailyCapOf(Discipline::Mobility));
     }
 
     public function testRefusesANegativeDuration(): void
@@ -65,7 +68,7 @@ final class XpRatesTest extends TestCase
     }
 
     /**
-     * @param list<array{discipline: string, xp_per_hour: int}> $disciplines
+     * @param list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}> $disciplines
      */
     #[DataProvider('unusableRates')]
     public function testRefusesAnUnusableBalance(array $disciplines, string $expectedMessage): void
@@ -77,30 +80,38 @@ final class XpRatesTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{list<array{discipline: string, xp_per_hour: int}>, string}>
+     * @return iterable<string, array{list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}>, string}>
      */
     public static function unusableRates(): iterable
     {
         // Le cas qui compte : sans ce refus, la discipline oubliée rapporterait zéro en
         // silence, et c'est un joueur qui découvrirait le trou.
         yield 'discipline non couverte' => [
-            [['discipline' => 'RUNNING', 'xp_per_hour' => 90]],
+            [['discipline' => 'RUNNING', 'xp_per_hour' => 90, 'daily_cap_xp' => 180]],
             '/Aucun barème.*CYCLING|Aucun barème/',
         ];
 
         yield 'discipline inconnue' => [
-            [...self::everyDiscipline(), ['discipline' => 'QUIDDITCH', 'xp_per_hour' => 90]],
+            [...self::everyDiscipline(), ['discipline' => 'QUIDDITCH', 'xp_per_hour' => 90, 'daily_cap_xp' => 180]],
             '/inconnue/',
         ];
 
         yield 'discipline en double' => [
-            [...self::everyDiscipline(), ['discipline' => 'RUNNING', 'xp_per_hour' => 120]],
+            [...self::everyDiscipline(), ['discipline' => 'RUNNING', 'xp_per_hour' => 120, 'daily_cap_xp' => 240]],
             '/double/',
         ];
 
         yield 'taux nul' => [
-            [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'xp_per_hour' => 0]],
+            [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'xp_per_hour' => 0, 'daily_cap_xp' => 180]],
             '/au moins 1 XP/',
+        ];
+
+        // Un plafond sous ce qu'une heure rapporte ferait du garde-fou le limiteur
+        // principal, à la place des rendements décroissants — et le joueur buterait dessus
+        // tous les jours sans comprendre pourquoi.
+        yield 'plafond sous le taux horaire' => [
+            [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'xp_per_hour' => 90, 'daily_cap_xp' => 60]],
+            '/sous ce qu\'une heure rapporte/',
         ];
     }
 
@@ -114,27 +125,27 @@ final class XpRatesTest extends TestCase
     }
 
     /**
-     * @return list<array{discipline: string, xp_per_hour: int}>
+     * @return list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}>
      */
     private static function everyDiscipline(): array
     {
         return [
-            ['discipline' => 'RUNNING', 'xp_per_hour' => 90],
+            ['discipline' => 'RUNNING', 'xp_per_hour' => 90, 'daily_cap_xp' => 180],
             ...self::everyDisciplineExceptRunning(),
         ];
     }
 
     /**
-     * @return list<array{discipline: string, xp_per_hour: int}>
+     * @return list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}>
      */
     private static function everyDisciplineExceptRunning(): array
     {
         return [
-            ['discipline' => 'CYCLING', 'xp_per_hour' => 70],
-            ['discipline' => 'SWIMMING', 'xp_per_hour' => 100],
-            ['discipline' => 'STRENGTH', 'xp_per_hour' => 80],
-            ['discipline' => 'MOBILITY', 'xp_per_hour' => 50],
-            ['discipline' => 'CLIMBING', 'xp_per_hour' => 85],
+            ['discipline' => 'CYCLING', 'xp_per_hour' => 70, 'daily_cap_xp' => 140],
+            ['discipline' => 'SWIMMING', 'xp_per_hour' => 100, 'daily_cap_xp' => 200],
+            ['discipline' => 'STRENGTH', 'xp_per_hour' => 80, 'daily_cap_xp' => 160],
+            ['discipline' => 'MOBILITY', 'xp_per_hour' => 50, 'daily_cap_xp' => 100],
+            ['discipline' => 'CLIMBING', 'xp_per_hour' => 85, 'daily_cap_xp' => 170],
         ];
     }
 }

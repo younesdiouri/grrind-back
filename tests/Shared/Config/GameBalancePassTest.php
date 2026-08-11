@@ -69,7 +69,7 @@ final class GameBalancePassTest extends KernelTestCase
         $disciplines = $container->getParameter('game.xp.disciplines');
         self::assertIsArray($disciplines);
 
-        /** @var list<array{discipline: string, xp_per_hour: int}> $disciplines */
+        /** @var list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}> $disciplines */
         $rates = new XpRates($disciplines);
 
         foreach (Discipline::cases() as $discipline) {

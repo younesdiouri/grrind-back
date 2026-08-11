@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Progression;
 
 use App\Progression\Domain\Exception\LedgerIsNotRewritable;
+use App\Progression\Domain\XpAward;
 use App\Progression\Domain\XpBreakdown;
 use App\Progression\Domain\XpBreakdownLine;
 use App\Progression\Domain\XpBreakdownSource;
 use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Domain\Activity\Discipline;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -173,7 +175,14 @@ final class LedgerTest extends KernelTestCase
 
     private function record(Uuid $userId, Uuid $sourceId, XpBreakdown $breakdown): XpTransaction
     {
-        $transaction = XpTransaction::creditFor($userId, $sourceId, $breakdown, 'v1-000000000000', $this->now);
+        $transaction = XpTransaction::creditFor(
+            $userId,
+            $sourceId,
+            Discipline::Running,
+            2700,
+            new XpAward($breakdown, 'v1-000000000000'),
+            $this->now,
+        );
 
         $this->ledger->add($transaction);
         $this->ledger->commit();

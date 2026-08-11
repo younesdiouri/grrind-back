@@ -6,10 +6,13 @@ namespace App\Identity\Infrastructure\Doctrine;
 
 use App\Identity\Domain\Exception\EmailAlreadyUsed;
 use App\Identity\Domain\User;
+use App\Shared\Application\PlayerTimezones;
+use App\Shared\Domain\Timezone;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bridge\Doctrine\Security\User\UserLoaderInterface;
+use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
@@ -26,7 +29,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * @extends ServiceEntityRepository<User>
  */
-class UserRepository extends ServiceEntityRepository implements UserLoaderInterface, PasswordUpgraderInterface
+class UserRepository extends ServiceEntityRepository implements UserLoaderInterface, PasswordUpgraderInterface, PlayerTimezones
 {
     public function __construct(ManagerRegistry $registry)
     {
@@ -57,6 +60,31 @@ class UserRepository extends ServiceEntityRepository implements UserLoaderInterf
     public function emailExists(string $email): bool
     {
         return null !== $this->ofEmail($email);
+    }
+
+    /**
+     * Le seul point par lequel un autre module lit un attribut de profil. Une projection
+     * scalaire et non l'entité : ce qui sort d'ici ne doit pas donner prise sur le compte.
+     *
+     * Voir {@see PlayerTimezones} pour la justification du port, et pour pourquoi un
+     * compte introuvable rend `UTC` plutôt que de lever.
+     */
+    public function of(Uuid $userId): Timezone
+    {
+        $row = $this->createQueryBuilder('u')
+            ->select('u.timezone')
+            ->where('u.id = :id')
+            ->setParameter('id', $userId, UuidType::NAME)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        // Doctrine hydrate une projection de champ **à travers son type** : `timezone` en
+        // ressort déjà en `Timezone`, pas en chaîne. Attendre une chaîne ici retombait sur
+        // le repli UTC sans rien signaler — le pire des bugs, puisqu'un joueur se serait
+        // simplement vu compter sa journée de travers.
+        $timezone = \is_array($row) ? $row['timezone'] : null;
+
+        return $timezone instanceof Timezone ? $timezone : Timezone::utc();
     }
 
     /**

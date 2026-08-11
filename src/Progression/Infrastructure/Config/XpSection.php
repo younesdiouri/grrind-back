@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Progression\Infrastructure\Config;
 
+use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\XpRates;
 use App\Shared\Infrastructure\Config\GameBalanceSection;
 use InvalidArgumentException;
@@ -40,15 +41,28 @@ final class XpSection implements GameBalanceSection
                         ->children()
                             ->scalarNode('discipline')->isRequired()->cannotBeEmpty()->end()
                             ->integerNode('xp_per_hour')->isRequired()->min(1)->end()
+                            ->integerNode('daily_cap_xp')->isRequired()->min(1)->end()
                         ->end()
                     ->end()
                 ->end()
+                ->arrayNode('diminishing_returns')
+                    ->isRequired()
+                    ->requiresAtLeastOneElement()
+                    ->arrayPrototype()
+                        ->children()
+                            ->integerNode('up_to_minutes')->isRequired()->min(1)->end()
+                            ->integerNode('weight_percent')->isRequired()->min(0)->max(100)->end()
+                        ->end()
+                    ->end()
+                ->end()
+                ->integerNode('diminishing_returns_beyond_percent')->isRequired()->min(0)->max(100)->end()
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
-                    /** @var array{disciplines: list<array{discipline: string, xp_per_hour: int}>} $values */
+                    /** @var array{disciplines: list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}>, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $values */
                     try {
                         new XpRates($values['disciplines']);
+                        new DiminishingReturns($values['diminishing_returns'], $values['diminishing_returns_beyond_percent']);
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);
                     }
