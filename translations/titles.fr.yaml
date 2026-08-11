@@ -1,0 +1,49 @@
+# Les libellés des titres. Une entrée `<id>.name` et une `<id>.hint` par titre de
+# `config/game/v1/titles.yaml` — `TitleTranslationsTest` refuse un catalogue incomplet, sinon
+# le repli du traducteur enverrait `veteran.name` au joueur, en silence.
+#
+# `%threshold%` est le seuil tel qu'il est écrit dans le YAML d'équilibrage, `%hours%` le
+# même en heures. Les écrire en toutes lettres ici ferait mentir la consigne au premier
+# rééquilibrage.
+#
+# Le `name` est un titre qu'on porte : court, sans article, il s'affiche sous un pseudo. Le
+# `hint` est une consigne : à l'impératif, à la deuxième personne, comme le reste de l'app.
+
+apprentice.name: Apprenti
+apprentice.hint: Atteins le niveau %threshold%
+adept.name: Adepte
+adept.hint: Atteins le niveau %threshold%
+master.name: Maître
+master.hint: Atteins le niveau %threshold%
+legend.name: Légende
+legend.hint: Atteins le niveau %threshold%
+
+ten_thousand.name: Dix mille
+ten_thousand.hint: Cumule %threshold% points d'expérience
+fifty_thousand.name: Cinquante mille
+fifty_thousand.hint: Cumule %threshold% points d'expérience
+
+first_steps.name: Premiers pas
+first_steps.hint: Termine ta première séance
+regular.name: Habitué
+regular.hint: Termine %threshold% séances
+veteran.name: Vétéran
+veteran.hint: Termine %threshold% séances
+
+road_runner.name: Bitume
+road_runner.hint: Termine %threshold% séances de course
+peloton.name: Peloton
+peloton.hint: Termine %threshold% séances de vélo
+triton.name: Triton
+triton.hint: Termine %threshold% séances de natation
+iron.name: Fonte
+iron.hint: Termine %threshold% séances de renforcement
+elastic.name: Élastique
+elastic.hint: Termine %threshold% séances de mobilité
+spider.name: Araignée
+spider.hint: Termine %threshold% séances d'escalade
+
+marathoner.name: Marathonien
+marathoner.hint: Cumule %hours% heures de course
+centurion.name: Centurion
+centurion.hint: Cumule %hours% heures de vélo

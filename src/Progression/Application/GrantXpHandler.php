@@ -17,7 +17,7 @@ use Psr\Clock\ClockInterface;
  *
  * C'est le cœur de ce qui deviendra la transaction de complétion (#21) : celle-ci
  * l'entourera du loot, du streak et de l'outbox, mais la séquence écrite ici ne bougera
- * pas. Elle tient en quatre gestes, dans cet ordre et pas un autre :
+ * pas. Elle tient en cinq gestes, dans cet ordre et pas un autre :
  *
  * 1. **verrouiller la ligne de progression du joueur.** Sans ça, deux complétions
  *    simultanées lisent le même total, calculent le même niveau et s'écrasent l'une
@@ -26,7 +26,9 @@ use Psr\Clock\ClockInterface;
  *    concurrente a déjà écrit, sans quoi les rendements décroissants se contourneraient
  *    en clôturant deux séances à la même seconde ;
  * 3. **calculer**, purement, et écrire l'XpTransaction ;
- * 4. **reprojeter** le snapshot sur le nouveau total.
+ * 4. **reprojeter** le snapshot sur le nouveau total ;
+ * 5. **évaluer les titres**, une fois l'écriture faite, pour que la séance qui vient d'être
+ *    créditée compte dans la condition qu'elle satisfait.
  *
  * Le total reprojeté est **relu au ledger** plutôt qu'additionné au snapshot : c'est ce
  * qui garde le snapshot réellement dérivé, et ce qui fait qu'une divergence se corrige
@@ -39,6 +41,7 @@ final readonly class GrantXpHandler
         private ProgressionSnapshotRepository $snapshots,
         private DailyLoadProvider $dailyLoad,
         private XpCalculator $calculator,
+        private TitleUnlocker $titles,
         private LevelCurve $curve,
         private ClockInterface $clock,
         private EntityManagerInterface $entityManager,
@@ -73,7 +76,18 @@ final readonly class GrantXpHandler
             $levelsReached = $snapshot->retotal($this->ledger->totalOf($command->userId), $this->curve, $now);
             $this->snapshots->commit();
 
-            return new XpGranted($award, $snapshot, $levelsReached, $snapshot->earnedSkillPoints() - $before);
+            return new XpGranted(
+                $award,
+                $snapshot,
+                $levelsReached,
+                $snapshot->earnedSkillPoints() - $before,
+                // En dernier, et dans la transaction : les conditions se lisent au ledger,
+                // donc la séance qui vient d'être écrite compte pour le titre qu'elle
+                // débloque. Le verrou posé plus haut sérialise l'évaluation avec elle —
+                // deux complétions simultanées ne peuvent pas décider chacune de leur côté
+                // qu'un titre est neuf.
+                $this->titles->unlock($command->userId, $now),
+            );
         });
     }
 }

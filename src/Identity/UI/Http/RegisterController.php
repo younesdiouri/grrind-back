@@ -10,6 +10,7 @@ use App\Identity\Application\RegisterUser;
 use App\Identity\Application\RegisterUserHandler;
 use App\Identity\UI\Http\Request\RegisterRequest;
 use App\Identity\UI\Http\Response\AuthResource;
+use App\Shared\Application\PlayerTitles;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -20,6 +21,7 @@ final readonly class RegisterController
     public function __construct(
         private RegisterUserHandler $register,
         private IssueTokens $issueTokens,
+        private PlayerTitles $titles,
     ) {
     }
 
@@ -37,6 +39,6 @@ final readonly class RegisterController
         // ajouterait un aller-retour sur l'étape la plus fragile du tunnel.
         $authenticated = new AuthenticatedUser($user, ($this->issueTokens)($user));
 
-        return new JsonResponse(AuthResource::from($authenticated)->toArray(), Response::HTTP_CREATED);
+        return new JsonResponse(AuthResource::from($authenticated, $this->titles->of($user->id()))->toArray(), Response::HTTP_CREATED);
     }
 }

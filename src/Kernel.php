@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App;
 
 use App\Progression\Infrastructure\Config\LevelsSection;
+use App\Progression\Infrastructure\Config\TitlesSection;
 use App\Progression\Infrastructure\Config\XpSection;
 use App\Shared\Infrastructure\Config\GameBalancePass;
 use App\Training\Infrastructure\Config\TrainingSection;
@@ -32,6 +33,7 @@ class Kernel extends BaseKernel
             new TrainingSection(),
             new XpSection(),
             new LevelsSection(),
+            new TitlesSection(),
         ));
     }
 }

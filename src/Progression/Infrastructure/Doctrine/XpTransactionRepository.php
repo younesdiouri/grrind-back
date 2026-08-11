@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Progression\Infrastructure\Doctrine;
 
 use App\Progression\Domain\DailyLoad;
+use App\Progression\Domain\LevelCurve;
+use App\Progression\Domain\PlayerRecord;
 use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
 use App\Shared\Domain\Activity\Discipline;
@@ -98,6 +100,61 @@ class XpTransactionRepository extends ServiceEntityRepository
         // signifierait qu'on a annulé plus que ce qui avait été crédité ce jour-là, ce que
         // seule une annulation datée d'un autre jour peut produire.
         return new DailyLoad(max(0, (int) $row['seconds']), (int) $row['xp']);
+    }
+
+    /**
+     * Le relevé du joueur, tel que les conditions de titre le lisent : son niveau, son XP,
+     * et ce qu'il a fait discipline par discipline.
+     *
+     * **Tout se déduit du seul ledger**, y compris le niveau — la courbe le projette du
+     * total, exactement comme pour le snapshot. Rien ici ne lit `progression_snapshot` :
+     * un titre ne doit pas dépendre d'un cache, sans quoi un cache en retard ferait rater
+     * un déblocage.
+     *
+     * La courbe entre en paramètre plutôt qu'en dépendance du dépôt — même geste qu'à
+     * `ProgressionSnapshotRepository::lockFor()` : c'est l'appelant qui sait sous quel
+     * équilibrage il projette.
+     *
+     * Une passe unique, groupée par discipline. Le compte de séances se somme comme le
+     * reste : `+1` par crédit, `-1` par annulation, et une séance invalidée disparaît du
+     * relevé sans que la requête ait à connaître les raisons.
+     */
+    public function recordOf(Uuid $userId, LevelCurve $curve): PlayerRecord
+    {
+        $rows = $this->createQueryBuilder('t')
+            ->select('t.discipline AS discipline')
+            ->addSelect('SUM(CASE WHEN t.reason = :completed THEN 1 ELSE -1 END) AS sessions')
+            ->addSelect('SUM(t.durationSeconds) AS seconds')
+            ->addSelect('SUM(t.amount) AS xp')
+            ->where('t.userId = :userId')
+            ->groupBy('t.discipline')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->setParameter('completed', XpReason::SessionCompleted)
+            ->getQuery()
+            ->getScalarResult()
+        ;
+
+        $sessions = [];
+        $seconds = [];
+        $totalXp = 0;
+
+        foreach ($rows as $row) {
+            \assert(\is_array($row) && is_numeric($row['sessions']) && is_numeric($row['seconds']) && is_numeric($row['xp']));
+
+            // Selon le mode d'hydratation, une colonne typée `enumType` rend l'enum ou sa
+            // valeur brute. On normalise ici plutôt que de parier sur l'un des deux.
+            \assert($row['discipline'] instanceof Discipline || \is_string($row['discipline']));
+            $discipline = $row['discipline'] instanceof Discipline ? $row['discipline'] : Discipline::from($row['discipline']);
+
+            // Des compteurs négatifs ne décrivent rien : ils signifieraient qu'on a annulé
+            // plus de séances qu'il n'y en a eu. Le relevé plafonne à zéro, le ledger garde
+            // le détail.
+            $sessions[$discipline->value] = max(0, (int) $row['sessions']);
+            $seconds[$discipline->value] = max(0, (int) $row['seconds']);
+            $totalXp += (int) $row['xp'];
+        }
+
+        return new PlayerRecord($curve->standingAt($totalXp)->level, $totalXp, $sessions, $seconds);
     }
 
     public function commit(): void
