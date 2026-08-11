@@ -338,6 +338,43 @@ garde parce qu'ils donnent un domicile aux invariants (« le *quand* n'est pas u
 rendent les handlers testables sans HTTP, et que `CompleteSession` va grossir au Lot 4. C'est écrit
 ici pour que personne ne « corrige » l'incohérence dans le mauvais sens dans six mois.
 
+**Lot 3 — le détail d'un calcul d'XP est une table fille, pas une colonne JSON.**
+`xp_transaction_line` : une ligne par contribution, `source` en colonne typée, `amount` en entier
+signé, `position` pour l'ordre d'animation. Ce que ça achète au-delà du stockage : « combien d'XP
+ce joueur doit-il à son streak » est un `GROUP BY` et non une relecture de tout l'historique, et
+PostgreSQL refuse une contribution qui ne serait pas un entier. `position` est explicite plutôt que
+déduit de l'ordre d'insertion — s'en remettre à celui-ci marcherait jusqu'au jour où il ne
+marcherait plus, sans que rien ne le signale.
+
+**Lot 3 — l'append-only est tenu par l'applicatif, pas par un trigger PostgreSQL.** Décision prise
+contre l'habitude du Lot 2 (« l'unicité vient de l'index, pas du contrôle applicatif ») et assumée
+comme telle. Les entités n'ont aucun mutateur, et `LedgerIsAppendOnly` — un entity listener
+Doctrine, le point d'extension prévu — refuse `preUpdate` et `preRemove` sur les deux tables.
+**Ce que ça ne couvre pas** : un `DELETE` en SQL direct ou une requête DQL de masse ne passent pas
+par l'unité de travail. C'est le prix du choix, il est écrit ici pour que personne ne croie la
+garantie plus large qu'elle n'est. Le `ON DELETE RESTRICT` sur la jointure est la seule chose que
+la base oppose, et c'est déjà mieux que le `CASCADE` par défaut, qui est le contraire de ce qu'on
+veut sur une table de vérité comptable.
+
+**Lot 3 — l'idempotence du ledger est `uniq_xp_transaction_source_reason`, pas un `SELECT`.**
+Le couple (source, raison) autorise exactement ce qu'il faut : une séance se crédite une fois,
+s'invalide une fois. `recordedFor()` existe pour rendre le cas courant lisible, pas pour garantir
+quoi que ce soit — entre la lecture et l'écriture, deux complétions rejouées par un client mobile
+passent toutes les deux.
+
+**Lot 3 — le montant d'une transaction n'est pas une donnée d'entrée : c'est la somme de son
+détail.** `XpTransaction` le calcule depuis le `XpBreakdown` qu'on lui donne. Un total qui pourrait
+diverger du détail censé l'expliquer serait le premier endroit où le ledger cesserait d'être
+vérifiable. Corollaire : `XpBreakdown` refuse d'être vide — un montant sans explication n'est pas
+un montant, y compris quand il vaut zéro (une séance entièrement rognée par les rendements
+décroissants s'écrit quand même, et c'est le détail qui la rend compréhensible).
+
+**Lot 3 — une annulation reprend la `rulesetVersion` du crédit qu'elle annule.** On rend ce qu'on
+avait donné, sous les règles qui l'avaient donné, ligne par ligne inversée. Recalculer aux règles
+courantes ferait de chaque rééquilibrage une redistribution silencieuse sur tout l'historique.
+Et pas de valeur « correction manuelle » dans `XpReason` : aucune route ni commande n'en crédite,
+et une valeur qu'aucun code n'écrit est une porte qu'on finit par pousser.
+
 ## Pièges déjà rencontrés
 
 **Un index partiel se déclare tel que PostgreSQL le *relit*, casts compris.** Écrire
