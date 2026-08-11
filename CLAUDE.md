@@ -270,9 +270,17 @@ Lots 0 et 1 (Identity) faits ; le reste est ouvert sur le tableau, dans l'ordre 
 Progression → **RewardSummary (premier jouable)** → Streak → Loot → Arbres → Classements →
 durcissement. Strava arrive après, comme simple adapter d'`ActivitySource`.
 
-[PROGRESS.md](PROGRESS.md) ne porte plus la feuille de route : il ne garde que ce qu'un tableau ne
-sait pas porter — les **décisions** structurantes et les **pièges** déjà rencontrés. Les deux
-sections se mettent à jour au fil de l'eau ; c'est là que va un choix tranché en cours de route.
+[ARCHITECTURE.md](ARCHITECTURE.md) est la vue d'ensemble, **en schémas** : la carte des modules et
+de leurs frontières, la vie d'une séance, la transaction de complétion, le modèle de données,
+l'authentification, la chaîne du config-as-code. C'est ce qu'on ouvre pour comprendre le système
+tel qu'il est aujourd'hui — pas pour savoir ce qui reste à faire, ça vit sur le tableau.
+
+**Un choix structurant s'écrit dans le docblock du fichier qu'il concerne, et dans le corps de la
+PR.** Pas dans un fichier de suivi à part : celui-là devient une troisième copie qui vieillit sans
+que personne s'en aperçoive — c'est ce qui est arrivé à `PROGRESS.md`, supprimé au ticket 68.
+`ARCHITECTURE.md` ne reçoit que ce qui change la **forme** du système, et deux sections courtes :
+les décisions contre-intuitives qu'on « corrigerait » dans le mauvais sens, et les pièges qui se
+reproduisent.
 
 Le mapping Doctrine n'a **pas** d'`auto_mapping` : chaque module déclare le sien dans
 `config/packages/doctrine.yaml` au moment de son lot. Idem pour les layers Deptrac, déjà déclarés

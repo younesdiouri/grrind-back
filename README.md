@@ -38,6 +38,10 @@ correspondante de [CLAUDE.md](CLAUDE.md).
 Monolithe modulaire : `Shared`, `Identity`, `Training`, `Progression`, `Rewards`, `Engagement`.
 Un module ne connaît que `Shared` — Deptrac le vérifie en CI.
 
+👉 **[ARCHITECTURE.md](ARCHITECTURE.md) est la vue d'ensemble en schémas** : la carte des modules,
+la vie d'une séance, la transaction de complétion, le modèle de données, l'authentification et la
+chaîne du config-as-code. C'est le fichier à ouvrir en premier.
+
 Les invariants de conception (le serveur possède l'horloge, l'XP est un ledger append-only, un seul
 vocabulaire de modificateurs, RNG serveur auditable) sont détaillés dans [CLAUDE.md](CLAUDE.md).
 
@@ -70,5 +74,4 @@ injecte une valeur ([#54]).
 ## Avancement
 
 Le suivi vit sur le [tableau GitHub](https://github.com/users/younesdiouri/projects/1) : un ticket
-par feature, un jalon par lot, un label par module. [PROGRESS.md](PROGRESS.md) garde ce qu'un
-tableau ne sait pas porter — les décisions structurantes et les pièges déjà rencontrés.
+par feature, un jalon par lot, un label par module.
