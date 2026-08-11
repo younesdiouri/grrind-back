@@ -11,7 +11,7 @@ RUN_DB  := $(DC) run --rm php
 RUN_TEST := $(DC) run --rm -e APP_ENV=test php
 
 .DEFAULT_GOAL := help
-.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate db-reset test qa phpstan cs cs-fix deptrac install
+.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset test qa phpstan cs cs-fix deptrac install
 
 help: ## Liste les commandes disponibles
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -88,6 +88,23 @@ db-reset: ## Recrée la base et rejoue toutes les migrations
 	$(RUN_DB) bin/console doctrine:database:drop --if-exists --force
 	$(RUN_DB) bin/console doctrine:database:create
 	$(RUN_DB) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+
+# La migration du déploiement. Elle ne tourne pas dans l'image de dev mais dans
+# l'image de prod — celle qui partira sur ECS — pour que ce qui migre la base soit
+# exactement le code qui va la lire. Voir README, « Déploiement ».
+#
+# `--allow-no-migration` : un déploiement qui n'apporte aucune migration est le cas
+# courant, et il ne doit pas échouer pour ça.
+#
+# `--query-time --no-debug` : un déploiement qui traîne doit dire *où*, et le
+# profiler n'a rien à faire dans une tâche de migration.
+#
+# La commande sort en code non nul si une migration échoue — c'est ce qui doit
+# interrompre le déploiement avant que les nouvelles tâches prennent du trafic.
+migrate-prod: ## Applique les migrations depuis l'image de prod (étape de déploiement)
+	$(DC) run --rm --build php-prod \
+		bin/console doctrine:migrations:migrate \
+			--no-interaction --allow-no-migration --query-time --no-debug
 
 ## —— Qualité ——————————————————————————————————————————————————————————————
 test: ## Suite de tests (base de test créée/migrée au passage)
