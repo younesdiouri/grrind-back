@@ -1,0 +1,20 @@
+# Ce qu'une heure de pratique vaut, avant tout modificateur et avant tout garde-fou.
+#
+# Le socle est linéaire au prorata de la durée retenue : `durée × xp_per_hour ÷ 3600`, en
+# arithmétique entière, tronqué vers le bas — une séance ne peut jamais rapporter plus que
+# ce que le barème annonce. La courbe non linéaire ne vient pas d'ici : ce sont les
+# rendements décroissants de la journée (#15), qui s'expriment en tranches de minutes.
+#
+# Les six disciplines doivent être couvertes, chacune une fois. Une discipline oubliée fait
+# échouer le démarrage plutôt que de rapporter zéro à un joueur.
+#
+# L'équilibrage tient en une phrase par ligne : « une heure de natation vaut 100 XP ».
+# Les écarts traduisent l'intensité, pas la préférence — la mobilité est un entretien, la
+# natation coûte cher, la musculation se compte moins bien à la minute que le reste.
+disciplines:
+    - { discipline: RUNNING, xp_per_hour: 90 }
+    - { discipline: CYCLING, xp_per_hour: 70 }
+    - { discipline: SWIMMING, xp_per_hour: 100 }
+    - { discipline: STRENGTH, xp_per_hour: 80 }
+    - { discipline: MOBILITY, xp_per_hour: 50 }
+    - { discipline: CLIMBING, xp_per_hour: 85 }

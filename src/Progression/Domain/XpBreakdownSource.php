@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Progression\Domain;
 
+use App\Shared\Domain\Modifier\ModifierSource;
+
 /**
  * D'où vient une ligne du détail de calcul. C'est le contrat que le client iOS animera —
  * « 90 base, +18 streak, +13 bottes » — et la colonne `source` de `xp_transaction_line`.
@@ -29,4 +31,20 @@ enum XpBreakdownSource: string
 
     /** Le plafond quotidien par discipline (#15) : négatif au crédit. */
     case DailyCap = 'DAILY_CAP';
+
+    /**
+     * Le vocabulaire du breakdown est un sur-ensemble de celui des modificateurs : le
+     * socle et les garde-fous ne viennent d'aucune source active. Le `match` exhaustif
+     * est ce qui fait échouer la compilation le jour où un `ModifierSource` s'ajoute
+     * sans qu'on ait dit comment il s'affiche.
+     */
+    public static function producedBy(ModifierSource $source): self
+    {
+        return match ($source) {
+            ModifierSource::Streak => self::Streak,
+            ModifierSource::Skill => self::Skill,
+            ModifierSource::Item => self::Item,
+            ModifierSource::League => self::League,
+        };
+    }
 }

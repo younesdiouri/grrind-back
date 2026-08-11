@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared\Config;
 
+use App\Progression\Domain\XpRates;
+use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Infrastructure\Config\GameBalancePass;
 use App\Training\Domain\TrainingRules;
 use App\Training\Infrastructure\Config\TrainingSection;
@@ -55,10 +57,24 @@ final class GameBalancePassTest extends KernelTestCase
 
         self::assertMatchesRegularExpression('/^v1-[0-9a-f]{12}$/', (string) $container->getParameter('game.ruleset_version'));
 
-        // Et que le domaine reçoit un objet typé, pas un tableau d'équilibrage.
+        // Et que le domaine reçoit des objets typés, pas des tableaux d'équilibrage.
         $rules = $container->get(TrainingRules::class);
         self::assertInstanceOf(TrainingRules::class, $rules);
         self::assertSame(300, $rules->minimumDurationSeconds);
+
+        // Le barème d'XP passe par son paramètre et non par son service : rien ne consomme
+        // encore `XpRates` — la transaction de complétion est au Lot 4 — donc le conteneur
+        // le retire. Que la compilation ait abouti prouve déjà que `XpSection` l'a
+        // construit sans broncher ; on vérifie ici qu'il couvre bien les six disciplines.
+        $disciplines = $container->getParameter('game.xp.disciplines');
+        self::assertIsArray($disciplines);
+
+        /** @var list<array{discipline: string, xp_per_hour: int}> $disciplines */
+        $rates = new XpRates($disciplines);
+
+        foreach (Discipline::cases() as $discipline) {
+            self::assertGreaterThan(0, $rates->perHourOf($discipline));
+        }
     }
 
     private static function compile(string $fixture): ContainerBuilder
