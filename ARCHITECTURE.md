@@ -436,6 +436,15 @@ le `detail`.
 | `GET /api/training/sessions/active` | Bearer | 200 séance en cours, ou **204** |
 | `GET /api/titles` | Bearer | 200, catalogue situé + titre porté |
 | `PUT /api/titles/active` | Bearer | 200, catalogue après changement |
+| `GET /api/progression` | Bearer | 200, état du joueur — servi du snapshot |
+| `GET /api/progression/history` | Bearer | 200, page de ledger + `nextCursor` |
+
+**Trois routes lisent les titres, et c'est délibéré.** `/api/me` en montre deux — le porté et
+le prochain — parce que le client les affiche à côté du pseudo. `/api/titles` montre le
+catalogue **entier**, situé sur un relevé du ledger, parce qu'un écran de sélection doit donner
+à viser. `/api/progression` ne montre que **l'acquis**, et c'est ce qui lui permet de tenir sur
+le seul snapshot : lister ce qu'on a débloqué ne demande aucune agrégation, situer ce qu'on n'a
+pas encore en demande une.
 
 **Une forme par concept, partout.** `register`, `login`, `refresh` et `social` rendent le même
 `AuthResource`. Une séance ouverte et une séance close sont le même objet, avec des champs à
@@ -480,7 +489,12 @@ défaire. Le raisonnement complet est dans le docblock du fichier concerné.
 - **Les refresh tokens sont faits main** alors qu'un bundle de référence existe : il stocke le
   jeton en clair, ignore la notion de famille et ne détecte pas le rejeu.
 - **Le snapshot stocke les points de compétence *accordés*, pas *disponibles*.** Un solde
-  rendrait le cache irreconstructible, puisque le ledger ignore les dépenses.
+  rendrait le cache irreconstructible, puisque le ledger ignore les dépenses. L'API sert
+  quand même les **deux** nombres, égaux jusqu'au Lot 7 : les fondre obligerait à renommer,
+  donc à casser le client, le jour où le premier point se dépense.
+- **`GET /api/progression` sert les colonnes du snapshot telles quelles**, sans les reprojeter
+  de son total. Reprojeter masquerait précisément la divergence que la reconstruction (#20)
+  existe pour détecter, et ferait de chaque ouverture d'app une réparation silencieuse.
 - **Une clôture trop courte est refusée, pas requalifiée en abandon.** Entre deux options, celle
   qui ne détruit rien.
 - **Pas de Redis en v1**, et le déclencheur est écrit : le jour où il y a plus d'un conteneur
@@ -516,6 +530,10 @@ Les pièges qui se reproduisent. Les autres sont datés, corrigés, et vivent da
   `#[AsEventListener(event: JWTNotFoundEvent::class)]` ne se déclenche jamais, sans erreur.
 - **Vérifier le corps d'une erreur, pas seulement son code.** Un membre d'extension nommé comme
   un membre standard de problem+json disparaît silencieusement de la réponse.
+- **Un N+1 Doctrine ne se voit dans aucune assertion.** Une collection chargée en boucle rend
+  la même réponse qu'une collection préchargée ; seul le nombre de requêtes change, et il croît
+  avec la taille de la page. Ça se teste en comptant les requêtes
+  (`doctrine.debug_data_holder`), pas en relisant le JSON.
 - **Un service tagué qui n'est pas ramassé ne lève rien.** Tag mal orthographié,
   autoconfiguration coupée, service retiré parce qu'inutilisé : l'itérateur est simplement
   vide. Un contributeur de modificateurs qui se tait sous-paie un joueur en silence, et

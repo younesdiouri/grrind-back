@@ -34,10 +34,16 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: XpTransactionRepository::class)]
 #[ORM\Table(name: 'xp_transaction')]
-// L'historique se lit toujours « les écritures d'un joueur, les plus récentes d'abord » :
-// c'est l'index de GET /api/progression/history (#19) comme de la reconstruction du
-// snapshot (#20).
+// La journée d'un joueur : c'est l'index des garde-fous quotidiens, lus à chaque
+// complétion de séance, et celui de la reconstruction du snapshot (#20).
 #[ORM\Index(name: 'idx_xp_transaction_user_created', columns: ['user_id', 'created_at'])]
+// L'historique paginé (#19), qui se lit « les écritures d'un joueur, les plus récentes
+// d'abord » et pagine sur l'identifiant. Un second index sur la même table plutôt qu'un
+// tri sur celui du dessus : `ORDER BY id DESC` ne sait pas s'en servir, et remonter la clé
+// primaire en filtrant sur le compte ferait payer à un joueur inactif tout ce que les
+// autres ont écrit depuis. La table est écrite quelques fois par jour et par joueur —
+// c'est le bon côté du compromis pour la payer en lecture.
+#[ORM\Index(name: 'idx_xp_transaction_user_id', columns: ['user_id', 'id'])]
 // L'idempotence du ledger, garantie par la base et non par un SELECT préalable : entre le
 // contrôle et l'écriture, deux complétions rejouées par un client mobile passent toutes
 // les deux. Le couple (source, raison) autorise ce qu'il faut et rien de plus — une séance

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Progression\Infrastructure\Doctrine;
 
+use App\Progression\Application\ListXpHistory;
 use App\Progression\Domain\DailyLoad;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\PlayerRecord;
@@ -157,8 +158,73 @@ class XpTransactionRepository extends ServiceEntityRepository
         return new PlayerRecord($curve->standingAt($totalXp)->level, $totalXp, $sessions, $seconds);
     }
 
+    /**
+     * L'historique du joueur, du plus récent au plus ancien.
+     *
+     * L'ordre est celui de l'UUID v7, triable par construction : `id < :cursor` tient lieu
+     * de pagination, sans colonne d'ordre ni `OFFSET`. Il coïncide avec `createdAt` parce
+     * que les deux naissent du même instant dans le constructeur — l'identifiant est tiré
+     * là où la date est posée. Même geste qu'à
+     * {@see \App\Training\Infrastructure\Doctrine\TrainingSessionRepository::history()},
+     * pour que le client n'ait qu'une pagination à écrire.
+     *
+     * `$take` est volontairement plus grand que `$query->limit` : l'appelant lit une ligne
+     * de plus pour savoir s'il existe une page suivante, et ne la rend pas.
+     *
+     * @return list<XpTransaction>
+     */
+    public function history(ListXpHistory $query, int $take): array
+    {
+        $builder = $this->createQueryBuilder('t')
+            ->where('t.userId = :userId')
+            ->setParameter('userId', $query->userId, UuidType::NAME)
+            ->orderBy('t.id', 'DESC')
+            ->setMaxResults($take);
+
+        if (null !== $query->cursor) {
+            $builder->andWhere('t.id < :cursor')->setParameter('cursor', $query->cursor, UuidType::NAME);
+        }
+
+        /** @var list<XpTransaction> $transactions */
+        $transactions = $builder->getQuery()->getResult();
+
+        $this->warmBreakdownsOf($transactions);
+
+        return $transactions;
+    }
+
     public function commit(): void
     {
         $this->getEntityManager()->flush();
+    }
+
+    /**
+     * Charge les lignes de détail de toute la page d'un coup.
+     *
+     * Sans ça, chaque `breakdown()` déclencherait sa propre requête au moment de sérialiser
+     * — vingt écritures, vingt allers-retours, et un écran d'historique dont le coût croît
+     * avec la taille de la page. La jointure ne peut pas se faire dans la requête ci-dessus :
+     * un `JOIN` sur une collection multiplie les lignes, et `setMaxResults` couperait au
+     * milieu d'une transaction plutôt qu'entre deux.
+     *
+     * Le résultat est jeté : ce qui compte est l'effet de bord, les collections des entités
+     * déjà chargées se remplissent dans l'unité de travail.
+     *
+     * @param list<XpTransaction> $transactions
+     */
+    private function warmBreakdownsOf(array $transactions): void
+    {
+        if ([] === $transactions) {
+            return;
+        }
+
+        $this->createQueryBuilder('t')
+            ->addSelect('l')
+            ->join('t.lines', 'l')
+            ->where('t.id IN (:ids)')
+            ->setParameter('ids', array_map(static fn (XpTransaction $t): Uuid => $t->id(), $transactions))
+            ->getQuery()
+            ->getResult()
+        ;
     }
 }
