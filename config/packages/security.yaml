@@ -1,13 +1,11 @@
 security:
-    # https://symfony.com/doc/current/security.html
     password_hashers:
         # La clé est l'interface : tout ce qui s'authentifie par mot de passe est couvert.
         Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
 
     providers:
-        # Pas de `property` : le dépôt implémente UserLoaderInterface. C'est lui qui
-        # sait qu'un identifiant est tantôt un UUID (le claim `sub` d'un JWT), tantôt
-        # une adresse e-mail (le corps d'un login), et qui normalise la seconde.
+        # Pas de `property` : le dépôt implémente UserLoaderInterface, parce que
+        # l'identifiant est tantôt un UUID (claim `sub`), tantôt une adresse (login).
         app_users:
             entity:
                 class: App\Identity\Domain\User
@@ -17,9 +15,8 @@ security:
             pattern: ^/(_profiler|_wdt)/
             security: false
 
-        # Un firewall pour le seul login : c'est `json_login` qui vérifie le mot de
-        # passe, protège de l'énumération de comptes et déclenche le rehash quand
-        # l'algorithme a évolué. Rien de tout ça n'est écrit dans le projet.
+        # `json_login` vérifie le mot de passe, protège de l'énumération de comptes et
+        # déclenche le rehash. Rien de tout ça n'est écrit dans le projet.
         login:
             pattern: ^/api/auth/login$
             stateless: true
@@ -34,8 +31,8 @@ security:
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
 
         # Inscription, rafraîchissement et déconnexion s'authentifient par ce qu'ils
-        # portent dans leur corps, pas par un jeton d'accès. Le logout en particulier
-        # doit rester possible quand le JWT vient d'expirer.
+        # portent dans leur corps. Le logout doit rester possible quand le JWT vient
+        # d'expirer.
         auth:
             pattern: ^/api/auth/
             security: false
@@ -46,7 +43,6 @@ security:
             provider: app_users
             jwt: ~
 
-        # /health et tout ce qui n'est pas sous /api : pas de firewall, pas de session.
         public:
             pattern: ^/
             security: false

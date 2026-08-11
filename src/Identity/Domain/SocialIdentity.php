@@ -14,13 +14,9 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Le lien entre un compte GRRIND et un compte chez un fournisseur d'identité.
  *
- * La clé, c'est le couple (provider, subject) — jamais l'adresse e-mail. Le `sub`
- * de Google comme celui d'Apple est stable et ne change pas quand l'utilisateur
- * change d'adresse ; l'adresse, elle, change, et chez Apple elle peut être un
- * relais privé que l'utilisateur peut désactiver.
- *
- * Un compte peut porter plusieurs identités : se connecter avec Google puis avec
- * Apple sur la même adresse vérifiée relie les deux au même joueur.
+ * La clé est le couple (provider, subject), jamais l'adresse : le `sub` est stable
+ * quand l'adresse change, et chez Apple elle peut être un relais privé désactivable.
+ * Un compte peut porter plusieurs identités.
  */
 #[ORM\Entity(repositoryClass: SocialIdentityRepository::class)]
 #[ORM\Table(name: 'identity_social_identity')]
@@ -38,10 +34,8 @@ class SocialIdentity
     #[ORM\Column(length: 16, enumType: SocialProvider::class)]
     private SocialProvider $provider;
 
-    /**
-     * Le `sub` du fournisseur. Opaque, stable, propre à notre client OAuth : le
-     * même humain a un `sub` différent dans une autre application.
-     */
+    /** Opaque et stable, mais propre à notre client OAuth : le même humain a un `sub`
+     * différent dans une autre application. */
     #[ORM\Column(length: 255)]
     private string $subject;
 

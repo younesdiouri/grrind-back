@@ -13,16 +13,12 @@ use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Jeton de rafraîchissement, à usage unique et rotatif.
+ * Jeton de rafraîchissement, à usage unique et rotatif. Chaque échange consomme le
+ * jeton présenté et en émet un nouveau dans la même *famille* — une famille = un
+ * appareil connecté, s'en déconnecter la révoque entièrement.
  *
- * Chaque échange consomme le jeton présenté et en émet un nouveau dans la même
- * *famille*. Une famille correspond à un appareil connecté : s'y déconnecter la
- * révoque entièrement.
- *
- * Le rejeu d'un jeton déjà consommé est traité comme un vol, pas comme une erreur
- * de client : soit l'attaquant a doublé le vrai client, soit l'inverse, et on n'a
- * aucun moyen de les distinguer. La seule réponse sûre est de révoquer la famille
- * et de forcer un vrai login.
+ * Le rejeu d'un jeton consommé est traité comme un vol : on ne peut pas distinguer
+ * l'attaquant du vrai client qui a été doublé, donc on révoque la famille.
  */
 #[ORM\Entity(repositoryClass: RefreshTokenRepository::class)]
 #[ORM\Table(name: 'identity_refresh_token')]
@@ -31,8 +27,8 @@ use Symfony\Component\Uid\Uuid;
 class RefreshToken
 {
     /**
-     * Trente jours : assez pour qu'un joueur régulier ne se reconnecte jamais,
-     * assez court pour qu'un appareil oublié finisse par sortir.
+     * Assez long pour qu'un joueur régulier ne se reconnecte jamais, assez court pour
+     * qu'un appareil oublié finisse par sortir.
      */
     public const string LIFETIME = 'P30D';
 
@@ -44,9 +40,7 @@ class RefreshToken
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private User $user;
 
-    /**
-     * Identifie la lignée de rotations issue d'un même login.
-     */
+    /** La lignée de rotations issue d'un même login. */
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $familyId;
 
@@ -75,17 +69,13 @@ class RefreshToken
         $this->expiresAt = $now->add(new DateInterval(self::LIFETIME));
     }
 
-    /**
-     * Premier jeton d'une famille : un login, un appareil.
-     */
+    /** Premier jeton d'une famille : un login, un appareil. */
     public static function startFamily(User $user, RefreshTokenSecret $secret, DateTimeImmutable $now): self
     {
         return new self($user, Uuid::v7(), $secret, $now);
     }
 
-    /**
-     * Successeur du jeton courant, dans la même famille.
-     */
+    /** Successeur du jeton courant, dans la même famille. */
     public function rotate(RefreshTokenSecret $secret, DateTimeImmutable $now): self
     {
         $this->consumedAt = $now;
@@ -125,10 +115,7 @@ class RefreshToken
             && $now < $this->expiresAt;
     }
 
-    /**
-     * Un jeton déjà consommé ou révoqué qu'on nous représente : ce n'est plus une
-     * expiration banale, c'est le signal qu'une copie circule.
-     */
+    /** Pas une expiration banale : le signal qu'une copie circule. */
     public function isReplay(): bool
     {
         return null !== $this->consumedAt || null !== $this->revokedAt;

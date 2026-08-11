@@ -18,13 +18,10 @@ use Symfony\Component\Uid\Uuid;
  * Le joueur renonce. La séance est close, ne rapporte rien, et reste dans l'historique :
  * un abandon est une information, pas une erreur à effacer.
  *
- * `#[Idempotent]` comme la clôture, bien que rien ne se double ici : sans la clé, le rejeu
- * d'une requête déjà passée rendrait un `409` au client qui, lui, n'a fait que renvoyer une
- * requête perdue en route. Il afficherait un échec pour une action réussie. La clé fait de
- * ce cas ce qu'il est — une non-opération — et le `409` retrouve son sens : *une autre*
- * requête a fermé cette séance entre-temps.
- *
- * Ni le motif ni la durée ne se déclarent : le corps de la requête n'est pas lu.
+ * `#[Idempotent]` bien que rien ne se double ici. Le doublon ne coûte rien au jeu, il
+ * coûte au client : sans la clé, une requête perdue puis renvoyée rendrait un `409` —
+ * un échec affiché pour une action réussie. La clé en fait la non-opération qu'elle est,
+ * et rend au `409` son seul sens utile : *une autre* requête a fermé cette séance.
  */
 final readonly class AbandonSessionController
 {

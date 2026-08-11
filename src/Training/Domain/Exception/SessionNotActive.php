@@ -9,14 +9,11 @@ use App\Training\Domain\SessionStatus;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * On a voulu clôturer ou abandonner une séance qui n'est plus en cours. C'est le cas
- * banal du client mobile qui rejoue une requête déjà passée : il apprend le statut
- * réel et se resynchronise, plutôt que de croire à un échec.
+ * Séance déjà close : le client rejoue une requête passée, apprend le statut réel et se
+ * resynchronise.
  *
  * La clé s'appelle `sessionStatus` et non `status` : un problem details RFC 9457 a déjà
- * un membre `status`, celui du code HTTP, et les membres d'extension ne l'écrasent pas
- * — le statut de la séance disparaissait donc de la réponse, précisément ce qu'elle
- * était censée apprendre au client.
+ * un membre `status`, celui du code HTTP, que les extensions n'écrasent pas.
  */
 final class SessionNotActive extends ConflictError
 {

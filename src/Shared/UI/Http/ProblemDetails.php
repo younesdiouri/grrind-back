@@ -7,9 +7,8 @@ namespace App\Shared\UI\Http;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Un problem details RFC 9457. Les quatre membres standard sont typés ; les
- * membres d'extension (`violations`, contexte métier) sont libres mais ne
- * peuvent pas écraser les standard.
+ * Un problem details RFC 9457. Les quatre membres standard sont typés ; les extensions
+ * sont libres mais ne peuvent pas les écraser.
  */
 final readonly class ProblemDetails
 {

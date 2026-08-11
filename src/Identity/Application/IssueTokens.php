@@ -12,11 +12,9 @@ use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Psr\Clock\ClockInterface;
 
 /**
- * Ouvre une session : un jeton d'accès court et une nouvelle famille de refresh
- * tokens. Une famille = un appareil.
- *
- * Le JWT est fabriqué par Lexik, sans port intermédiaire : `JWTTokenManagerInterface`
- * *est* l'abstraction, en écrire une seconde par-dessus n'achetait rien.
+ * Ouvre une session : un jeton d'accès court et une nouvelle famille de refresh tokens.
+ * Le JWT vient de Lexik sans port intermédiaire — `JWTTokenManagerInterface` *est*
+ * l'abstraction.
  */
 final readonly class IssueTokens
 {
@@ -28,18 +26,13 @@ final readonly class IssueTokens
     ) {
     }
 
-    /**
-     * Session complète, jeton d'accès compris. Utilisé par l'inscription.
-     */
+    /** Session complète, jeton d'accès compris. Utilisé par l'inscription. */
     public function __invoke(User $user): TokenPair
     {
         return $this->alongside($user, $this->jwt->create($user));
     }
 
-    /**
-     * Même chose, mais le jeton d'accès existe déjà : au login, c'est le firewall
-     * qui l'a signé. On ne le refait pas pour le jeter aussitôt.
-     */
+    /** Au login, le firewall a déjà signé le jeton : on ne le refait pas. */
     public function alongside(User $user, string $accessToken): TokenPair
     {
         $secret = RefreshTokenSecret::generate();

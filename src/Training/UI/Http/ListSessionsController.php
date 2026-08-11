@@ -18,15 +18,9 @@ use Symfony\Component\Uid\Uuid;
 /**
  * L'historique du joueur, du plus récent au plus ancien.
  *
- * Le compte n'est pas un paramètre : il vient du jeton. C'est ce qui rend l'isolation
- * structurelle plutôt que déclarative — il n'existe aucune requête capable de demander
- * l'historique d'un autre, donc aucune à refuser.
- *
  * L'argument `#[MapQueryString]` n'est ni nullable ni pourvu d'un défaut, et c'est
- * voulu : le résolveur ne construit le DTO sur une query string vide que dans ce
- * cas-là. Nullable, une requête sans paramètre rendrait `null` et il faudrait un
- * `?? new SessionHistoryQuery()` à la main — les valeurs par défaut sont déjà dans le
- * constructeur, elles n'ont pas à être écrites deux fois.
+ * voulu : le résolveur ne construit le DTO sur une query string vide que dans ce cas-là.
+ * Nullable, il faudrait un `?? new SessionHistoryQuery()` à la main.
  */
 final readonly class ListSessionsController
 {

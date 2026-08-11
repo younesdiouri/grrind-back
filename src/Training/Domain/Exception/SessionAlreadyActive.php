@@ -8,12 +8,9 @@ use App\Shared\Domain\Exception\ConflictError;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Une séance tourne déjà. C'est le cas du joueur qui a fermé l'app sans couper son
- * chronomètre et rouvre l'écran de démarrage.
- *
+ * Une séance tourne déjà — le joueur a fermé l'app sans couper son chronomètre.
  * L'identifiant de la séance en cours part dans l'erreur pour qu'il puisse s'y
- * rebrancher plutôt que de rester coincé devant un refus : c'est la même séance qu'il
- * voulait, il ne le sait simplement plus.
+ * rebrancher plutôt que de rester devant un refus.
  */
 final class SessionAlreadyActive extends ConflictError
 {

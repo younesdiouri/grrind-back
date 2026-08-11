@@ -22,9 +22,8 @@ abstract class DomainError extends RuntimeException
     }
 
     /**
-     * Identifiant stable de l'erreur, en kebab-case : « email-already-used ».
-     * C'est sur cette valeur que le client iOS branche ses messages — elle ne
-     * change jamais, contrairement au message qui reste humain.
+     * Identifiant stable en kebab-case (« email-already-used »). C'est dessus que le
+     * client iOS branche ses messages : il ne change jamais, contrairement au message.
      */
     abstract public function type(): string;
 

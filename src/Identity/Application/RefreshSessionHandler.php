@@ -35,10 +35,8 @@ final readonly class RefreshSessionHandler
         }
 
         if ($presented->isReplay()) {
-            // Un jeton déjà consommé revient : soit une copie a été volée, soit le
-            // vrai client rejoue après nous avoir doublés. Impossible de trancher,
-            // donc on coupe la famille entière et on force un vrai login. C'est
-            // brutal, et c'est le seul comportement sûr.
+            // Voir RefreshToken : impossible de distinguer le voleur du vrai client,
+            // donc on coupe la famille entière.
             $this->refreshTokens->revokeFamily($presented->familyId(), $now);
             $this->refreshTokens->commit();
 
@@ -53,8 +51,7 @@ final readonly class RefreshSessionHandler
         $rotated = $presented->rotate($secret, $now);
 
         $this->refreshTokens->add($rotated);
-        // La consommation de l'ancien et l'écriture du nouveau partent ensemble :
-        // un flush partiel laisserait la session sans jeton valide.
+        // Consommation de l'ancien et écriture du nouveau dans le même flush.
         $this->refreshTokens->commit();
 
         $user = $presented->user();

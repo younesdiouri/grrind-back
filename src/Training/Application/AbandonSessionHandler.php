@@ -12,14 +12,12 @@ use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
 use Psr\Clock\ClockInterface;
 
 /**
- * Ferme la séance sans rien accorder. C'est la porte de sortie du joueur qui a lancé son
- * chronomètre par erreur : sans elle, la règle « une seule séance active » le bloquerait
- * jusqu'au plafond de durée.
+ * Ferme la séance sans rien accorder : la porte de sortie du joueur qui a lancé son
+ * chronomètre par erreur.
  *
  * Jumeau de {@see CompleteSessionHandler} aujourd'hui, et pourtant distinct : au Lot 4 la
- * complétion devient une transaction — verrou, XP, loot, streak, outbox — quand l'abandon
- * restera ces quatre lignes. Les factoriser maintenant reviendrait à donner un paramètre
- * `$outcome` à une méthode qui va cesser d'en avoir un.
+ * complétion devient une transaction quand l'abandon restera ces quatre lignes. Les
+ * factoriser reviendrait à donner un `$outcome` à une méthode qui va cesser d'en avoir.
  */
 final readonly class AbandonSessionHandler
 {

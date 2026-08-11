@@ -19,32 +19,23 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Une séance de sport, de son ouverture à sa clôture.
  *
- * **Le serveur possède l'horloge.** L'agrégat ne lit jamais l'heure lui-même : chaque
- * transition reçoit le `$now` de l'appelant, qui le tient de `ClockInterface`. Aucun
- * timestamp venu du client n'entre dans le calcul de la durée, sinon l'antidatage est
- * une ligne de JSON. C'est aussi ce qui rend le domaine testable sans infrastructure.
+ * **Le serveur possède l'horloge.** L'agrégat ne la lit jamais lui-même : chaque
+ * transition reçoit le `$now` de l'appelant. Aucun timestamp du client n'entre dans le
+ * calcul de la durée, sinon l'antidatage est une ligne de JSON.
  *
- * L'agrégat ne connaît pas `User` — Deptrac interdit l'import croisé, et il n'en a
- * pas besoin : il porte un `userId`, point. La cohérence de cet UUID relève de
- * l'authentification, pas d'une clé étrangère.
- *
- * Les garde-fous qui ne concernent *que cette séance* sont ici — durée plancher, durée
- * plafond — parce qu'ils sont la définition même d'une clôture valide, et que les
- * laisser au-dessus reviendrait à espérer que personne n'oublie de les appeler. Ceux
- * qui ont besoin des *autres* séances du joueur — unicité de la séance active,
- * cooldown — restent une couche au-dessus : l'agrégat ne connaît que lui-même.
- *
- * L'index unique partiel n'est pas une redite de la vérification applicative : entre
- * le `SELECT` qui ne trouve aucune séance active et l'`INSERT` qui en crée une, deux
- * requêtes simultanées passent toutes les deux. Le contrôle applicatif rend une erreur
- * lisible dans le cas courant ; l'index est ce qui garantit l'invariant.
+ * Répartition des garde-fous : ceux qui ne concernent *que cette séance* — plancher,
+ * plafond — sont ici, parce qu'ils définissent une clôture valide et que les laisser
+ * au-dessus reviendrait à espérer que personne n'oublie de les appeler. Ceux qui ont
+ * besoin des *autres* séances du joueur — unicité de l'active, cooldown — sont une
+ * couche au-dessus.
  */
 #[ORM\Entity(repositoryClass: TrainingSessionRepository::class)]
 #[ORM\Table(name: 'training_session')]
 #[ORM\Index(name: 'idx_training_session_user_started', columns: ['user_id', 'started_at'])]
-// Le prédicat est écrit tel que PostgreSQL le **relit**, casts compris, et non tel
-// qu'on l'écrirait à la main : `doctrine:migrations:diff` compare deux chaînes, et
-// `(status = 'ACTIVE')` proposerait un DROP + CREATE identique à chaque diff.
+// Prédicat écrit tel que PostgreSQL le **relit**, casts compris : `migrations:diff`
+// compare deux chaînes, et `(status = 'ACTIVE')` reproposerait un DROP + CREATE
+// identique à chaque diff. L'index — et non le contrôle applicatif — est ce qui
+// garantit l'unicité : entre le SELECT et l'INSERT, deux requêtes passent.
 #[ORM\UniqueConstraint(
     name: 'uniq_training_session_active',
     columns: ['user_id'],
@@ -78,20 +69,14 @@ class TrainingSession
     private ?DateTimeImmutable $endedAt = null;
 
     /**
-     * Figée à la clôture plutôt que recalculée à la lecture : c'est elle qui alimentera
-     * le ledger d'XP, et une valeur qui se recalcule est une valeur qui peut changer
-     * après coup. Un entier, jamais un flottant — la règle vaut pour toute valeur de
-     * jeu persistée.
+     * Figée à la clôture, pas recalculée à la lecture : elle alimentera le ledger d'XP,
+     * et une valeur qui se recalcule peut changer après coup.
      */
     #[ORM\Column(nullable: true)]
     private ?int $durationSeconds = null;
 
-    /**
-     * Distinct de `startedAt`, et pas par excès de zèle : les deux coïncident pour un
-     * chronomètre lancé dans l'app, mais une activité importée plus tard aura commencé
-     * bien avant d'être enregistrée. `startedAt` est un fait sportif, `createdAt` un
-     * fait système.
-     */
+    /** `startedAt` est un fait sportif, `createdAt` un fait système. Ils divergeront
+     * quand une activité s'importera après coup. */
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $createdAt;
 
@@ -112,21 +97,17 @@ class TrainingSession
         $this->createdAt = $now;
     }
 
-    /**
-     * Ouvre une séance au chronomètre : le joueur appuie sur « démarrer », le serveur
-     * date. Le client n'envoie que la discipline, et c'est tout ce qu'on accepte de lui.
-     */
+    /** Le client n'envoie que la discipline ; le serveur date. */
     public static function start(Uuid $userId, Discipline $discipline, DateTimeImmutable $now): self
     {
         return new self($userId, $discipline, SessionSource::ManualTimer, $now, $now);
     }
 
     /**
-     * La séance est finie et compte. Ce qu'elle rapporte ne se décide pas ici : le
-     * calcul d'XP appartient à `Progression`, qui apprendra la nouvelle par événement.
-     *
      * Seule voie soumise à la durée plancher : sous le seuil, rien n'est écrit et la
-     * séance reste en cours. Le joueur continue, ou renonce par `abandon()`.
+     * séance reste en cours — le joueur continue, ou renonce par `abandon()`.
+     *
+     * Ce qu'elle rapporte ne se décide pas ici : `Progression` l'apprendra par événement.
      *
      * @throws SessionNotActive
      * @throws SessionTooShort
@@ -145,13 +126,9 @@ class TrainingSession
     }
 
     /**
-     * Le joueur renonce. La séance est close et ne rapportera rien, mais elle reste :
-     * on ne supprime pas d'historique, et sa durée servira à répondre à la question du
-     * cooldown — abandonner ne doit pas devenir le moyen de l'effacer.
-     *
-     * Aucun plancher ici, et c'est le pendant du refus opposé à une clôture trop
-     * courte : il faut bien une sortie, sans quoi une séance ouverte par erreur
-     * enfermerait le joueur jusqu'au plafond de durée.
+     * La séance est close et ne rapportera rien, mais elle reste : on ne supprime pas
+     * d'historique. Aucun plancher ici — c'est le pendant du refus opposé à une clôture
+     * trop courte, il faut bien une sortie.
      *
      * @throws SessionNotActive
      */
@@ -162,10 +139,9 @@ class TrainingSession
     }
 
     /**
-     * Une séance qui compte pour le cooldown. Sous le plancher, elle n'a pas eu lieu :
-     * c'est un chronomètre lancé par erreur, et le punir d'un quart d'heure d'attente
-     * ferait du garde-fou une punition. Au-dessus, complétée ou abandonnée, elle
-     * déclenche l'attente — sinon abandonner deviendrait le moyen de l'effacer.
+     * Sous le plancher, la séance n'a pas eu lieu : un chrono lancé par erreur ne se
+     * punit pas d'un quart d'heure. Au-dessus, complétée ou abandonnée, elle déclenche
+     * l'attente — sinon abandonner deviendrait le moyen de l'effacer.
      */
     public function countsTowardCooldown(TrainingRules $rules): bool
     {
@@ -226,10 +202,8 @@ class TrainingSession
     {
         $this->status = $outcome;
         $this->endedAt = $now;
-        // Écrêtée, jamais rejetée : le joueur qui oublie de couper son chrono garde le
-        // plafond au lieu de tout perdre. La durée retenue peut donc être plus courte
-        // que `endedAt - startedAt`, et c'est elle qui fait foi — `durationSeconds` est
-        // ce que la séance *vaut*, pas ce que la montre a affiché.
+        // Écrêtée, jamais rejetée. `durationSeconds` peut donc être plus petit que
+        // `endedAt - startedAt`, et c'est lui qui fait foi : ce que la séance *vaut*.
         $this->durationSeconds = min($this->elapsedAt($now), $rules->maximumDurationSeconds);
     }
 
@@ -244,8 +218,8 @@ class TrainingSession
     }
 
     /**
-     * Un plancher à zéro : si l'horloge du serveur recule (un pas NTP suffit), la
-     * séance ne rapporte rien plutôt que d'empoisonner le ledger d'une durée négative.
+     * Plancher à zéro : si l'horloge recule (un pas NTP suffit), la séance ne rapporte
+     * rien plutôt que d'empoisonner le ledger d'une durée négative.
      */
     private function elapsedAt(DateTimeImmutable $now): int
     {

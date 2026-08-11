@@ -20,21 +20,16 @@ use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
 use Throwable;
 
 /**
- * L'échange réel, par league/oauth2-client, câblé par KnpUOAuth2ClientBundle.
+ * L'échange réel, par league/oauth2-client.
  *
- * Le flux est celui d'un client natif, pas d'un site web : l'app SwiftUI ouvre
- * elle-même l'écran d'autorisation (ASWebAuthenticationSession, ou Sign in with
- * Apple), récupère le code, et nous l'envoie. Le serveur seul détient le secret
- * client et fait l'échange — le code d'autorisation ne vaut rien sans lui.
+ * Le flux est celui d'un client natif : l'app SwiftUI ouvre elle-même l'écran
+ * d'autorisation, récupère le code et nous l'envoie. Le serveur seul détient le secret
+ * client — le code ne vaut rien sans lui.
  *
- * Les providers league sont câblés à la main dans config/services.yaml plutôt que
- * par KnpUOAuth2ClientBundle : tout ce que le bundle apporte — routes de
- * redirection, état en session — suppose un navigateur, et il exige un
- * `redirect_route` qui n'aurait rien désigné ici.
- *
- * Ils arrivent par un service locator, donc instanciés seulement quand on s'en
- * sert : le constructeur d'Apple refuse une configuration vide, et un poste de dev
- * sans clé Apple doit rester capable de servir Google.
+ * Les providers sont câblés à la main dans config/services.yaml (KnpUOAuth2ClientBundle
+ * écarté : tout ce qu'il apporte suppose un navigateur) et arrivent par un service
+ * locator, donc instanciés à la demande — le constructeur d'Apple refuse une
+ * configuration vide, et un poste sans clé Apple doit pouvoir servir Google.
  */
 final readonly class LeagueSocialProfileResolver implements SocialProfileResolver
 {
@@ -57,9 +52,8 @@ final readonly class LeagueSocialProfileResolver implements SocialProfileResolve
         string $redirectUri,
         ?string $codeVerifier = null,
     ): SocialProfile {
-        // Le redirect_uri doit être identique au bit près à celui présenté à
-        // l'étape précédente : les deux fournisseurs le recomparent et refusent
-        // l'échange sinon. Il vient donc du client, pas de notre configuration.
+        // Le redirect_uri doit être identique au bit près à celui de l'étape
+        // précédente : il vient donc du client, pas de notre configuration.
         $options = ['code' => $code, 'redirect_uri' => $redirectUri];
 
         if (null !== $codeVerifier) {
@@ -75,17 +69,16 @@ final readonly class LeagueSocialProfileResolver implements SocialProfileResolve
         try {
             $token = $oauth->getAccessToken('authorization_code', $options);
 
-            // getAccessToken() promet l'interface, getResourceOwner() exige la
-            // classe concrète : incohérence de league/oauth2-client, pas la nôtre.
+            // getAccessToken() promet l'interface, getResourceOwner() exige la classe
+            // concrète : incohérence de league/oauth2-client, pas la nôtre.
             if (!$token instanceof AccessToken) {
                 throw new SocialSignInRejected();
             }
 
             $owner = $oauth->getResourceOwner($token);
         } catch (Throwable $e) {
-            // Code expiré, déjà échangé, émis pour une autre app, PKCE qui ne
-            // correspond pas : le client n'a qu'une chose à faire dans tous les cas.
-            // Le détail part dans les logs, pas dans la réponse.
+            // Code expiré, déjà échangé, émis pour une autre app, PKCE qui ne colle
+            // pas : même conduite à tenir côté client. Le détail va aux logs.
             $this->logger->warning('Échange OAuth refusé par {provider} : {message}', [
                 'provider' => $provider->value,
                 'message' => $e->getMessage(),
@@ -110,8 +103,8 @@ final readonly class LeagueSocialProfileResolver implements SocialProfileResolve
             throw new SocialSignInRejected();
         }
 
-        // GoogleUser::getId() est typé mixed : le `sub` OIDC est une chaîne, mais
-        // rien dans la signature ne le garantit.
+        // getId() est typé mixed : le `sub` OIDC est une chaîne, mais rien dans la
+        // signature ne le garantit.
         $id = $owner->getId();
 
         if (!\is_string($id) || '' === $id) {
@@ -122,8 +115,7 @@ final readonly class LeagueSocialProfileResolver implements SocialProfileResolve
             SocialProvider::Google,
             $id,
             $owner->getEmail(),
-            // Google renvoie email_verified sur l'endpoint OIDC. Absent = non
-            // vérifié : en cas de doute on ne relie pas à un compte existant.
+            // Absent vaut non vérifié : en cas de doute, on ne relie pas.
             true === $owner->getEmailVerified(),
             $owner->getName(),
         );
@@ -150,9 +142,7 @@ final readonly class LeagueSocialProfileResolver implements SocialProfileResolve
             SocialProvider::Apple,
             $id,
             $owner->getEmail(),
-            // L'adresse vient de l'id_token, dont le provider a vérifié la signature
-            // Apple. `email_verified` y figure en booléen ou en chaîne selon les
-            // versions de l'API — les deux sont acceptées ici, et une absence vaut
+            // L'adresse vient de l'id_token, signature vérifiée. Une absence vaut
             // vérifié : Apple ne diffuse pas d'adresse qu'il n'a pas validée.
             self::appleSaysVerified($owner),
             '' === $name ? null : $name,

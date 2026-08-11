@@ -56,8 +56,8 @@ final readonly class ProblemDetailsListener
                 $throwable->getMessage(),
                 $throwable->context(),
             ),
-            // Le message d'une HttpException est écrit pour être lu et ne contient
-            // rien de sensible ; s'il est vide, le titre du statut suffit.
+            // Le message d'une HttpException est écrit pour être lu ; s'il est vide,
+            // le titre du statut suffit.
             $throwable instanceof HttpExceptionInterface => ProblemDetails::ofStatus(
                 $throwable->getStatusCode(),
                 $throwable->getMessage(),
@@ -90,8 +90,8 @@ final readonly class ProblemDetailsListener
     }
 
     /**
-     * Remonte la chaîne des exceptions : `#[MapRequestPayload]` enveloppe la
-     * ValidationFailedException dans une HttpException.
+     * Remonte la chaîne : `#[MapRequestPayload]` enveloppe la ValidationFailedException
+     * dans une HttpException.
      *
      * @return list<array{field: string, message: string}>
      */

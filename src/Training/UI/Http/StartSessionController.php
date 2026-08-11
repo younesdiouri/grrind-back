@@ -20,18 +20,13 @@ use Symfony\Component\Uid\Uuid;
  * Le joueur appuie sur « démarrer » ; le serveur ouvre la séance et la date.
  *
  * L'auteur vient de `#[CurrentUser]`, donc du jeton : aucune route ne prend
- * d'identifiant de compte en paramètre, donc aucune ne peut être détournée pour
- * ouvrir une séance au nom d'un autre.
+ * d'identifiant de compte en paramètre, donc aucune ne peut être détournée.
  *
- * L'argument est typé `UserInterface` et non `App\Identity\Domain\User` — Deptrac
- * interdit à `Training` d'importer une entité d'`Identity`, et il n'y a rien à en
- * tirer ici. L'identifiant de sécurité étant l'UUID du compte (invariant posé au
- * Lot 1), `getUserIdentifier()` suffit à savoir qui écrit. C'est déjà par là que
- * `Shared\UI\Http\IdempotencyListener` s'y prend.
- *
- * Cette conversion d'une ligne se répétera dans les autres modules de jeu ; un value
- * resolver `#[CurrentPlayer]` la mutualisera quand il y aura assez d'appelants pour
- * la justifier — voir #46.
+ * L'argument est typé `UserInterface` et non `User` : Deptrac interdit à `Training`
+ * d'importer une entité d'`Identity`, et l'identifiant de sécurité étant l'UUID du
+ * compte, `getUserIdentifier()` suffit. Les autres contrôleurs des modules de jeu
+ * répètent cette ligne ; un value resolver `#[CurrentPlayer]` la mutualisera quand il y
+ * aura assez d'appelants — #46.
  */
 final readonly class StartSessionController
 {

@@ -8,10 +8,9 @@ use DateTimeZone;
 use InvalidArgumentException;
 
 /**
- * Fuseau IANA du user. Le stockage est en UTC partout, mais le streak et les
- * plafonds quotidiens se calculent dans *ce* fuseau : sans lui, un user à Tokyo
- * perdrait sa série à 9 h du matin. C'est un attribut de profil, jamais une
- * déduction faite à partir de l'IP ou de l'heure d'envoi.
+ * Fuseau IANA du joueur. Le stockage est en UTC partout, mais le streak et les plafonds
+ * quotidiens se calculent dans *ce* fuseau : sans lui, un joueur à Tokyo perdrait sa
+ * série à 9 h du matin. C'est un attribut de profil, jamais une déduction depuis l'IP.
  */
 final readonly class Timezone implements StringValue
 {

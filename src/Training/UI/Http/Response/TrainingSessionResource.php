@@ -8,21 +8,17 @@ use App\Training\Domain\TrainingSession;
 use DateTimeInterface;
 
 /**
- * Représentation publique d'une séance, séparée de l'entité pour qu'un champ ajouté
- * au domaine ne parte pas sur le réseau par accident.
+ * Représentation publique d'une séance, séparée de l'entité pour qu'un champ ajouté au
+ * domaine ne parte pas sur le réseau par accident.
  *
- * `source` et `trust` sont exposés dès la v1 alors qu'ils ne valent aujourd'hui que
- * `MANUAL_TIMER` / `DECLARED` : le client iOS doit apprendre à les lire maintenant,
- * pour que l'arrivée de Strava n'ajoute pas de champ au contrat.
+ * Tous les champs sont toujours présents, jamais omis — `source` et `trust` alors qu'ils
+ * ne valent encore que `MANUAL_TIMER` / `DECLARED`, `endedAt` et `durationSeconds` à
+ * `null` tant que la séance court. Une séance ouverte et une séance close sont **une
+ * seule forme** : le client iOS décode un seul type, et un champ qui apparaît et
+ * disparaît finit lu de travers.
  *
- * Le même argument vaut pour `endedAt` et `durationSeconds`, `null` tant que la séance
- * court : une séance ouverte et une séance close sont **une seule forme**, décodée par
- * un seul type côté client, plutôt que deux à tenir en phase. Les champs sont toujours
- * présents, jamais omis — un champ qui apparaît et disparaît est un champ qu'on finit
- * par lire de travers.
- *
- * Ce que le Lot 4 ajoutera — XP, level ups, loot, streak — n'a rien à faire ici : ça
- * décrit une *récompense*, pas une séance, et ça partira dans son propre `RewardSummary`.
+ * Ce que le Lot 4 ajoutera décrit une *récompense*, pas une séance : ça ira dans
+ * `RewardSummary`.
  */
 final readonly class TrainingSessionResource
 {

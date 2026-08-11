@@ -274,6 +274,32 @@ vaut aussi pour les tables qu'on n'écrit pas soi-même.
 module. Ce fichier ne porte plus que les décisions et les pièges — le reste divergeait dès qu'on
 ne le relisait pas.
 
+**Checkpoint #53 — pas de Redis en v1, et le déclencheur est écrit.** Rien dans le code ne dépend
+d'un état partagé entre processus : `cache.app` est en filesystem, il n'y a ni `LockFactory`, ni
+`RateLimiter`, ni `CacheInterface` injecté nulle part. Le verrou de la complétion sera pessimiste
+sur la ligne de progression, dans la transaction — un verrou distribué serait un affaiblissement,
+pas un progrès. Redis entre le jour où il y a **plus d'un conteneur applicatif en prod** *et* un
+besoin d'état partagé ; le premier sera le rate limiter (#38), et même là un pool
+`cache.adapter.doctrine_dbal` suffit tant que le volume ne le dément pas. Les classements (#36)
+sont le seul candidat sérieux à terme, et une table Postgres indexée tient les premiers milliers
+de joueurs.
+
+**Checkpoint #53 — la règle d'admission dans `Shared`.** Une classe y entre si (a) au moins
+**deux** modules l'importent, ou (b) c'est une préoccupation transverse HTTP/persistance sans
+logique de jeu. `Domain\Activity` passe par (a), `Idempotency` par (b). À 1 300 lignes pour trois
+modules, `Shared` est proportionné ; le risque est qu'il devienne le dépotoir quand Progression,
+Rewards et Engagement arriveront — `ModifierVocabulary` sera le premier à se présenter. Point de
+contrôle au Lot 5 : au-delà de ~2 500 lignes, l'idempotence sort dans son propre module technique.
+Et la question « hexagonal plutôt que ça ? » ne se pose pas : `Domain / Application /
+Infrastructure / UI` par module *est* ports & adapters, la découpe existe déjà.
+
+**Checkpoint #53 — les objets commande restent, et la tension est assumée.** `StartSession` a deux
+propriétés, il est construit dans le contrôleur et passé à un handler appelé directement : sans
+bus, il ne découple de rien, et c'est en tension avec « Lot 1 — pas de bus de commandes ». On les
+garde parce qu'ils donnent un domicile aux invariants (« le *quand* n'est pas un paramètre »),
+rendent les handlers testables sans HTTP, et que `CompleteSession` va grossir au Lot 4. C'est écrit
+ici pour que personne ne « corrige » l'incohérence dans le mauvais sens dans six mois.
+
 ## Pièges déjà rencontrés
 
 **Un index partiel se déclare tel que PostgreSQL le *relit*, casts compris.** Écrire

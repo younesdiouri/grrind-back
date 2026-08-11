@@ -8,16 +8,11 @@ use App\Shared\Domain\Exception\ConflictError;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * La séance n'a pas atteint la durée plancher, et la clôture est refusée.
+ * Clôture refusée sous la durée plancher — refusée, et non requalifiée en abandon : la
+ * séance reste en cours, donc rien n'est perdu. Requalifier déciderait à la place du
+ * joueur et détruirait une séance qu'un appui malheureux à 4 min 59 ferait disparaître.
  *
- * Refusée, et non requalifiée en abandon : la séance reste en cours, donc rien n'est
- * perdu. Le joueur continue et clôt plus tard, ou renonce explicitement par
- * `/abandon` — qui existe précisément pour ça. Requalifier reviendrait à décider à sa
- * place, et à détruire une séance qu'un appui malheureux à 4 min 59 aurait suffi à
- * faire disparaître.
- *
- * Le temps restant part dans l'erreur : le client affiche « encore 2 min » plutôt
- * qu'un refus opaque.
+ * Le temps restant part dans l'erreur : le client affiche « encore 2 min ».
  */
 final class SessionTooShort extends ConflictError
 {

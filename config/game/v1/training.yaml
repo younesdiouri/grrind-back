@@ -1,30 +1,15 @@
-# Les garde-fous d'une séance — config-as-code.
-#
-# Ces valeurs sont de l'équilibrage, pas du code : elles bougeront après les premiers
-# joueurs, et une constante en dur dans une classe rendrait chaque ajustement dépendant
-# d'une revue de code. `v1` dans le chemin n'est pas décoratif — au Lot 3, tout
-# `config/game/v1/` sera chargé, validé et **hashé** pour produire le `rulesetVersion`
-# stocké avec chaque transaction d'XP, de sorte qu'un rééquilibrage ne corrompe pas
-# l'historique. Ce fichier prend sa place dès maintenant pour que ce chargeur n'ait
-# rien à déplacer.
-#
-# En attendant, il est lu par le mécanisme que Symfony fournit déjà — des paramètres de
-# conteneur, importés par config/services.yaml et injectés dans
-# App\Training\Domain\TrainingRules. Rien à écrire pour ça, et une valeur manquante
-# casse la compilation du conteneur plutôt que la première requête.
+# Les garde-fous d'une séance. Ces valeurs sont de l'équilibrage, pas du code : elles
+# bougeront après les premiers joueurs. Lues comme paramètres de conteneur et injectées
+# dans App\Training\Domain\TrainingRules.
 parameters:
-    # Sous ce seuil, une séance ne se clôt pas : le client affiche le temps restant et
-    # le joueur continue — ou renonce par /abandon, qui existe pour ça. Cinq minutes,
-    # parce qu'en dessous il n'y a pas d'entraînement à récompenser, juste un
-    # chronomètre qu'on a tapé deux fois.
+    # Sous ce seuil, une séance ne se clôt pas : le client affiche le temps restant et le
+    # joueur continue — ou renonce par /abandon, qui existe pour ça.
     game.training.minimum_duration_seconds: 300
 
-    # Au-delà, la durée est **écrêtée**, pas rejetée : le joueur qui oublie de couper
-    # son chrono garde ses quatre heures créditées au lieu de tout perdre. C'est aussi
-    # ce qui rend inutile de laisser tourner une séance toute la nuit.
+    # Au-delà, la durée est écrêtée, pas rejetée : le chrono oublié rend quatre heures
+    # créditées au lieu de tout perdre.
     game.training.maximum_duration_seconds: 14400
 
-    # Entre deux séances qui comptent. Assez court pour ne pas gêner deux entraînements
-    # dans la même journée, assez long pour qu'enchaîner des séances plancher ne soit
-    # pas une stratégie.
+    # Assez court pour ne pas gêner deux entraînements dans la journée, assez long pour
+    # qu'enchaîner des séances plancher ne soit pas une stratégie.
     game.training.cooldown_seconds: 900

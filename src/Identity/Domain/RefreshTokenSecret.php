@@ -7,12 +7,9 @@ namespace App\Identity\Domain;
 use InvalidArgumentException;
 
 /**
- * La valeur brute d'un refresh token — celle que le client garde et renvoie.
- *
- * Elle n'est jamais stockée : la base ne contient que son SHA-256. Une fuite du
- * dump ne donne donc aucun jeton utilisable. Pas de sel ni de bcrypt ici, c'est
- * inutile : contrairement à un mot de passe, ce secret fait 256 bits d'entropie
- * réelle, il n'y a rien à deviner.
+ * La valeur brute d'un refresh token, jamais stockée : la base ne contient que son
+ * SHA-256, donc une fuite du dump ne donne aucun jeton utilisable. Ni sel ni bcrypt —
+ * contrairement à un mot de passe, ce secret fait 256 bits d'entropie réelle.
  */
 final readonly class RefreshTokenSecret
 {

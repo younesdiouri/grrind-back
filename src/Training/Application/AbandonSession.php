@@ -7,9 +7,8 @@ namespace App\Training\Application;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le joueur renonce à sa séance. Comme pour la clôture, le serveur n'accepte que deux
- * choses : qui, et laquelle. Le *quand* est à lui, et le motif de l'abandon ne l'intéresse
- * pas — rien dans le jeu n'en dépend.
+ * Qui, et laquelle. Le motif de l'abandon n'est pas demandé : rien dans le jeu n'en
+ * dépend.
  */
 final readonly class AbandonSession
 {

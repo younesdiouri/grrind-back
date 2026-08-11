@@ -12,11 +12,12 @@ use Doctrine\DBAL\Types\Type;
 use InvalidArgumentException;
 
 /**
- * Persiste n'importe quel `StringValue` en colonne texte. Chaque VO n'a plus qu'à
- * déclarer sa classe — on évite un type Doctrine complet par value object.
- *
- * Une valeur illisible en base lève : mieux vaut une erreur bruyante qu'un VO
+ * Persiste n'importe quel `StringValue` en colonne texte : un VO n'a plus qu'à déclarer
+ * sa classe. Une valeur illisible en base lève — mieux vaut une erreur bruyante qu'un VO
  * fabriqué de travers qui se propage dans le moteur de jeu.
+ *
+ * Un seul implémenteur pour l'instant ({@see \App\Shared\Domain\Timezone}) : si le
+ * second ne vient pas, fusionner les trois classes en un TimezoneType autonome.
  */
 abstract class StringValueType extends Type
 {

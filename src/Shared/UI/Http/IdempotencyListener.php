@@ -24,33 +24,24 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Fait tenir la promesse de {@see Idempotent} : une clé, une écriture, une réponse.
  *
- * Le cycle tient en deux temps. Avant le contrôleur, on **réserve** la clé — et si
- * elle est déjà prise, on tranche sans exécuter : rejeu à rendre, requête concurrente
- * à refuser, ou clé recyclée sur un autre contenu. Après le contrôleur, on **fige** la
- * réponse produite, ou on relâche la clé si rien n'a pu être écrit.
+ * Deux temps. Avant le contrôleur on **réserve** la clé, et si elle est déjà prise on
+ * tranche sans exécuter : rejeu à rendre, requête concurrente à refuser, ou clé recyclée
+ * sur un autre contenu. Après, on **fige** la réponse produite — ou on relâche la clé si
+ * rien n'a pu être écrit.
  *
- * L'accroche se fait sur `kernel.controller` et non sur `kernel.request` : c'est le
- * premier moment où le contrôleur visé est connu, donc où l'on peut lire ses attributs.
- * `ControllerEvent::getAttributes()` est le point d'extension prévu pour ça — la
- * réflexion est déjà faite, on ne la refait pas.
+ * L'accroche est sur `kernel.controller` et non `kernel.request` : c'est le premier
+ * moment où le contrôleur visé est connu, donc où ses attributs sont lisibles.
  */
 final readonly class IdempotencyListener
 {
-    /**
-     * Prévient le client qu'il lit une réponse conservée et non un nouveau traitement.
-     * Utile en debug, indispensable en test : c'est la preuve que rien n'a été réexécuté.
-     */
+    /** Prévient le client qu'il lit une réponse conservée, et prouve en test que rien
+     * n'a été réexécuté. */
     public const string REPLAY_HEADER = 'Idempotent-Replay';
-    /**
-     * L'attribut de requête qui relie les deux temps. Le préfixe `_` est la convention
-     * Symfony pour ce qui est interne au framework et n'a pas à finir en paramètre.
-     */
+    /** Relie les deux temps. Préfixe `_` : convention Symfony pour l'interne. */
     private const string RESERVATION = '_idempotency_reservation';
 
-    /**
-     * Ce qu'on remet dans une réponse rejouée. Tout le reste — `Date`, `Cache-Control`,
-     * cookies éventuels — appartient à la requête d'origine et n'a plus de sens.
-     */
+    /** Tout le reste — `Date`, `Cache-Control`, cookies — appartient à la requête
+     * d'origine et n'a plus de sens. */
     private const array REPLAYED_HEADERS = ['Content-Type', 'Location'];
 
     public function __construct(
@@ -160,11 +151,9 @@ final readonly class IdempotencyListener
     }
 
     /**
-     * Ce qui identifie « la même requête ». La méthode et le chemin en font partie :
-     * sans eux, une clé recyclée d'une route sur l'autre passerait pour un rejeu.
-     *
-     * La query string en est absente, faute d'écriture métier qui en dépende ; le jour
-     * où il y en aura une, c'est ici qu'il faudra l'ajouter.
+     * Méthode et chemin en font partie : sans eux, une clé recyclée d'une route sur
+     * l'autre passerait pour un rejeu. La query string en est absente, faute d'écriture
+     * métier qui en dépende — c'est ici qu'il faudra l'ajouter le jour venu.
      */
     private static function fingerprint(Request $request): string
     {
@@ -176,9 +165,8 @@ final readonly class IdempotencyListener
     }
 
     /**
-     * L'identifiant de sécurité est l'UUID du compte — c'est un invariant du projet,
-     * posé au Lot 1 pour que changer d'adresse n'invalide aucun jeton. Il permet ici à
-     * `Shared` de savoir *qui* écrit sans rien connaître d'`Identity`.
+     * L'identifiant de sécurité étant l'UUID du compte, `Shared` sait *qui* écrit sans
+     * rien connaître d'`Identity`.
      */
     private function currentUserId(): Uuid
     {

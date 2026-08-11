@@ -11,8 +11,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
 
 /**
- * Sonde de liveness/readiness. Volontairement sans authentification :
- * elle ne divulgue rien d'autre que la joignabilité des dépendances.
+ * Sonde de liveness/readiness, sans authentification : elle ne divulgue rien d'autre que
+ * la joignabilité des dépendances.
  */
 final readonly class HealthController
 {

@@ -16,15 +16,12 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Le compte d'un joueur. Volontairement pauvre : tout ce qui relève du jeu (XP,
- * niveau, streak, inventaire) appartient aux autres modules et n'a rien à faire ici.
- * Un User ne connaît ni son niveau ni ses sessions.
+ * Le compte d'un joueur. Volontairement pauvre : tout ce qui relève du jeu appartient
+ * aux autres modules — un User ne connaît ni son niveau ni ses séances.
  *
- * C'est aussi le `UserInterface` du composant Security — pas d'adaptateur entre les
- * deux. L'identifiant de sécurité reste l'UUID et non l'e-mail : changer d'adresse
- * n'invalide aucun jeton, et l'adresse ne se promène pas dans le claim `sub`.
- * La correspondance e-mail → compte au moment du login est le travail de
- * {@see UserRepository::loadUserByIdentifier()}.
+ * C'est aussi le `UserInterface` du firewall, sans adaptateur. L'identifiant de sécurité
+ * est l'UUID et non l'e-mail : changer d'adresse n'invalide aucun jeton, et l'adresse ne
+ * se promène pas dans le claim `sub`.
  */
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'identity_user')]
@@ -53,8 +50,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private array $roles = [];
 
     /**
-     * Nul pour un compte créé par social sign-in : il n'a jamais eu de mot de passe.
-     * Un tel compte ne peut pas se connecter par `/api/auth/login`, et c'est voulu.
+     * Nul pour un compte créé par social sign-in : il n'a jamais eu de mot de passe, et
+     * ne peut donc pas passer par `/api/auth/login`.
      */
     #[ORM\Column(nullable: true)]
     private ?string $password = null;
@@ -64,10 +61,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\Length(max: self::DISPLAY_NAME_MAX_LENGTH)]
     private string $displayName;
 
-    // Le type « timezone » est écrit en toutes lettres plutôt qu'importé depuis
-    // Infrastructure : il est enregistré dans config/packages/doctrine.yaml et fait
-    // partie du schéma. Timezone reste un value object — contrairement à l'e-mail,
-    // il porte un comportement réel (toDateTimeZone) qu'aucune contrainte ne remplace.
+    // Nom de type écrit en toutes lettres : il est enregistré dans doctrine.yaml et
+    // fait partie du schéma. Timezone reste un VO parce qu'il porte un comportement
+    // réel (toDateTimeZone) qu'aucune contrainte de validation ne remplace.
     #[ORM\Column(type: 'timezone', length: 64)]
     private Timezone $timezone;
 
@@ -89,15 +85,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * L'UUID v7 est généré ici, applicativement : il est triable par date de création,
-     * ce qui évite une colonne d'ordre sur les gros volumes à venir.
-     *
-     * `$now` est fourni par l'appelant parce que le serveur possède l'horloge — aucune
-     * classe du domaine ne lit l'heure toute seule, sinon plus rien n'est testable.
-     *
-     * Le mot de passe n'est pas un paramètre : il est haché par
-     * `UserPasswordHasherInterface`, qui a besoin du User pour choisir son algorithme.
-     * L'appelant enchaîne donc avec `setPassword()`.
+     * Le mot de passe n'est pas un paramètre : `UserPasswordHasherInterface` a besoin du
+     * User pour choisir son algorithme, donc l'appelant enchaîne avec `setPassword()`.
      */
     public static function register(
         string $email,
@@ -109,12 +98,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Normalisation de l'adresse : c'est elle qui donne son sens à l'index unique.
-     * Sans elle, « Bob@x.fr » et « bob@x.fr » ouvriraient deux comptes.
-     *
-     * La RFC autorise une partie locale sensible à la casse ; aucun fournisseur
-     * sérieux ne s'en sert, et la respecter coûterait plus cher en support qu'elle
-     * ne rapporte.
+     * Ce qui donne son sens à l'index unique : sans normalisation, « Bob@x.fr » et
+     * « bob@x.fr » ouvriraient deux comptes. La RFC autorise une partie locale sensible
+     * à la casse ; aucun fournisseur sérieux ne s'en sert.
      */
     public static function normalizeEmail(string $email): string
     {
@@ -126,10 +112,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->id;
     }
 
-    /**
-     * Identifiant de firewall : l'UUID, pas l'e-mail. C'est ce que Lexik place dans
-     * le claim `sub`, et ce que le provider reçoit à chaque requête authentifiée.
-     */
+    /** L'UUID, pas l'e-mail : c'est ce que Lexik place dans le claim `sub`. */
     public function getUserIdentifier(): string
     {
         return $this->id->toRfc4122();
@@ -158,9 +141,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Reçoit un hash, jamais un mot de passe en clair — le hachage appartient à
-     * `UserPasswordHasherInterface`. Sert aussi au rehash automatique déclenché par
-     * Symfony au login quand l'algorithme a évolué (voir `UserRepository`).
+     * Reçoit un hash, jamais un mot de passe en clair. Sert aussi au rehash opportuniste
+     * déclenché par Symfony au login — voir `UserRepository::upgradePassword()`.
      */
     public function setPassword(?string $hashedPassword): void
     {

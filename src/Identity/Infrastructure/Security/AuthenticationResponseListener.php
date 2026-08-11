@@ -20,15 +20,12 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Tout ce que l'API répond à propos de l'authentification passe par ici.
+ * Tout ce que l'API répond à propos de l'authentification passe par ici : les échecs ne
+ * traversent pas `kernel.exception`, l'authenticator fabrique sa propre réponse, et sans
+ * ce branchement le `{"code":401,…}` de Lexik sortirait au milieu du problem+json.
  *
- * Les échecs d'authentification ne traversent pas `kernel.exception` : l'authenticator
- * fabrique lui-même sa réponse. Sans ce branchement, l'API renverrait le
- * `{"code":401,"message":"..."}` maison de Lexik au milieu de problem+json partout
- * ailleurs.
- *
- * Lexik dispatche ces événements sous un **nom**, pas sous leur classe : écouter la
- * classe ne déclencherait jamais rien, silencieusement. D'où les constantes `Events`.
+ * Lexik dispatche sous un **nom**, pas sous la classe : écouter la classe ne
+ * déclencherait rien, silencieusement. D'où les constantes `Events`.
  */
 final readonly class AuthenticationResponseListener
 {

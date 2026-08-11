@@ -5,8 +5,8 @@ doctrine:
         server_version: '17'
         profiling_collect_backtrace: '%kernel.debug%'
 
-        # Un type par value object persistable. Le nom du type est celui qu'on
-        # écrit dans les #[Column] : il fait partie du schéma, il ne bouge plus.
+        # Le nom du type est celui qu'on écrit dans les #[Column] : il fait partie du
+        # schéma, il ne bouge plus.
         types:
             timezone: App\Shared\Infrastructure\Doctrine\Type\TimezoneType
     orm:
@@ -14,9 +14,9 @@ doctrine:
         naming_strategy: doctrine.orm.naming_strategy.underscore
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
+        # Un mapping par module, déclaré au lot correspondant : ajouter un module est un
+        # acte explicite, et un module oublié se voit tout de suite.
         auto_mapping: false
-        # Un mapping par module, déclaré au lot correspondant. Pas d'auto_mapping :
-        # on veut que l'ajout d'un module soit un acte explicite.
         mappings:
             Shared:
                 type: attribute
@@ -40,7 +40,6 @@ doctrine:
 when@test:
     doctrine:
         dbal:
-            # "TEST_TOKEN" is typically set by ParaTest
             dbname_suffix: '_test%env(default::TEST_TOKEN)%'
 
 when@prod:

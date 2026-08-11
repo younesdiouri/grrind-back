@@ -15,12 +15,11 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Le `User` vient de `#[CurrentUser]`, donc du jeton : aucune route ne prend
- * d'identifiant de compte en paramètre, donc aucune ne peut être détournée pour
- * lire le profil d'un autre.
+ * Le `User` vient du jeton : aucune route ne prend d'identifiant de compte en paramètre,
+ * donc aucune ne peut être détournée pour lire le profil d'un autre.
  *
- * Le compte est relu à chaque requête par le provider — le firewall est stateless,
- * rien n'est mis en session — donc un profil modifié entre deux appels est à jour.
+ * Le firewall étant stateless, le compte est relu à chaque requête — un profil modifié
+ * entre deux appels est à jour.
  */
 final readonly class MeController
 {

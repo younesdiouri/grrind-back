@@ -13,21 +13,15 @@ use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * La trace d'une écriture métier déjà tentée : « cette clé, pour ce joueur, portait
- * cette requête, et voici ce qu'on lui a répondu ».
+ * Cette clé, pour ce joueur, portait cette requête, et voici ce qu'on lui a répondu.
  *
- * Elle existe parce qu'un client mobile rejoue : réseau coupé, reprise en arrière-plan,
- * retry système. Sans elle, une séance terminée deux fois est une séance créditée deux
- * fois — ou, pire, un 409 rendu à un joueur dont l'action avait pourtant réussi.
+ * La réponse conservée est **opaque** — un statut, quelques en-têtes, un corps. Le
+ * record ne sait pas ce qu'il rejoue, et c'est ce qui le rend transverse.
  *
- * La réponse conservée est un contenu **opaque** : un entier, quelques en-têtes et un
- * corps. Le record ne sait pas ce qu'il rejoue, et c'est ce qui le rend transverse.
+ * L'unicité porte sur (user, clé) et non sur la clé seule : une clé interceptée ne doit
+ * jamais donner accès à la réponse de quelqu'un d'autre.
  *
- * L'unicité porte sur (user, clé) et non sur la clé seule : deux joueurs peuvent tirer
- * la même valeur, et surtout une clé interceptée ne doit jamais donner accès à la
- * réponse de quelqu'un d'autre.
- *
- * @see IdempotencyRecordRepository pour la raison — bien réelle — des écritures en DBAL
+ * @see IdempotencyRecordRepository pour la raison des écritures en DBAL
  */
 #[ORM\Entity(repositoryClass: IdempotencyRecordRepository::class)]
 #[ORM\Table(name: 'shared_idempotency_key')]
@@ -36,17 +30,14 @@ use Symfony\Component\Uid\Uuid;
 class IdempotencyRecord
 {
     /**
-     * Vingt-quatre heures : au-delà, un client qui rejoue ne rejoue plus, il refait.
-     * La purge des expirées est un travail de fond, ticketé au Lot 9 ; d'ici là une
-     * clé périmée est simplement réutilisable, personne ne la lit.
+     * Au-delà, un client qui rejoue ne rejoue plus, il refait. La purge des expirées est
+     * un travail de fond (#43) ; d'ici là une clé périmée est simplement réutilisable.
      */
     public const string LIFETIME = 'PT24H';
 
     public const int KEY_MAX_LENGTH = 255;
 
-    /**
-     * SHA-256 en hexadécimal de la méthode, du chemin et du corps de la requête.
-     */
+    /** SHA-256 hexadécimal de la méthode, du chemin et du corps de la requête. */
     public const int FINGERPRINT_LENGTH = 64;
 
     #[ORM\Id]
@@ -56,8 +47,8 @@ class IdempotencyRecord
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $userId;
 
-    // Nommée en toutes lettres plutôt que « key », qui est un mot-clé SQL dans assez
-    // de moteurs pour que la question se repose à chaque outil qui lit le schéma.
+    // « key » est un mot-clé SQL dans assez de moteurs pour que la question se repose
+    // à chaque outil qui lit le schéma.
     #[ORM\Column(name: 'idempotency_key', length: self::KEY_MAX_LENGTH)]
     private string $key;
 
@@ -71,8 +62,8 @@ class IdempotencyRecord
     private ?int $responseStatus = null;
 
     /**
-     * Une liste blanche, pas la totalité des en-têtes : rejouer un `Date` d'hier ou
-     * un jeton de session périmé ferait plus de dégâts que de ne rien rejouer.
+     * Une liste blanche : rejouer un `Date` d'hier ferait plus de dégâts que de ne rien
+     * rejouer.
      *
      * @var array<string, string>|null
      */
@@ -104,12 +95,8 @@ class IdempotencyRecord
     }
 
     /**
-     * La réservation qu'une requête tente de poser. C'est ici, et pas dans le dépôt,
-     * que se décident l'identifiant et la date de péremption : la durée de rétention
+     * L'identifiant et la péremption se décident ici et pas dans le dépôt : la rétention
      * est une règle du mécanisme, pas un détail de la commande SQL qui l'écrit.
-     *
-     * Le dépôt lit ensuite cet objet pour composer son `INSERT` — il ne repasse pas
-     * par l'ORM, et {@see IdempotencyRecordRepository} dit pourquoi.
      */
     public static function reserve(
         Uuid $userId,
@@ -155,10 +142,7 @@ class IdempotencyRecord
         return $this->requestFingerprint;
     }
 
-    /**
-     * Même clé, même requête ? C'est la question qui sépare le rejeu légitime — on
-     * rend la réponse d'origine — de la clé recyclée sur un autre contenu, qu'on refuse.
-     */
+    /** Sépare le rejeu légitime de la clé recyclée sur un autre contenu, qu'on refuse. */
     public function covers(string $requestFingerprint): bool
     {
         return hash_equals($this->requestFingerprint, $requestFingerprint);
