@@ -440,6 +440,41 @@ les bonus que le joueur a investi pour obtenir, et un bonus qui ne sert jamais e
 regrette d'avoir acheté. `XpRates` refuse un plafond sous le taux horaire — ce serait faire du
 backstop le limiteur principal.
 
+**Lot 3 — la courbe de niveaux porte des seuils *cumulés*, pas des coûts.** `levels.yaml` donne
+pour chaque niveau le total d'XP à partir duquel il est atteint, ce qui rend la projection
+indépendante de l'historique : un joueur à 3 060 XP est niveau 10, qu'il y soit arrivé en un mois
+ou en un jour, et qu'on ait rejoué ou non les transactions qui l'y ont mené. Les seuils sont écrits
+en clair et non calculés au chargement depuis `coût(n) = 100 + 60 × (n − 1)` — une formule
+interdirait de retoucher un niveau seul, et c'est justement ce que « config-as-code » doit
+permettre. Le niveau 1 est déclaré explicitement à 0 XP : un fichier qui commence à 2 laisse le
+socle implicite, et un sous-entendu se relit de travers.
+
+**Lot 3 — le snapshot stocke les points de compétence *accordés*, pas *disponibles*.** Le ticket
+#16 disait « disponibles » ; c'est la seule chose qu'un cache reconstructible ne peut pas porter.
+Les points dépensés viendront de l'arbre du joueur (#32), que le ledger ignore : stocker un solde
+ici rendrait le snapshot irreconstruisible, et « disponibles » se calcule de toute façon en
+`accordés − dépensés` au moment de l'afficher. Le ticket a été corrigé plutôt que le code.
+
+**Lot 3 — la reprojection relit la somme du ledger, elle n'incrémente pas le snapshot.**
+`retotal()` reçoit `SUM(amount)` et en dérive tout. Un `+=` serait plus rapide d'une requête et
+transformerait chaque divergence en dette permanente ; là, un écart — import, correction, reprise
+après incident — se résorbe tout seul au crédit suivant. C'est aussi ce qui fait que la commande
+de reconstruction (#20) n'aura rien de particulier à faire.
+
+**Lot 3 — `user_id` *est* la clé primaire de `progression_snapshot`.** Une ligne par compte, sans
+identifiant propre : l'unicité vient de la structure au lieu de reposer sur un index qu'on pourrait
+oublier, et c'est cette ligne que la complétion verrouille en `PESSIMISTIC_WRITE` — un verrou par
+joueur, donc deux comptes ne s'attendent jamais. La ligne se crée au premier crédit par un
+`INSERT … ON CONFLICT (user_id) DO NOTHING` hors ORM, pas à l'inscription : `Identity` n'a pas à
+connaître `Progression`, et entre un `SELECT` qui ne trouve rien et un `INSERT`, deux requêtes
+simultanées passent toutes les deux. Même geste qu'à la réservation d'une clé d'idempotence.
+
+**Lot 3 — les niveaux franchis sont une *liste*, et une baisse n'annonce rien.** Un joueur qui
+revient après une pause en gagne deux ou trois d'un coup, et le client les anime un par un ; un
+booléen « a monté de niveau » les lui ferait avaler en silence. À l'inverse, une annulation qui
+fait redescendre le niveau ne produit aucune annonce : le joueur revient à son niveau réel, mais
+il n'y a rien à célébrer ni à animer.
+
 ## Pièges déjà rencontrés
 
 **Un index partiel se déclare tel que PostgreSQL le *relit*, casts compris.** Écrire
@@ -468,6 +503,17 @@ suffit pas : c'est pour ça que la cible `test` du Makefile passe `-e APP_ENV=te
 
 **PHPStan a besoin d'un cache dev chaud** pour l'extension Symfony — la cible `phpstan` fait le
 `cache:warmup` elle-même, sinon la CI échoue sur un conteneur neuf.
+
+**`migrations:diff` compare au *schéma de la base de dev*, pas aux migrations écrites.** Une base
+en retard d'une migration fait reproduire ses instructions dans la suivante : le diff du #16 a
+resservi les deux `ALTER TABLE xp_transaction` du #15, qui auraient cassé la montée sur toute base
+à jour. `make migrate` **avant** `make migration`, et relire le diff en cherchant ce qui ne parle
+pas du ticket en cours.
+
+**`LockMode` vit dans DBAL, pas dans l'ORM.** `Doctrine\ORM\LockMode` n'existe plus en ORM 3 ;
+c'est `Doctrine\DBAL\LockMode`. L'erreur ne se voit qu'à l'exécution — l'autoload ne se plaint pas
+d'un `use` inutilisé à l'analyse — et un verrou pessimiste n'a pas de comportement dégradé : ou il
+s'exécute, ou il lève.
 
 **Les recettes Flex écrasent les fichiers de config existants.** `symfony/orm-pack` avait injecté
 un second service `database` dans `compose.yaml` ; `deptrac/deptrac` a réécrit `deptrac.yaml` avec
