@@ -12,7 +12,7 @@ use DateTimeInterface;
  *
  * **C'est la seule forme JSON d'un titre dans toute l'API.** `GET /api/me` et
  * `GET /api/titles` la servent tous les deux, débloqué comme verrouillé, ce qui laisse à
- * l'app iOS un unique type à décoder et un unique composant à dessiner. C'est aussi pour ça
+ * au client un unique type à décoder et un unique composant à dessiner. C'est aussi pour ça
  * que la mise en forme vit ici plutôt que dans une ressource HTTP par module : deux
  * ressources finiraient par diverger d'un champ, et le client par avoir deux structures.
  *

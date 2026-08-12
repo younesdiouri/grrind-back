@@ -16,7 +16,7 @@ use Symfony\Component\Uid\Uuid;
  * se redéduit du ledger et de la courbe, et la commande de reconstruction (#20) le prouve
  * en le réécrivant à l'identique.
  *
- * Il existe parce que l'app iOS a besoin de l'état du joueur à l'ouverture sans rejouer
+ * Il existe parce que le client a besoin de l'état du joueur à l'ouverture sans rejouer
  * dix mille transactions, et parce que **c'est cette ligne qu'on verrouille** : une ligne
  * par joueur, donc un verrou pessimiste dessus sérialise les complétions concurrentes d'un
  * même compte sans bloquer qui que ce soit d'autre.

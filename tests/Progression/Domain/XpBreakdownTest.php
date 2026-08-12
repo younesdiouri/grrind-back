@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Le breakdown est la valeur que `XpCalculator` (#14) rendra et que le ledger
  * matérialise. Ce qui se vérifie ici est son arithmétique et son ordre — le contrat que
- * le client iOS animera.
+ * le client animera.
  */
 final class XpBreakdownTest extends TestCase
 {

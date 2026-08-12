@@ -11,7 +11,7 @@ use InvalidArgumentException;
  * montant accordé. Valeur pure — c'est ce que `XpCalculator` (#14) rendra, et ce que le
  * ledger matérialise en lignes de `xp_transaction_line`.
  *
- * **L'ordre est le contrat.** Le client iOS anime les lignes les unes après les autres :
+ * **L'ordre est le contrat.** Le client anime les lignes les unes après les autres :
  * il ne les trie pas, il les joue. C'est pour ça que la persistance porte une `position`
  * plutôt que de s'en remettre à l'ordre d'insertion.
  */

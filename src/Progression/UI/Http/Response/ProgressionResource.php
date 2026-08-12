@@ -88,7 +88,7 @@ final readonly class ProgressionResource
                 'available' => $this->availableSkillPoints,
             ],
             // La même forme qu'à `GET /api/me` et `GET /api/titles` : un seul type à
-            // décoder et un seul composant à dessiner côté iOS.
+            // décoder et un seul composant à dessiner côté client.
             'activeTitle' => $this->activeTitle?->toArray(),
             'unlockedTitles' => array_map(static fn (PlayerTitle $title): array => $title->toArray(), $this->unlockedTitles),
             'rulesetVersion' => $this->rulesetVersion,

@@ -135,7 +135,7 @@ final class ProgressionStateTest extends ApiTestCase
         self::assertSame('first_steps', $state['activeTitle']['id']);
 
         // La même forme qu'à `GET /api/me` et `GET /api/titles` : un seul type à décoder
-        // côté iOS, et un seul composant à dessiner.
+        // côté client, et un seul composant à dessiner.
         self::assertIsArray($state['unlockedTitles']);
         self::assertSame($state['unlockedTitles'][0], $state['activeTitle']);
     }

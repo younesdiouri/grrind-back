@@ -14,7 +14,7 @@ use DateTimeInterface;
  * Tous les champs sont toujours présents, jamais omis — `source` et `trust` alors qu'ils
  * ne valent encore que `MANUAL_TIMER` / `DECLARED`, `endedAt` et `durationSeconds` à
  * `null` tant que la séance court. Une séance ouverte et une séance close sont **une
- * seule forme** : le client iOS décode un seul type, et un champ qui apparaît et
+ * seule forme** : le client décode un seul type, et un champ qui apparaît et
  * disparaît finit lu de travers.
  *
  * Ce que la complétion rapporte décrit une *récompense*, pas une séance : ça vit dans

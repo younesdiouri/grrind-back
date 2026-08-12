@@ -28,7 +28,7 @@ final readonly class RegisterRequest
         #[Assert\NotBlank(normalizer: 'trim')]
         #[Assert\Length(max: User::DISPLAY_NAME_MAX_LENGTH, normalizer: 'trim')]
         public string $displayName = '',
-        // Le client iOS envoie le fuseau de l'appareil. Il conditionne le calcul du
+        // Le client envoie le fuseau de l'appareil. Il conditionne le calcul du
         // streak, donc on ne le devine pas côté serveur.
         #[Assert\NotBlank]
         #[Assert\Timezone]

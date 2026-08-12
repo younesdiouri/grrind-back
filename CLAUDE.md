@@ -2,7 +2,28 @@
 
 API du produit GRRIND : une app qui transforme le sport en RPG (XP, niveaux, titres, arbres de
 compétences, loot, streak, ligues). Ce dépôt ne contient **que le back**. Le client est une app
-SwiftUI (dépôt/dossier séparé).
+**React Native** (dépôt séparé) — voir ci-dessous pourquoi, la question se repose sinon.
+
+### Le client est en React Native, et ce n'est pas à « corriger »
+
+Le projet est développé en solo et **Android est un objectif réel à 12-18 mois**. SwiftUI ferme
+cette porte définitivement : Android imposerait une réécriture complète en Kotlin/Compose, dont
+seul le client HTTP généré depuis l'OpenAPI serait réutilisable. React Native préserve l'option
+pour un coût marginal.
+
+Le risque de React Native est unique et localisé : le `RewardSummary` est *l'*écran du produit,
+« l'ordre des champs, c'est l'ordre de l'animation ». C'est le seul endroit où il peut décevoir,
+et il se lève par un spike — pas par un pari.
+
+**Swift ne disparaît pas.** HealthKit passera par un module natif Expo écrit en Swift (aucune vue),
+et une vraie app watchOS reste prévue à long terme comme target séparé à côté de l'app RN. Une
+mention de SwiftUI ou d'iOS qui parle de *la plateforme* — le clavier qui ajoute une majuscule,
+l'exigence d'Apple sur le sign-in tiers, un schéma d'URL de redirection — reste donc vraie. Seules
+celles qui parlaient *du client* étaient à corriger.
+
+**Rien de tout ça n'a bougé côté serveur, et c'est le point.** `HEALTHKIT` était déjà prévu comme
+`source` avec `trust=PROVIDER_VERIFIED`, et la forme du `RewardSummary` est dictée par la mise en
+scène, pas par le framework qui la joue.
 
 ## Règle n°0 : priorité à l'écosystème Symfony
 
@@ -72,7 +93,7 @@ Si une commande manque au Makefile, on l'ajoute au Makefile — on ne contourne 
 | Persistance | PostgreSQL 17 + Doctrine ORM 3 (migrations versionnées, jamais de `schema:update`) |
 | Async | Symfony Messenger, transport Doctrine (pattern outbox) |
 | Auth | Firewall Symfony + JWT (LexikJWTAuthenticationBundle) + refresh tokens maison, social sign-in Google/Apple (league/oauth2-client) |
-| HTTP | Contrôleurs fins + DTO + Serializer. OpenAPI généré (source de vérité du contrat client iOS) |
+| HTTP | Contrôleurs fins + DTO + Serializer. OpenAPI généré (`openapi.yaml`, source de vérité du contrat client) |
 | Tests | PHPUnit — le moteur de jeu est testable sans aucune infra |
 | Qualité | PHPStan niveau max, PHP-CS-Fixer, Deptrac (frontières entre modules) |
 
@@ -157,8 +178,9 @@ COMMIT
 ```
 
 Le verrou sérialise les complétions concurrentes. Le `RewardSummary` est un payload unique conçu
-pour être **animé séquentiellement** par SwiftUI : gains d'XP détaillés, level ups, titre débloqué,
-loot, streak, nouveaux nœuds débloquables.
+pour être **animé séquentiellement** par le client : gains d'XP détaillés, level ups, titre
+débloqué, loot, streak, nouveaux nœuds débloquables. **L'ordre des champs est l'ordre de
+l'animation**, et il ne doit rien au framework qui la joue.
 
 ## Garde-fous anti-abus v1 (sans API tierce)
 
@@ -261,6 +283,11 @@ Closes #6
   apparaîtra dans le fil du ticket sans le fermer.
 - **Toucher à autre chose en passant** reste interdit : si ça n'est pas dans le ticket, ça mérite
   son propre ticket, pas une ligne discrète dans un commit qui parle d'autre chose.
+- **Viser un ticket de l'autre dépôt** s'écrit en toutes lettres : `Closes younesdiouri/grrind-back#42`
+  depuis le front, `younesdiouri/grrind-app#7` depuis ici. Les mots-clés de fermeture fonctionnent
+  sous cette forme. Le tableau est commun aux deux dépôts — c'est un projet utilisateur, il affiche
+  la colonne « Repository » — mais **les jalons et les labels, eux, sont par dépôt** : « Lot 4 » ne
+  traverse pas, et c'est un champ du projet qui doit en tenir lieu.
 
 Le format reste le conventionnel déjà en place — `feat(module):`, `fix(module):`, `refactor:`,
 `chore:`, `docs:`, `test:` — corps en français, à l'impératif, qui explique le *pourquoi* et pas

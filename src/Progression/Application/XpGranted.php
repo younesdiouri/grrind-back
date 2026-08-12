@@ -13,7 +13,7 @@ use App\Progression\Domain\XpAward;
  * en est ensuite, et ce qu'il a franchi au passage.
  *
  * C'est la matière première du `RewardSummary` (#22), pensé pour être animé séquentiellement
- * par SwiftUI — d'où les niveaux **listés** et non un simple booléen : un joueur qui en gagne
+ * par le client — d'où les niveaux **listés** et non un simple booléen : un joueur qui en gagne
  * trois d'un coup doit les voir défiler tous les trois.
  */
 final readonly class XpGranted

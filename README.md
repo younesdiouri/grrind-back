@@ -1,7 +1,7 @@
 # grrind-back
 
 API de **GRRIND** — une app qui transforme le sport en RPG : XP, niveaux, titres, arbres de
-compétences, loot, streak, ligues. Le client SwiftUI vit dans un dépôt séparé.
+compétences, loot, streak, ligues. Le client React Native vit dans un dépôt séparé.
 
 ## Démarrer
 
