@@ -58,6 +58,40 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
         return $snapshot;
     }
 
+    /**
+     * Tout compte dont la progression peut être vérifiée : ceux qui ont une ligne, **et**
+     * ceux qui ont écrit au ledger sans en avoir une.
+     *
+     * L'union est la définition de « connu », et c'est pour ça qu'elle se fait en SQL
+     * plutôt qu'en PHP : fusionner deux listes obligerait à tenir les deux en mémoire, au
+     * moment précis où la commande de reconstruction (#20) sert à traiter une base entière.
+     * La requête traverse la table du ledger, qui appartient au même module — aucune
+     * frontière n'est franchie.
+     *
+     * Le second terme est celui qui compte vraiment : un compte qui a de l'XP et pas de
+     * ligne est exactement le défaut qu'on cherche, et le chercher depuis
+     * `progression_snapshot` seul ne le trouverait jamais.
+     *
+     * @return iterable<Uuid>
+     */
+    public function everyKnownPlayer(): iterable
+    {
+        $ids = $this->getEntityManager()->getConnection()->iterateColumn(
+            <<<'SQL'
+                SELECT user_id FROM progression_snapshot
+                UNION
+                SELECT DISTINCT user_id FROM xp_transaction
+                ORDER BY user_id
+                SQL,
+        );
+
+        foreach ($ids as $id) {
+            \assert(\is_string($id));
+
+            yield Uuid::fromString($id);
+        }
+    }
+
     public function commit(): void
     {
         $this->getEntityManager()->flush();

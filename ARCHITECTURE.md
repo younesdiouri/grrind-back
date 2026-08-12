@@ -307,9 +307,9 @@ Quatre lectures de ce schéma :
   `xp_transaction.user_id` ne référencent rien : la frontière vaut pour les tables autant que
   pour les classes.
 - **`xp_transaction` est la vérité, `progression_snapshot` est un cache.** Le niveau est une
-  projection ; le snapshot se reconstruit intégralement du ledger, et
-  [le ticket 20](https://github.com/younesdiouri/grrind-back/issues/20) le prouvera en le
-  réécrivant à l'identique.
+  projection ; le snapshot se reconstruit intégralement du ledger, et `app:progression:rebuild`
+  le prouve — `--dry-run` compare toute la base sans rien écrire, une passe normale réécrit ce
+  qui a dérivé, par le chemin exact de la complétion de séance.
 - **Le ledger est append-only.** Aucun mutateur sur les entités, et un listener Doctrine refuse
   `UPDATE` et `DELETE`. Une séance invalidée écrit une transaction **négative** ; on ne supprime
   rien.
@@ -505,6 +505,15 @@ défaire. Le raisonnement complet est dans le docblock du fichier concerné.
 - **Le `ModifierResolver` agrège, il ne compose pas.** Additionner ou filtrer chez lui
   obligerait ses deux consommateurs, qui ne veulent ni le même type ni la même portée, à
   défaire son travail.
+- **`app:progression:rebuild --dry-run` sort en erreur quand il trouve un écart.** La commande
+  est faite pour tourner en tâche planifiée, et une sonde qui rend toujours zéro ne sonde rien.
+  Hors `--dry-run`, réparer *est* le travail : la sortie est zéro même après réécriture.
+- **La reconstruction compare avant d'écrire, y compris hors `--dry-run`.** Réécrire tout le
+  monde « pour être sûr » remonterait `updated_at` sur des comptes qui n'ont rien fait — or
+  cette colonne sort en `lastProgressionAt`. Une commande de maintenance qui fait mentir
+  l'écran d'un joueur est pire que le problème qu'elle répare.
+- **Un compte sans ligne de progression n'est pas un écart** tant que son ledger est vide :
+  c'est l'état normal d'une inscription, et c'est le premier crédit qui pose la ligne.
 
 ---
 
@@ -534,6 +543,11 @@ Les pièges qui se reproduisent. Les autres sont datés, corrigés, et vivent da
   la même réponse qu'une collection préchargée ; seul le nombre de requêtes change, et il croît
   avec la taille de la page. Ça se teste en comptant les requêtes
   (`doctrine.debug_data_holder`), pas en relisant le JSON.
+- **`SymfonyStyle::table()` est intestable avec `runCommand()`.** L'API récente écrit dans un
+  `TestOutput` qui refuse `section()`, dont `createTable()` se sert — et ça sort en
+  `LogicException`, pas en assertion ratée. Le testeur historique (`CommandTester::execute()`)
+  écrit dans un `StreamOutput` simple et n'a pas ce trou. C'est le harnais qu'on change, pas la
+  sortie de la commande.
 - **Un service tagué qui n'est pas ramassé ne lève rien.** Tag mal orthographié,
   autoconfiguration coupée, service retiré parce qu'inutilisé : l'itérateur est simplement
   vide. Un contributeur de modificateurs qui se tait sous-paie un joueur en silence, et
