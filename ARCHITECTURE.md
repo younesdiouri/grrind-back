@@ -78,8 +78,9 @@ L'événement quand le destinataire peut attendre et n'a rien à répondre. Le p
 réponse est nécessaire tout de suite — le fuseau du joueur ne peut pas arriver en différé,
 sinon un changement de fuseau suivi d'une séance compterait sur l'ancien.
 
-Un port se justifie **un par un** dans son docblock. Il y en a quatre en tout, et c'est
-volontaire : `PlayerTimezones`, `PlayerTitles`, `SocialProfileResolver` (aucun test ne peut
+Un port se justifie **un par un** dans son docblock. Il y en a cinq en tout, et c'est
+volontaire : `PlayerTimezones`, `PlayerTitles`, `SessionRewards` (par lequel `Training`
+crédite l'XP sans connaître `Progression`), `SocialProfileResolver` (aucun test ne peut
 appeler Google), et `ModifierContributor`.
 
 Ce dernier est le seul **en éventail** — plusieurs implémentations, un seul consommateur :
@@ -207,11 +208,33 @@ flowchart TB
     class loot todo
 ```
 
-**Ce qui existe aujourd'hui**, c'est tout sauf la case en pointillés — et le tout n'est pas
-encore branché sur la complétion de séance : `GrantXpHandler` porte déjà la séquence,
-[le ticket 21](https://github.com/younesdiouri/grrind-back/issues/21) l'appellera depuis
-`CompleteSessionHandler` et
-[le 22](https://github.com/younesdiouri/grrind-back/issues/22) en fera le `RewardSummary`.
+**Ce qui existe aujourd'hui**, c'est tout sauf la case en pointillés, et c'est branché sur
+la complétion de séance : `CompleteSessionHandler` ouvre la transaction, écrit la séance,
+puis appelle `GrantXpHandler` par le port `SessionRewards`. Reste
+[le ticket 22](https://github.com/younesdiouri/grrind-back/issues/22), qui en fera le
+`RewardSummary` — la transaction le calcule déjà, la réponse HTTP ne le rend pas encore.
+
+**Le port, et pourquoi il en faut un.** Deptrac interdit à `Training` d'importer
+`Progression`, et l'événement de domaine — l'autre chemin autorisé — se consomme *après*
+le COMMIT, alors que le crédit doit être annulé si la suite échoue et que la réponse doit
+le porter. `SessionRewards` vit donc dans `Shared`, `Progression` l'implémente,
+`Training` ne connaît que l'interface. Le loot (Lot 6) et le streak (Lot 5) ajouteront
+chacun le leur, entre le crédit et l'outbox.
+
+```mermaid
+flowchart LR
+    ts["<b>Training</b><br/>CompleteSessionHandler<br/><i>possède la transaction</i>"]
+    port{{"<b>Shared</b><br/>SessionRewards<br/><i>le contrat</i>"}}
+    pg["<b>Progression</b><br/>LedgerSessionRewards<br/>→ GrantXpHandler"]
+
+    ts -->|"creditFor(TrainingSessionCompleted)"| port
+    port -.->|implémenté par| pg
+    pg -->|SessionReward| ts
+```
+
+**Le verrou est posé par l'implémentation, à l'intérieur de la transaction de `Training`.**
+Le `wrapInTransaction` de `GrantXpHandler` n'en rouvre pas une seconde : DBAL en fait un
+point de sauvegarde, le verrou de ligne court jusqu'au COMMIT extérieur.
 
 Pourquoi cet ordre, en trois phrases :
 

@@ -16,9 +16,11 @@ use Psr\Clock\ClockInterface;
 /**
  * Écrit au ledger et reprojette le snapshot, **dans une seule transaction**.
  *
- * C'est le cœur de ce qui deviendra la transaction de complétion (#21) : celle-ci
- * l'entourera du loot, du streak et de l'outbox, mais la séquence écrite ici ne bougera
- * pas. Elle tient en six gestes, dans cet ordre et pas un autre :
+ * C'est le cœur de la transaction de complétion (#21), qui l'appelle par le port
+ * `SessionRewards` et l'entoure du loot, du streak et de l'outbox. Le `wrapInTransaction`
+ * ci-dessous devient alors un point de sauvegarde dans celle de `Training` : le verrou
+ * court jusqu'au COMMIT extérieur, et un échec en aval défait bien le crédit. La séquence,
+ * elle, ne bouge pas. Elle tient en six gestes, dans cet ordre et pas un autre :
  *
  * 1. **verrouiller la ligne de progression du joueur.** Sans ça, deux complétions
  *    simultanées lisent le même total, calculent le même niveau et s'écrasent l'une
