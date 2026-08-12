@@ -39,6 +39,33 @@ final class ProblemDetailsTest extends WebTestCase
     }
 
     /**
+     * Les deux pannes que `#[MapRequestPayload]` produit avant d'atteindre le contrôleur. Elles
+     * sont testées ici parce qu'`OpenApiContractTest` déclare leurs statuts pour en dériver les
+     * `type` du contrat : sans ces deux cas, cette déclaration serait une supposition.
+     */
+    public function testAMalformedBodyIsABadRequest(): void
+    {
+        $client = self::createClient();
+        $client->request('POST', '/api/auth/register', server: ['CONTENT_TYPE' => 'application/json'], content: '{pas du json');
+
+        $response = $client->getResponse();
+
+        self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+        self::assertSame('https://grrind.app/problems/bad-request', self::decode($response)['type']);
+    }
+
+    public function testANonJsonBodyIsAnUnsupportedMediaType(): void
+    {
+        $client = self::createClient();
+        $client->request('POST', '/api/auth/register', server: ['CONTENT_TYPE' => 'text/plain'], content: 'coucou');
+
+        $response = $client->getResponse();
+
+        self::assertSame(Response::HTTP_UNSUPPORTED_MEDIA_TYPE, $response->getStatusCode());
+        self::assertSame('https://grrind.app/problems/unsupported-media-type', self::decode($response)['type']);
+    }
+
+    /**
      * @return array<mixed>
      */
     private static function decode(Response $response): array
