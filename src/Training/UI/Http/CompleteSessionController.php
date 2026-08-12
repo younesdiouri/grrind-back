@@ -7,7 +7,7 @@ namespace App\Training\UI\Http;
 use App\Shared\UI\Http\Idempotent;
 use App\Training\Application\CompleteSession;
 use App\Training\Application\CompleteSessionHandler;
-use App\Training\UI\Http\Response\TrainingSessionResource;
+use App\Training\UI\Http\Response\RewardSummaryResource;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -15,14 +15,11 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le joueur appuie sur « terminer » ; le serveur date la fin, fige la durée et crédite
- * l'XP — le tout en une transaction.
+ * Le joueur appuie sur « terminer » ; le serveur date la fin, fige la durée, crédite l'XP
+ * et rend de quoi jouer l'animation — le tout en une transaction et un aller-retour.
  *
  * `#[Idempotent]` était déjà imposé quand la réponse était anodine, précisément pour ce
  * moment : un client mobile rejoue ses requêtes, et cette route accorde désormais de l'XP.
- *
- * La réponse, elle, ne décrit encore que la séance : le `RewardSummary` qui rendra la
- * récompense entière est le ticket suivant (#22). La transaction, elle, la calcule déjà.
  *
  * Le `Uuid` en paramètre est résolu par l'`UidValueResolver`, qui rend déjà un 404 sur
  * une chaîne malformée — illisible et inconnu sont le même non-résultat.
@@ -45,6 +42,6 @@ final readonly class CompleteSessionController
             $id,
         ));
 
-        return new JsonResponse(TrainingSessionResource::from($completion->session)->toArray());
+        return new JsonResponse(RewardSummaryResource::from($completion)->toArray());
     }
 }
