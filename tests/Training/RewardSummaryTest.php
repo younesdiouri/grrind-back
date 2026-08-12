@@ -174,7 +174,16 @@ final class RewardSummaryTest extends ApiTestCase
 
         self::assertSame('COMPLETED', $session['status']);
         self::assertSame('SWIMMING', $session['discipline']);
-        self::assertSame(self::ELAPSED, $session['durationSeconds']);
+
+        // À la seconde près, et pas à la seconde exacte : `ageSession` recule la séance,
+        // mais c'est le serveur qui date la clôture. Le temps réel qui passe entre les
+        // deux requêtes s'ajoute à la durée, et il n'est pas nul sous une CI chargée.
+        //
+        // Les montants, eux, restent écrits en dur : au-delà de la dernière tranche de
+        // rendements décroissants, une seconde de plus est retenue à 0 % et ne change rien
+        // à ce qui est accordé. C'est ce qui permet à cette suite de rester exacte là où
+        // ça compte.
+        self::assertEqualsWithDelta(self::ELAPSED, $session['durationSeconds'], 5);
     }
 
     /**
