@@ -240,13 +240,20 @@ en bas, il ne le réordonne pas. `loot`, `streak` et `unlockableNodes` sont pré
 jusqu'aux Lots 6, 5 et 7 : une clé qui apparaîtrait plus tard obligerait un client déjà
 déployé à la rendre optionnelle pour toujours.
 
+Le palier de départ y est donné **en entier** — `before`, `xpIntoLevelBefore`,
+`xpToNextLevelBefore` — et pas seulement son numéro. Le client place la barre, puis la
+remplit : sans la largeur du palier d'où elle part, il ne sait pas où la placer. Elle se
+redéduit du reste tant que `after` vaut `before + 1`, et plus du tout dès qu'il y a deux
+niveaux à franchir, ce qui est un cas normal (#79).
+
 ```jsonc
 {
   "session":     { /* la séance close, forme identique partout dans l'API */ },
   "xp":          { "awarded": 145,
                    "breakdown": [ { "source": "BASE",        "amount":  200 },
                                   { "source": "DIMINISHING", "amount":  -55 } ] },
-  "level":       { "before": 1, "after": 2, "reached": [2],
+  "level":       { "before": 1, "xpIntoLevelBefore": 0, "xpToNextLevelBefore": 100,
+                   "after": 2, "reached": [2],
                    "totalXp": 145, "xpIntoLevel": 45, "xpToNextLevel": 115,
                    "skillPointsGranted": 1 },
   "titlesUnlocked": [ /* PlayerTitle, déjà traduit — rien à recharger */ ],

@@ -19,7 +19,7 @@ use App\Training\Application\SessionCompletion;
  * produit.
  *
  * **Un seul aller-retour.** Rien ici ne demande au client de recharger quoi que ce soit
- * avant de jouer l'animation — c'est pourquoi le niveau est donné avant *et* après, et
+ * avant de jouer l'animation — c'est pourquoi le palier est donné avant *et* après, et
  * pourquoi les titres arrivent déjà traduits, dans la forme unique de {@see PlayerTitle}
  * que servent déjà `GET /api/me` et `GET /api/titles`.
  *
@@ -61,7 +61,14 @@ final readonly class RewardSummaryResource
                 ),
             ],
             'level' => [
+                // Le palier de départ vient avant la bascule parce que l'animation est
+                // dans cet ordre : la barre se pose là où le joueur en était, puis elle
+                // monte. Sa largeur — `xpIntoLevelBefore` + `xpToNextLevelBefore` — est
+                // introuvable autrement dès que plusieurs niveaux sont franchis, et une
+                // barre qui repart de zéro ment à tout joueur qui n'y était pas.
                 'before' => $this->reward->levelBefore,
+                'xpIntoLevelBefore' => $this->reward->xpIntoLevelBefore,
+                'xpToNextLevelBefore' => $this->reward->xpToNextLevelBefore,
                 'after' => $this->reward->level,
                 // Plusieurs d'un coup est un cas normal, pas l'exception : le client les
                 // anime tous, l'un après l'autre. Vide quand rien n'a été franchi.

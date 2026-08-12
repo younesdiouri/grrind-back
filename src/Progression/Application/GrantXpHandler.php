@@ -79,15 +79,19 @@ final readonly class GrantXpHandler
             ));
             $this->ledger->commit();
 
-            $before = $snapshot->earnedSkillPoints();
+            // Lu avant la reprojection, donc c'est bien le palier d'où le joueur part —
+            // et il est cohérent avec `levelsReached` par construction, puisque `retotal`
+            // compare au même état. Le client anime la barre depuis là (#79).
+            $standingBefore = $snapshot->standing();
             $levelsReached = $snapshot->retotal($this->ledger->totalOf($command->userId), $this->curve, $now);
             $this->snapshots->commit();
 
             return new XpGranted(
                 $award,
                 $snapshot,
+                $standingBefore,
                 $levelsReached,
-                $snapshot->earnedSkillPoints() - $before,
+                $snapshot->earnedSkillPoints() - $standingBefore->earnedSkillPoints,
                 // En dernier, et dans la transaction : les conditions se lisent au ledger,
                 // donc la séance qui vient d'être écrite compte pour le titre qu'elle
                 // débloque. Le verrou posé plus haut sérialise l'évaluation avec elle —

@@ -106,6 +106,19 @@ class ProgressionSnapshot
         return $this->userId;
     }
 
+    /**
+     * Où en est le joueur, **d'un seul geste**.
+     *
+     * Les quatre champs se lisent aussi un à un, et c'est ce qu'on faisait. Mais qui veut
+     * le point de départ d'une animation les veut *tous les quatre au même instant* : lus
+     * séparément autour d'un {@see retotal}, deux d'entre eux décriraient le palier de
+     * départ et deux celui d'arrivée, sans qu'aucun type ne s'en aperçoive.
+     */
+    public function standing(): LevelStanding
+    {
+        return new LevelStanding($this->level, $this->xpIntoLevel, $this->xpToNextLevel, $this->earnedSkillPoints);
+    }
+
     public function totalXp(): int
     {
         return $this->totalXp;

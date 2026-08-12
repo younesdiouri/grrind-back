@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Training;
 
+use App\Shared\Domain\Modifier\Modifier;
+use App\Shared\Domain\Modifier\ModifierSource;
+use App\Shared\Domain\Modifier\ModifierType;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\ProgrammableModifiers;
 use App\Tests\Support\TrainingSessions;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -76,6 +80,10 @@ final class RewardSummaryTest extends ApiTestCase
     /**
      * Le passage de niveau se donne des deux côtés, plus la liste de ce qui a été franchi :
      * en gagner plusieurs d'un coup est un cas normal, et le client les anime tous.
+     *
+     * **Le palier de départ est donné en entier**, et pas seulement son numéro : la barre se
+     * place avant de se remplir. Ici le compte est neuf, donc elle part à 0 sur 100 — ce qui
+     * ne prouve rien à soi seul, d'où {@see testTheBarStartsWhereThePlayerLeftIt}.
      */
     public function testTheLevelUpCarriesItsBeforeAndAfter(): void
     {
@@ -87,6 +95,9 @@ final class RewardSummaryTest extends ApiTestCase
         self::assertSame(
             [
                 'before' => 1,
+                'xpIntoLevelBefore' => 0,
+                // Le palier 1 fait 100 de large : 100 − 0, le seuil du niveau 2.
+                'xpToNextLevelBefore' => 100,
                 'after' => 2,
                 'reached' => [2],
                 'totalXp' => self::AWARDED,
@@ -101,8 +112,54 @@ final class RewardSummaryTest extends ApiTestCase
     }
 
     /**
+     * Le cas qui a ouvert #79 : un joueur au milieu d'un palier qui en franchit **deux**
+     * d'un coup.
+     *
+     * `xpIntoLevelBefore` seul ne suffirait pas ici. Le client sait déduire la largeur du
+     * palier de départ tant que le niveau d'arrivée est `before + 1` — la différence des
+     * deux seuils. Dès qu'il y en a deux, le seuil d'arrivée n'est plus celui du palier
+     * suivant, et la largeur devient introuvable : la barre repartirait de zéro pour un
+     * joueur qui en était à 90 %.
+     */
+    public function testTheBarStartsWhereThePlayerLeftIt(): void
+    {
+        $bob = $this->openAccount();
+
+        // Avant-hier, une heure de course : 90 XP pile, à dix points du niveau 2.
+        $this->sessionTwoDaysAgo($bob, 'RUNNING', 3600);
+
+        // Aujourd'hui, deux heures de natation et une série qui paie : 145 rabotés, +29 de
+        // bonus, soit 264 au total. Les niveaux 2 (100) et 3 (260) tombent tous les deux.
+        ProgrammableModifiers::grant(new Modifier(ModifierType::XpMultiplier, 20, ModifierSource::Streak));
+
+        $level = $this->completeTwoHoursOfSwimming($bob)['level'];
+        self::assertIsArray($level);
+
+        self::assertSame(
+            [
+                'before' => 1,
+                // 90 sur un palier de 100 : la barre part presque pleine.
+                'xpIntoLevelBefore' => 90,
+                'xpToNextLevelBefore' => 10,
+                'after' => 3,
+                'reached' => [2, 3],
+                'totalXp' => 264,
+                // 264 − 260, le seuil du niveau 3.
+                'xpIntoLevel' => 4,
+                'xpToNextLevel' => 216,
+                'skillPointsGranted' => 2,
+            ],
+            $level,
+        );
+    }
+
+    /**
      * Une séance sans franchissement ne ment pas : `before` vaut `after` et la liste est
      * vide. Le client n'a alors rien à jouer, et il le sait sans comparer deux nombres.
+     *
+     * Le palier de départ reste servi, et c'est le même que celui d'arrivée reculé de l'XP
+     * accordée. Le client pourrait le calculer dans ce cas-là ; lui faire distinguer les
+     * deux cas est précisément ce qu'on ne veut pas.
      */
     public function testASessionWithoutALevelUpSaysSoPlainly(): void
     {
@@ -118,6 +175,14 @@ final class RewardSummaryTest extends ApiTestCase
             $level['after'],
             $level['reached'],
             $level['skillPointsGranted'],
+        ]);
+
+        // Une demi-heure de course, 45 XP : la barre va de 0 à 45 sur un palier de 100.
+        self::assertSame([0, 100, 45, 55], [
+            $level['xpIntoLevelBefore'],
+            $level['xpToNextLevelBefore'],
+            $level['xpIntoLevel'],
+            $level['xpToNextLevel'],
         ]);
     }
 
@@ -184,6 +249,33 @@ final class RewardSummaryTest extends ApiTestCase
         // à ce qui est accordé. C'est ce qui permet à cette suite de rester exacte là où
         // ça compte.
         self::assertEqualsWithDelta(self::ELAPSED, $session['durationSeconds'], 5);
+    }
+
+    /**
+     * Une séance close et rangée deux jours en arrière, **ledger compris**.
+     *
+     * {@see TrainingSessions::ageSession()} recule la séance ; il ne recule pas la ligne
+     * d'XP qu'elle a produite, et c'est celle-là que lisent les rendements décroissants.
+     * Une seconde séance laissée le même jour tomberait dans la tranche à 0 % et ne
+     * rapporterait rien — ce qui est le comportement voulu du jeu, et ce qui rend
+     * inatteignable tout scénario où un joueur arrive avec de l'XP derrière lui.
+     *
+     * Même geste et même honnêteté qu'ailleurs dans la suite : c'est le passé qu'on
+     * déplace, pas le serveur qu'on contourne. Il date toujours ce qu'il date.
+     */
+    private function sessionTwoDaysAgo(Account $account, string $discipline, int $elapsed): void
+    {
+        $session = $this->startSession($account, $discipline);
+        $this->ageSession($session, $elapsed);
+
+        $response = $this->completeSession($account, $session);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+
+        $this->ageSession($session, 2 * 86400);
+        $this->connection()->executeStatement(
+            "UPDATE xp_transaction SET created_at = created_at - INTERVAL '2 days' WHERE user_id = :id",
+            ['id' => $account->id->toRfc4122()],
+        );
     }
 
     /**

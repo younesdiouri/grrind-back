@@ -18,8 +18,11 @@ namespace App\Shared\Application;
  * forme JSON d'un titre dans toute l'API — donc un titre gagné en fin de séance se dessine
  * avec le composant qui sert déjà `GET /api/me` et `GET /api/titles`.
  *
- * `levelBefore` est là bien qu'il se déduise de `levelsReached` : le client anime un
- * *passage*, et lui faire reconstituer le point de départ à partir d'une liste
+ * **Le palier de départ est donné en entier** — `levelBefore`, `xpIntoLevelBefore` et
+ * `xpToNextLevelBefore` — bien qu'il se déduise en partie du reste. Le client anime un
+ * *passage* : il place la barre, puis la remplit. Sans la largeur du palier d'où elle part,
+ * il ne sait pas où la placer, et un franchissement multiple la fait démarrer à zéro pour
+ * un joueur qui n'y était pas (#79). Lui faire reconstituer tout ça à partir d'une liste
  * éventuellement vide est exactement le genre de calcul qu'on refait de travers.
  */
 final readonly class SessionReward
@@ -33,6 +36,10 @@ final readonly class SessionReward
         public int $xpAwarded,
         public array $breakdown,
         public int $levelBefore,
+        /** Où en était la barre au moment d'appuyer sur « terminer ». */
+        public int $xpIntoLevelBefore,
+        /** Avec le précédent, la largeur du palier de départ. `null` au niveau maximum. */
+        public ?int $xpToNextLevelBefore,
         public int $level,
         public int $totalXp,
         public int $xpIntoLevel,
