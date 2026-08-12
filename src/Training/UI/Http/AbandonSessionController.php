@@ -8,6 +8,7 @@ use App\Shared\UI\Http\Idempotent;
 use App\Training\Application\AbandonSession;
 use App\Training\Application\AbandonSessionHandler;
 use App\Training\UI\Http\Response\TrainingSessionResource;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -31,6 +32,18 @@ final readonly class AbandonSessionController
 
     #[Route('/api/training/sessions/{id}/abandon', name: 'training_session_abandon', methods: ['POST'])]
     #[Idempotent]
+    #[OA\Tag(name: 'Entraînement')]
+    #[OA\Parameter(ref: '#/components/parameters/IdempotencyKey')]
+    #[OA\RequestBody(required: false, description: 'Aucun corps attendu.')]
+    #[OA\Response(
+        response: 200,
+        description: 'La séance est close et ne rapporte rien. Elle reste dans l\'historique.',
+        content: new OA\JsonContent(ref: '#/components/schemas/TrainingSession'),
+    )]
+    #[OA\Response(response: 400, ref: '#/components/responses/BadRequest')]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
     public function __invoke(
         #[CurrentUser]
         UserInterface $user,

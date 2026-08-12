@@ -83,6 +83,7 @@
     "require-dev": {
         "deptrac/deptrac": "^4.7",
         "friendsofphp/php-cs-fixer": "^3.95",
+        "nelmio/api-doc-bundle": "^5.11",
         "phpstan/phpstan": "^2.2",
         "phpstan/phpstan-doctrine": "^2.0",
         "phpstan/phpstan-symfony": "^2.0",

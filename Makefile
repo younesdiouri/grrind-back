@@ -11,7 +11,7 @@ RUN_DB  := $(DC) run --rm php
 RUN_TEST := $(DC) run --rm -e APP_ENV=test php
 
 .DEFAULT_GOAL := help
-.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset test qa phpstan cs cs-fix deptrac install
+.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset openapi test qa phpstan cs cs-fix deptrac install
 
 help: ## Liste les commandes disponibles
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -105,6 +105,16 @@ migrate-prod: ## Applique les migrations depuis l'image de prod (étape de dépl
 	$(DC) run --rm --build php-prod \
 		bin/console doctrine:migrations:migrate \
 			--no-interaction --allow-no-migration --query-time --no-debug
+
+## —— Contrat d'API —————————————————————————————————————————————————————————
+# Le contrat client est un **fichier versionné**, pas une route de documentation : le
+# dépôt front en génère son client TypeScript, et un contrat qu'on ne peut pas differ est
+# un contrat qui dérive. La CI rejoue cette cible et refuse un openapi.yaml pas à jour.
+#
+# Le bundle n'est chargé qu'en dev, d'où `$(RUN)` : l'image de prod est bâtie `--no-dev` et
+# n'expose aucune documentation.
+openapi: ## Régénère openapi.yaml depuis les routes et les attributs
+	$(RUN) sh -c "bin/console nelmio:apidoc:dump --format=yaml" > openapi.yaml
 
 ## —— Qualité ——————————————————————————————————————————————————————————————
 test: ## Suite de tests (base de test créée/migrée au passage)

@@ -8,6 +8,7 @@ use App\Training\Application\StartSession;
 use App\Training\Application\StartSessionHandler;
 use App\Training\UI\Http\Request\StartSessionRequest;
 use App\Training\UI\Http\Response\TrainingSessionResource;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -35,6 +36,22 @@ final readonly class StartSessionController
     }
 
     #[Route('/api/training/sessions', name: 'training_session_start', methods: ['POST'])]
+    #[OA\Tag(name: 'Entraînement')]
+    #[OA\Response(
+        response: 201,
+        description: 'La séance est ouverte, datée par le serveur.',
+        content: new OA\JsonContent(ref: '#/components/schemas/TrainingSession'),
+    )]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(
+        response: 409,
+        description: 'Une séance tourne déjà (`session-already-active`, avec `activeSessionId`), ou le cooldown court encore (`session-cooldown`, avec `remainingSeconds` et `readyAt`).',
+        content: new OA\MediaType(
+            mediaType: 'application/problem+json',
+            schema: new OA\Schema(ref: '#/components/schemas/ProblemDetails'),
+        ),
+    )]
+    #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
     public function __invoke(
         #[CurrentUser]
         UserInterface $user,
