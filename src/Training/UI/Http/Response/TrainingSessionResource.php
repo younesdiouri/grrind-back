@@ -17,8 +17,9 @@ use DateTimeInterface;
  * seule forme** : le client iOS décode un seul type, et un champ qui apparaît et
  * disparaît finit lu de travers.
  *
- * Ce que le Lot 4 ajoutera décrit une *récompense*, pas une séance : ça ira dans
- * `RewardSummary`.
+ * Ce que la complétion rapporte décrit une *récompense*, pas une séance : ça ira dans le
+ * `RewardSummary` (#22), qui embarquera cette forme-ci telle quelle plutôt que de la
+ * réécrire à plat — une séance close se décode partout avec le même type.
  */
 final readonly class TrainingSessionResource
 {

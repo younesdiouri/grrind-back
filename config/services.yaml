@@ -66,6 +66,11 @@ services:
     # affiche dans le profil sans jamais connaître ni le catalogue ni la table.
     App\Shared\Application\PlayerTitles: '@App\Progression\Infrastructure\Translation\TranslatedPlayerTitles'
 
+    # Le troisième et dernier port : `Training` clôt la séance, `Progression` la crédite, et
+    # aucun des deux ne nomme l'autre. C'est ce câblage-là qui fait la transaction de
+    # complétion — sans lui, une séance se fermerait sans rapporter un point.
+    App\Shared\Application\SessionRewards: '@App\Progression\Infrastructure\Reward\LedgerSessionRewards'
+
     # Providers league/oauth2-client câblés directement : KnpUOAuth2ClientBundle a été
     # écarté (décision Lot 1bis). Ils sont derrière un service locator dans le résolveur,
     # donc construits à la demande — le constructeur d'Apple refuse une configuration
@@ -103,10 +108,9 @@ when@test:
         # `ModifierContributor`, et c'est précisément ce qu'il sert à démontrer.
         App\Tests\Support\ProgrammableModifiers: ~
 
-        # Rien ne consomme encore ce service — le premier appelant sera la transaction de
-        # complétion (#21) — donc le conteneur le retire. Le rendre public en test est ce
-        # qui permet de prouver dès maintenant que le port `PlayerTimezones` est bien câblé
-        # sur `Identity`, plutôt que de le découvrir au Lot 4.
+        # Publics pour que les tests les appellent sans passer par HTTP : la charge du jour
+        # et le crédit se démontrent contre la vraie base, indépendamment de la route qui
+        # les déclenche.
         App\Progression\Application\DailyLoadProvider:
             public: true
 

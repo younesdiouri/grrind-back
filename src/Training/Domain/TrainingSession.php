@@ -107,7 +107,8 @@ class TrainingSession
      * Seule voie soumise à la durée plancher : sous le seuil, rien n'est écrit et la
      * séance reste en cours — le joueur continue, ou renonce par `abandon()`.
      *
-     * Ce qu'elle rapporte ne se décide pas ici : `Progression` l'apprendra par événement.
+     * Ce qu'elle rapporte ne se décide pas ici : `Progression` le calcule, dans la même
+     * transaction, derrière le port `SessionRewards`.
      *
      * @throws SessionNotActive
      * @throws SessionTooShort

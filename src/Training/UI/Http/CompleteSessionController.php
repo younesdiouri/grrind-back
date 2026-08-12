@@ -15,11 +15,14 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le joueur appuie sur « terminer » ; le serveur date la fin et fige la durée.
+ * Le joueur appuie sur « terminer » ; le serveur date la fin, fige la durée et crédite
+ * l'XP — le tout en une transaction.
  *
- * `#[Idempotent]` est imposé dès maintenant, pendant que la réponse est encore anodine :
- * au Lot 4 cette requête accordera de l'XP et tirera du loot, et il serait alors coûteux
- * de l'exiger d'un client déjà déployé.
+ * `#[Idempotent]` était déjà imposé quand la réponse était anodine, précisément pour ce
+ * moment : un client mobile rejoue ses requêtes, et cette route accorde désormais de l'XP.
+ *
+ * La réponse, elle, ne décrit encore que la séance : le `RewardSummary` qui rendra la
+ * récompense entière est le ticket suivant (#22). La transaction, elle, la calcule déjà.
  *
  * Le `Uuid` en paramètre est résolu par l'`UidValueResolver`, qui rend déjà un 404 sur
  * une chaîne malformée — illisible et inconnu sont le même non-résultat.
@@ -37,11 +40,11 @@ final readonly class CompleteSessionController
         UserInterface $user,
         Uuid $id,
     ): JsonResponse {
-        $session = ($this->completeSession)(new CompleteSession(
+        $completion = ($this->completeSession)(new CompleteSession(
             Uuid::fromString($user->getUserIdentifier()),
             $id,
         ));
 
-        return new JsonResponse(TrainingSessionResource::from($session)->toArray());
+        return new JsonResponse(TrainingSessionResource::from($completion->session)->toArray());
     }
 }
