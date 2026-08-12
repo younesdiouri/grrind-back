@@ -51,6 +51,23 @@ final class FirstPlayableTest extends ApiTestCase
     /** Et la suivante dans la tranche à 30 % : 540 s retenues, 13 XP. */
     private const int THIRD = 13;
 
+    /**
+     * Un point de tolérance sur les séances qui en suivent une autre, et **seulement**
+     * sur celles-là.
+     *
+     * Le serveur date la clôture lui-même : la durée mesurée vaut la durée simulée plus le
+     * temps réel écoulé entre les deux requêtes, une seconde ou deux sous une CI chargée.
+     * Cette dérive entre au ledger, donc dans la charge du jour, et **déplace la frontière
+     * entre deux tranches** : une seconde de plus sur la première heure fait passer la
+     * deuxième séance de 27 à 26.
+     *
+     * On ne fige donc pas ces montants-là au point près. Ce que le test affirme reste
+     * entier : la décroissance a lieu, elle se lit dans le breakdown, et elle est stricte.
+     * L'arithmétique exacte, c'est `XpCalculatorTest` qui la démontre par table de cas,
+     * sans horloge ni base.
+     */
+    private const int DRIFT = 1;
+
     public function testADayOfTrainingFromRegistrationToProgression(): void
     {
         // 1. Un compte tout neuf, par la vraie route d'inscription : le jeton qui suit est
@@ -73,14 +90,19 @@ final class FirstPlayableTest extends ApiTestCase
         //    négative *montre* ce qui a été rogné, au lieu de livrer un total amaigri.
         $second = $this->runSession($bob, 'RUNNING', self::HALF_HOUR);
 
-        self::assertSame(self::SECOND, self::awardedIn($second));
-        self::assertSame(
-            [
-                ['source' => 'BASE', 'amount' => 45],
-                ['source' => 'DIMINISHING', 'amount' => self::SECOND - 45],
-            ],
-            self::breakdownIn($second),
-        );
+        self::assertEqualsWithDelta(self::SECOND, self::awardedIn($second), self::DRIFT);
+
+        // Le socle annonçait 45 ; la ligne négative dit ce qui a été rogné, et la somme des
+        // deux *est* le montant accordé. C'est la forme qui compte ici, pas le point près.
+        $lines = self::breakdownIn($second);
+        self::assertSame(['BASE', 'DIMINISHING'], array_column($lines, 'source'));
+        self::assertSame(45, $lines[0]['amount']);
+        self::assertLessThan(0, $lines[1]['amount']);
+        self::assertSame(self::awardedIn($second), array_sum(array_column($lines, 'amount')));
+
+        // La même demi-heure vaut nettement moins que la première heure, à la minute près
+        // de pratique. C'est ça, la mécanique.
+        self::assertLessThan(self::awardedIn($first), self::awardedIn($second));
 
         // Et c'est cette séance-là qui fait basculer le niveau : 90 + 27 = 117, au-dessus
         // du seuil de 100. Le joueur ne l'a pas cherché, il a continué.
@@ -91,14 +113,20 @@ final class FirstPlayableTest extends ApiTestCase
         //    jamais refuser une séance : elle compte toujours, elle rapporte moins.
         $third = $this->runSession($bob, 'RUNNING', self::HALF_HOUR);
 
-        self::assertSame(self::THIRD, self::awardedIn($third));
+        self::assertEqualsWithDelta(self::THIRD, self::awardedIn($third), self::DRIFT);
+        self::assertLessThan(self::awardedIn($second), self::awardedIn($third));
         self::assertSame([2, 2, []], self::levelStoryIn($third));
 
         // 5. L'état du joueur raconte la même chose que la somme de ses récompenses. C'est
         //    ce que le client lira à la réouverture de l'app, sans rejouer quoi que ce soit.
+        //    L'égalité est **exacte** : elle porte sur ce qui a été observé, pas sur ce qui
+        //    était prévu, et c'est précisément ce qu'on veut prouver ici.
         $progression = self::decode($this->get('/api/progression', $bob->headers));
 
-        self::assertSame(self::FIRST + self::SECOND + self::THIRD, $progression['totalXp']);
+        self::assertSame(
+            self::awardedIn($first) + self::awardedIn($second) + self::awardedIn($third),
+            $progression['totalXp'],
+        );
         self::assertSame(2, $progression['level']);
         self::assertSame(['earned' => 1, 'available' => 1], $progression['skillPoints']);
 
@@ -154,11 +182,12 @@ final class FirstPlayableTest extends ApiTestCase
         $cycling = $this->runSession($bob, 'CYCLING', self::HALF_HOUR);
 
         // 1 800 s à 60 % font 1 080 s retenues, à 70 XP/h : 21 XP au lieu de 35.
-        self::assertSame(21, self::awardedIn($cycling));
-        self::assertSame(
-            [['source' => 'BASE', 'amount' => 35], ['source' => 'DIMINISHING', 'amount' => -14]],
-            self::breakdownIn($cycling),
-        );
+        self::assertEqualsWithDelta(21, self::awardedIn($cycling), self::DRIFT);
+
+        $lines = self::breakdownIn($cycling);
+        self::assertSame(['BASE', 'DIMINISHING'], array_column($lines, 'source'));
+        self::assertSame(35, $lines[0]['amount']);
+        self::assertLessThan(0, $lines[1]['amount']);
     }
 
     /**
@@ -199,7 +228,7 @@ final class FirstPlayableTest extends ApiTestCase
     /**
      * @param array<string, mixed> $summary
      *
-     * @return array<mixed>
+     * @return list<array{source: string, amount: int}>
      */
     private static function breakdownIn(array $summary): array
     {
@@ -207,7 +236,17 @@ final class FirstPlayableTest extends ApiTestCase
         self::assertIsArray($xp);
         self::assertIsArray($xp['breakdown']);
 
-        return $xp['breakdown'];
+        $lines = [];
+
+        foreach ($xp['breakdown'] as $line) {
+            self::assertIsArray($line);
+            self::assertIsString($line['source']);
+            self::assertIsInt($line['amount']);
+
+            $lines[] = ['source' => $line['source'], 'amount' => $line['amount']];
+        }
+
+        return $lines;
     }
 
     /**
