@@ -735,7 +735,7 @@ components:
           example: -55
       type: object
     RewardSummary:
-      description: "**Le contrat le plus coûteux à casser du produit.** Ce que le joueur reçoit quand il\nappuie sur « terminer ».\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau\nbascule, le titre tombe, puis le loot et la série. Un champ déplacé change la mise\nen scène.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le niveau donné avant *et* après, et les titres déjà\ntraduits.\n\n`loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5\net 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
+      description: "**Le contrat le plus coûteux à casser du produit.** Ce que le joueur reçoit quand il\nappuie sur « terminer ».\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau\nbascule, le titre tombe, puis le loot et la série. Un champ déplacé change la mise\nen scène.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, et les titres déjà\ntraduits.\n\n`loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5\net 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
       required:
         - session
         - xp
@@ -766,6 +766,8 @@ components:
         level:
           required:
             - before
+            - xpIntoLevelBefore
+            - xpToNextLevelBefore
             - after
             - reached
             - totalXp
@@ -776,6 +778,15 @@ components:
             before:
               type: integer
               example: 1
+            xpIntoLevelBefore:
+              description: "Où en était la barre avant la séance. Le client l'y place, **puis** la remplit."
+              type: integer
+              example: 30
+            xpToNextLevelBefore:
+              description: "Avec le précédent, la largeur du palier de départ. Elle ne se redéduit pas du reste dès que plusieurs niveaux sont franchis, et sans elle la barre repart de zéro pour un joueur qui n'y était pas. `null` au niveau maximum."
+              type: integer
+              example: 70
+              nullable: true
             after:
               type: integer
               example: 2

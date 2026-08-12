@@ -48,6 +48,7 @@ final readonly class LedgerSessionRewards implements SessionRewards
         ));
 
         $snapshot = $granted->snapshot;
+        $before = $granted->standingBefore;
 
         return new SessionReward(
             $granted->award->amount(),
@@ -55,9 +56,14 @@ final readonly class LedgerSessionRewards implements SessionRewards
                 static fn (XpBreakdownLine $line): XpLine => new XpLine($line->source->value, $line->amount),
                 $granted->award->breakdown->lines,
             ),
-            // Le niveau d'où le joueur part, déduit du premier franchi. Le lire sur le
-            // snapshot serait le lire *après* la reprojection, donc lire l'arrivée.
-            [] === $granted->levelsReached ? $snapshot->level() : $granted->levelsReached[0] - 1,
+            // Le palier d'où le joueur part, dans son entier : le client y place la barre
+            // avant de la remplir, et sa largeur ne se redéduit pas du reste du payload
+            // quand plusieurs niveaux sont franchis (#79). Le lire sur le snapshot serait
+            // le lire *après* la reprojection, donc lire l'arrivée — d'où `standingBefore`,
+            // capturé par le handler du bon côté du `retotal`.
+            $before->level,
+            $before->xpIntoLevel,
+            $before->xpToNextLevel,
             $snapshot->level(),
             $snapshot->totalXp(),
             $snapshot->xpIntoLevel(),

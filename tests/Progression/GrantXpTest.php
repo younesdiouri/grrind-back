@@ -147,6 +147,38 @@ final class GrantXpTest extends ApiTestCase
         self::assertNull($granted->snapshot->xpToNextLevel());
     }
 
+    /**
+     * Le palier de départ est lu **avant** la reprojection, pas après (#79).
+     *
+     * C'est tout l'enjeu : le snapshot est une seule instance qui se réécrit sur place, donc
+     * l'y relire une ligne trop bas rendrait l'arrivée sous le nom du départ, sans qu'aucun
+     * type ne bronche. Le client animerait une barre qui part de là où elle finit.
+     *
+     * **Et c'est bien le snapshot qu'on lit, pas le ledger.** La tentation est de reprojeter
+     * `total − accordé` pour se passer du cache ; ce serait plus juste et plus faux. Sur un
+     * snapshot divergent — celui de
+     * {@see testTheSnapshotIsRecomputedFromTheLedgerRatherThanIncremented} — le départ
+     * annoncerait un niveau que `levelsReached` s'apprête à faire franchir, et l'animation
+     * se contredirait elle-même. Les deux se lisent au même endroit ou ils ne s'accordent
+     * plus.
+     */
+    public function testTheStandingBeforeIsWhereTheSessionStartedFrom(): void
+    {
+        $player = $this->openAccount()->id;
+
+        // Deux crédits d'affilée : c'est le second qui compte, parce qu'il part d'un joueur
+        // qui a déjà une position sur la courbe. Le premier ne fait que la lui donner.
+        $first = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 3600));
+        $standingAfterTheFirst = $first->snapshot->standing();
+
+        $second = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 3600));
+
+        self::assertEquals($standingAfterTheFirst, $second->standingBefore);
+
+        // Et ce n'est pas l'arrivée : la séance a rapporté, donc les deux paliers diffèrent.
+        self::assertNotEquals($second->snapshot->standing(), $second->standingBefore);
+    }
+
     public function testTheActiveModifiersCrossThePortAndReachTheLedger(): void
     {
         $player = $this->openAccount()->id;

@@ -275,7 +275,7 @@ when@dev:
                             en scène.
 
                             **Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de
-                            jouer l'animation — d'où le niveau donné avant *et* après, et les titres déjà
+                            jouer l'animation — d'où le palier donné avant *et* après, et les titres déjà
                             traduits.
 
                             `loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5
@@ -295,9 +295,18 @@ when@dev:
                                         items: { $ref: '#/components/schemas/XpLine' }
                             level:
                                 type: object
-                                required: [before, after, reached, totalXp, xpIntoLevel, xpToNextLevel, skillPointsGranted]
+                                required: [before, xpIntoLevelBefore, xpToNextLevelBefore, after, reached, totalXp, xpIntoLevel, xpToNextLevel, skillPointsGranted]
                                 properties:
                                     before: { type: integer, example: 1 }
+                                    xpIntoLevelBefore:
+                                        type: integer
+                                        example: 30
+                                        description: "Où en était la barre avant la séance. Le client l'y place, **puis** la remplit."
+                                    xpToNextLevelBefore:
+                                        type: integer
+                                        nullable: true
+                                        example: 70
+                                        description: "Avec le précédent, la largeur du palier de départ. Elle ne se redéduit pas du reste dès que plusieurs niveaux sont franchis, et sans elle la barre repart de zéro pour un joueur qui n'y était pas. `null` au niveau maximum."
                                     after: { type: integer, example: 2 }
                                     reached:
                                         type: array
