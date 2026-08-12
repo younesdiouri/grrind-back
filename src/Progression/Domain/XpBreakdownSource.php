@@ -7,7 +7,7 @@ namespace App\Progression\Domain;
 use App\Shared\Domain\Modifier\ModifierSource;
 
 /**
- * D'où vient une ligne du détail de calcul. C'est le contrat que le client iOS animera —
+ * D'où vient une ligne du détail de calcul. C'est le contrat que le client animera —
  * « 90 base, +18 streak, +13 bottes » — et la colonne `source` de `xp_transaction_line`.
  *
  * Fermé et stocké : ajouter une valeur est une migration de données autant qu'une

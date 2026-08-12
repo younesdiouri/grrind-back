@@ -1,5 +1,5 @@
 framework:
-    # Le client iOS envoie son `Accept-Language` : c'est la seule chose que le serveur ait à
+    # Le client envoie son `Accept-Language` : c'est la seule chose que le serveur ait à
     # écouter pour rendre un libellé dans la langue du joueur. Pas de `_locale` dans les
     # routes — l'API n'est pas un site, ses URL ne varient pas avec la langue — et pas de
     # préférence stockée en profil tant que personne ne demande à lire l'app dans une autre

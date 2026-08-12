@@ -40,7 +40,7 @@ final readonly class AuthenticationResponseListener
      * Login réussi. Lexik a signé le JWT et s'apprêtait à répondre `{"token": …}` ;
      * on lui substitue le contrat GRRIND — profil et paire de jetons — pour que
      * login, inscription et rafraîchissement rendent tous la même forme et que le
-     * client iOS n'ait qu'un seul chemin de traitement.
+     * client n'ait qu'un seul chemin de traitement.
      *
      * C'est aussi ici que naît la famille de refresh tokens : une par login, donc
      * une par appareil.

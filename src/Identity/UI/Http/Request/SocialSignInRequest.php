@@ -9,7 +9,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 /**
  * Corps de `POST /api/auth/social/{provider}`.
  *
- * Le client iOS a déjà mené l'écran d'autorisation ; il nous transmet le code à
+ * Le client natif a déjà mené l'écran d'autorisation ; il nous transmet le code à
  * échanger. Le secret client ne quitte jamais le serveur.
  */
 final readonly class SocialSignInRequest
@@ -19,7 +19,7 @@ final readonly class SocialSignInRequest
         #[Assert\Length(max: 2048)]
         public string $code = '',
         // Doit être exactement celui présenté au fournisseur à l'étape précédente
-        // (un schéma d'URL personnalisé, côté iOS). Les deux le recomparent.
+        // (un schéma d'URL personnalisé, côté application). Les deux le recomparent.
         #[Assert\NotBlank]
         #[Assert\Length(max: 2048)]
         public string $redirectUri = '',

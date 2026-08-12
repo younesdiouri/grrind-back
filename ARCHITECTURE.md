@@ -23,7 +23,7 @@ Deptrac le vérifie en CI, et le build casse sur une flèche interdite.
 
 ```mermaid
 flowchart TB
-    ios["📱 App SwiftUI<br/><i>dépôt séparé</i>"]
+    app["📱 App React Native<br/><i>dépôt séparé</i>"]
 
     subgraph api["API — un seul déploiement, FrankenPHP en mode worker"]
         direction TB
@@ -35,9 +35,9 @@ flowchart TB
         shared["<b>Shared</b><br/>vocabulaire d'activité · événements de domaine<br/>ports · idempotence · horloge"]
     end
 
-    ios --> identity
-    ios --> training
-    ios --> progression
+    app --> identity
+    app --> training
+    app --> progression
 
     identity --> shared
     training --> shared
@@ -490,7 +490,7 @@ pas encore en demande une.
 
 **Une forme par concept, partout.** `register`, `login`, `refresh` et `social` rendent le même
 `AuthResource`. Une séance ouverte et une séance close sont le même objet, avec des champs à
-`null`. Un titre a la même forme dans le profil et dans le catalogue. Le client iOS décode un
+`null`. Un titre a la même forme dans le profil et dans le catalogue. Le client décode un
 seul type par concept — un champ qui apparaît et disparaît selon la route finit lu de travers.
 
 ---

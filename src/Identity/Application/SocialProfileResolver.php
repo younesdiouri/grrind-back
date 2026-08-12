@@ -17,7 +17,7 @@ use App\Identity\Domain\SocialProvider;
 interface SocialProfileResolver
 {
     /**
-     * @param string      $code         code d'autorisation obtenu par le client iOS
+     * @param string      $code         code d'autorisation obtenu par le client natif
      * @param string      $redirectUri  celui présenté au fournisseur à l'étape précédente ; il doit correspondre au bit près
      * @param string|null $codeVerifier PKCE, quand le client en a utilisé un
      *

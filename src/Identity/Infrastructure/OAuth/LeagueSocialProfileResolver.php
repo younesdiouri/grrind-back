@@ -22,7 +22,7 @@ use Throwable;
 /**
  * L'échange réel, par league/oauth2-client.
  *
- * Le flux est celui d'un client natif : l'app SwiftUI ouvre elle-même l'écran
+ * Le flux est celui d'un client natif : l'app ouvre elle-même l'écran
  * d'autorisation, récupère le code et nous l'envoie. Le serveur seul détient le secret
  * client — le code ne vaut rien sans lui.
  *
