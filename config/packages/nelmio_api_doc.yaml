@@ -1,0 +1,400 @@
+# La description de l'API, et **rien d'autre que le vocabulaire partagé**.
+#
+# Le bundle n'est chargé qu'en `dev` : il ne sert qu'à produire `openapi.yaml`, que
+# `make openapi` écrit et que la CI compare. Rien n'expose la documentation en HTTP — le
+# contrat est le fichier versionné, pas une route de plus sous `^/api`.
+#
+# **Pourquoi les schémas sont ici et pas en attributs sur les ressources.** Nos ressources
+# HTTP rendent leur JSON par un `toArray()` qui compose — `skillPoints` regroupe deux
+# champs, un titre en imbrique trois — et aucun générateur ne sait déduire ça de leurs
+# propriétés. Écrire les schémas à la main est donc le seul chemin honnête ; ils vivent d'un
+# bloc pour qu'on relise le contrat comme un tout plutôt qu'éparpillé sur quinze fichiers.
+#
+# Ce qui empêche cette description de mentir n'est pas la relecture : ce sont les tests, qui
+# figent les mêmes formes contre la vraie API — jusqu'à l'ordre des clés du `RewardSummary`
+# — plus `OpenApiContractTest`, qui refuse une route non documentée.
+when@dev:
+    nelmio_api_doc:
+        # Seul `^/api` est décrit. `/health` est une sonde d'infrastructure : elle
+        # n'appartient pas au contrat client, et la documenter inviterait à s'en servir.
+        areas:
+            path_patterns:
+                - ^/api
+
+        documentation:
+            info:
+                title: GRRIND
+                description: |
+                    L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.
+
+                    **Le serveur possède l'horloge.** Aucune route n'accepte une date ni une durée envoyée par le
+                    client : une séance s'ouvre, puis se ferme, et le serveur date les deux. Antidater est
+                    impossible par construction, pas par contrôle.
+
+                    **Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un
+                    en-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse
+                    d'origine sans rien réexécuter.
+
+                    **Les erreurs sont en `application/problem+json`** (RFC 9457). Le membre `type` est un
+                    identifiant stable sur lequel un client peut brancher un comportement ; le `detail` est du
+                    texte, il peut changer.
+                version: 1.0.0
+
+            components:
+                # Les réponses d'erreur sont déclarées une fois et référencées par les
+                # routes : quinze contrôleurs qui recopieraient le même bloc finiraient par
+                # en avoir quinze versions, dont quatorze fausses.
+                responses:
+                    BadRequest:
+                        description: "Requête malformée — en-tête d'idempotence absent, corps illisible."
+                        content:
+                            application/problem+json:
+                                schema: { $ref: '#/components/schemas/ProblemDetails' }
+                    Unauthorized:
+                        description: "Jeton absent, expiré ou invalide."
+                        content:
+                            application/problem+json:
+                                schema: { $ref: '#/components/schemas/ProblemDetails' }
+                    NotFound:
+                        description: |
+                            La ressource n'existe pas, **ou n'appartient pas à ce compte**. Les deux cas
+                            rendent la même réponse : répondre « interdit » confirmerait l'existence, et un
+                            identifiant, ça s'essaie en boucle.
+                        content:
+                            application/problem+json:
+                                schema: { $ref: '#/components/schemas/ProblemDetails' }
+                    Conflict:
+                        description: "L'état actuel refuse l'opération. Le `type` dit lequel, et les membres supplémentaires disent comment se recaler."
+                        content:
+                            application/problem+json:
+                                schema: { $ref: '#/components/schemas/ProblemDetails' }
+                    UnprocessableEntity:
+                        description: "Le corps est bien formé mais son contenu est refusé."
+                        content:
+                            application/problem+json:
+                                schema: { $ref: '#/components/schemas/ValidationProblem' }
+
+                parameters:
+                    IdempotencyKey:
+                        name: Idempotency-Key
+                        in: header
+                        required: true
+                        description: |
+                            Une clé propre à cette tentative, stable au travers des rejeus du client.
+                            Rejouer la même clé sur la même requête rend la réponse d'origine sans rien
+                            réexécuter, et l'en-tête `Idempotent-Replay: true` le signale. La même clé sur
+                            une requête différente est un abus et vaut un 409.
+                        schema: { type: string, maxLength: 255 }
+
+                securitySchemes:
+                    bearerAuth:
+                        type: http
+                        scheme: bearer
+                        bearerFormat: JWT
+                        description: |
+                            Le JWT rendu par `/api/auth/login`, `/api/auth/register` ou `/api/auth/refresh`.
+                            Quinze minutes de validité — il ne se révoque pas, c'est pour ça qu'il est court.
+                            Passé ce délai, on le renouvelle avec le refresh token.
+
+                schemas:
+                    # ————— Le vocabulaire des erreurs ——————————————————————————————————
+                    ProblemDetails:
+                        type: object
+                        description: |
+                            Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et
+                            `detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une
+                            séance déjà active donne `activeSessionId`, un cooldown donne `remainingSeconds`
+                            et `readyAt` — pour que le client se recale au lieu d'afficher un refus sec.
+                        required: [type, title, status, detail]
+                        additionalProperties: true
+                        properties:
+                            type:
+                                type: string
+                                format: uri
+                                enum:
+                                    - https://grrind.app/problems/validation-failed
+                                    - https://grrind.app/problems/internal-error
+                                    - https://grrind.app/problems/idempotency-key-required
+                                    - https://grrind.app/problems/idempotency-key-in-flight
+                                    - https://grrind.app/problems/idempotency-key-reused
+                                    - https://grrind.app/problems/email-already-used
+                                    - https://grrind.app/problems/email-belongs-to-another-account
+                                    - https://grrind.app/problems/invalid-refresh-token
+                                    - https://grrind.app/problems/social-sign-in-rejected
+                                    - https://grrind.app/problems/social-profile-incomplete
+                                    - https://grrind.app/problems/session-not-found
+                                    - https://grrind.app/problems/session-not-active
+                                    - https://grrind.app/problems/session-already-active
+                                    - https://grrind.app/problems/session-too-short
+                                    - https://grrind.app/problems/session-cooldown
+                                    - https://grrind.app/problems/title-unknown
+                                    - https://grrind.app/problems/title-not-unlocked
+                            title: { type: string, example: Conflict }
+                            status: { type: integer, example: 409 }
+                            detail: { type: string }
+
+                    ValidationProblem:
+                        description: "Le corps est bien formé mais son contenu est refusé. Chaque violation nomme son champ."
+                        allOf:
+                            - $ref: '#/components/schemas/ProblemDetails'
+                            - type: object
+                              properties:
+                                  violations:
+                                      type: array
+                                      items:
+                                          type: object
+                                          required: [field, message]
+                                          properties:
+                                              field: { type: string, example: email }
+                                              message: { type: string }
+
+                    # ————— Identité ————————————————————————————————————————————————————
+                    PlayerTitle:
+                        type: object
+                        description: |
+                            **La seule forme d'un titre dans toute l'API** — débloqué comme verrouillé, dans le
+                            profil, sur le mur des titres et dans une récompense. Un seul type à décoder, un
+                            seul composant à dessiner.
+
+                            `unlockedAt` à `null` est ce qui distingue les deux états. `progress` est toujours
+                            renseignée : sur un titre acquis, `current` vaut `target`.
+                        required: [id, name, hint, unlocked, unlockedAt, progress]
+                        properties:
+                            id: { type: string, example: first_steps }
+                            name: { type: string, description: "Déjà traduit, dans la langue négociée sur `Accept-Language`.", example: First Steps }
+                            hint: { type: string, description: "Ce qu'il reste à faire, rédigé.", example: Complete your first session }
+                            unlocked: { type: boolean }
+                            unlockedAt: { type: string, format: date-time, nullable: true }
+                            progress:
+                                type: object
+                                required: [current, target, unit]
+                                properties:
+                                    current: { type: integer, description: "Écrêté à `target` — une barre ne dépasse pas." }
+                                    target: { type: integer }
+                                    unit: { type: string, enum: [LEVELS, XP, SESSIONS, SECONDS] }
+
+                    UserProfile:
+                        type: object
+                        required: [id, email, displayName, timezone, registeredAt, title, nextTitle]
+                        properties:
+                            id: { type: string, format: uuid }
+                            email: { type: string, format: email }
+                            displayName: { type: string }
+                            timezone:
+                                type: string
+                                description: "Identifiant IANA. **Le streak et le plafond quotidien se calculent dedans** : c'est un attribut de profil, jamais une déduction."
+                                example: Europe/Paris
+                            registeredAt: { type: string, format: date-time }
+                            title:
+                                description: "Le titre porté, ou `null` si le joueur n'en a débloqué aucun ou n'en affiche aucun."
+                                nullable: true
+                                allOf: [{ $ref: '#/components/schemas/PlayerTitle' }]
+                            nextTitle:
+                                description: "Le plus proche d'aboutir parmi ceux qui restent. `null` quand il les a tous."
+                                nullable: true
+                                allOf: [{ $ref: '#/components/schemas/PlayerTitle' }]
+
+                    TokenPair:
+                        type: object
+                        description: |
+                            Deux jetons de nature différente. Le JWT porte l'identité et ne se révoque pas —
+                            d'où sa courte durée. Le refresh token est **à usage unique et rotatif**, groupé par
+                            famille : une famille est un appareil connecté, s'en déconnecter la révoque
+                            entièrement. Rejouer un jeton déjà consommé révoque toute la famille.
+                        required: [accessToken, tokenType, expiresIn, refreshToken, refreshTokenExpiresAt]
+                        properties:
+                            accessToken: { type: string }
+                            tokenType: { type: string, enum: [Bearer] }
+                            expiresIn: { type: integer, description: "Secondes de validité du JWT.", example: 900 }
+                            refreshToken: { type: string }
+                            refreshTokenExpiresAt: { type: string, format: date-time }
+
+                    AuthSession:
+                        type: object
+                        description: "Ce que rendent l'inscription, la connexion et le rafraîchissement — le profil et la paire de jetons, en une réponse."
+                        required: [user, tokens]
+                        properties:
+                            user: { $ref: '#/components/schemas/UserProfile' }
+                            tokens: { $ref: '#/components/schemas/TokenPair' }
+
+                    # ————— Entraînement ————————————————————————————————————————————————
+                    TrainingSession:
+                        type: object
+                        description: |
+                            Une séance, ouverte ou close — **une seule forme**, jamais deux. `endedAt` et
+                            `durationSeconds` valent `null` tant qu'elle court, plutôt que de disparaître : un
+                            champ qui apparaît et disparaît finit lu de travers.
+
+                            `durationSeconds` est la durée **retenue**, déjà écrêtée au plafond. Ce n'est pas
+                            `endedAt - startedAt` sur une séance trop longue, et c'est elle qui fait foi.
+                        required: [id, discipline, status, source, trust, startedAt, endedAt, durationSeconds]
+                        properties:
+                            id: { type: string, format: uuid }
+                            discipline: { type: string, enum: [RUNNING, CYCLING, SWIMMING, STRENGTH, MOBILITY, CLIMBING] }
+                            status: { type: string, enum: [ACTIVE, COMPLETED, ABANDONED] }
+                            source:
+                                type: string
+                                enum: [MANUAL_TIMER, STRAVA, HEALTHKIT]
+                                description: "Toute activité est une source attribuée. `MANUAL_TIMER` en v1 ; les autres arrivent sans changer ce contrat."
+                            trust: { type: string, enum: [DECLARED, PROVIDER_VERIFIED] }
+                            startedAt: { type: string, format: date-time }
+                            endedAt: { type: string, format: date-time, nullable: true }
+                            durationSeconds: { type: integer, nullable: true }
+
+                    SessionPage:
+                        type: object
+                        description: "Pagination par curseur, sur l'identifiant — UUID v7, donc triable, donc chronologique. `nextCursor` à `null` signifie la fin."
+                        required: [sessions, nextCursor]
+                        properties:
+                            sessions:
+                                type: array
+                                items: { $ref: '#/components/schemas/TrainingSession' }
+                            nextCursor: { type: string, format: uuid, nullable: true }
+
+                    # ————— Progression —————————————————————————————————————————————————
+                    XpLine:
+                        type: object
+                        description: |
+                            Une contribution au total, entier signé. Un multiplicateur se résout en points
+                            **avant** d'arriver ici : ce qui est écrit est ce que le joueur a reçu, pas la
+                            formule. Les deux dernières sources sont des garde-fous, négatives au crédit.
+                        required: [source, amount]
+                        properties:
+                            source: { type: string, enum: [BASE, STREAK, ITEM, SKILL, LEAGUE, DIMINISHING, DAILY_CAP] }
+                            amount: { type: integer, example: -55 }
+
+                    RewardSummary:
+                        type: object
+                        description: |
+                            **Le contrat le plus coûteux à casser du produit.** Ce que le joueur reçoit quand il
+                            appuie sur « terminer ».
+
+                            **L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en
+                            bas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau
+                            bascule, le titre tombe, puis le loot et la série. Un champ déplacé change la mise
+                            en scène.
+
+                            **Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de
+                            jouer l'animation — d'où le niveau donné avant *et* après, et les titres déjà
+                            traduits.
+
+                            `loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5
+                            et 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la
+                            rendre optionnelle pour toujours.
+                        required: [session, xp, level, titlesUnlocked, loot, streak, unlockableNodes, rulesetVersion]
+                        properties:
+                            session: { $ref: '#/components/schemas/TrainingSession' }
+                            xp:
+                                type: object
+                                required: [awarded, breakdown]
+                                properties:
+                                    awarded: { type: integer, description: "La somme du `breakdown`, jamais autre chose.", example: 145 }
+                                    breakdown:
+                                        type: array
+                                        description: "Dans l'ordre d'affichage. Le client ne le trie pas, il le joue."
+                                        items: { $ref: '#/components/schemas/XpLine' }
+                            level:
+                                type: object
+                                required: [before, after, reached, totalXp, xpIntoLevel, xpToNextLevel, skillPointsGranted]
+                                properties:
+                                    before: { type: integer, example: 1 }
+                                    after: { type: integer, example: 2 }
+                                    reached:
+                                        type: array
+                                        description: "Les niveaux franchis, dans l'ordre. En gagner plusieurs d'un coup est un cas normal — le client les anime tous. Vide quand rien ne bouge."
+                                        items: { type: integer }
+                                    totalXp: { type: integer }
+                                    xpIntoLevel: { type: integer }
+                                    xpToNextLevel:
+                                        type: integer
+                                        nullable: true
+                                        description: Ce qu'il **reste** à gagner. `null` signifie le niveau maximum ; zéro voudrait dire « atteint ».
+                                    skillPointsGranted: { type: integer }
+                            titlesUnlocked:
+                                type: array
+                                description: "Vide le plus souvent — un titre est un événement rare, c'est ce qui en fait un."
+                                items: { $ref: '#/components/schemas/PlayerTitle' }
+                            loot: { type: array, description: 'Lot 6 : toujours vide aujourd''hui.', items: { type: object } }
+                            streak: { type: object, nullable: true, description: 'Lot 5 : toujours `null` aujourd''hui.' }
+                            unlockableNodes: { type: array, description: 'Lot 7 : toujours vide aujourd''hui.', items: { type: object } }
+                            rulesetVersion:
+                                type: string
+                                description: "L'équilibrage sous lequel ces montants ont été accordés. Le client n'en fait rien ; un rapport de bug, si."
+
+                    Progression:
+                        type: object
+                        description: "L'état du joueur — l'écran d'accueil de l'app en une requête, servi du seul snapshot."
+                        required: [level, totalXp, xpIntoLevel, xpToNextLevel, skillPoints, activeTitle, unlockedTitles, rulesetVersion, lastProgressionAt]
+                        properties:
+                            level: { type: integer }
+                            totalXp: { type: integer }
+                            xpIntoLevel: { type: integer }
+                            xpToNextLevel: { type: integer, nullable: true, description: '`null` au niveau maximum.' }
+                            skillPoints:
+                                type: object
+                                description: |
+                                    Deux nombres, alors qu'ils valent la même chose aujourd'hui. `earned` est un
+                                    cumul de carrière qui ne redescend pas, `available` un solde que les arbres
+                                    feront baisser. Les fondre obligerait à renommer — donc à casser le client —
+                                    au premier point dépensé.
+                                required: [earned, available]
+                                properties:
+                                    earned: { type: integer }
+                                    available: { type: integer }
+                            activeTitle:
+                                nullable: true
+                                allOf: [{ $ref: '#/components/schemas/PlayerTitle' }]
+                            unlockedTitles:
+                                type: array
+                                items: { $ref: '#/components/schemas/PlayerTitle' }
+                            rulesetVersion: { type: string }
+                            lastProgressionAt: { type: string, format: date-time, nullable: true, description: '`null` pour un joueur qui n''a encore rien fait.' }
+
+                    TitleBoard:
+                        type: object
+                        description: |
+                            Le catalogue **entier**, traduit et situé. Pas seulement l'acquis : un mur qui ne
+                            montrerait que l'atteint ne donnerait rien à viser.
+                        required: [activeTitleId, titles]
+                        properties:
+                            activeTitleId:
+                                type: string
+                                nullable: true
+                                description: "Redondant avec le tableau — il évite de le parcourir pour savoir quoi cocher, et dit `null` sans ambiguïté."
+                            titles:
+                                type: array
+                                items: { $ref: '#/components/schemas/PlayerTitle' }
+
+                    XpTransaction:
+                        type: object
+                        description: |
+                            Une écriture au ledger. **Le ledger est la vérité** ; le niveau et le total en sont
+                            des projections. Rien ne s'efface : une séance invalidée produit une écriture
+                            négative, et les deux restent.
+                        required: [id, sourceId, reason, discipline, amount, durationSeconds, breakdown, rulesetVersion, createdAt]
+                        properties:
+                            id: { type: string, format: uuid }
+                            sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant de la séance en v1." }
+                            reason: { type: string, enum: [SESSION_COMPLETED, SESSION_INVALIDATED] }
+                            discipline: { type: string, enum: [RUNNING, CYCLING, SWIMMING, STRENGTH, MOBILITY, CLIMBING] }
+                            amount: { type: integer, description: "Signé. La somme du `breakdown`, jamais autre chose." }
+                            durationSeconds: { type: integer, description: "Signée elle aussi — négative sur une annulation." }
+                            breakdown:
+                                type: array
+                                items: { $ref: '#/components/schemas/XpLine' }
+                            rulesetVersion: { type: string, description: "Celui du calcul, pas celui d'aujourd'hui. C'est ce qui permet de rééquilibrer sans corrompre l'historique." }
+                            createdAt: { type: string, format: date-time }
+
+                    XpHistoryPage:
+                        type: object
+                        required: [transactions, nextCursor]
+                        properties:
+                            transactions:
+                                type: array
+                                items: { $ref: '#/components/schemas/XpTransaction' }
+                            nextCursor: { type: string, format: uuid, nullable: true }
+
+            # Par défaut tout est authentifié : c'est l'état d'`^/api`, et l'oubli
+            # dangereux est dans l'autre sens. Les routes publiques le disent une par une.
+            security:
+                - bearerAuth: []

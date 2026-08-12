@@ -10,6 +10,8 @@ use App\Identity\Domain\SocialProvider;
 use App\Identity\UI\Http\Request\SocialSignInRequest;
 use App\Identity\UI\Http\Response\AuthResource;
 use App\Shared\Application\PlayerTitles;
+use Nelmio\ApiDocBundle\Attribute\Security;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -35,6 +37,30 @@ final readonly class SocialSignInController
         requirements: ['provider' => 'google|apple'],
         methods: ['POST'],
     )]
+    #[OA\Tag(name: 'Authentification')]
+    #[Security(name: null)]
+    #[OA\Response(
+        response: 200,
+        description: 'Compte rattaché ou créé. Un compte né ici n\'a pas de mot de passe et ne peut pas passer par `/api/auth/login`.',
+        content: new OA\JsonContent(ref: '#/components/schemas/AuthSession'),
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Le fournisseur a refusé le code (`social-sign-in-rejected`).',
+        content: new OA\MediaType(
+            mediaType: 'application/problem+json',
+            schema: new OA\Schema(ref: '#/components/schemas/ProblemDetails'),
+        ),
+    )]
+    #[OA\Response(
+        response: 409,
+        description: 'L\'adresse appartient à un compte existant que le fournisseur ne certifie pas (`email-belongs-to-another-account`) — sans certification, rattacher serait une prise de contrôle en une requête. Ou profil incomplet (`social-profile-incomplete`).',
+        content: new OA\MediaType(
+            mediaType: 'application/problem+json',
+            schema: new OA\Schema(ref: '#/components/schemas/ProblemDetails'),
+        ),
+    )]
+    #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
     public function __invoke(SocialProvider $provider, #[MapRequestPayload] SocialSignInRequest $request): JsonResponse
     {
         $authenticated = ($this->signIn)(new SignInWithProvider(

@@ -6,6 +6,7 @@ namespace App\Training\UI\Http;
 
 use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
 use App\Training\UI\Http\Response\TrainingSessionResource;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -29,6 +30,14 @@ final readonly class ActiveSessionController
     }
 
     #[Route('/api/training/sessions/active', name: 'training_session_active', methods: ['GET'])]
+    #[OA\Tag(name: 'Entraînement')]
+    #[OA\Response(
+        response: 200,
+        description: 'La séance en cours.',
+        content: new OA\JsonContent(ref: '#/components/schemas/TrainingSession'),
+    )]
+    #[OA\Response(response: 204, description: 'Aucune séance en cours — l\'état normal du joueur, pas une erreur.')]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     public function __invoke(
         #[CurrentUser]
         UserInterface $user,

@@ -10,6 +10,7 @@ use App\Progression\Application\TitleBoardProvider;
 use App\Progression\Infrastructure\Translation\TitleTranslator;
 use App\Progression\UI\Http\Request\SelectTitleRequest;
 use App\Progression\UI\Http\Response\TitleBoardResource;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -37,12 +38,35 @@ final readonly class TitlesController
     }
 
     #[Route('/api/titles', name: 'progression_titles', methods: ['GET'])]
+    #[OA\Tag(name: 'Progression')]
+    #[OA\Response(
+        response: 200,
+        description: 'Le catalogue entier, situé pour ce joueur.',
+        content: new OA\JsonContent(ref: '#/components/schemas/TitleBoard'),
+    )]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     public function index(#[CurrentUser] UserInterface $user): JsonResponse
     {
         return $this->board($user);
     }
 
     #[Route('/api/titles/active', name: 'progression_titles_select', methods: ['PUT'])]
+    #[OA\Tag(name: 'Progression')]
+    #[OA\Response(
+        response: 200,
+        description: 'Le mur des titres, avec le nouveau titre porté. `titleId` à `null` n\'en affiche aucun.',
+        content: new OA\JsonContent(ref: '#/components/schemas/TitleBoard'),
+    )]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(
+        response: 409,
+        description: 'Titre inconnu du catalogue (`title-unknown`) ou non débloqué par ce joueur (`title-not-unlocked`).',
+        content: new OA\MediaType(
+            mediaType: 'application/problem+json',
+            schema: new OA\Schema(ref: '#/components/schemas/ProblemDetails'),
+        ),
+    )]
+    #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
     public function select(
         #[CurrentUser]
         UserInterface $user,

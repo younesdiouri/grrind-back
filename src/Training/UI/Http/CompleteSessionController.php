@@ -8,6 +8,7 @@ use App\Shared\UI\Http\Idempotent;
 use App\Training\Application\CompleteSession;
 use App\Training\Application\CompleteSessionHandler;
 use App\Training\UI\Http\Response\RewardSummaryResource;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -32,6 +33,25 @@ final readonly class CompleteSessionController
 
     #[Route('/api/training/sessions/{id}/complete', name: 'training_session_complete', methods: ['POST'])]
     #[Idempotent]
+    #[OA\Tag(name: 'Entraînement')]
+    #[OA\Parameter(ref: '#/components/parameters/IdempotencyKey')]
+    #[OA\RequestBody(required: false, description: 'Aucun corps attendu. Le serveur ne lit ni durée ni date de fin : il lit son horloge.')]
+    #[OA\Response(
+        response: 200,
+        description: 'La séance est close et créditée. Le corps est le `RewardSummary`, à jouer de haut en bas.',
+        content: new OA\JsonContent(ref: '#/components/schemas/RewardSummary'),
+    )]
+    #[OA\Response(response: 400, ref: '#/components/responses/BadRequest')]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(
+        response: 409,
+        description: 'Séance déjà close (`session-not-active`), sous la durée plancher (`session-too-short`), ou clé d\'idempotence en cours (`idempotency-key-in-flight`).',
+        content: new OA\MediaType(
+            mediaType: 'application/problem+json',
+            schema: new OA\Schema(ref: '#/components/schemas/ProblemDetails'),
+        ),
+    )]
     public function __invoke(
         #[CurrentUser]
         UserInterface $user,

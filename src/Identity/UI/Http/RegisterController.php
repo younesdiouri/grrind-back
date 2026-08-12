@@ -11,6 +11,8 @@ use App\Identity\Application\RegisterUserHandler;
 use App\Identity\UI\Http\Request\RegisterRequest;
 use App\Identity\UI\Http\Response\AuthResource;
 use App\Shared\Application\PlayerTitles;
+use Nelmio\ApiDocBundle\Attribute\Security;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -26,6 +28,22 @@ final readonly class RegisterController
     }
 
     #[Route('/api/auth/register', name: 'identity_register', methods: ['POST'])]
+    #[OA\Tag(name: 'Authentification')]
+    #[Security(name: null)]
+    #[OA\Response(
+        response: 201,
+        description: 'Le compte est ouvert **et la session aussi** : forcer un login juste après ajouterait un aller-retour sur l\'étape la plus fragile du tunnel.',
+        content: new OA\JsonContent(ref: '#/components/schemas/AuthSession'),
+    )]
+    #[OA\Response(
+        response: 409,
+        description: 'Adresse déjà prise (`email-already-used`).',
+        content: new OA\MediaType(
+            mediaType: 'application/problem+json',
+            schema: new OA\Schema(ref: '#/components/schemas/ProblemDetails'),
+        ),
+    )]
+    #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
     public function __invoke(#[MapRequestPayload] RegisterRequest $request): JsonResponse
     {
         $user = ($this->register)(new RegisterUser(

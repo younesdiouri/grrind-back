@@ -1,0 +1,1145 @@
+openapi: 3.0.0
+info:
+  title: GRRIND
+  description: "L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.\n\n**Le serveur possède l'horloge.** Aucune route n'accepte une date ni une durée envoyée par le\nclient : une séance s'ouvre, puis se ferme, et le serveur date les deux. Antidater est\nimpossible par construction, pas par contrôle.\n\n**Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un\nen-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse\nd'origine sans rien réexécuter.\n\n**Les erreurs sont en `application/problem+json`** (RFC 9457). Le membre `type` est un\nidentifiant stable sur lequel un client peut brancher un comportement ; le `detail` est du\ntexte, il peut changer.\n"
+  version: 1.0.0
+paths:
+  /api/auth/login:
+    post:
+      tags:
+        - Authentification
+      operationId: post_identity_login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+              type: object
+      responses:
+        '200':
+          description: 'Identifiants acceptés.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '401':
+          description: "Identifiants refusés. La réponse ne distingue pas une adresse inconnue d'un mot de passe faux, et le temps de réponse non plus (#39)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+      security: []
+  /api/auth/logout:
+    post:
+      tags:
+        - Authentification
+      summary: "Le jeton d'accès n'est pas requis : la preuve de possession du refresh token\nsuffit, et c'est justement quand le JWT vient d'expirer qu'on veut pouvoir\nse déconnecter proprement."
+      operationId: post_identity_logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '204':
+          description: "La famille entière est révoquée — c'est l'appareil qui se déconnecte, pas seulement ce jeton. Rien à rendre."
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security: []
+  /api/me:
+    get:
+      tags:
+        - Profil
+      operationId: get_identity_me
+      responses:
+        '200':
+          description: "Le profil, titre porté et titre visé compris : l'état du joueur en une requête à l'ouverture de l'app."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags:
+        - Profil
+      operationId: patch_identity_me_update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: 'Le profil mis à jour. Les champs absents ne sont pas touchés.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /api/auth/refresh:
+    post:
+      tags:
+        - Authentification
+      operationId: post_identity_refresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: 'Une paire neuve. **Le jeton présenté est consommé** : il est à usage unique et rotatif.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '401':
+          description: 'Jeton inconnu, expiré, **ou déjà consommé** (`invalid-refresh-token`). Un rejeu révoque toute la famille : on ne peut pas distinguer le voleur du vrai client qui a été doublé, donc on coupe.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security: []
+  /api/auth/register:
+    post:
+      tags:
+        - Authentification
+      operationId: post_identity_register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: "Le compte est ouvert **et la session aussi** : forcer un login juste après ajouterait un aller-retour sur l'étape la plus fragile du tunnel."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '409':
+          description: 'Adresse déjà prise (`email-already-used`).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security: []
+  '/api/auth/social/{provider}':
+    post:
+      tags:
+        - Authentification
+      operationId: post_identity_social_sign_in
+      parameters:
+        -
+          name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: google|apple
+            enum:
+              - google
+              - apple
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SocialSignInRequest'
+      responses:
+        '200':
+          description: "Compte rattaché ou créé. Un compte né ici n'a pas de mot de passe et ne peut pas passer par `/api/auth/login`."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '401':
+          description: 'Le fournisseur a refusé le code (`social-sign-in-rejected`).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: "L'adresse appartient à un compte existant que le fournisseur ne certifie pas (`email-belongs-to-another-account`) — sans certification, rattacher serait une prise de contrôle en une requête. Ou profil incomplet (`social-profile-incomplete`)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security: []
+  /api/progression:
+    get:
+      tags:
+        - Progression
+      operationId: get_progression_state
+      responses:
+        '200':
+          description: "L'état du joueur, servi du seul snapshot — aucune relecture du ledger."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Progression'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/progression/history:
+    get:
+      tags:
+        - Progression
+      summary: "L'argument `#[MapQueryString]` n'est ni nullable ni pourvu d'un défaut, et c'est\nvoulu : le résolveur ne construit le DTO sur une query string vide que dans ce\ncas-là. Nullable, il faudrait un `?? new XpHistoryQuery()` à la main."
+      operationId: get_progression_history
+      parameters:
+        -
+          name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+            nullable: true
+            default: null
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+            minimum: 1
+      responses:
+        '200':
+          description: "Une page du ledger, la plus récente d'abord. C'est la vérité dont le niveau est une projection."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/XpHistoryPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /api/titles:
+    get:
+      tags:
+        - Progression
+      operationId: get_progression_titles
+      responses:
+        '200':
+          description: 'Le catalogue entier, situé pour ce joueur.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TitleBoard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/titles/active:
+    put:
+      tags:
+        - Progression
+      operationId: put_progression_titles_select
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelectTitleRequest'
+      responses:
+        '200':
+          description: "Le mur des titres, avec le nouveau titre porté. `titleId` à `null` n'en affiche aucun."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TitleBoard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: 'Titre inconnu du catalogue (`title-unknown`) ou non débloqué par ce joueur (`title-not-unlocked`).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  '/api/training/sessions/{id}/abandon':
+    post:
+      tags:
+        - Entraînement
+      operationId: post_training_session_abandon
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Aucun corps attendu.'
+        required: false
+      responses:
+        '200':
+          description: "La séance est close et ne rapporte rien. Elle reste dans l'historique."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/training/sessions/active:
+    get:
+      tags:
+        - Entraînement
+      operationId: get_training_session_active
+      responses:
+        '200':
+          description: 'La séance en cours.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingSession'
+        '204':
+          description: "Aucune séance en cours — l'état normal du joueur, pas une erreur."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  '/api/training/sessions/{id}/complete':
+    post:
+      tags:
+        - Entraînement
+      operationId: post_training_session_complete
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Aucun corps attendu. Le serveur ne lit ni durée ni date de fin : il lit son horloge.'
+        required: false
+      responses:
+        '200':
+          description: 'La séance est close et créditée. Le corps est le `RewardSummary`, à jouer de haut en bas.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RewardSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: "Séance déjà close (`session-not-active`), sous la durée plancher (`session-too-short`), ou clé d'idempotence en cours (`idempotency-key-in-flight`)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /api/training/sessions:
+    get:
+      tags:
+        - Entraînement
+      operationId: get_training_session_list
+      parameters:
+        -
+          name: status
+          in: query
+          required: false
+          schema:
+            nullable: true
+            oneOf:
+              -
+                $ref: '#/components/schemas/SessionStatus'
+            default: null
+        -
+          name: discipline
+          in: query
+          required: false
+          schema:
+            nullable: true
+            oneOf:
+              -
+                $ref: '#/components/schemas/Discipline'
+            default: null
+        -
+          name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+            default: null
+        -
+          name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+            default: null
+        -
+          name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+            nullable: true
+            default: null
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+            minimum: 1
+      responses:
+        '200':
+          description: "Une page d'historique, du plus récent au plus ancien."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    post:
+      tags:
+        - Entraînement
+      operationId: post_training_session_start
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartSessionRequest'
+      responses:
+        '201':
+          description: 'La séance est ouverte, datée par le serveur.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: 'Une séance tourne déjà (`session-already-active`, avec `activeSessionId`), ou le cooldown court encore (`session-cooldown`, avec `remainingSeconds` et `readyAt`).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+components:
+  schemas:
+    ProblemDetails:
+      description: "Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et\n`detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une\nséance déjà active donne `activeSessionId`, un cooldown donne `remainingSeconds`\net `readyAt` — pour que le client se recale au lieu d'afficher un refus sec.\n"
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+          format: uri
+          enum:
+            - 'https://grrind.app/problems/validation-failed'
+            - 'https://grrind.app/problems/internal-error'
+            - 'https://grrind.app/problems/idempotency-key-required'
+            - 'https://grrind.app/problems/idempotency-key-in-flight'
+            - 'https://grrind.app/problems/idempotency-key-reused'
+            - 'https://grrind.app/problems/email-already-used'
+            - 'https://grrind.app/problems/email-belongs-to-another-account'
+            - 'https://grrind.app/problems/invalid-refresh-token'
+            - 'https://grrind.app/problems/social-sign-in-rejected'
+            - 'https://grrind.app/problems/social-profile-incomplete'
+            - 'https://grrind.app/problems/session-not-found'
+            - 'https://grrind.app/problems/session-not-active'
+            - 'https://grrind.app/problems/session-already-active'
+            - 'https://grrind.app/problems/session-too-short'
+            - 'https://grrind.app/problems/session-cooldown'
+            - 'https://grrind.app/problems/title-unknown'
+            - 'https://grrind.app/problems/title-not-unlocked'
+        title:
+          type: string
+          example: Conflict
+        status:
+          type: integer
+          example: 409
+        detail:
+          type: string
+      type: object
+      additionalProperties: true
+    ValidationProblem:
+      description: 'Le corps est bien formé mais son contenu est refusé. Chaque violation nomme son champ.'
+      allOf:
+        -
+          $ref: '#/components/schemas/ProblemDetails'
+        -
+          properties:
+            violations:
+              type: array
+              items:
+                required:
+                  - field
+                  - message
+                properties:
+                  field: { type: string, example: email }
+                  message: { type: string }
+                type: object
+          type: object
+    PlayerTitle:
+      description: "**La seule forme d'un titre dans toute l'API** — débloqué comme verrouillé, dans le\nprofil, sur le mur des titres et dans une récompense. Un seul type à décoder, un\nseul composant à dessiner.\n\n`unlockedAt` à `null` est ce qui distingue les deux états. `progress` est toujours\nrenseignée : sur un titre acquis, `current` vaut `target`.\n"
+      required:
+        - id
+        - name
+        - hint
+        - unlocked
+        - unlockedAt
+        - progress
+      properties:
+        id:
+          type: string
+          example: first_steps
+        name:
+          description: 'Déjà traduit, dans la langue négociée sur `Accept-Language`.'
+          type: string
+          example: 'First Steps'
+        hint:
+          description: "Ce qu'il reste à faire, rédigé."
+          type: string
+          example: 'Complete your first session'
+        unlocked:
+          type: boolean
+        unlockedAt:
+          type: string
+          format: date-time
+          nullable: true
+        progress:
+          required:
+            - current
+            - target
+            - unit
+          properties:
+            current:
+              description: 'Écrêté à `target` — une barre ne dépasse pas.'
+              type: integer
+            target:
+              type: integer
+            unit:
+              type: string
+              enum:
+                - LEVELS
+                - XP
+                - SESSIONS
+                - SECONDS
+          type: object
+      type: object
+    UserProfile:
+      required:
+        - id
+        - email
+        - displayName
+        - timezone
+        - registeredAt
+        - title
+        - nextTitle
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        timezone:
+          description: "Identifiant IANA. **Le streak et le plafond quotidien se calculent dedans** : c'est un attribut de profil, jamais une déduction."
+          type: string
+          example: Europe/Paris
+        registeredAt:
+          type: string
+          format: date-time
+        title:
+          description: "Le titre porté, ou `null` si le joueur n'en a débloqué aucun ou n'en affiche aucun."
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/PlayerTitle'
+        nextTitle:
+          description: "Le plus proche d'aboutir parmi ceux qui restent. `null` quand il les a tous."
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/PlayerTitle'
+      type: object
+    TokenPair:
+      description: "Deux jetons de nature différente. Le JWT porte l'identité et ne se révoque pas —\nd'où sa courte durée. Le refresh token est **à usage unique et rotatif**, groupé par\nfamille : une famille est un appareil connecté, s'en déconnecter la révoque\nentièrement. Rejouer un jeton déjà consommé révoque toute la famille.\n"
+      required:
+        - accessToken
+        - tokenType
+        - expiresIn
+        - refreshToken
+        - refreshTokenExpiresAt
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum:
+            - Bearer
+        expiresIn:
+          description: 'Secondes de validité du JWT.'
+          type: integer
+          example: 900
+        refreshToken:
+          type: string
+        refreshTokenExpiresAt:
+          type: string
+          format: date-time
+      type: object
+    AuthSession:
+      description: "Ce que rendent l'inscription, la connexion et le rafraîchissement — le profil et la paire de jetons, en une réponse."
+      required:
+        - user
+        - tokens
+      properties:
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        tokens:
+          $ref: '#/components/schemas/TokenPair'
+      type: object
+    TrainingSession:
+      description: "Une séance, ouverte ou close — **une seule forme**, jamais deux. `endedAt` et\n`durationSeconds` valent `null` tant qu'elle court, plutôt que de disparaître : un\nchamp qui apparaît et disparaît finit lu de travers.\n\n`durationSeconds` est la durée **retenue**, déjà écrêtée au plafond. Ce n'est pas\n`endedAt - startedAt` sur une séance trop longue, et c'est elle qui fait foi.\n"
+      required:
+        - id
+        - discipline
+        - status
+        - source
+        - trust
+        - startedAt
+        - endedAt
+        - durationSeconds
+      properties:
+        id:
+          type: string
+          format: uuid
+        discipline:
+          type: string
+          enum:
+            - RUNNING
+            - CYCLING
+            - SWIMMING
+            - STRENGTH
+            - MOBILITY
+            - CLIMBING
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - COMPLETED
+            - ABANDONED
+        source:
+          description: 'Toute activité est une source attribuée. `MANUAL_TIMER` en v1 ; les autres arrivent sans changer ce contrat.'
+          type: string
+          enum:
+            - MANUAL_TIMER
+            - STRAVA
+            - HEALTHKIT
+        trust:
+          type: string
+          enum:
+            - DECLARED
+            - PROVIDER_VERIFIED
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        durationSeconds:
+          type: integer
+          nullable: true
+      type: object
+    SessionPage:
+      description: "Pagination par curseur, sur l'identifiant — UUID v7, donc triable, donc chronologique. `nextCursor` à `null` signifie la fin."
+      required:
+        - sessions
+        - nextCursor
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrainingSession'
+        nextCursor:
+          type: string
+          format: uuid
+          nullable: true
+      type: object
+    XpLine:
+      description: "Une contribution au total, entier signé. Un multiplicateur se résout en points\n**avant** d'arriver ici : ce qui est écrit est ce que le joueur a reçu, pas la\nformule. Les deux dernières sources sont des garde-fous, négatives au crédit.\n"
+      required:
+        - source
+        - amount
+      properties:
+        source:
+          type: string
+          enum:
+            - BASE
+            - STREAK
+            - ITEM
+            - SKILL
+            - LEAGUE
+            - DIMINISHING
+            - DAILY_CAP
+        amount:
+          type: integer
+          example: -55
+      type: object
+    RewardSummary:
+      description: "**Le contrat le plus coûteux à casser du produit.** Ce que le joueur reçoit quand il\nappuie sur « terminer ».\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau\nbascule, le titre tombe, puis le loot et la série. Un champ déplacé change la mise\nen scène.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le niveau donné avant *et* après, et les titres déjà\ntraduits.\n\n`loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5\net 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
+      required:
+        - session
+        - xp
+        - level
+        - titlesUnlocked
+        - loot
+        - streak
+        - unlockableNodes
+        - rulesetVersion
+      properties:
+        session:
+          $ref: '#/components/schemas/TrainingSession'
+        xp:
+          required:
+            - awarded
+            - breakdown
+          properties:
+            awarded:
+              description: 'La somme du `breakdown`, jamais autre chose.'
+              type: integer
+              example: 145
+            breakdown:
+              description: "Dans l'ordre d'affichage. Le client ne le trie pas, il le joue."
+              type: array
+              items:
+                $ref: '#/components/schemas/XpLine'
+          type: object
+        level:
+          required:
+            - before
+            - after
+            - reached
+            - totalXp
+            - xpIntoLevel
+            - xpToNextLevel
+            - skillPointsGranted
+          properties:
+            before:
+              type: integer
+              example: 1
+            after:
+              type: integer
+              example: 2
+            reached:
+              description: "Les niveaux franchis, dans l'ordre. En gagner plusieurs d'un coup est un cas normal — le client les anime tous. Vide quand rien ne bouge."
+              type: array
+              items:
+                type: integer
+            totalXp:
+              type: integer
+            xpIntoLevel:
+              type: integer
+            xpToNextLevel:
+              description: "Ce qu'il **reste** à gagner. `null` signifie le niveau maximum ; zéro voudrait dire « atteint »."
+              type: integer
+              nullable: true
+            skillPointsGranted:
+              type: integer
+          type: object
+        titlesUnlocked:
+          description: "Vide le plus souvent — un titre est un événement rare, c'est ce qui en fait un."
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerTitle'
+        loot:
+          description: "Lot 6 : toujours vide aujourd'hui."
+          type: array
+          items:
+            type: object
+        streak:
+          description: "Lot 5 : toujours `null` aujourd'hui."
+          type: object
+          nullable: true
+        unlockableNodes:
+          description: "Lot 7 : toujours vide aujourd'hui."
+          type: array
+          items:
+            type: object
+        rulesetVersion:
+          description: "L'équilibrage sous lequel ces montants ont été accordés. Le client n'en fait rien ; un rapport de bug, si."
+          type: string
+      type: object
+    Progression:
+      description: "L'état du joueur — l'écran d'accueil de l'app en une requête, servi du seul snapshot."
+      required:
+        - level
+        - totalXp
+        - xpIntoLevel
+        - xpToNextLevel
+        - skillPoints
+        - activeTitle
+        - unlockedTitles
+        - rulesetVersion
+        - lastProgressionAt
+      properties:
+        level:
+          type: integer
+        totalXp:
+          type: integer
+        xpIntoLevel:
+          type: integer
+        xpToNextLevel:
+          description: '`null` au niveau maximum.'
+          type: integer
+          nullable: true
+        skillPoints:
+          description: "Deux nombres, alors qu'ils valent la même chose aujourd'hui. `earned` est un\ncumul de carrière qui ne redescend pas, `available` un solde que les arbres\nferont baisser. Les fondre obligerait à renommer — donc à casser le client —\nau premier point dépensé.\n"
+          required:
+            - earned
+            - available
+          properties:
+            earned:
+              type: integer
+            available:
+              type: integer
+          type: object
+        activeTitle:
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/PlayerTitle'
+        unlockedTitles:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerTitle'
+        rulesetVersion:
+          type: string
+        lastProgressionAt:
+          description: "`null` pour un joueur qui n'a encore rien fait."
+          type: string
+          format: date-time
+          nullable: true
+      type: object
+    TitleBoard:
+      description: "Le catalogue **entier**, traduit et situé. Pas seulement l'acquis : un mur qui ne\nmontrerait que l'atteint ne donnerait rien à viser.\n"
+      required:
+        - activeTitleId
+        - titles
+      properties:
+        activeTitleId:
+          description: 'Redondant avec le tableau — il évite de le parcourir pour savoir quoi cocher, et dit `null` sans ambiguïté.'
+          type: string
+          nullable: true
+        titles:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerTitle'
+      type: object
+    XpTransaction:
+      description: "Une écriture au ledger. **Le ledger est la vérité** ; le niveau et le total en sont\ndes projections. Rien ne s'efface : une séance invalidée produit une écriture\nnégative, et les deux restent.\n"
+      required:
+        - id
+        - sourceId
+        - reason
+        - discipline
+        - amount
+        - durationSeconds
+        - breakdown
+        - rulesetVersion
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceId:
+          description: "Ce qui a produit l'écriture — l'identifiant de la séance en v1."
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum:
+            - SESSION_COMPLETED
+            - SESSION_INVALIDATED
+        discipline:
+          type: string
+          enum:
+            - RUNNING
+            - CYCLING
+            - SWIMMING
+            - STRENGTH
+            - MOBILITY
+            - CLIMBING
+        amount:
+          description: 'Signé. La somme du `breakdown`, jamais autre chose.'
+          type: integer
+        durationSeconds:
+          description: 'Signée elle aussi — négative sur une annulation.'
+          type: integer
+        breakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/XpLine'
+        rulesetVersion:
+          description: "Celui du calcul, pas celui d'aujourd'hui. C'est ce qui permet de rééquilibrer sans corrompre l'historique."
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      type: object
+    XpHistoryPage:
+      required:
+        - transactions
+        - nextCursor
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/XpTransaction'
+        nextCursor:
+          type: string
+          format: uuid
+          nullable: true
+      type: object
+    RefreshTokenRequest:
+      properties:
+        refreshToken:
+          type: string
+          default: ''
+      type: object
+    UpdateProfileRequest:
+      properties:
+        displayName:
+          type: string
+          nullable: true
+          default: null
+          maxLength: 40
+        timezone:
+          type: string
+          nullable: true
+          default: null
+      type: object
+    RegisterRequest:
+      properties:
+        email:
+          type: string
+          default: ''
+          maxLength: 180
+        password:
+          type: string
+          default: ''
+          maxLength: 4096
+          minLength: 12
+        displayName:
+          type: string
+          default: ''
+          maxLength: 40
+        timezone:
+          type: string
+          default: UTC
+      type: object
+    SocialSignInRequest:
+      properties:
+        code:
+          type: string
+          default: ''
+          maxLength: 2048
+        redirectUri:
+          type: string
+          default: ''
+          maxLength: 2048
+        codeVerifier:
+          type: string
+          nullable: true
+          default: null
+          maxLength: 128
+          minLength: 43
+        timezone:
+          type: string
+          default: UTC
+      type: object
+    XpHistoryQuery:
+      properties:
+        cursor:
+          type: string
+          format: uuid
+          nullable: true
+          default: null
+        limit:
+          type: integer
+          default: 20
+          maximum: 50
+          minimum: 1
+      type: object
+    SelectTitleRequest:
+      properties:
+        titleId:
+          type: string
+          nullable: true
+          default: null
+          maxLength: 64
+      type: object
+    SessionStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - COMPLETED
+        - ABANDONED
+    Discipline:
+      type: string
+      enum:
+        - RUNNING
+        - CYCLING
+        - SWIMMING
+        - STRENGTH
+        - MOBILITY
+        - CLIMBING
+    SessionHistoryQuery:
+      properties:
+        status:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/SessionStatus'
+          default: null
+        discipline:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/Discipline'
+          default: null
+        from:
+          type: string
+          format: date-time
+          nullable: true
+          default: null
+        to:
+          type: string
+          format: date-time
+          nullable: true
+          default: null
+        cursor:
+          type: string
+          format: uuid
+          nullable: true
+          default: null
+        limit:
+          type: integer
+          default: 20
+          maximum: 50
+          minimum: 1
+      type: object
+    StartSessionRequest:
+      required:
+        - discipline
+      properties:
+        discipline:
+          $ref: '#/components/schemas/Discipline'
+      type: object
+  responses:
+    BadRequest:
+      description: "Requête malformée — en-tête d'idempotence absent, corps illisible."
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Unauthorized:
+      description: 'Jeton absent, expiré ou invalide.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: "La ressource n'existe pas, **ou n'appartient pas à ce compte**. Les deux cas\nrendent la même réponse : répondre « interdit » confirmerait l'existence, et un\nidentifiant, ça s'essaie en boucle.\n"
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Conflict:
+      description: "L'état actuel refuse l'opération. Le `type` dit lequel, et les membres supplémentaires disent comment se recaler."
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    UnprocessableEntity:
+      description: 'Le corps est bien formé mais son contenu est refusé.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: "Une clé propre à cette tentative, stable au travers des rejeus du client.\nRejouer la même clé sur la même requête rend la réponse d'origine sans rien\nréexécuter, et l'en-tête `Idempotent-Replay: true` le signale. La même clé sur\nune requête différente est un abus et vaut un 409.\n"
+      required: true
+      schema:
+        type: string
+        maxLength: 255
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: "Le JWT rendu par `/api/auth/login`, `/api/auth/register` ou `/api/auth/refresh`.\nQuinze minutes de validité — il ne se révoque pas, c'est pour ça qu'il est court.\nPassé ce délai, on le renouvelle avec le refresh token.\n"
+      bearerFormat: JWT
+      scheme: bearer
+security:
+  -
+    bearerAuth: []
+tags:
+  -
+    name: Authentification
+  -
+    name: Profil
+  -
+    name: Progression
+  -
+    name: Entraînement
+

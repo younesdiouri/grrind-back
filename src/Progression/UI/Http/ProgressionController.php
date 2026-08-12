@@ -11,6 +11,7 @@ use App\Progression\Infrastructure\Translation\TitleTranslator;
 use App\Progression\UI\Http\Request\XpHistoryQuery;
 use App\Progression\UI\Http\Response\ProgressionResource;
 use App\Progression\UI\Http\Response\XpHistoryPageResource;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
 use Symfony\Component\Routing\Attribute\Route;
@@ -39,6 +40,13 @@ final readonly class ProgressionController
     }
 
     #[Route('/api/progression', name: 'progression_state', methods: ['GET'])]
+    #[OA\Tag(name: 'Progression')]
+    #[OA\Response(
+        response: 200,
+        description: 'L\'état du joueur, servi du seul snapshot — aucune relecture du ledger.',
+        content: new OA\JsonContent(ref: '#/components/schemas/Progression'),
+    )]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     public function show(#[CurrentUser] UserInterface $user): JsonResponse
     {
         $state = $this->states->of(Uuid::fromString($user->getUserIdentifier()));
@@ -52,6 +60,14 @@ final readonly class ProgressionController
      * cas-là. Nullable, il faudrait un `?? new XpHistoryQuery()` à la main.
      */
     #[Route('/api/progression/history', name: 'progression_history', methods: ['GET'])]
+    #[OA\Tag(name: 'Progression')]
+    #[OA\Response(
+        response: 200,
+        description: 'Une page du ledger, la plus récente d\'abord. C\'est la vérité dont le niveau est une projection.',
+        content: new OA\JsonContent(ref: '#/components/schemas/XpHistoryPage'),
+    )]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
     public function history(
         #[CurrentUser]
         UserInterface $user,

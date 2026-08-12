@@ -8,6 +8,7 @@ use App\Training\Application\ListSessions;
 use App\Training\Application\ListSessionsHandler;
 use App\Training\UI\Http\Request\SessionHistoryQuery;
 use App\Training\UI\Http\Response\SessionPageResource;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
 use Symfony\Component\Routing\Attribute\Route;
@@ -29,6 +30,14 @@ final readonly class ListSessionsController
     }
 
     #[Route('/api/training/sessions', name: 'training_session_list', methods: ['GET'])]
+    #[OA\Tag(name: 'Entraînement')]
+    #[OA\Response(
+        response: 200,
+        description: 'Une page d\'historique, du plus récent au plus ancien.',
+        content: new OA\JsonContent(ref: '#/components/schemas/SessionPage'),
+    )]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
     public function __invoke(
         #[CurrentUser]
         UserInterface $user,

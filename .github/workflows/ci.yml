@@ -41,6 +41,18 @@ jobs:
       - name: Tests
         run: make test
 
+      # Le contrat client est un fichier versionné : le dépôt front en génère son client
+      # TypeScript. Un openapi.yaml en retard d'une route, c'est une intégration qui casse
+      # côté front pour une raison qui vient d'ici.
+      #
+      # Régénérer puis comparer, plutôt que faire confiance : personne ne pense à lancer
+      # `make openapi` en ajoutant une route, et c'est précisément ce qu'il faut attraper.
+      - name: Contrat d'API à jour
+        run: |
+          make openapi
+          git diff --exit-code --stat openapi.yaml \
+            || { echo "::error::openapi.yaml a dérivé. Lance 'make openapi' et committe le résultat."; exit 1; }
+
       - name: Arrêt de la stack
         if: always()
         run: make down

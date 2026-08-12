@@ -45,6 +45,19 @@ chaîne du config-as-code. C'est le fichier à ouvrir en premier.
 Les invariants de conception (le serveur possède l'horloge, l'XP est un ledger append-only, un seul
 vocabulaire de modificateurs, RNG serveur auditable) sont détaillés dans [CLAUDE.md](CLAUDE.md).
 
+## Contrat d'API
+
+**[`openapi.yaml`](openapi.yaml) est la source de vérité du contrat client**, et il est versionné :
+le dépôt front en génère son client typé plutôt que d'écrire des DTO à la main.
+
+```bash
+make openapi       # régénère le fichier depuis les routes et les attributs
+```
+
+Il n'y a **pas de route de documentation** — le contrat est le fichier, pas un endpoint de plus sous
+`^/api`, et le bundle qui le produit n'est chargé qu'en dev. Deux garde-fous le tiennent : la CI
+régénère et refuse un fichier en retard, et `OpenApiContractTest` refuse une route non décrite.
+
 ## Déploiement
 
 Rien n'est déployé à ce jour ; la cible visée est ECS Fargate — un service pour l'API en mode
