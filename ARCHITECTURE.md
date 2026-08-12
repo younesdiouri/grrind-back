@@ -210,9 +210,7 @@ flowchart TB
 
 **Ce qui existe aujourd'hui**, c'est tout sauf la case en pointillés, et c'est branché sur
 la complétion de séance : `CompleteSessionHandler` ouvre la transaction, écrit la séance,
-puis appelle `GrantXpHandler` par le port `SessionRewards`. Reste
-[le ticket 22](https://github.com/younesdiouri/grrind-back/issues/22), qui en fera le
-`RewardSummary` — la transaction le calcule déjà, la réponse HTTP ne le rend pas encore.
+appelle `GrantXpHandler` par le port `SessionRewards`, et rend le `RewardSummary`.
 
 **Le port, et pourquoi il en faut un.** Deptrac interdit à `Training` d'importer
 `Progression`, et l'événement de domaine — l'autre chemin autorisé — se consomme *après*
@@ -235,6 +233,27 @@ flowchart LR
 **Le verrou est posé par l'implémentation, à l'intérieur de la transaction de `Training`.**
 Le `wrapInTransaction` de `GrantXpHandler` n'en rouvre pas une seconde : DBAL en fait un
 point de sauvegarde, le verrou de ligne court jusqu'au COMMIT extérieur.
+
+**Ce qui sort du COMMIT : le `RewardSummary`.** C'est le contrat le plus coûteux à casser du
+produit, et **l'ordre de ses clés est l'ordre de l'animation** — le client le joue de haut
+en bas, il ne le réordonne pas. `loot`, `streak` et `unlockableNodes` sont présents et vides
+jusqu'aux Lots 6, 5 et 7 : une clé qui apparaîtrait plus tard obligerait un client déjà
+déployé à la rendre optionnelle pour toujours.
+
+```jsonc
+{
+  "session":     { /* la séance close, forme identique partout dans l'API */ },
+  "xp":          { "awarded": 145,
+                   "breakdown": [ { "source": "BASE",        "amount":  200 },
+                                  { "source": "DIMINISHING", "amount":  -55 } ] },
+  "level":       { "before": 1, "after": 2, "reached": [2],
+                   "totalXp": 145, "xpIntoLevel": 45, "xpToNextLevel": 115,
+                   "skillPointsGranted": 1 },
+  "titlesUnlocked": [ /* PlayerTitle, déjà traduit — rien à recharger */ ],
+  "loot": [], "streak": null, "unlockableNodes": [],
+  "rulesetVersion": "…"
+}
+```
 
 Pourquoi cet ordre, en trois phrases :
 

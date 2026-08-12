@@ -115,7 +115,10 @@ final class GuardRailsTest extends ApiTestCase
         $response = $this->completeSession($bob, $session);
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
-        self::assertSame('COMPLETED', self::decode($response)['status']);
+
+        $closed = self::decode($response)['session'];
+        self::assertIsArray($closed);
+        self::assertSame('COMPLETED', $closed['status']);
     }
 
     /**
@@ -147,7 +150,8 @@ final class GuardRailsTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 
-        $body = self::decode($response);
+        $body = self::decode($response)['session'];
+        self::assertIsArray($body);
         self::assertSame(self::MAXIMUM, $body['durationSeconds']);
 
         // La date de fin, elle, reste celle de l'horloge serveur : c'est la durée

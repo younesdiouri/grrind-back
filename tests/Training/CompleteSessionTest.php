@@ -35,7 +35,10 @@ final class CompleteSessionTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 
-        $body = self::decode($response);
+        // La séance close vit sous `session` : la réponse décrit désormais une
+        // *récompense*, dont la séance n'est que le premier temps. Voir #22.
+        $body = self::decode($response)['session'];
+        self::assertIsArray($body);
 
         self::assertSame($session, $body['id']);
         self::assertSame('COMPLETED', $body['status']);
@@ -69,7 +72,8 @@ final class CompleteSessionTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 
-        $body = self::decode($response);
+        $body = self::decode($response)['session'];
+        self::assertIsArray($body);
         self::assertEqualsWithDelta(self::ELAPSED, $body['durationSeconds'], 2);
         self::assertIsString($body['endedAt']);
         self::assertStringStartsNotWith('2030', $body['endedAt']);
