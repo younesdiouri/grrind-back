@@ -33,7 +33,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthSession'
         '401':
-          description: "Identifiants refusés. La réponse ne distingue pas une adresse inconnue d'un mot de passe faux, et le temps de réponse non plus (#39)."
+          description: "Identifiants refusés (`invalid-credentials`). La réponse ne distingue pas une adresse inconnue d'un mot de passe faux, et le temps de réponse non plus (#39) — c'est aussi ce que reçoit un compte né d'un social sign-in, qui n'a pas de mot de passe."
           content:
             application/problem+json:
               schema:
@@ -477,9 +477,14 @@ components:
         - detail
       properties:
         type:
+          description: "**L'énumération est exhaustive** : tout ce que le back sait émettre est ici,\npannes de transport comprises. C'est ce qui permet au client d'en faire un\n`switch` exhaustif et de laisser son compilateur réclamer un cas quand une\npanne s'ajoute — brancher un message sur le statut HTTP à la place ne\nmarcherait pas, un même statut couvrant des pannes qui n'appellent pas la\nmême phrase.\n\n`OpenApiContractTest` compare cette liste à ce que le code produit, dans les\ndeux sens : elle ne peut ni oublier une panne ni en garder une disparue.\n"
           type: string
           format: uri
           enum:
+            - 'https://grrind.app/problems/bad-request'
+            - 'https://grrind.app/problems/not-found'
+            - 'https://grrind.app/problems/method-not-allowed'
+            - 'https://grrind.app/problems/unsupported-media-type'
             - 'https://grrind.app/problems/validation-failed'
             - 'https://grrind.app/problems/internal-error'
             - 'https://grrind.app/problems/idempotency-key-required'
@@ -487,6 +492,10 @@ components:
             - 'https://grrind.app/problems/idempotency-key-reused'
             - 'https://grrind.app/problems/email-already-used'
             - 'https://grrind.app/problems/email-belongs-to-another-account'
+            - 'https://grrind.app/problems/invalid-credentials'
+            - 'https://grrind.app/problems/access-token-missing'
+            - 'https://grrind.app/problems/access-token-expired'
+            - 'https://grrind.app/problems/access-token-invalid'
             - 'https://grrind.app/problems/invalid-refresh-token'
             - 'https://grrind.app/problems/social-sign-in-rejected'
             - 'https://grrind.app/problems/social-profile-incomplete'
@@ -1103,7 +1112,7 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
     Unauthorized:
-      description: 'Jeton absent, expiré ou invalide.'
+      description: "Le jeton d'accès n'a pas fait son travail, et le `type` dit lequel des trois cas\nc'est — `access-token-missing`, `access-token-expired` ou `access-token-invalid`.\nLa distinction est le tout : **expiré** dit de rafraîchir et de rejouer la requête,\n**invalide** et **absent** disent de renvoyer le joueur sur l'écran de connexion.\n"
       content:
         application/problem+json:
           schema:

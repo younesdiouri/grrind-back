@@ -40,7 +40,7 @@ final readonly class LoginController
     )]
     #[OA\Response(
         response: 401,
-        description: 'Identifiants refusés. La réponse ne distingue pas une adresse inconnue d\'un mot de passe faux, et le temps de réponse non plus (#39).',
+        description: 'Identifiants refusés (`invalid-credentials`). La réponse ne distingue pas une adresse inconnue d\'un mot de passe faux, et le temps de réponse non plus (#39) — c\'est aussi ce que reçoit un compte né d\'un social sign-in, qui n\'a pas de mot de passe.',
         content: new OA\MediaType(
             mediaType: 'application/problem+json',
             schema: new OA\Schema(ref: '#/components/schemas/ProblemDetails'),

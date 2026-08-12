@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared;
 
+use App\Shared\UI\Http\ProblemDetails;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
@@ -30,6 +31,20 @@ final class OpenApiContractTest extends KernelTestCase
 {
     /** Ce qui appartient au contrat client. `/health` est une sonde d'infrastructure. */
     private const string DOCUMENTED_PREFIX = '/api';
+
+    /**
+     * Les statuts d'`HttpException` qu'une requête peut atteindre sous `^/api` : route ou
+     * ressource inconnue, mauvais verbe, corps illisible, mauvais `Content-Type`.
+     *
+     * **Ceux-là seuls sont écrits à la main**, parce qu'ils sont les seuls qu'aucune lecture du
+     * code ne peut trouver : leur `type` est *dérivé* du statut par `ProblemDetails::ofStatus()`
+     * au moment de la panne, il n'existe en clair nulle part. Le slug n'est pas recopié pour
+     * autant — c'est la vraie classe qui le fabrique. `ProblemDetailsTest` prouve que les quatre
+     * sortent bien de l'API ; sans lui cette liste serait une supposition.
+     *
+     * @var list<int>
+     */
+    private const array TRANSPORT_STATUSES = [400, 404, 405, 415];
 
     /** @var array<string, mixed> */
     private array $spec;
@@ -151,31 +166,29 @@ final class OpenApiContractTest extends KernelTestCase
     }
 
     /**
-     * Chaque `type` de problème que le domaine sait produire est dans l'énumération : c'est
-     * elle que le client branche, et un `type` absent le laisse sans recours.
+     * L'énumération est **exactement** ce que le code émet, ni plus ni moins. C'est elle que
+     * le client branche — un `switch` exhaustif dont le `default` n'accepte que `never` — donc
+     * les deux dérives coûtent : un `type` absent le laisse sans recours, un `type` fantôme lui
+     * fait écrire du code mort pour une panne qui n'arrive jamais.
+     *
+     * La comparaison remplace un `assertContains` qui ne regardait qu'un sens, et sur les seules
+     * exceptions : `invalid-credentials` et les trois `access-token-*` naissent dans un listener,
+     * pas dans une classe d'erreur, et sont passés dessous sans bruit jusqu'au ticket #81.
      */
-    public function testEveryProblemTypeIsEnumerated(): void
+    public function testTheEnumeratedProblemTypesAreExactlyTheOnesTheCodeEmits(): void
     {
-        $components = $this->spec['components'];
-        self::assertIsArray($components);
-        $schemas = $components['schemas'];
-        self::assertIsArray($schemas);
-        $problem = $schemas['ProblemDetails'];
-        self::assertIsArray($problem);
-        $properties = $problem['properties'];
-        self::assertIsArray($properties);
-        $type = $properties['type'];
-        self::assertIsArray($type);
-        $enumerated = $type['enum'];
-        self::assertIsArray($enumerated);
+        $emitted = $this->emittedProblemTypes();
+        $enumerated = $this->enumeratedProblemTypes();
 
-        foreach ($this->problemTypes() as $slug) {
-            self::assertContains(
-                'https://grrind.app/problems/'.$slug,
-                $enumerated,
-                \sprintf('Le problème "%s" existe dans le code mais pas dans le contrat.', $slug),
-            );
-        }
+        sort($emitted);
+        sort($enumerated);
+
+        self::assertSame(
+            $emitted,
+            $enumerated,
+            'Le contrat et le code ne disent plus la même chose. À gauche ce que le back émet, à '
+            .'droite ce que `nelmio_api_doc.yaml` déclare ; recale l\'énumération, puis `make openapi`.',
+        );
     }
 
     /**
@@ -232,14 +245,14 @@ final class OpenApiContractTest extends KernelTestCase
      *
      * @return list<string>
      */
-    private function problemTypes(): array
+    private function emittedProblemTypes(): array
     {
         $directory = self::getContainer()->getParameter('kernel.project_dir').'/src';
         self::assertIsString($directory);
 
         $files = new RegexIterator(
             new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
-            '/Exception\/\w+\.php$/',
+            '/\.php$/',
         );
 
         $types = [];
@@ -250,16 +263,61 @@ final class OpenApiContractTest extends KernelTestCase
             $source = file_get_contents($file->getPathname());
             self::assertIsString($source);
 
+            // Une erreur de domaine nomme son type.
             if (1 === preg_match('/function type\(\): string\s*\{\s*return \'([a-z0-9-]+)\';/', $source, $matches)) {
-                $types[] = $matches[1];
+                $types[] = ProblemDetails::of($matches[1], 0, '')->type;
+            }
+
+            // Un composeur de problèmes écrit le sien en clair. On lit **tous** les littéraux
+            // en kebab-case du fichier, et pas les arguments d'un `ProblemDetails::of(` :
+            // `AuthenticationResponseListener` passe par un helper privé, et un scan collé à
+            // l'appel n'y verrait rien — c'est le trou par lequel #81 est passé. La forme
+            // « minuscules avec tiret » ne collide avec rien d'autre dans ces fichiers : les
+            // noms d'en-tête portent des majuscules et les types de média une barre oblique.
+            if (str_contains($source, 'ProblemDetails::')) {
+                preg_match_all('/\'([a-z][a-z0-9]*(?:-[a-z0-9]+)+)\'/', $source, $matches);
+
+                foreach ($matches[1] as $slug) {
+                    $types[] = ProblemDetails::of($slug, 0, '')->type;
+                }
             }
         }
 
-        // Le fichier est parcouru pour de vrai : une expression qui ne trouverait plus rien
-        // ferait passer ce test en ne vérifiant rien du tout.
-        self::assertGreaterThan(10, \count($types));
+        foreach (self::TRANSPORT_STATUSES as $status) {
+            $types[] = ProblemDetails::ofStatus($status)->type;
+        }
 
-        return $types;
+        // Le code est parcouru pour de vrai : une expression qui ne trouverait plus rien ferait
+        // passer ce test en ne vérifiant rien du tout.
+        self::assertGreaterThan(20, \count($types));
+
+        return array_values(array_unique($types));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function enumeratedProblemTypes(): array
+    {
+        $components = $this->spec['components'];
+        self::assertIsArray($components);
+        $schemas = $components['schemas'];
+        self::assertIsArray($schemas);
+        $problem = $schemas['ProblemDetails'];
+        self::assertIsArray($problem);
+        $properties = $problem['properties'];
+        self::assertIsArray($properties);
+        $type = $properties['type'];
+        self::assertIsArray($type);
+        $enumerated = $type['enum'];
+        self::assertIsArray($enumerated);
+
+        foreach ($enumerated as $value) {
+            self::assertIsString($value);
+        }
+
+        /** @var list<string> $enumerated */
+        return $enumerated;
     }
 
     /**
