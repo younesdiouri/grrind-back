@@ -1,5 +1,4 @@
 # Faute de frappe sur un nom de réglage : sans refus, le défaut passerait en silence.
 minimum_duration_seconds: 300
 maximum_duration_seconds: 14400
-cooldown_seconds: 900
-cooldown_second: 60
+maximum_duration_second: 60

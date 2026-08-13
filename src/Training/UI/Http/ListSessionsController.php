@@ -46,7 +46,6 @@ final readonly class ListSessionsController
     ): JsonResponse {
         $page = ($this->listSessions)(new ListSessions(
             Uuid::fromString($user->getUserIdentifier()),
-            $query->status,
             $query->discipline,
             $query->from,
             $query->to,

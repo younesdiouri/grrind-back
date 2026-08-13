@@ -25,7 +25,7 @@ final class GameBalanceLoaderTest extends TestCase
         $balance = self::loadShipped();
 
         self::assertSame(
-            ['minimum_duration_seconds' => 300, 'maximum_duration_seconds' => 14400, 'cooldown_seconds' => 900],
+            ['minimum_duration_seconds' => 300, 'maximum_duration_seconds' => 14400],
             $balance->sections['training'],
         );
 
@@ -77,10 +77,10 @@ final class GameBalanceLoaderTest extends TestCase
     public static function unusableBalances(): iterable
     {
         yield 'seuils incohérents' => ['incoherent', '/sous le plancher/'];
-        yield 'réglage manquant' => ['incomplete', '/cooldown_seconds/'];
+        yield 'réglage manquant' => ['incomplete', '/maximum_duration_seconds/'];
         // Le vrai piège de l'équilibrage : une faute de frappe dans un nom de réglage
         // laisserait le défaut s'appliquer en silence.
-        yield 'réglage inconnu' => ['unknown-key', '/cooldown_second/'];
+        yield 'réglage inconnu' => ['unknown-key', '/maximum_duration_second/'];
         yield 'fichier sans schéma' => ['stray', '/loot\.yaml/'];
         yield 'fichier absent' => ['missing', '/absent/'];
     }

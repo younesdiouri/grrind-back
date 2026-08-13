@@ -18,30 +18,28 @@ final class WorkoutRulesTest extends TestCase
 {
     public function testAcceptsTheShippedBalance(): void
     {
-        $rules = new WorkoutRules(300, 14400, 900);
+        $rules = new WorkoutRules(300, 14400);
 
         self::assertSame(300, $rules->minimumDurationSeconds);
         self::assertSame(14400, $rules->maximumDurationSeconds);
-        self::assertSame(900, $rules->cooldownSeconds);
     }
 
     #[DataProvider('nonsense')]
-    public function testRefusesAnIncoherentBalance(int $minimum, int $maximum, int $cooldown): void
+    public function testRefusesAnIncoherentBalance(int $minimum, int $maximum): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new WorkoutRules($minimum, $maximum, $cooldown);
+        new WorkoutRules($minimum, $maximum);
     }
 
     /**
-     * @return iterable<string, array{int, int, int}>
+     * @return iterable<string, array{int, int}>
      */
     public static function nonsense(): iterable
     {
-        // Aucune séance ne pourrait être close : trop courte sous le plancher, écrêtée
-        // sous ce même plancher au-dessus.
-        yield 'plafond sous le plancher' => [3600, 60, 900];
-        yield 'plancher négatif' => [-1, 14400, 900];
-        yield 'cooldown négatif' => [300, 14400, -1];
+        // Aucun workout ne pourrait être retenu : refusé sous le plancher, écrêté sous ce
+        // même plancher au-dessus.
+        yield 'plafond sous le plancher' => [3600, 60];
+        yield 'plancher négatif' => [-1, 14400];
     }
 }

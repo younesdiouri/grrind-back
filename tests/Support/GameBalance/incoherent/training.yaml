@@ -1,4 +1,3 @@
-# Plafond sous le plancher : aucune séance ne pourrait être close.
+# Plafond sous le plancher : aucun workout ne pourrait être retenu.
 minimum_duration_seconds: 3600
 maximum_duration_seconds: 60
-cooldown_seconds: 900

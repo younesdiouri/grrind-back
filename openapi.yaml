@@ -282,106 +282,12 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  '/api/training/sessions/{id}/abandon':
-    post:
-      tags:
-        - Entraînement
-      operationId: post_training_session_abandon
-      parameters:
-        -
-          $ref: '#/components/parameters/IdempotencyKey'
-        -
-          name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        description: 'Aucun corps attendu.'
-        required: false
-      responses:
-        '200':
-          description: "La séance est close et ne rapporte rien. Elle reste dans l'historique."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TrainingSession'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-  /api/training/sessions/active:
-    get:
-      tags:
-        - Entraînement
-      operationId: get_training_session_active
-      responses:
-        '200':
-          description: 'La séance en cours.'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TrainingSession'
-        '204':
-          description: "Aucune séance en cours — l'état normal du joueur, pas une erreur."
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  '/api/training/sessions/{id}/complete':
-    post:
-      tags:
-        - Entraînement
-      operationId: post_training_session_complete
-      parameters:
-        -
-          $ref: '#/components/parameters/IdempotencyKey'
-        -
-          name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        description: 'Aucun corps attendu. Le serveur ne lit ni durée ni date de fin : il lit son horloge.'
-        required: false
-      responses:
-        '200':
-          description: 'La séance est close et créditée. Le corps est le `RewardSummary`, à jouer de haut en bas.'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RewardSummary'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: "Séance déjà close (`session-not-active`), sous la durée plancher (`session-too-short`), ou clé d'idempotence en cours (`idempotency-key-in-flight`)."
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
   /api/training/sessions:
     get:
       tags:
         - Entraînement
       operationId: get_training_session_list
       parameters:
-        -
-          name: status
-          in: query
-          required: false
-          schema:
-            nullable: true
-            oneOf:
-              -
-                $ref: '#/components/schemas/SessionStatus'
-            default: null
         -
           name: discipline
           in: query
@@ -439,37 +345,10 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-    post:
-      tags:
-        - Entraînement
-      operationId: post_training_session_start
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StartSessionRequest'
-      responses:
-        '201':
-          description: 'La séance est ouverte, datée par le serveur.'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TrainingSession'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: 'Une séance tourne déjà (`session-already-active`, avec `activeSessionId`), ou le cooldown court encore (`session-cooldown`, avec `remainingSeconds` et `readyAt`).'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
 components:
   schemas:
     ProblemDetails:
-      description: "Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et\n`detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une\nséance déjà active donne `activeSessionId`, un cooldown donne `remainingSeconds`\net `readyAt` — pour que le client se recale au lieu d'afficher un refus sec.\n"
+      description: "Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et\n`detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une\nviolation de validation donne `violations` — pour que le client se recale au lieu\nd'afficher un refus sec.\n"
       required:
         - type
         - title
@@ -499,11 +378,6 @@ components:
             - 'https://grrind.app/problems/invalid-refresh-token'
             - 'https://grrind.app/problems/social-sign-in-rejected'
             - 'https://grrind.app/problems/social-profile-incomplete'
-            - 'https://grrind.app/problems/session-not-found'
-            - 'https://grrind.app/problems/session-not-active'
-            - 'https://grrind.app/problems/session-already-active'
-            - 'https://grrind.app/problems/session-too-short'
-            - 'https://grrind.app/problems/session-cooldown'
             - 'https://grrind.app/problems/title-unknown'
             - 'https://grrind.app/problems/title-not-unlocked'
         title:
@@ -656,11 +530,10 @@ components:
           $ref: '#/components/schemas/TokenPair'
       type: object
     TrainingSession:
-      description: "Une séance, ouverte ou close — **une seule forme**, jamais deux. `endedAt` et\n`durationSeconds` valent `null` tant qu'elle court, plutôt que de disparaître : un\nchamp qui apparaît et disparaît finit lu de travers.\n\n`durationSeconds` est la durée **retenue**, déjà écrêtée au plafond. Ce n'est pas\n`endedAt - startedAt` sur une séance trop longue, et c'est elle qui fait foi.\n"
+      description: "Une séance **déjà faite**. Elle n'a pas d'état : `status` a disparu avec le\nchronomètre (#85), et `endedAt` comme `durationSeconds` ne sont plus nullables —\nun workout arrive terminé ou n'arrive pas.\n\n`durationSeconds` est calculée par le serveur à partir des deux bornes, jamais\nrecopiée d'un champ envoyé par le client.\n"
       required:
         - id
         - discipline
-        - status
         - source
         - trust
         - startedAt
@@ -679,14 +552,8 @@ components:
             - STRENGTH
             - MOBILITY
             - CLIMBING
-        status:
-          type: string
-          enum:
-            - ACTIVE
-            - COMPLETED
-            - ABANDONED
         source:
-          description: 'Toute activité est une source attribuée. `MANUAL_TIMER` en v1 ; les autres arrivent sans changer ce contrat.'
+          description: "Toute activité est une source attribuée. Les valeurs de l'import santé arrivent au #87."
           type: string
           enum:
             - MANUAL_TIMER
@@ -703,13 +570,11 @@ components:
         endedAt:
           type: string
           format: date-time
-          nullable: true
         durationSeconds:
           type: integer
-          nullable: true
       type: object
     SessionPage:
-      description: "Pagination par curseur, sur l'identifiant — UUID v7, donc triable, donc chronologique. `nextCursor` à `null` signifie la fin."
+      description: "Pagination par curseur, sur l'identifiant. `nextCursor` à `null` signifie la fin. L'ordre redevient chronologique au #93 : depuis l'import, l'UUID v7 date de l'écriture et non de la pratique."
       required:
         - sessions
         - nextCursor
@@ -1047,12 +912,6 @@ components:
           default: null
           maxLength: 64
       type: object
-    SessionStatus:
-      type: string
-      enum:
-        - ACTIVE
-        - COMPLETED
-        - ABANDONED
     Discipline:
       type: string
       enum:
@@ -1064,12 +923,6 @@ components:
         - CLIMBING
     SessionHistoryQuery:
       properties:
-        status:
-          nullable: true
-          oneOf:
-            -
-              $ref: '#/components/schemas/SessionStatus'
-          default: null
         discipline:
           nullable: true
           oneOf:
@@ -1096,13 +949,6 @@ components:
           default: 20
           maximum: 50
           minimum: 1
-      type: object
-    StartSessionRequest:
-      required:
-        - discipline
-      properties:
-        discipline:
-          $ref: '#/components/schemas/Discipline'
       type: object
   responses:
     BadRequest:

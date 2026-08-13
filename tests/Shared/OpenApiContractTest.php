@@ -137,12 +137,17 @@ final class OpenApiContractTest extends KernelTestCase
     /**
      * Les routes qui accordent quelque chose exigent `Idempotency-Key` : le contrat doit le
      * dire, sinon un client mobile qui rejoue crédite deux fois — ou croit l'avoir fait.
+     *
+     * La liste est **comparée**, pas parcourue. Une boucle sur les routes attendues passait
+     * sans rien vérifier le jour où il n'en restait aucune, ce que le retrait du chronomètre
+     * (#85) vient de provoquer : plus rien ne crédite jusqu'à `POST /api/workouts/import`
+     * (#88). Un test vide qui reste vert est pire qu'un test absent.
      */
-    public function testTheIdempotentRoutesDeclareTheirHeader(): void
+    public function testTheIdempotentRoutesAreExactlyTheOnesWeExpect(): void
     {
-        foreach (['/api/training/sessions/{id}/complete', '/api/training/sessions/{id}/abandon'] as $path) {
-            $operation = $this->operationAt($path, 'post');
+        $idempotent = [];
 
+        foreach ($this->operations() as $label => $operation) {
             $parameters = $operation['parameters'] ?? [];
             self::assertIsArray($parameters);
 
@@ -157,12 +162,19 @@ final class OpenApiContractTest extends KernelTestCase
                 $parameters,
             );
 
-            self::assertContains(
-                '#/components/parameters/IdempotencyKey',
-                $referenced,
-                \sprintf('POST %s n\'annonce pas son en-tête d\'idempotence.', $path),
-            );
+            if (\in_array('#/components/parameters/IdempotencyKey', $referenced, true)) {
+                $idempotent[] = $label;
+            }
         }
+
+        sort($idempotent);
+
+        self::assertSame(
+            [],
+            $idempotent,
+            'La liste des routes idempotentes a changé. Toute route qui crédite doit y entrer, '
+            .'et la mettre à jour ici est le geste qui le fait relire.',
+        );
     }
 
     /**
@@ -288,8 +300,11 @@ final class OpenApiContractTest extends KernelTestCase
         }
 
         // Le code est parcouru pour de vrai : une expression qui ne trouverait plus rien ferait
-        // passer ce test en ne vérifiant rien du tout.
-        self::assertGreaterThan(20, \count($types));
+        // passer ce test en ne vérifiant rien du tout. Le seuil est un plancher contre une
+        // regex qui cesse de matcher, pas un décompte — le retrait du chronomètre (#85) a
+        // fait tomber cinq types d'un coup, et un seuil collé au réel se serait mis en
+        // travers à chaque suppression légitime.
+        self::assertGreaterThan(10, \count($types));
 
         return array_values(array_unique($types));
     }
@@ -361,25 +376,5 @@ final class OpenApiContractTest extends KernelTestCase
                 yield strtoupper($method).' '.$path => $operation;
             }
         }
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function operationAt(string $path, string $method): array
-    {
-        $paths = $this->spec['paths'];
-        self::assertIsArray($paths);
-        self::assertArrayHasKey($path, $paths);
-
-        $documented = $paths[$path];
-        self::assertIsArray($documented);
-        self::assertArrayHasKey($method, $documented);
-
-        $operation = $documented[$method];
-        self::assertIsArray($operation);
-
-        /** @var array<string, mixed> $operation */
-        return $operation;
     }
 }

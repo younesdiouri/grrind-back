@@ -10,7 +10,13 @@ use App\Shared\Application\XpLine;
 use App\Training\Application\SessionCompletion;
 
 /**
- * Ce que le joueur reçoit quand il appuie sur « terminer » — le payload du moment dopamine.
+ * Ce que le joueur reçoit pour un workout crédité — le payload du moment dopamine.
+ *
+ * **Il n'a plus de producteur depuis le retrait du chronomètre (#85), et il est gardé
+ * exprès.** Le `SyncSummary` du #92 est une liste de ces objets-ci, un par workout
+ * importé : le supprimer pour le réécrire « de la forme déjà connue » deux tickets plus
+ * loin serait rejouer de mémoire la seule chose du produit qui ne se rattrape pas.
+ * `RewardSummaryPayloadTest` fige l'ordre des clés en attendant.
  *
  * **L'ordre des champs est l'ordre de l'animation.** Le client le joue de haut en bas : la
  * séance se referme, la barre d'XP se remplit ligne à ligne, le niveau bascule, le titre

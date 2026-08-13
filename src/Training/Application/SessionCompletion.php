@@ -8,7 +8,10 @@ use App\Shared\Application\SessionReward;
 use App\Training\Domain\Workout;
 
 /**
- * Ce que rend la complétion d'une séance : la séance close, et ce qu'elle a rapporté.
+ * Un workout crédité et ce qu'il a rapporté.
+ *
+ * Sans producteur jusqu'au #89, comme {@see \App\Training\UI\Http\Response\RewardSummaryResource}
+ * qu'il alimente, et gardé pour la même raison.
  *
  * Les deux ensemble parce qu'elles sortent de la **même** transaction. Les séparer
  * obligerait l'appelant à recharger l'une des deux après coup, donc à lire un état qui a pu

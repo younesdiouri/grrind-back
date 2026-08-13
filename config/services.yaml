@@ -33,7 +33,6 @@ services:
         arguments:
             $minimumDurationSeconds: '%game.training.minimum_duration_seconds%'
             $maximumDurationSeconds: '%game.training.maximum_duration_seconds%'
-            $cooldownSeconds: '%game.training.cooldown_seconds%'
 
     # Le barème de base, d'un bloc : `disciplines` est une liste dans le YAML, donc le
     # chargeur n'y descend pas et le paramètre reste unique. Ouvrir une discipline se fait
@@ -121,7 +120,6 @@ when@test:
         App\Tests\Support\Http\:
             resource: '../tests/Support/Http/'
 
-        # Un abonné aux événements de domaine qui ne connaît pas leur émetteur : il
-        # vérifie que la chaîne complète tient.
-        App\Tests\Support\Messaging\:
-            resource: '../tests/Support/Messaging/'
+        # `App\Tests\Support\Messaging\` reviendra au #89 avec le nouvel émetteur : plus
+        # rien ne publie d'événement de domaine depuis le retrait du chronomètre (#85), et
+        # un abonné sans émetteur ne démontre rien.

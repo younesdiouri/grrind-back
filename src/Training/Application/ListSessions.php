@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Training\Application;
 
 use App\Shared\Domain\Activity\Discipline;
-use App\Training\Domain\SessionStatus;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
 
@@ -22,7 +21,6 @@ final readonly class ListSessions
 {
     public function __construct(
         public Uuid $userId,
-        public ?SessionStatus $status = null,
         public ?Discipline $discipline = null,
         public ?DateTimeImmutable $from = null,
         public ?DateTimeImmutable $to = null,

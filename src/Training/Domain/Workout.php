@@ -7,8 +7,6 @@ namespace App\Training\Domain;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\SessionSource;
 use App\Shared\Domain\Activity\TrustLevel;
-use App\Training\Domain\Exception\WorkoutNotActive;
-use App\Training\Domain\Exception\WorkoutTooShort;
 use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
@@ -17,35 +15,26 @@ use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Une séance de sport, de son ouverture à sa clôture.
+ * Une séance de sport **déjà faite**, telle que la montre l'a enregistrée.
  *
- * Le nom dit « workout » alors que l'agrégat s'ouvre et se ferme encore : c'est
- * volontaire. Le renommage arrive avant le virage vers l'import santé (#85) parce qu'il
- * n'a aucun effet, et qu'un renommage sans effet se relit. Les transitions `start()`,
- * `abandon()` et le cooldown, eux, disparaîtront avec le chronomètre.
+ * Il n'y a plus de transition d'état : un workout naît complet. Ce n'était pas le cas
+ * tant que Grrind portait son propre chronomètre — on ouvrait, on fermait, et l'agrégat
+ * avait un statut. L'import santé supprime l'ouverture : quand le fait arrive, il est
+ * passé.
  *
- * **Le serveur possède l'horloge.** L'agrégat ne la lit jamais lui-même : chaque
- * transition reçoit le `$now` de l'appelant. Aucun timestamp du client n'entre dans le
- * calcul de la durée, sinon l'antidatage est une ligne de JSON.
+ * **Le serveur n'a plus l'horloge, il l'arbitre.** Les bornes viennent du fournisseur —
+ * c'est lui qui était au poignet — mais la durée n'est pas un champ qu'on recopie : elle
+ * se calcule ici à partir des deux bornes. Un client qui enverrait `duration: 36000` avec
+ * une séance d'un quart d'heure ne serait pas cru, et il n'y a aucune raison de lui
+ * laisser cette prise.
  *
- * Répartition des garde-fous : ceux qui ne concernent *que cette séance* — plancher,
- * plafond — sont ici, parce qu'ils définissent une clôture valide et que les laisser
- * au-dessus reviendrait à espérer que personne n'oublie de les appeler. Ceux qui ont
- * besoin des *autres* séances du joueur — unicité de l'active, cooldown — sont une
- * couche au-dessus.
+ * Ce que le workout **vaut** — plancher, écrêtage, chevauchements, fenêtre d'antériorité —
+ * ne se décide pas ici mais à l'import (#91) : ces règles ont besoin des *autres* workouts
+ * du joueur, que l'agrégat ne voit pas.
  */
 #[ORM\Entity(repositoryClass: WorkoutRepository::class)]
 #[ORM\Table(name: 'workout')]
 #[ORM\Index(name: 'idx_workout_user_started', columns: ['user_id', 'started_at'])]
-// Prédicat écrit tel que PostgreSQL le **relit**, casts compris : `migrations:diff`
-// compare deux chaînes, et `(status = 'ACTIVE')` reproposerait un DROP + CREATE
-// identique à chaque diff. L'index — et non le contrôle applicatif — est ce qui
-// garantit l'unicité : entre le SELECT et l'INSERT, deux requêtes passent.
-#[ORM\UniqueConstraint(
-    name: 'uniq_workout_active',
-    columns: ['user_id'],
-    options: ['where' => "((status)::text = 'ACTIVE'::text)"],
-)]
 // Le double crédit ne se prévient pas dans le code : entre le SELECT qui cherche
 // l'`externalId` et l'INSERT qui l'écrit, deux synchronisations concurrentes passent
 // toutes les deux. C'est la base qui refuse la seconde.
@@ -76,21 +65,19 @@ class Workout
     #[ORM\Column(length: 32, enumType: TrustLevel::class)]
     private TrustLevel $trust;
 
-    #[ORM\Column(length: 16, enumType: SessionStatus::class)]
-    private SessionStatus $status;
-
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $startedAt;
 
-    #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
-    private ?DateTimeImmutable $endedAt = null;
+    #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
+    private DateTimeImmutable $endedAt;
 
     /**
-     * Figée à la clôture, pas recalculée à la lecture : elle alimentera le ledger d'XP,
-     * et une valeur qui se recalcule peut changer après coup.
+     * Figée à l'écriture, pas recalculée à la lecture : elle alimente le ledger d'XP, et
+     * une valeur qui se recalcule peut changer après coup — un fuseau, un arrondi, une
+     * correction de borne, et l'historique ne dit plus ce qu'il a payé.
      */
-    #[ORM\Column(nullable: true)]
-    private ?int $durationSeconds = null;
+    #[ORM\Column]
+    private int $durationSeconds;
 
     /**
      * Ce que la montre a mesuré. **Toutes nullables, et c'est structurel** : aucun
@@ -133,8 +120,8 @@ class Workout
     #[ORM\Column(length: 128, nullable: true)]
     private ?string $externalId = null;
 
-    /** `startedAt` est un fait sportif, `createdAt` un fait système. Ils divergeront
-     * quand une activité s'importera après coup. */
+    /** `startedAt` est un fait sportif, `createdAt` un fait système. Ils divergent
+     * dès qu'une activité s'importe après coup, c'est-à-dire toujours. */
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $createdAt;
 
@@ -143,6 +130,7 @@ class Workout
         Discipline $discipline,
         SessionSource $source,
         DateTimeImmutable $startedAt,
+        DateTimeImmutable $endedAt,
         DateTimeImmutable $now,
     ) {
         $this->id = Uuid::v7();
@@ -150,61 +138,31 @@ class Workout
         $this->discipline = $discipline;
         $this->source = $source;
         $this->trust = $source->defaultTrust();
-        $this->status = SessionStatus::Active;
         $this->startedAt = $startedAt;
+        $this->endedAt = $endedAt;
+        // Plancher à zéro : une montre qui rend des bornes inversées — un fuseau mal
+        // appliqué suffit — donne un workout sans valeur, pas une durée négative qui
+        // empoisonnerait le ledger.
+        $this->durationSeconds = max(0, $endedAt->getTimestamp() - $startedAt->getTimestamp());
         $this->createdAt = $now;
     }
 
-    /** Le client n'envoie que la discipline ; le serveur date. */
-    public static function start(Uuid $userId, Discipline $discipline, DateTimeImmutable $now): self
-    {
-        return new self($userId, $discipline, SessionSource::ManualTimer, $now, $now);
-    }
-
     /**
-     * Seule voie soumise à la durée plancher : sous le seuil, rien n'est écrit et la
-     * séance reste en cours — le joueur continue, ou renonce par `abandon()`.
+     * Un fait rapporté par une source, écrit tel quel.
      *
-     * Ce qu'elle rapporte ne se décide pas ici : `Progression` le calcule, dans la même
-     * transaction, derrière le port `SessionRewards`.
-     *
-     * @throws WorkoutNotActive
-     * @throws WorkoutTooShort
+     * `$now` est l'heure du serveur et ne sert qu'à `createdAt` : le reste vient du
+     * fournisseur. C'est exactement la frontière entre ce qu'on constate et ce qu'on
+     * date nous-mêmes.
      */
-    public function complete(DateTimeImmutable $now, WorkoutRules $rules): void
-    {
-        $this->ensureActive();
-
-        $elapsed = $this->elapsedAt($now);
-
-        if ($elapsed < $rules->minimumDurationSeconds) {
-            throw new WorkoutTooShort($this->id, $elapsed, $rules->minimumDurationSeconds);
-        }
-
-        $this->finish(SessionStatus::Completed, $now, $rules);
-    }
-
-    /**
-     * La séance est close et ne rapportera rien, mais elle reste : on ne supprime pas
-     * d'historique. Aucun plancher ici — c'est le pendant du refus opposé à une clôture
-     * trop courte, il faut bien une sortie.
-     *
-     * @throws WorkoutNotActive
-     */
-    public function abandon(DateTimeImmutable $now, WorkoutRules $rules): void
-    {
-        $this->ensureActive();
-        $this->finish(SessionStatus::Abandoned, $now, $rules);
-    }
-
-    /**
-     * Sous le plancher, la séance n'a pas eu lieu : un chrono lancé par erreur ne se
-     * punit pas d'un quart d'heure. Au-dessus, complétée ou abandonnée, elle déclenche
-     * l'attente — sinon abandonner deviendrait le moyen de l'effacer.
-     */
-    public function countsTowardCooldown(WorkoutRules $rules): bool
-    {
-        return null !== $this->durationSeconds && $this->durationSeconds >= $rules->minimumDurationSeconds;
+    public static function record(
+        Uuid $userId,
+        Discipline $discipline,
+        SessionSource $source,
+        DateTimeImmutable $startedAt,
+        DateTimeImmutable $endedAt,
+        DateTimeImmutable $now,
+    ): self {
+        return new self($userId, $discipline, $source, $startedAt, $endedAt, $now);
     }
 
     public function id(): Uuid
@@ -232,22 +190,17 @@ class Workout
         return $this->trust;
     }
 
-    public function status(): SessionStatus
-    {
-        return $this->status;
-    }
-
     public function startedAt(): DateTimeImmutable
     {
         return $this->startedAt;
     }
 
-    public function endedAt(): ?DateTimeImmutable
+    public function endedAt(): DateTimeImmutable
     {
         return $this->endedAt;
     }
 
-    public function durationSeconds(): ?int
+    public function durationSeconds(): int
     {
         return $this->durationSeconds;
     }
@@ -280,33 +233,5 @@ class Workout
     public function createdAt(): DateTimeImmutable
     {
         return $this->createdAt;
-    }
-
-    private function finish(SessionStatus $outcome, DateTimeImmutable $now, WorkoutRules $rules): void
-    {
-        $this->status = $outcome;
-        $this->endedAt = $now;
-        // Écrêtée, jamais rejetée. `durationSeconds` peut donc être plus petit que
-        // `endedAt - startedAt`, et c'est lui qui fait foi : ce que la séance *vaut*.
-        $this->durationSeconds = min($this->elapsedAt($now), $rules->maximumDurationSeconds);
-    }
-
-    /**
-     * @throws WorkoutNotActive
-     */
-    private function ensureActive(): void
-    {
-        if (SessionStatus::Active !== $this->status) {
-            throw new WorkoutNotActive($this->id, $this->status);
-        }
-    }
-
-    /**
-     * Plancher à zéro : si l'horloge recule (un pas NTP suffit), la séance ne rapporte
-     * rien plutôt que d'empoisonner le ledger d'une durée négative.
-     */
-    private function elapsedAt(DateTimeImmutable $now): int
-    {
-        return max(0, $now->getTimestamp() - $this->startedAt->getTimestamp());
     }
 }
