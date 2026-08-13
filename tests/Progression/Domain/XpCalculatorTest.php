@@ -288,9 +288,12 @@ final class XpCalculatorTest extends TestCase
         return new XpCalculator(
             new XpRates([
                 ['discipline' => 'RUNNING', 'xp_per_hour' => 90, 'daily_cap_xp' => 180],
+                ['discipline' => 'WALKING', 'xp_per_hour' => 40, 'daily_cap_xp' => 80],
                 ['discipline' => 'CYCLING', 'xp_per_hour' => 70, 'daily_cap_xp' => 140],
                 ['discipline' => 'SWIMMING', 'xp_per_hour' => 100, 'daily_cap_xp' => 200],
                 ['discipline' => 'STRENGTH', 'xp_per_hour' => 80, 'daily_cap_xp' => 160],
+                ['discipline' => 'HIIT', 'xp_per_hour' => 110, 'daily_cap_xp' => 220],
+                ['discipline' => 'HIKING', 'xp_per_hour' => 65, 'daily_cap_xp' => 130],
                 ['discipline' => 'MOBILITY', 'xp_per_hour' => 50, 'daily_cap_xp' => 100],
                 ['discipline' => 'CLIMBING', 'xp_per_hour' => 85, 'daily_cap_xp' => 170],
             ]),

@@ -8,6 +8,7 @@ use App\Progression\Infrastructure\Config\LevelsSection;
 use App\Progression\Infrastructure\Config\TitlesSection;
 use App\Progression\Infrastructure\Config\XpSection;
 use App\Shared\Infrastructure\Config\GameBalancePass;
+use App\Training\Infrastructure\Config\ActivityTypesSection;
 use App\Training\Infrastructure\Config\TrainingSection;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -31,6 +32,7 @@ class Kernel extends BaseKernel
         $container->addCompilerPass(new GameBalancePass(
             $this->getProjectDir().'/config/game/v1',
             new TrainingSection(),
+            new ActivityTypesSection(),
             new XpSection(),
             new LevelsSection(),
             new TitlesSection(),

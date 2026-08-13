@@ -547,9 +547,12 @@ components:
           type: string
           enum:
             - RUNNING
+            - WALKING
             - CYCLING
             - SWIMMING
             - STRENGTH
+            - HIIT
+            - HIKING
             - MOBILITY
             - CLIMBING
         source:
@@ -798,9 +801,12 @@ components:
           type: string
           enum:
             - RUNNING
+            - WALKING
             - CYCLING
             - SWIMMING
             - STRENGTH
+            - HIIT
+            - HIKING
             - MOBILITY
             - CLIMBING
         amount:
@@ -916,9 +922,12 @@ components:
       type: string
       enum:
         - RUNNING
+        - WALKING
         - CYCLING
         - SWIMMING
         - STRENGTH
+        - HIIT
+        - HIKING
         - MOBILITY
         - CLIMBING
     SessionHistoryQuery:
