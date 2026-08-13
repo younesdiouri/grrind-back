@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Training\Domain;
 
 use App\Shared\Domain\Activity\Discipline;
-use App\Shared\Domain\Activity\SessionSource;
 use App\Shared\Domain\Activity\TrustLevel;
+use App\Shared\Domain\Activity\WorkoutSource;
 use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
@@ -59,8 +59,8 @@ class Workout
     #[ORM\Column(length: 32, enumType: Discipline::class)]
     private Discipline $discipline;
 
-    #[ORM\Column(length: 32, enumType: SessionSource::class)]
-    private SessionSource $source;
+    #[ORM\Column(length: 32, enumType: WorkoutSource::class)]
+    private WorkoutSource $source;
 
     #[ORM\Column(length: 32, enumType: TrustLevel::class)]
     private TrustLevel $trust;
@@ -128,7 +128,7 @@ class Workout
     private function __construct(
         Uuid $userId,
         Discipline $discipline,
-        SessionSource $source,
+        WorkoutSource $source,
         DateTimeImmutable $startedAt,
         DateTimeImmutable $endedAt,
         DateTimeImmutable $now,
@@ -157,7 +157,7 @@ class Workout
     public static function record(
         Uuid $userId,
         Discipline $discipline,
-        SessionSource $source,
+        WorkoutSource $source,
         DateTimeImmutable $startedAt,
         DateTimeImmutable $endedAt,
         DateTimeImmutable $now,
@@ -180,7 +180,7 @@ class Workout
         return $this->discipline;
     }
 
-    public function source(): SessionSource
+    public function source(): WorkoutSource
     {
         return $this->source;
     }

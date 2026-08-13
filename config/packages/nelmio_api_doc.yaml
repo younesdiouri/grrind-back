@@ -265,9 +265,17 @@ when@dev:
                             discipline: { type: string, enum: [RUNNING, WALKING, CYCLING, SWIMMING, STRENGTH, HIIT, HIKING, MOBILITY, CLIMBING] }
                             source:
                                 type: string
-                                enum: [MANUAL_TIMER, STRAVA, HEALTHKIT]
-                                description: "Toute activité est une source attribuée. Les valeurs de l'import santé arrivent au #87."
-                            trust: { type: string, enum: [DECLARED, PROVIDER_VERIFIED] }
+                                enum: [APPLE_HEALTH, HEALTH_CONNECT]
+                                description: |
+                                    L'agrégateur de plateforme qui a rapporté la séance, pas l'appareil qui l'a
+                                    mesurée : une montre Garmin arrive en `APPLE_HEALTH` sur iPhone et en
+                                    `HEALTH_CONNECT` sur Android. `STRAVA` a quitté le contrat — elle n'avait pas de
+                                    producteur, et un client déployé n'a pas à traiter un cas mort en attendant son
+                                    adapter.
+                            trust:
+                                type: string
+                                enum: [DECLARED, PROVIDER_VERIFIED]
+                                description: "Toujours `PROVIDER_VERIFIED` aujourd'hui : les deux sources sont vérifiées. `DECLARED` reste le plancher de l'échelle, pas une valeur morte."
                             startedAt: { type: string, format: date-time }
                             endedAt: { type: string, format: date-time }
                             durationSeconds: { type: integer }

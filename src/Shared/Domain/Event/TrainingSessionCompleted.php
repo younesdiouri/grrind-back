@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Shared\Domain\Event;
 
 use App\Shared\Domain\Activity\Discipline;
-use App\Shared\Domain\Activity\SessionSource;
 use App\Shared\Domain\Activity\TrustLevel;
+use App\Shared\Domain\Activity\WorkoutSource;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
 
@@ -30,7 +30,7 @@ final readonly class TrainingSessionCompleted implements DomainEvent
         public DateTimeImmutable $startedAt,
         public DateTimeImmutable $endedAt,
         public int $durationSeconds,
-        public SessionSource $source,
+        public WorkoutSource $source,
         public TrustLevel $trust,
     ) {
     }

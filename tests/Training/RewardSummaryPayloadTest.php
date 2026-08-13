@@ -8,7 +8,7 @@ use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\XpLine;
 use App\Shared\Domain\Activity\Discipline;
-use App\Shared\Domain\Activity\SessionSource;
+use App\Shared\Domain\Activity\WorkoutSource;
 use App\Training\Application\SessionCompletion;
 use App\Training\Domain\Workout;
 use App\Training\UI\Http\Response\RewardSummaryResource;
@@ -86,7 +86,7 @@ final class RewardSummaryPayloadTest extends TestCase
         $workout = Workout::record(
             Uuid::v7(),
             Discipline::Running,
-            SessionSource::HealthKit,
+            WorkoutSource::AppleHealth,
             new DateTimeImmutable('2026-08-12T09:00:00+00:00'),
             new DateTimeImmutable('2026-08-12T09:45:00+00:00'),
             new DateTimeImmutable('2026-08-12T19:00:00+00:00'),

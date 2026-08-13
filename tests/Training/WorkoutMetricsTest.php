@@ -53,11 +53,11 @@ final class WorkoutMetricsTest extends ApiTestCase
     public function testTheSameProviderWorkoutCannotBeStoredTwice(): void
     {
         $bob = $this->openAccount();
-        $this->imported($bob, 'HEALTHKIT', 'HK-2026-08-12-001');
+        $this->imported($bob, 'APPLE_HEALTH', 'HK-2026-08-12-001');
 
         $this->expectException(UniqueConstraintViolationException::class);
 
-        $this->imported($bob, 'HEALTHKIT', 'HK-2026-08-12-001');
+        $this->imported($bob, 'APPLE_HEALTH', 'HK-2026-08-12-001');
     }
 
     /**
@@ -70,8 +70,8 @@ final class WorkoutMetricsTest extends ApiTestCase
         $bob = $this->openAccount();
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
 
-        $this->imported($bob, 'HEALTHKIT', 'HK-PARTAGE');
-        $this->imported($alice, 'HEALTHKIT', 'HK-PARTAGE');
+        $this->imported($bob, 'APPLE_HEALTH', 'HK-PARTAGE');
+        $this->imported($alice, 'APPLE_HEALTH', 'HK-PARTAGE');
 
         self::assertSame(2, $this->countWorkoutsWithExternalId('HK-PARTAGE'));
     }
@@ -85,25 +85,28 @@ final class WorkoutMetricsTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
-        $this->imported($bob, 'HEALTHKIT', 'SEANCE-DU-12');
-        $this->imported($bob, 'STRAVA', 'SEANCE-DU-12');
+        $this->imported($bob, 'APPLE_HEALTH', 'SEANCE-DU-12');
+        $this->imported($bob, 'HEALTH_CONNECT', 'SEANCE-DU-12');
 
         self::assertSame(2, $this->countWorkoutsWithExternalId('SEANCE-DU-12'));
     }
 
     /**
      * L'index est partiel, et il fallait qu'il le soit : PostgreSQL considère deux NULL
-     * comme distincts, mais une contrainte totale sur trois colonnes dont une nullable
-     * se comporte de façon surprenante dès qu'on la relit. Le `WHERE` dit ce qu'on
-     * protège. Les séances sans identifiant fournisseur — le chronomètre, tant qu'il
-     * existe — n'entrent pas dedans.
+     * comme distincts, mais une contrainte totale sur trois colonnes dont une nullable se
+     * comporte de façon surprenante dès qu'on la relit. Le `WHERE` dit ce qu'on protège.
+     *
+     * Les deux sources fournissent un identifiant, donc ce cas ne devrait pas se produire —
+     * et c'est bien pour ça qu'il se teste : l'index ne doit pas devenir le mécanisme qui
+     * *impose* l'identifiant. Une source qui n'en donnerait pas doit pouvoir écrire, et le
+     * jour où il en arrive une, c'est ici qu'on verra que rien ne s'y oppose.
      */
     public function testWorkoutsWithoutAProviderIdentifierAreNotConstrained(): void
     {
         $bob = $this->openAccount();
 
-        $this->imported($bob, 'MANUAL_TIMER', null);
-        $this->imported($bob, 'MANUAL_TIMER', null);
+        $this->imported($bob, 'APPLE_HEALTH', null);
+        $this->imported($bob, 'APPLE_HEALTH', null);
 
         self::assertSame(2, $this->countWorkouts(
             'user_id = :userId AND external_id IS NULL',

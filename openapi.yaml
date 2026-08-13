@@ -556,13 +556,13 @@ components:
             - MOBILITY
             - CLIMBING
         source:
-          description: "Toute activité est une source attribuée. Les valeurs de l'import santé arrivent au #87."
+          description: "L'agrégateur de plateforme qui a rapporté la séance, pas l'appareil qui l'a\nmesurée : une montre Garmin arrive en `APPLE_HEALTH` sur iPhone et en\n`HEALTH_CONNECT` sur Android. `STRAVA` a quitté le contrat — elle n'avait pas de\nproducteur, et un client déployé n'a pas à traiter un cas mort en attendant son\nadapter.\n"
           type: string
           enum:
-            - MANUAL_TIMER
-            - STRAVA
-            - HEALTHKIT
+            - APPLE_HEALTH
+            - HEALTH_CONNECT
         trust:
+          description: "Toujours `PROVIDER_VERIFIED` aujourd'hui : les deux sources sont vérifiées. `DECLARED` reste le plancher de l'échelle, pas une valeur morte."
           type: string
           enum:
             - DECLARED

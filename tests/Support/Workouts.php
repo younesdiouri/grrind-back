@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Support;
 
+use App\Shared\Domain\Activity\WorkoutSource;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Doctrine\DBAL\Connection;
@@ -36,7 +37,7 @@ trait Workouts
         string $discipline = 'RUNNING',
         int $durationSeconds = 1800,
         ?DateTimeImmutable $endedAt = null,
-        string $source = 'MANUAL_TIMER',
+        string $source = 'APPLE_HEALTH',
         ?string $externalId = null,
         ?int $distanceMeters = null,
         ?int $calories = null,
@@ -57,7 +58,10 @@ trait Workouts
                 'userId' => $account->id->toRfc4122(),
                 'discipline' => $discipline,
                 'source' => $source,
-                'trust' => 'MANUAL_TIMER' === $source ? 'DECLARED' : 'PROVIDER_VERIFIED',
+                // Le crédit se dérive de la source, ici comme dans l'agrégat : une fixture
+                // qui poserait `trust` à la main pourrait écrire une ligne que le domaine
+                // ne sait pas produire, et le test vérifierait alors un monde imaginaire.
+                'trust' => WorkoutSource::from($source)->defaultTrust()->value,
                 'startedAt' => $startedAt->format(DateTimeInterface::ATOM),
                 'endedAt' => $endedAt->format(DateTimeInterface::ATOM),
                 'durationSeconds' => $durationSeconds,
