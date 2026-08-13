@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Training\Domain;
 
 use App\Shared\Domain\Activity\Discipline;
-use App\Shared\Domain\Activity\SessionSource;
 use App\Shared\Domain\Activity\TrustLevel;
+use App\Shared\Domain\Activity\WorkoutSource;
 use App\Training\Domain\Workout;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -40,7 +40,7 @@ final class WorkoutTest extends TestCase
         $endedAt = new DateTimeImmutable('2026-08-01T07:15:00+02:00');
         $now = new DateTimeImmutable('2026-08-13T20:00:00+00:00');
 
-        $workout = Workout::record(Uuid::v7(), Discipline::Running, SessionSource::HealthKit, $startedAt, $endedAt, $now);
+        $workout = Workout::record(Uuid::v7(), Discipline::Running, WorkoutSource::AppleHealth, $startedAt, $endedAt, $now);
 
         self::assertSame($startedAt->getTimestamp(), $workout->startedAt()->getTimestamp());
         self::assertSame($endedAt->getTimestamp(), $workout->endedAt()->getTimestamp());
@@ -62,9 +62,14 @@ final class WorkoutTest extends TestCase
     /**
      * Le niveau de confiance se déduit de la source et ne se passe pas en argument :
      * personne ne peut déclarer une séance vérifiée par un fournisseur.
+     *
+     * Toutes les sources rendent le même crédit aujourd'hui, et le test est écrit sur
+     * `cases()` pour cette raison : il ne vérifie pas deux valeurs choisies à la main mais
+     * qu'**aucune source n'entre sans qu'on ait tranché son crédit**. Une source déclarée
+     * ajoutée sans y penser fait échouer ce test, ce qui est exactement ce qu'on veut.
      */
     #[DataProvider('sources')]
-    public function testTrustIsDerivedFromTheSource(SessionSource $source, TrustLevel $expected): void
+    public function testEverySourceIsCreditedAsProviderVerified(WorkoutSource $source): void
     {
         $workout = Workout::record(
             Uuid::v7(),
@@ -75,16 +80,17 @@ final class WorkoutTest extends TestCase
             new DateTimeImmutable('2026-08-12T10:00:00+00:00'),
         );
 
-        self::assertSame($expected, $workout->trust());
+        self::assertSame(TrustLevel::ProviderVerified, $workout->trust());
     }
 
     /**
-     * @return iterable<string, array{SessionSource, TrustLevel}>
+     * @return iterable<string, array{WorkoutSource}>
      */
     public static function sources(): iterable
     {
-        yield 'déclarée' => [SessionSource::ManualTimer, TrustLevel::Declared];
-        yield 'vérifiée par le fournisseur' => [SessionSource::HealthKit, TrustLevel::ProviderVerified];
+        foreach (WorkoutSource::cases() as $source) {
+            yield $source->value => [$source];
+        }
     }
 
     /**
@@ -107,7 +113,7 @@ final class WorkoutTest extends TestCase
         return Workout::record(
             Uuid::v7(),
             Discipline::Running,
-            SessionSource::HealthKit,
+            WorkoutSource::AppleHealth,
             new DateTimeImmutable($startedAt),
             new DateTimeImmutable($endedAt),
             new DateTimeImmutable('2026-08-13T00:00:00+00:00'),
