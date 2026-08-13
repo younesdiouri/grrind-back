@@ -100,7 +100,7 @@ final readonly class ImportWorkoutsHandler
         $eligible = $this->onTheirOwnMerits($command, $candidates, $skipped);
         $eligible = self::withoutInternalOverlaps($eligible, $skipped);
 
-        return new WorkoutImport($this->write($command, $eligible, $now, $skipped), $skipped);
+        return new WorkoutImport($now, $this->write($command, $eligible, $now, $skipped), $skipped);
     }
 
     /**
