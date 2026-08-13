@@ -47,6 +47,7 @@ apple_health:
     - { activity_type: coreTraining, discipline: STRENGTH }
     - { activity_type: highIntensityIntervalTraining, discipline: HIIT }
     - { activity_type: crossTraining, discipline: HIIT }
+    - { activity_type: mixedCardio, discipline: HIIT }
     - { activity_type: hiking, discipline: HIKING }
     - { activity_type: flexibility, discipline: MOBILITY }
     - { activity_type: yoga, discipline: MOBILITY }
