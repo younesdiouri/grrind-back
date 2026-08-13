@@ -7,9 +7,9 @@ namespace App\Training\Domain;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\SessionSource;
 use App\Shared\Domain\Activity\TrustLevel;
-use App\Training\Domain\Exception\SessionNotActive;
-use App\Training\Domain\Exception\SessionTooShort;
-use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
+use App\Training\Domain\Exception\WorkoutNotActive;
+use App\Training\Domain\Exception\WorkoutTooShort;
+use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -18,6 +18,11 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * Une séance de sport, de son ouverture à sa clôture.
+ *
+ * Le nom dit « workout » alors que l'agrégat s'ouvre et se ferme encore : c'est
+ * volontaire. Le renommage arrive avant le virage vers l'import santé (#85) parce qu'il
+ * n'a aucun effet, et qu'un renommage sans effet se relit. Les transitions `start()`,
+ * `abandon()` et le cooldown, eux, disparaîtront avec le chronomètre.
  *
  * **Le serveur possède l'horloge.** L'agrégat ne la lit jamais lui-même : chaque
  * transition reçoit le `$now` de l'appelant. Aucun timestamp du client n'entre dans le
@@ -29,19 +34,19 @@ use Symfony\Component\Uid\Uuid;
  * besoin des *autres* séances du joueur — unicité de l'active, cooldown — sont une
  * couche au-dessus.
  */
-#[ORM\Entity(repositoryClass: TrainingSessionRepository::class)]
-#[ORM\Table(name: 'training_session')]
-#[ORM\Index(name: 'idx_training_session_user_started', columns: ['user_id', 'started_at'])]
+#[ORM\Entity(repositoryClass: WorkoutRepository::class)]
+#[ORM\Table(name: 'workout')]
+#[ORM\Index(name: 'idx_workout_user_started', columns: ['user_id', 'started_at'])]
 // Prédicat écrit tel que PostgreSQL le **relit**, casts compris : `migrations:diff`
 // compare deux chaînes, et `(status = 'ACTIVE')` reproposerait un DROP + CREATE
 // identique à chaque diff. L'index — et non le contrôle applicatif — est ce qui
 // garantit l'unicité : entre le SELECT et l'INSERT, deux requêtes passent.
 #[ORM\UniqueConstraint(
-    name: 'uniq_training_session_active',
+    name: 'uniq_workout_active',
     columns: ['user_id'],
     options: ['where' => "((status)::text = 'ACTIVE'::text)"],
 )]
-class TrainingSession
+class Workout
 {
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME)]
@@ -110,17 +115,17 @@ class TrainingSession
      * Ce qu'elle rapporte ne se décide pas ici : `Progression` le calcule, dans la même
      * transaction, derrière le port `SessionRewards`.
      *
-     * @throws SessionNotActive
-     * @throws SessionTooShort
+     * @throws WorkoutNotActive
+     * @throws WorkoutTooShort
      */
-    public function complete(DateTimeImmutable $now, TrainingRules $rules): void
+    public function complete(DateTimeImmutable $now, WorkoutRules $rules): void
     {
         $this->ensureActive();
 
         $elapsed = $this->elapsedAt($now);
 
         if ($elapsed < $rules->minimumDurationSeconds) {
-            throw new SessionTooShort($this->id, $elapsed, $rules->minimumDurationSeconds);
+            throw new WorkoutTooShort($this->id, $elapsed, $rules->minimumDurationSeconds);
         }
 
         $this->finish(SessionStatus::Completed, $now, $rules);
@@ -131,9 +136,9 @@ class TrainingSession
      * d'historique. Aucun plancher ici — c'est le pendant du refus opposé à une clôture
      * trop courte, il faut bien une sortie.
      *
-     * @throws SessionNotActive
+     * @throws WorkoutNotActive
      */
-    public function abandon(DateTimeImmutable $now, TrainingRules $rules): void
+    public function abandon(DateTimeImmutable $now, WorkoutRules $rules): void
     {
         $this->ensureActive();
         $this->finish(SessionStatus::Abandoned, $now, $rules);
@@ -144,7 +149,7 @@ class TrainingSession
      * punit pas d'un quart d'heure. Au-dessus, complétée ou abandonnée, elle déclenche
      * l'attente — sinon abandonner deviendrait le moyen de l'effacer.
      */
-    public function countsTowardCooldown(TrainingRules $rules): bool
+    public function countsTowardCooldown(WorkoutRules $rules): bool
     {
         return null !== $this->durationSeconds && $this->durationSeconds >= $rules->minimumDurationSeconds;
     }
@@ -199,7 +204,7 @@ class TrainingSession
         return $this->createdAt;
     }
 
-    private function finish(SessionStatus $outcome, DateTimeImmutable $now, TrainingRules $rules): void
+    private function finish(SessionStatus $outcome, DateTimeImmutable $now, WorkoutRules $rules): void
     {
         $this->status = $outcome;
         $this->endedAt = $now;
@@ -209,12 +214,12 @@ class TrainingSession
     }
 
     /**
-     * @throws SessionNotActive
+     * @throws WorkoutNotActive
      */
     private function ensureActive(): void
     {
         if (SessionStatus::Active !== $this->status) {
-            throw new SessionNotActive($this->id, $this->status);
+            throw new WorkoutNotActive($this->id, $this->status);
         }
     }
 

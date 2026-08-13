@@ -7,7 +7,7 @@ namespace App\Tests\Training;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
-use App\Tests\Support\TrainingSessions;
+use App\Tests\Support\Workouts;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
@@ -17,7 +17,7 @@ use Symfony\Component\Uid\Uuid;
  * Une seule journée d'un seul joueur, par les vraies routes et de bout en bout :
  * inscription, trois séances, et l'état de progression qui en découle. Rien n'est posé dans
  * le conteneur, rien n'est simulé — pas même l'horloge, dont c'est le stockage qu'on recule
- * et non le comportement qu'on contourne (voir {@see TrainingSessions}).
+ * et non le comportement qu'on contourne (voir {@see Workouts}).
  *
  * **Il tourne sur l'équilibrage réel**, `config/game/v1/`, et les montants sont écrits en
  * dur. Une fixture de test dédiée avait été envisagée au ticket et écartée : le premier
@@ -35,7 +35,7 @@ use Symfony\Component\Uid\Uuid;
  */
 final class FirstPlayableTest extends ApiTestCase
 {
-    use TrainingSessions;
+    use Workouts;
 
     private const int HOUR = 3600;
     private const int HALF_HOUR = 1800;
@@ -164,7 +164,7 @@ final class FirstPlayableTest extends ApiTestCase
         self::assertSame('true', $replayed->headers->get(IdempotencyListener::REPLAY_HEADER));
 
         // La preuve que rien n'a été rejoué : une seconde exécution aurait buté sur
-        // `SessionNotActive` et rendu un 409, jamais la réponse d'origine.
+        // `WorkoutNotActive` et rendu un 409, jamais la réponse d'origine.
         self::assertSame(1, $this->rowsIn('xp_transaction'));
         self::assertSame(self::FIRST, $this->totalXpOf($bob));
     }

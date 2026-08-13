@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Training\Application;
 
-use App\Training\Domain\TrainingSession;
-use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
+use App\Training\Domain\Workout;
+use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 
 /**
  * Découpe l'historique en pages. Une ligne de plus que demandé est lue à chaque appel :
@@ -15,7 +15,7 @@ use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
  */
 final readonly class ListSessionsHandler
 {
-    public function __construct(private TrainingSessionRepository $sessions)
+    public function __construct(private WorkoutRepository $sessions)
     {
     }
 
@@ -28,7 +28,7 @@ final readonly class ListSessionsHandler
         }
 
         // Non vide par construction : plus de lignes que la limite, elle-même >= 1.
-        /** @var non-empty-list<TrainingSession> $page */
+        /** @var non-empty-list<Workout> $page */
         $page = \array_slice($found, 0, $query->limit);
 
         return new SessionPage($page, $page[array_key_last($page)]->id());

@@ -113,7 +113,7 @@ final class StartSessionTest extends ApiTestCase
         self::assertInstanceOf(Connection::class, $connection);
 
         $owner = $connection->fetchOne(
-            'SELECT user_id FROM training_session WHERE id = :id',
+            'SELECT user_id FROM workout WHERE id = :id',
             ['id' => $session['id']],
         );
 

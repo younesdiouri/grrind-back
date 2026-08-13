@@ -7,11 +7,11 @@ namespace App\Tests\Training\Domain;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\SessionSource;
 use App\Shared\Domain\Activity\TrustLevel;
-use App\Training\Domain\Exception\SessionNotActive;
-use App\Training\Domain\Exception\SessionTooShort;
+use App\Training\Domain\Exception\WorkoutNotActive;
+use App\Training\Domain\Exception\WorkoutTooShort;
 use App\Training\Domain\SessionStatus;
-use App\Training\Domain\TrainingRules;
-use App\Training\Domain\TrainingSession;
+use App\Training\Domain\Workout;
+use App\Training\Domain\WorkoutRules;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -21,14 +21,14 @@ use Symfony\Component\Uid\Uuid;
  * Le domaine se teste sans base, sans conteneur et sans horloge réelle : c'est la
  * contrepartie du `$now` passé en paramètre à chaque transition.
  */
-final class TrainingSessionTest extends TestCase
+final class WorkoutTest extends TestCase
 {
     private const string START = '2026-08-10T09:00:00+02:00';
 
     public function testStartsActiveOnTheServerClock(): void
     {
         $now = new DateTimeImmutable(self::START);
-        $session = TrainingSession::start(Uuid::v7(), Discipline::Running, $now);
+        $session = Workout::start(Uuid::v7(), Discipline::Running, $now);
 
         self::assertSame(SessionStatus::Active, $session->status());
         self::assertEquals($now, $session->startedAt());
@@ -118,7 +118,7 @@ final class TrainingSessionTest extends TestCase
         try {
             $session->complete(new DateTimeImmutable('2026-08-10T09:04:00+02:00'), self::rules());
             self::fail('Une séance sous le plancher ne peut pas être clôturée.');
-        } catch (SessionTooShort $error) {
+        } catch (WorkoutTooShort $error) {
             self::assertSame('session-too-short', $error->type());
             self::assertSame(240, $error->context()['elapsedSeconds']);
             self::assertSame(60, $error->context()['remainingSeconds']);
@@ -156,8 +156,8 @@ final class TrainingSessionTest extends TestCase
     }
 
     /**
-     * @param callable(TrainingSession, DateTimeImmutable): void $first
-     * @param callable(TrainingSession, DateTimeImmutable): void $again
+     * @param callable(Workout, DateTimeImmutable): void $first
+     * @param callable(Workout, DateTimeImmutable): void $again
      */
     #[DataProvider('closedTwice')]
     public function testAClosedSessionRefusesAnyFurtherTransition(callable $first, callable $again): void
@@ -170,7 +170,7 @@ final class TrainingSessionTest extends TestCase
         try {
             $again($session, new DateTimeImmutable('2026-08-10T10:00:00+02:00'));
             self::fail('Une séance close ne peut plus changer d\'état.');
-        } catch (SessionNotActive $error) {
+        } catch (WorkoutNotActive $error) {
             self::assertSame('session-not-active', $error->type());
             self::assertSame($status->value, $error->context()['sessionStatus']);
         }
@@ -185,8 +185,8 @@ final class TrainingSessionTest extends TestCase
      */
     public static function closedTwice(): iterable
     {
-        $complete = static fn (TrainingSession $s, DateTimeImmutable $at) => $s->complete($at, self::rules());
-        $abandon = static fn (TrainingSession $s, DateTimeImmutable $at) => $s->abandon($at, self::rules());
+        $complete = static fn (Workout $s, DateTimeImmutable $at) => $s->complete($at, self::rules());
+        $abandon = static fn (Workout $s, DateTimeImmutable $at) => $s->abandon($at, self::rules());
 
         yield 'complétée puis complétée' => [$complete, $complete];
         yield 'complétée puis abandonnée' => [$complete, $abandon];
@@ -209,14 +209,14 @@ final class TrainingSessionTest extends TestCase
      * relit la configuration qu'il vérifie ne vérifie rien. Un rééquilibrage doit
      * faire échouer cette suite et forcer à relire ce qu'il change.
      */
-    private static function rules(): TrainingRules
+    private static function rules(): WorkoutRules
     {
-        return new TrainingRules(300, 14400, 900);
+        return new WorkoutRules(300, 14400, 900);
     }
 
-    private static function started(): TrainingSession
+    private static function started(): Workout
     {
-        return TrainingSession::start(
+        return Workout::start(
             Uuid::v7(),
             Discipline::Running,
             new DateTimeImmutable(self::START),

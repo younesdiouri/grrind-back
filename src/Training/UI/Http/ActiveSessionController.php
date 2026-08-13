@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Training\UI\Http;
 
-use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
+use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use App\Training\UI\Http\Response\TrainingSessionResource;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,7 +25,7 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class ActiveSessionController
 {
-    public function __construct(private TrainingSessionRepository $sessions)
+    public function __construct(private WorkoutRepository $sessions)
     {
     }
 

@@ -9,7 +9,7 @@ use App\Progression\Application\GrantXpHandler;
 use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
-use App\Tests\Support\TrainingSessions;
+use App\Tests\Support\Workouts;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
@@ -27,7 +27,7 @@ use Symfony\Component\Uid\Uuid;
  */
 final class RewardTransactionTest extends ApiTestCase
 {
-    use TrainingSessions;
+    use Workouts;
 
     private const int ELAPSED = 1800;
 

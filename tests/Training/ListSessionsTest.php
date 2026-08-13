@@ -6,12 +6,12 @@ namespace App\Tests\Training;
 
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
-use App\Tests\Support\TrainingSessions;
+use App\Tests\Support\Workouts;
 use Symfony\Component\HttpFoundation\Response;
 
 final class ListSessionsTest extends ApiTestCase
 {
-    use TrainingSessions;
+    use Workouts;
 
     public function testAnEmptyHistoryIsAnEmptyListAndNotAnError(): void
     {
@@ -232,13 +232,13 @@ final class ListSessionsTest extends ApiTestCase
     }
 
     /**
-     * Une date de début absolue, là où {@see TrainingSessions::ageSession()} déplace
+     * Une date de début absolue, là où {@see Workouts::ageSession()} déplace
      * relativement : la fenêtre se teste sur un mois nommé, pas sur « il y a longtemps ».
      */
     private function backdate(string $sessionId, string $startedAt): void
     {
         $this->connection()->executeStatement(
-            'UPDATE training_session SET started_at = :startedAt WHERE id = :id',
+            'UPDATE workout SET started_at = :startedAt WHERE id = :id',
             ['startedAt' => $startedAt, 'id' => $sessionId],
         );
     }

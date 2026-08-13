@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Training;
 
 use App\Tests\Support\ApiTestCase;
-use App\Tests\Support\TrainingSessions;
+use App\Tests\Support\Workouts;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -23,7 +23,7 @@ use Symfony\Component\Uid\Uuid;
  */
 final class GuardRailsTest extends ApiTestCase
 {
-    use TrainingSessions;
+    use Workouts;
 
     private const int MINIMUM = 300;
     private const int MAXIMUM = 14400;
@@ -58,7 +58,7 @@ final class GuardRailsTest extends ApiTestCase
         $this->expectException(UniqueConstraintViolationException::class);
 
         $this->connection()->executeStatement(
-            'INSERT INTO training_session (id, user_id, discipline, source, trust, status, started_at, created_at)
+            'INSERT INTO workout (id, user_id, discipline, source, trust, status, started_at, created_at)
              VALUES (:id, :userId, :discipline, :source, :trust, :status, NOW(), NOW())',
             [
                 'id' => Uuid::v7()->toRfc4122(),

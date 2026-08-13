@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Training\Application;
 
-use App\Training\Domain\TrainingSession;
+use App\Training\Domain\Workout;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -15,7 +15,7 @@ use Symfony\Component\Uid\Uuid;
 final readonly class SessionPage
 {
     /**
-     * @param list<TrainingSession> $sessions
+     * @param list<Workout> $sessions
      */
     public function __construct(
         public array $sessions,

@@ -13,7 +13,7 @@ use InvalidArgumentException;
  *
  * Valeurs et justification de chaque seuil : `config/game/v1/training.yaml`.
  */
-final readonly class TrainingRules
+final readonly class WorkoutRules
 {
     public function __construct(
         public int $minimumDurationSeconds,

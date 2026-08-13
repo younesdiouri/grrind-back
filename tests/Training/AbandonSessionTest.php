@@ -7,7 +7,7 @@ namespace App\Tests\Training;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
-use App\Tests\Support\TrainingSessions;
+use App\Tests\Support\Workouts;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,7 +15,7 @@ use Symfony\Component\Uid\Uuid;
 
 final class AbandonSessionTest extends ApiTestCase
 {
-    use TrainingSessions;
+    use Workouts;
 
     private const string KEY = '6a1c8f30-5d24-4b91-8e07-3f9b2d64c115';
 
@@ -168,7 +168,7 @@ final class AbandonSessionTest extends ApiTestCase
     }
 
     /**
-     * Clé fixe, contrairement à {@see TrainingSessions::abandonSession()} : c'est ici
+     * Clé fixe, contrairement à {@see Workouts::abandonSession()} : c'est ici
      * le sujet du test, le rejeu comme le recyclage de clé doivent être observables.
      */
     private function abandon(Account $account, string $sessionId, string $key = self::KEY): Response

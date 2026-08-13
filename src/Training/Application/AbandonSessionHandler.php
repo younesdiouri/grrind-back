@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Training\Application;
 
-use App\Training\Domain\Exception\SessionNotActive;
-use App\Training\Domain\Exception\SessionNotFound;
-use App\Training\Domain\TrainingRules;
-use App\Training\Domain\TrainingSession;
-use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
+use App\Training\Domain\Exception\WorkoutNotActive;
+use App\Training\Domain\Exception\WorkoutNotFound;
+use App\Training\Domain\Workout;
+use App\Training\Domain\WorkoutRules;
+use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -22,20 +22,20 @@ use Psr\Clock\ClockInterface;
 final readonly class AbandonSessionHandler
 {
     public function __construct(
-        private TrainingSessionRepository $sessions,
+        private WorkoutRepository $sessions,
         private ClockInterface $clock,
-        private TrainingRules $rules,
+        private WorkoutRules $rules,
     ) {
     }
 
     /**
-     * @throws SessionNotFound  la séance n'existe pas, ou n'est pas celle de ce joueur
-     * @throws SessionNotActive la séance est déjà close
+     * @throws WorkoutNotFound  la séance n'existe pas, ou n'est pas celle de ce joueur
+     * @throws WorkoutNotActive la séance est déjà close
      */
-    public function __invoke(AbandonSession $command): TrainingSession
+    public function __invoke(AbandonSession $command): Workout
     {
         $session = $this->sessions->ofPlayer($command->userId, $command->sessionId)
-            ?? throw new SessionNotFound($command->sessionId);
+            ?? throw new WorkoutNotFound($command->sessionId);
 
         $session->abandon($this->clock->now(), $this->rules);
 

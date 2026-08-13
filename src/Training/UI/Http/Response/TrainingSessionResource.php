@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Training\UI\Http\Response;
 
-use App\Training\Domain\TrainingSession;
+use App\Training\Domain\Workout;
 use DateTimeInterface;
 
 /**
@@ -35,7 +35,7 @@ final readonly class TrainingSessionResource
     ) {
     }
 
-    public static function from(TrainingSession $session): self
+    public static function from(Workout $session): self
     {
         return new self(
             $session->id()->toRfc4122(),

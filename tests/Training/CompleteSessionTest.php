@@ -7,7 +7,7 @@ namespace App\Tests\Training;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
-use App\Tests\Support\TrainingSessions;
+use App\Tests\Support\Workouts;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,7 +15,7 @@ use Symfony\Component\Uid\Uuid;
 
 final class CompleteSessionTest extends ApiTestCase
 {
-    use TrainingSessions;
+    use Workouts;
 
     private const string KEY = 'd0f6b2c4-7a11-4e3c-9b8f-5c2a1e7d4406';
 
@@ -97,7 +97,7 @@ final class CompleteSessionTest extends ApiTestCase
         self::assertSame('true', $replayed->headers->get(IdempotencyListener::REPLAY_HEADER));
 
         // La preuve que la règle n'a pas rejoué : la clôture serait passée par
-        // `SessionNotActive` et aurait rendu un 409, pas la réponse d'origine.
+        // `WorkoutNotActive` et aurait rendu un 409, pas la réponse d'origine.
         self::assertNull($first->headers->get(IdempotencyListener::REPLAY_HEADER));
     }
 
@@ -178,7 +178,7 @@ final class CompleteSessionTest extends ApiTestCase
     /**
      * Une séance en cours depuis une demi-heure : au-dessus de la durée plancher, donc
      * clôturable. Aucune route ne permet d'antidater — c'est le stockage qu'on recule,
-     * pas le comportement qu'on contourne. Voir {@see TrainingSessions}.
+     * pas le comportement qu'on contourne. Voir {@see Workouts}.
      */
     private function runningSession(Account $account): string
     {

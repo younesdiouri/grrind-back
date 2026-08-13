@@ -15,7 +15,7 @@ use Symfony\Component\Uid\Uuid;
  * La clé s'appelle `sessionStatus` et non `status` : un problem details RFC 9457 a déjà
  * un membre `status`, celui du code HTTP, que les extensions n'écrasent pas.
  */
-final class SessionNotActive extends ConflictError
+final class WorkoutNotActive extends ConflictError
 {
     public function __construct(Uuid $sessionId, SessionStatus $status)
     {

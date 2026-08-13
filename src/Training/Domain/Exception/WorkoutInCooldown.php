@@ -14,7 +14,7 @@ use DateTimeInterface;
  * `readyAt` accompagne `remainingSeconds` pour que le client affiche un décompte sans
  * dépendre de l'heure de l'appareil.
  */
-final class SessionInCooldown extends ConflictError
+final class WorkoutInCooldown extends ConflictError
 {
     public function __construct(DateTimeImmutable $readyAt, int $remainingSeconds)
     {

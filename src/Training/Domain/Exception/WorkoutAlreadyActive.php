@@ -12,7 +12,7 @@ use Symfony\Component\Uid\Uuid;
  * L'identifiant de la séance en cours part dans l'erreur pour qu'il puisse s'y
  * rebrancher plutôt que de rester devant un refus.
  */
-final class SessionAlreadyActive extends ConflictError
+final class WorkoutAlreadyActive extends ConflictError
 {
     public function __construct(Uuid $activeSessionId)
     {
