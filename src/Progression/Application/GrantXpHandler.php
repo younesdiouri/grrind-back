@@ -25,9 +25,12 @@ use Psr\Clock\ClockInterface;
  * 1. **verrouiller la ligne de progression du joueur.** Sans ça, deux complétions
  *    simultanées lisent le même total, calculent le même niveau et s'écrasent l'une
  *    l'autre. Le verrou porte sur une ligne : deux joueurs ne s'attendent jamais ;
- * 2. **lire la charge du jour** — après le verrou, donc en voyant ce que la transaction
- *    concurrente a déjà écrit, sans quoi les rendements décroissants se contourneraient
- *    en clôturant deux séances à la même seconde ;
+ * 2. **lire la charge du jour** — celle de la journée du *sport*, et après le verrou, donc
+ *    en voyant ce que la transaction concurrente a déjà écrit ; sans quoi les rendements
+ *    décroissants se contourneraient en créditant deux workouts à la même seconde. C'est
+ *    aussi ce qui rend un import correct workout par workout : la charge est **relue à
+ *    chaque appel**, donc le deuxième workout d'une même journée voit le premier, même
+ *    lorsque les deux arrivent dans le même lot ;
  * 3. **résoudre les modificateurs actifs**, après le verrou pour la même raison : le
  *    streak et les objets équipés changent à l'intérieur de cette transaction-là, et un
  *    ensemble lu avant elle créditerait des bonus déjà périmés ;
@@ -66,7 +69,10 @@ final readonly class GrantXpHandler
                 $command->discipline,
                 $command->durationSeconds,
                 $this->modifiers->of($command->userId),
-                $this->dailyLoad->of($command->userId, $command->discipline, $now),
+                // La journée du **sport**, pas celle de l'appel. Sur un import, les deux
+                // sont à des jours d'écart, et c'est bien la charge de ce jour-là qui place
+                // le workout sur la courbe des rendements décroissants.
+                $this->dailyLoad->of($command->userId, $command->discipline, $command->occurredAt),
             );
 
             $this->ledger->add(XpTransaction::creditFor(
@@ -75,7 +81,7 @@ final readonly class GrantXpHandler
                 $command->discipline,
                 $command->durationSeconds,
                 $award,
-                $now,
+                $command->occurredAt,
             ));
             $this->ledger->commit();
 

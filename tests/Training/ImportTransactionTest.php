@@ -1,0 +1,283 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Training;
+
+use App\Tests\Support\Account;
+use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\ProgrammableModifiers;
+use App\Tests\Support\Workouts;
+use DateTimeImmutable;
+use DateTimeInterface;
+use Symfony\Component\HttpFoundation\Response;
+
+/**
+ * La transaction d'import contre la vraie base : un seul COMMIT, ou rien.
+ *
+ * Ce qui se démontre ici ne se démontre nulle part ailleurs. Les suites de `Progression`
+ * prouvent que le crédit est **juste** ; celles-ci prouvent qu'il est **lié au workout** —
+ * que l'import écrit au ledger dans le même COMMIT, et qu'un échec en aval ne laisse ni
+ * workout, ni XP, ni événement dans l'outbox.
+ *
+ * L'échec est provoqué par la base elle-même plutôt que par un service de test qui lèverait
+ * sur commande : `uniq_xp_transaction_source_reason` est précisément le garde-fou qui
+ * arbitre deux crédits simultanés, et un double le remplacerait par une mise en scène.
+ */
+final class ImportTransactionTest extends ApiTestCase
+{
+    use Workouts;
+
+    public function testAnImportCreditsTheLedgerInTheSameCommit(): void
+    {
+        $bob = $this->openAccount();
+
+        $response = $this->import($bob, [self::candidate(durationSeconds: 1800)]);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+
+        // Une demi-heure de course à 90 XP l'heure, sans aucun modificateur actif ni
+        // rendement décroissant déclenché : le socle seul, et il est au ledger.
+        self::assertSame(45, $this->ledgerTotalOf($bob));
+
+        // Le snapshot est reprojeté dans la foulée — c'est ce que le client lira ensuite sur
+        // `GET /api/progression`, sans attendre un consommateur de l'outbox.
+        self::assertSame(45, $this->snapshotTotalOf($bob));
+    }
+
+    /**
+     * Dix workouts, un seul COMMIT. Le verrou est pris une fois — un verrou de ligne est
+     * ré-entrant dans une transaction — et tenu jusqu'au bout.
+     */
+    public function testABatchIsCreditedWorkoutByWorkoutInOneTransaction(): void
+    {
+        $bob = $this->openAccount();
+
+        $this->import($bob, [
+            self::candidate(externalId: 'HK-1', startedAt: '2026-08-03T07:00:00+00:00', durationSeconds: 1800),
+            self::candidate(externalId: 'HK-2', startedAt: '2026-08-04T07:00:00+00:00', durationSeconds: 1800),
+            self::candidate(externalId: 'HK-3', startedAt: '2026-08-05T07:00:00+00:00', durationSeconds: 1800),
+        ]);
+
+        // Trois journées distinctes, donc aucun rendement décroissant : 45 chacune.
+        self::assertSame(3, $this->ledgerSize());
+        self::assertSame(135, $this->snapshotTotalOf($bob));
+    }
+
+    /**
+     * **Le test qui porte le ticket.** Les rendements décroissants se calculent sur ce que
+     * le joueur a déjà fait ce jour-là, donc la charge du jour doit être relue à chaque
+     * itération — en voyant les workouts crédités plus tôt dans la **même boucle**, pas
+     * seulement ce qui était en base au BEGIN.
+     *
+     * Trois heures de course le même jour : la première heure pleine, la deuxième à 60 %,
+     * la demi-heure suivante à 30 %. Si la boucle relisait la même charge à chaque fois,
+     * les trois vaudraient 90 et le total serait 270.
+     */
+    public function testTheDailyLoadSeesTheWorkoutsCreditedEarlierInTheSameBatch(): void
+    {
+        $bob = $this->openAccount();
+
+        $this->import($bob, [
+            self::candidate(externalId: 'HK-MATIN', startedAt: '2026-08-05T06:00:00+00:00', durationSeconds: 3600),
+            self::candidate(externalId: 'HK-MIDI', startedAt: '2026-08-05T12:00:00+00:00', durationSeconds: 1800),
+            self::candidate(externalId: 'HK-SOIR', startedAt: '2026-08-05T18:00:00+00:00', durationSeconds: 1800),
+        ]);
+
+        // 90 sur la première heure, puis 27 et 27 sur les deux demi-heures de la tranche
+        // 60-90 puis 90-120, pondérées à 60 % et 30 %.
+        self::assertSame(90 + 27 + 13, $this->snapshotTotalOf($bob));
+    }
+
+    /**
+     * Le corollaire, et c'est lui qui rend l'ordre non cosmétique : le même lot envoyé à
+     * l'envers doit donner **le même ledger**. Sans tri, la séance longue prendrait la
+     * pleine tranche ou pas selon ce que le client a mis en premier.
+     */
+    public function testTheSameBatchInAnyOrderGivesTheSameTotal(): void
+    {
+        $bob = $this->openAccount();
+        $alice = $this->openAccount('alice@grrind.app', 'Alice');
+
+        $matin = self::candidate(externalId: 'HK-MATIN', startedAt: '2026-08-05T06:00:00+00:00', durationSeconds: 3600);
+        $soir = self::candidate(externalId: 'HK-SOIR', startedAt: '2026-08-05T18:00:00+00:00', durationSeconds: 1800);
+
+        $this->import($bob, [$matin, $soir]);
+        $this->import($alice, [$soir, $matin]);
+
+        self::assertSame($this->snapshotTotalOf($bob), $this->snapshotTotalOf($alice));
+    }
+
+    /**
+     * Un workout de mardi importé vendredi compte pour **mardi**. C'est ce que le
+     * renommage de `created_at` en `occurred_at` a rendu possible : daté de son écriture,
+     * il se serait entassé avec les autres sur la journée de la synchronisation, où le
+     * plafond quotidien en aurait écrasé la moitié.
+     */
+    public function testEachWorkoutIsCreditedOnTheDayItWasPractised(): void
+    {
+        $bob = $this->openAccount();
+
+        $this->import($bob, [
+            self::candidate(externalId: 'HK-LUNDI', startedAt: '2026-08-03T07:00:00+00:00', durationSeconds: 3600),
+            self::candidate(externalId: 'HK-MARDI', startedAt: '2026-08-04T07:00:00+00:00', durationSeconds: 3600),
+        ]);
+
+        // Deux heures pleines à 90, sur deux journées : aucun rendement décroissant. Sur
+        // une seule journée, la seconde ne vaudrait que 54.
+        self::assertSame(180, $this->snapshotTotalOf($bob));
+
+        $days = $this->connection()->fetchFirstColumn(
+            "SELECT to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') FROM xp_transaction ORDER BY occurred_at",
+        );
+
+        self::assertSame(['2026-08-03', '2026-08-04'], $days);
+    }
+
+    /**
+     * Le chemin d'échec, et c'est le test qui porte l'autre moitié du ticket : une panne au
+     * **milieu** de la boucle ne doit rien laisser — pas même le premier workout, pourtant
+     * écrit, crédité et publié avant elle.
+     *
+     * C'est exactement ce que dix appels séparés ne sauraient pas garantir : un échec au
+     * septième laisserait six crédits en base et le joueur avec la moitié de sa récompense.
+     */
+    public function testAFailureMidBatchLeavesNeitherWorkoutNorXpNorEvent(): void
+    {
+        $bob = $this->openAccount();
+        ProgrammableModifiers::failAfter(1);
+
+        $response = $this->import($bob, [
+            self::candidate(externalId: 'HK-AVANT', startedAt: '2026-08-03T07:00:00+00:00'),
+            self::candidate(externalId: 'HK-APRES', startedAt: '2026-08-04T07:00:00+00:00'),
+        ]);
+
+        self::assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
+
+        // Le rollback porte sur tout, y compris sur ce que le transport Doctrine avait déjà
+        // inséré dans l'outbox — c'est ce que le pattern outbox achète.
+        self::assertSame(0, $this->countWorkouts());
+        self::assertSame(0, $this->ledgerSize());
+        self::assertSame(0, $this->snapshotTotalOf($bob));
+        self::assertSame(0, $this->outboxSize());
+    }
+
+    /**
+     * L'événement part une fois par workout crédité, jamais un agrégat : le classement
+     * compte des activités, pas des synchronisations.
+     */
+    public function testOneEventPerCreditedWorkoutAndNoneForTheSkippedOnes(): void
+    {
+        $bob = $this->openAccount();
+
+        $this->import($bob, [
+            self::candidate(externalId: 'HK-1', startedAt: '2026-08-03T07:00:00+00:00'),
+            self::candidate(externalId: 'HK-2', startedAt: '2026-08-04T07:00:00+00:00'),
+            self::candidate(externalId: 'HK-CURLING', activityType: 'curling', startedAt: '2026-08-05T07:00:00+00:00'),
+        ]);
+
+        self::assertSame(2, $this->outboxSize());
+    }
+
+    /**
+     * Le rejeu de la clé d'idempotence rend la réponse conservée sans réexécuter la règle :
+     * sans ça, l'outbox contiendrait deux fois les mêmes faits.
+     */
+    public function testAReplayedRequestDoesNotPublishTwice(): void
+    {
+        $bob = $this->openAccount();
+        $lot = [self::candidate()];
+
+        $this->import($bob, $lot);
+        $this->import($bob, $lot);
+
+        self::assertSame(1, $this->outboxSize());
+        self::assertSame(1, $this->ledgerSize());
+    }
+
+    /**
+     * Un workout écarté n'annule pas le lot, et un lot entièrement écarté ne crédite rien
+     * sans être un échec. Les deux phrases du ticket, dans un seul appel.
+     */
+    public function testASkippedWorkoutDoesNotPreventTheOthersFromBeingCredited(): void
+    {
+        $bob = $this->openAccount();
+
+        $response = $this->import($bob, [
+            self::candidate(externalId: 'HK-CURLING', activityType: 'curling'),
+            self::candidate(externalId: 'HK-COURSE', durationSeconds: 1800),
+        ]);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+        self::assertSame(45, $this->snapshotTotalOf($bob));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $workouts
+     */
+    private function import(Account $account, array $workouts, string $key = 'import-du-jour'): Response
+    {
+        return $this->post(
+            '/api/workouts/import',
+            ['workouts' => $workouts],
+            $account->headers + ['Idempotency-Key' => $key],
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function candidate(
+        string $externalId = 'HK-001',
+        string $activityType = 'running',
+        string $startedAt = '2026-08-05T07:00:00+00:00',
+        int $durationSeconds = 1800,
+    ): array {
+        return [
+            'externalId' => $externalId,
+            'source' => 'APPLE_HEALTH',
+            'activityType' => $activityType,
+            'startedAt' => $startedAt,
+            'endedAt' => new DateTimeImmutable($startedAt)
+                ->modify(\sprintf('+%d seconds', $durationSeconds))
+                ->format(DateTimeInterface::ATOM),
+        ];
+    }
+
+    private function ledgerTotalOf(Account $account): int
+    {
+        return self::asInt($this->connection()->fetchOne(
+            'SELECT COALESCE(SUM(amount), 0) FROM xp_transaction WHERE user_id = :id',
+            ['id' => $account->id->toRfc4122()],
+        ));
+    }
+
+    private function snapshotTotalOf(Account $account): int
+    {
+        return self::asInt($this->connection()->fetchOne(
+            'SELECT COALESCE(MAX(total_xp), 0) FROM progression_snapshot WHERE user_id = :id',
+            ['id' => $account->id->toRfc4122()],
+        ));
+    }
+
+    private function ledgerSize(): int
+    {
+        return self::asInt($this->connection()->fetchOne('SELECT COUNT(*) FROM xp_transaction'));
+    }
+
+    private function countWorkouts(): int
+    {
+        return self::asInt($this->connection()->fetchOne('SELECT COUNT(*) FROM workout'));
+    }
+
+    private function outboxSize(): int
+    {
+        return self::asInt($this->connection()->fetchOne('SELECT COUNT(*) FROM messenger_messages'));
+    }
+
+    private static function asInt(mixed $value): int
+    {
+        self::assertIsNumeric($value);
+
+        return (int) $value;
+    }
+}

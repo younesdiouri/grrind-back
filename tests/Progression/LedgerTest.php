@@ -120,7 +120,7 @@ final class LedgerTest extends KernelTestCase
             new XpBreakdownLine(XpBreakdownSource::Diminishing, -30),
         ));
 
-        $this->ledger->add(XpTransaction::reversalOf($credit, $this->now));
+        $this->ledger->add(XpTransaction::reversalOf($credit));
         $this->ledger->commit();
 
         self::assertSame(0, $this->ledger->totalOf($userId));

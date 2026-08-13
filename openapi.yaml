@@ -902,13 +902,13 @@ components:
         - durationSeconds
         - breakdown
         - rulesetVersion
-        - createdAt
+        - occurredAt
       properties:
         id:
           type: string
           format: uuid
         sourceId:
-          description: "Ce qui a produit l'écriture — l'identifiant de la séance en v1."
+          description: "Ce qui a produit l'écriture — l'identifiant du workout."
           type: string
           format: uuid
         reason:
@@ -941,7 +941,8 @@ components:
         rulesetVersion:
           description: "Celui du calcul, pas celui d'aujourd'hui. C'est ce qui permet de rééquilibrer sans corrompre l'historique."
           type: string
-        createdAt:
+        occurredAt:
+          description: "**L'instant du sport, pas celui de l'écriture.** Un workout de mardi importé\nvendredi est daté de mardi : c'est ce qui range l'écriture dans la bonne journée,\npour le plafond quotidien comme pour l'affichage. L'instant de l'écriture, lui,\nest encodé dans l'`id` — c'est un UUID v7.\n"
           type: string
           format: date-time
       type: object

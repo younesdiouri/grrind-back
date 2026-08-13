@@ -12,7 +12,7 @@ use DateTimeImmutable;
  *
  * - **il vit dans `Shared`** — il *est* le contrat entre deux modules, et Deptrac
  *   interdit qu'un abonné importe une classe de son émetteur ;
- * - **il se nomme au passé** — `TrainingSessionCompleted`, jamais `…Event` ;
+ * - **il se nomme au passé** — `WorkoutImported`, jamais `…Event` ;
  * - **il ne porte que des scalaires, des enums de `Shared` et des `Uuid`.** Jamais
  *   d'entité : il sera désérialisé plus tard, dans un autre processus, où l'entité
  *   aurait changé. Le payload est autoportant ;
@@ -23,9 +23,11 @@ use DateTimeImmutable;
 interface DomainEvent
 {
     /**
-     * L'instant du fait, sur l'horloge serveur — pas celui de la publication. Les deux
-     * coïncident aujourd'hui ; ils divergeront le jour où une activité s'importera après
-     * coup, et c'est le fait qui compte.
+     * L'instant du fait — ni celui de la publication, ni celui de l'écriture.
+     *
+     * Les deux ne coïncident plus depuis l'import santé : un workout de mardi publié
+     * vendredi est daté de mardi. C'était annoncé ici comme une divergence à venir ; elle
+     * est arrivée, et c'est bien le fait qui compte.
      */
     public function occurredAt(): DateTimeImmutable;
 }

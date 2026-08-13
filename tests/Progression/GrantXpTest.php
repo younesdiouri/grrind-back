@@ -76,7 +76,7 @@ final class GrantXpTest extends ApiTestCase
         $player = $this->openAccount()->id;
         $sessionId = Uuid::v7();
 
-        $granted = ($this->grantXp)(new GrantXp($player, $sessionId, Discipline::Running, 3600));
+        $granted = ($this->grantXp)(new GrantXp($player, $sessionId, Discipline::Running, 3600, new DateTimeImmutable()));
 
         // Une heure de course rapporte quelque chose, et ce quelque chose est au ledger,
         // attribué à la séance qui l'a produit.
@@ -106,8 +106,8 @@ final class GrantXpTest extends ApiTestCase
         // la pose, sans quoi `Identity` devrait connaître `Progression`.
         self::assertNull($this->snapshots->ofPlayer($player));
 
-        ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 1800));
-        ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Cycling, 1800));
+        ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
+        ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Cycling, 1800, new DateTimeImmutable()));
 
         self::assertCount(1, $this->snapshots->findAll());
         self::assertSame($this->ledger->totalOf($player), $this->snapshots->ofPlayer($player)?->totalXp());
@@ -122,7 +122,7 @@ final class GrantXpTest extends ApiTestCase
         // rendements décroissants ni sur le plafond du jour.
         $this->seedLedger($player, 1_000, new DateTimeImmutable('-2 days'));
 
-        $granted = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 3600));
+        $granted = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         // Le handler relit la somme au lieu d'ajouter au compteur : l'écart se résorbe tout
         // seul au crédit suivant, là où un `+=` l'aurait entériné pour toujours.
@@ -138,7 +138,7 @@ final class GrantXpTest extends ApiTestCase
         // est vérifié est la mécanique d'annonce, pas la valeur des seuils.
         $this->seedLedger($player, 1_000_000, new DateTimeImmutable('-2 days'));
 
-        $granted = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 1800));
+        $granted = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
 
         // Tous les niveaux, dans l'ordre, du deuxième au dernier — le client les anime un
         // par un, un booléen lui en ferait avaler quarante-huit en silence.
@@ -168,10 +168,10 @@ final class GrantXpTest extends ApiTestCase
 
         // Deux crédits d'affilée : c'est le second qui compte, parce qu'il part d'un joueur
         // qui a déjà une position sur la courbe. Le premier ne fait que la lui donner.
-        $first = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 3600));
+        $first = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
         $standingAfterTheFirst = $first->snapshot->standing();
 
-        $second = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 3600));
+        $second = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         self::assertEquals($standingAfterTheFirst, $second->standingBefore);
 
@@ -189,7 +189,7 @@ final class GrantXpTest extends ApiTestCase
         // un ensemble vide, et le joueur est sous-payé en silence.
         ProgrammableModifiers::grant(new Modifier(ModifierType::XpMultiplier, 20, ModifierSource::Streak));
 
-        $granted = ($this->grantXp)(new GrantXp($player, $sessionId = Uuid::v7(), Discipline::Running, 3600));
+        $granted = ($this->grantXp)(new GrantXp($player, $sessionId = Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         $lines = $granted->award->breakdown->lines;
         self::assertSame(XpBreakdownSource::Base, $lines[0]->source);
@@ -217,7 +217,7 @@ final class GrantXpTest extends ApiTestCase
     {
         // L'état du Lot 3 : aucun module n'accorde encore de modificateur, et c'est un cas
         // normal — pas une raison de refuser une séance ni de créditer zéro.
-        $granted = ($this->grantXp)(new GrantXp($this->openAccount()->id, Uuid::v7(), Discipline::Running, 3600));
+        $granted = ($this->grantXp)(new GrantXp($this->openAccount()->id, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         self::assertSame([XpBreakdownSource::Base], array_map(
             static fn (XpBreakdownLine $line): XpBreakdownSource => $line->source,
@@ -230,13 +230,13 @@ final class GrantXpTest extends ApiTestCase
         $player = $this->openAccount()->id;
         $sessionId = Uuid::v7();
 
-        ($this->grantXp)(new GrantXp($player, $sessionId, Discipline::Running, 1800));
+        ($this->grantXp)(new GrantXp($player, $sessionId, Discipline::Running, 1800, new DateTimeImmutable()));
 
         // Un client mobile rejoue ses requêtes. La transaction entière est annulée, donc le
         // snapshot ne bouge pas non plus : c'est ce que le `wrapInTransaction` achète.
         $this->expectException(UniqueConstraintViolationException::class);
 
-        ($this->grantXp)(new GrantXp($player, $sessionId, Discipline::Running, 1800));
+        ($this->grantXp)(new GrantXp($player, $sessionId, Discipline::Running, 1800, new DateTimeImmutable()));
     }
 
     public function testTheLockRefusesToRunOutsideATransaction(): void

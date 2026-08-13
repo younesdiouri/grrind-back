@@ -6,6 +6,7 @@ namespace App\Tests\Support;
 
 use App\Shared\Application\ModifierContributor;
 use App\Shared\Domain\Modifier\Modifier;
+use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -35,6 +36,9 @@ final class ProgrammableModifiers implements ModifierContributor
     /** @var list<Modifier> */
     private static array $granted = [];
 
+    /** @see failAfter() */
+    private static ?int $remainingBeforeFailure = null;
+
     public static function grant(Modifier ...$modifiers): void
     {
         self::$granted = array_values($modifiers);
@@ -43,10 +47,34 @@ final class ProgrammableModifiers implements ModifierContributor
     public static function grantNothing(): void
     {
         self::$granted = [];
+        self::$remainingBeforeFailure = null;
+    }
+
+    /**
+     * Fait échouer la résolution après `$successes` appels — c'est-à-dire **au milieu d'un
+     * lot d'import**, une fois les premiers workouts écrits et crédités.
+     *
+     * C'est une panne injectée, et on préférerait une vraie contrainte : `RewardTransaction`
+     * provoquait la sienne par `uniq_xp_transaction_source_reason`, la base refusant
+     * elle-même un second crédit de la même séance. Aucune contrainte n'est atteignable ici —
+     * la source d'une écriture est l'identifiant du workout, tiré par `Workout::record()`, et
+     * aucun test ne peut le choisir pour le faire entrer en collision.
+     *
+     * Ce seam-là plutôt qu'un autre parce qu'il est déjà celui des tests, qu'il est appelé
+     * **une fois par workout et dans la transaction**, et qu'il n'ajoute rien au code de
+     * production.
+     */
+    public static function failAfter(int $successes): void
+    {
+        self::$remainingBeforeFailure = $successes;
     }
 
     public function modifiersOf(Uuid $userId): array
     {
+        if (null !== self::$remainingBeforeFailure && self::$remainingBeforeFailure-- <= 0) {
+            throw new RuntimeException('Panne provoquée au milieu du lot.');
+        }
+
         return self::$granted;
     }
 }

@@ -503,10 +503,10 @@ when@dev:
                             Une écriture au ledger. **Le ledger est la vérité** ; le niveau et le total en sont
                             des projections. Rien ne s'efface : une séance invalidée produit une écriture
                             négative, et les deux restent.
-                        required: [id, sourceId, reason, discipline, amount, durationSeconds, breakdown, rulesetVersion, createdAt]
+                        required: [id, sourceId, reason, discipline, amount, durationSeconds, breakdown, rulesetVersion, occurredAt]
                         properties:
                             id: { type: string, format: uuid }
-                            sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant de la séance en v1." }
+                            sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant du workout." }
                             reason: { type: string, enum: [SESSION_COMPLETED, SESSION_INVALIDATED] }
                             discipline: { type: string, enum: [RUNNING, WALKING, CYCLING, SWIMMING, STRENGTH, HIIT, HIKING, MOBILITY, CLIMBING] }
                             amount: { type: integer, description: "Signé. La somme du `breakdown`, jamais autre chose." }
@@ -515,7 +515,14 @@ when@dev:
                                 type: array
                                 items: { $ref: '#/components/schemas/XpLine' }
                             rulesetVersion: { type: string, description: "Celui du calcul, pas celui d'aujourd'hui. C'est ce qui permet de rééquilibrer sans corrompre l'historique." }
-                            createdAt: { type: string, format: date-time }
+                            occurredAt:
+                                type: string
+                                format: date-time
+                                description: |
+                                    **L'instant du sport, pas celui de l'écriture.** Un workout de mardi importé
+                                    vendredi est daté de mardi : c'est ce qui range l'écriture dans la bonne journée,
+                                    pour le plafond quotidien comme pour l'affichage. L'instant de l'écriture, lui,
+                                    est encodé dans l'`id` — c'est un UUID v7.
 
                     XpHistoryPage:
                         type: object

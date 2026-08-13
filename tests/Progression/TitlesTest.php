@@ -10,6 +10,7 @@ use App\Progression\Domain\Title;
 use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
@@ -64,7 +65,7 @@ final class TitlesTest extends ApiTestCase
     {
         $account = $this->openAccount();
 
-        $granted = ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800));
+        $granted = ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
 
         // La séance qui vient d'être créditée compte dans sa propre condition : évaluer
         // avant l'écriture ferait attendre la séance suivante au joueur.
@@ -79,8 +80,8 @@ final class TitlesTest extends ApiTestCase
     {
         $account = $this->openAccount();
 
-        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800));
-        $second = ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Cycling, 1800));
+        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
+        $second = ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Cycling, 1800, new DateTimeImmutable()));
 
         // Sans quoi la complétion rappellerait au joueur, à chaque séance, qu'il vient de
         // débloquer un titre qu'il porte depuis six mois.
@@ -174,7 +175,7 @@ final class TitlesTest extends ApiTestCase
     private function unlockedAccount(): Account
     {
         $account = $this->openAccount();
-        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800));
+        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
 
         return $account;
     }
