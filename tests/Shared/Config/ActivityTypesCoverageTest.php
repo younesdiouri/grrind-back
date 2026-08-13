@@ -68,6 +68,20 @@ final class ActivityTypesCoverageTest extends KernelTestCase
     }
 
     /**
+     * Le type que l'Apple Watch écrit pour « Cardio varié », et le repli de plusieurs
+     * appareils de salle.
+     *
+     * Il n'était pas dans la table, et il valait onze des douze séances de la première
+     * synchronisation réelle depuis un iPhone (#110) : le back les a toutes écartées, à
+     * raison, et le joueur n'avait rien à jouer. Il se range avec `crossTraining`, qui
+     * est la même idée sous un autre nom.
+     */
+    public function testMixedCardioIsPlayed(): void
+    {
+        self::assertSame(Discipline::Hiit, self::shippedMap()->disciplineFor('APPLE_HEALTH', 'mixedCardio'));
+    }
+
+    /**
      * Une activité que Grrind ne sait pas traduire ne casse rien : elle rend `null`, et
      * l'import la comptera et la nommera au joueur (#92).
      */
