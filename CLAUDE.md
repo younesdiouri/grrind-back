@@ -25,6 +25,11 @@ celles qui parlaient *du client* étaient à corriger.
 `source` avec `trust=PROVIDER_VERIFIED`, et la forme du `RewardSummary` est dictée par la mise en
 scène, pas par le framework qui la joue.
 
+Le virage santé l'a **renforcé** plutôt que remis en cause : le module natif Swift pour HealthKit
+était déjà écrit ici comme le plan, et il est devenu la brique centrale du produit. Son pendant
+Android — Health Connect, en Kotlin — est un second module natif derrière la même interface JS.
+C'est exactement l'option que React Native préservait.
+
 ## Règle n°0 : priorité à l'écosystème Symfony
 
 **Ce que Symfony fournit ne se réécrit pas.** Avant d'écrire une classe, la question est
@@ -107,7 +112,7 @@ jamais par import direct d'une entité d'un autre module.
 src/
   Shared/         # Kernel, Clock, UuidV7, types Doctrine, idempotence, ModifierVocabulary
   Identity/       # User, auth, profil, timezone
-  Training/       # TrainingSession : déclaration, démarrage, complétion, garde-fous
+  Training/       # Workout : import santé, arbitrage, historique
   Progression/    # Ledger XP, courbe de niveaux, titres, arbres de compétences
   Rewards/        # Tables de loot, tirages, inventaire, équipement
   Engagement/     # Streak, classements, ligues
@@ -125,18 +130,34 @@ Chaque module suit la même découpe :
 
 ## Invariants de conception (à ne jamais casser)
 
-**Le serveur possède l'horloge.** Une session doit être ouverte côté serveur avant d'être fermée.
-La durée retenue est calculée à partir des timestamps serveur, jamais de ceux envoyés par le client.
-Pas d'antidatage. C'est ce qui rend l'arrivée de Strava indolore : ça restera une simple source
-supplémentaire.
+**Le serveur *arbitre* l'horloge.** Il ne la possède plus, et c'est un vrai changement
+d'invariant — pas une reformulation. Un workout a eu lieu avant que Grrind en entende parler :
+il n'existe aucune horloge serveur pour un fait passé, donc les bornes viennent du fournisseur
+santé. Ce que le serveur garde, c'est le **jugement** : la durée n'est jamais un champ acceptable
+(elle se recalcule des deux bornes), et fenêtre d'antériorité, chevauchements, plancher et
+plafond décident de ce qui compte.
 
-**Toute activité est une source attribuée.** Chaque session porte `source`
-(`MANUAL_TIMER` en v1, puis `STRAVA`, `HEALTHKIT`) et `trust` (`DECLARED` → `PROVIDER_VERIFIED`).
-Le modèle ne bouge pas quand on branche une API tierce.
+La raison d'origine — empêcher l'antidatage — est servie autrement, et mieux : la donnée est
+certifiée par la plateforme, et l'arbitrage reste serveur. Ce qui n'a pas changé d'un mot :
+**aucune valeur de jeu ne se calcule à partir de ce que le client affirme.**
+
+**Toute activité est une source attribuée.** Chaque workout porte `source` (`APPLE_HEALTH`,
+`HEALTH_CONNECT`) et `trust` (`DECLARED` → `PROVIDER_VERIFIED`). Le modèle ne bouge pas quand on
+branche un fournisseur de plus.
+
+C'est l'invariant qui a le mieux vieilli, et ça vaut d'être noté : `HEALTHKIT` était déjà prévu
+avec `trust=PROVIDER_VERIFIED` bien avant qu'on décide d'en faire la source principale, et le
+modèle n'a pas eu à bouger pour l'accueillir — seulement les valeurs de l'enum. C'est la
+démonstration que la règle marche.
 
 **L'XP est un ledger append-only.** `xp_transaction` est la vérité ; le niveau est une projection.
-On n'incrémente jamais un compteur `xp` en place. Une session invalidée génère une transaction
+On n'incrémente jamais un compteur `xp` en place. Un workout invalidé génère une transaction
 négative, on ne supprime rien. `progression_snapshot` est un cache reconstructible.
+
+Chaque écriture est datée par le **sport** (`occurred_at`), pas par son insertion : dix workouts
+importés d'un coup appartiennent à dix journées différentes, et c'est ce qui range chacun sous le
+bon plafond quotidien. L'instant de l'écriture n'est pas perdu pour autant — il est encodé dans
+l'UUID v7 de la ligne.
 
 **Le calcul d'XP est une fonction pure et versionnée.** On stocke le montant accordé *et* la version
 du ruleset *et* le détail du calcul. On peut rééquilibrer sans corrompre l'historique, et le client
@@ -150,48 +171,84 @@ pourrir.
 **Le RNG est serveur et auditable.** Tout tirage de loot stocke le roll, la graine et la version de
 la table. Le client ne tire jamais rien.
 
-**Les écritures métier sont idempotentes.** Header `Idempotency-Key` obligatoire sur la complétion
-de session — les clients mobiles rejouent leurs requêtes.
+**Les écritures métier sont idempotentes.** Header `Idempotency-Key` obligatoire sur l'import —
+les clients mobiles rejouent leurs requêtes. Il ne fait pas doublon avec l'unicité
+`(user, source, externalId)` : celle-ci empêche le double crédit, celui-là rend la **réponse**
+d'origine. Sans lui, un client qui rejoue reçoit une synchronisation vide au lieu de sa mise en
+scène — l'XP serait juste, l'animation perdue.
 
 **La balance du jeu est du config-as-code.** Courbe de niveaux, coefficients XP, tables de loot,
 arbres, catalogue d'objets vivent en YAML versionné sous `config/game/v1/`, chargés et validés au
 boot, hashés pour produire le `rulesetVersion`. Rien de tout ça en base en v1.
 
-## Transaction de complétion de session
+## Transaction d'import
 
-C'est le cœur du produit — le moment dopamine. Séquence, en une transaction :
+C'est le cœur du produit — le moment dopamine. Le client envoie **tout ce que la montre a
+enregistré depuis sa dernière synchronisation** : revenir après dix jours avec trois séances est
+le cas nominal, pas l'exception. Séquence, en une transaction :
 
 ```
+trier les workouts par startedAt croissant
+écarter ce qui se juge seul : doublon, activité non traduite, durée sous le plancher
+départager les chevauchements du lot : le plus complet gagne
+
 BEGIN
-  verrou pessimiste sur la ligne progression du user
-  valider la transition d'état de la session
-  résoudre les modificateurs actifs (ModifierResolver)
-  calculer l'XP (XpCalculator, pur)
-  écrire la/les XpTransaction
-  mettre à jour le snapshot, attribuer les points de compétence
-  tirer le loot (LootRoller, audité)
-  mettre à jour le streak
-  écrire les événements de domaine dans l'outbox
+  pour chaque workout, dans l'ordre :
+      écarter s'il chevauche un workout déjà en base
+      écrire le workout
+      hors fenêtre → conservé, non crédité, on s'arrête là
+      verrou pessimiste sur la ligne progression du user (pris une fois, tenu jusqu'au COMMIT)
+      résoudre les modificateurs actifs (ModifierResolver)
+      relire la charge du jour — celle de la journée du sport
+      calculer l'XP (XpCalculator, pur)
+      écrire l'XpTransaction
+      mettre à jour le snapshot, attribuer les points de compétence
+      tirer le loot (LootRoller, audité)
+      mettre à jour le streak
+      publier WorkoutImported dans l'outbox
 COMMIT
 → asynchrone : classements, notifications
-→ réponse : RewardSummary
+→ réponse : SyncSummary
 ```
 
-Le verrou sérialise les complétions concurrentes. Le `RewardSummary` est un payload unique conçu
-pour être **animé séquentiellement** par le client : gains d'XP détaillés, level ups, titre
-débloqué, loot, streak, nouveaux nœuds débloquables. **L'ordre des champs est l'ordre de
-l'animation**, et il ne doit rien au framework qui la joue.
+**Un import est un ensemble, pas une transaction tout-ou-rien** — et les deux phrases coexistent.
+Un workout *écarté* n'annule rien : neuf séances valides ne peuvent pas échouer parce que la
+dixième est une partie de curling. Une *panne*, elle, défait tout : un workout écrit sans XP
+créditée est une perte silencieuse.
 
-## Garde-fous anti-abus v1 (sans API tierce)
+**L'ordre chronologique n'est pas cosmétique.** Les rendements décroissants se calculent sur ce
+que le joueur a déjà fait ce jour-là, donc la charge du jour se relit à chaque itération, en
+voyant ce que la boucle vient d'écrire. Le même lot envoyé dans un autre ordre doit donner le
+même ledger.
 
-Ce sont autant des règles de game design que des règles anti-triche :
+Le verrou est pris une fois — un verrou de ligne est ré-entrant dans une transaction — et
+sérialise deux synchronisations concurrentes : deux appareils du même compte, ou l'app relancée
+pendant qu'une synchronisation tournait encore.
 
-- une seule session active à la fois, durée plancher et plafond
-- rendements décroissants sur la journée (0-60 min ×1, 60-90 ×0.6, 90-120 ×0.3, au-delà ×0)
+Le `SyncSummary` est un payload unique conçu pour être **animé séquentiellement** : un
+`RewardSummary` par workout crédité, dans l'ordre chronologique, chacun portant son palier de
+départ *et* d'arrivée pour que la barre s'enchaîne sans un seul recalcul côté client. **L'ordre
+des champs est l'ordre de l'animation** — entre les workouts, puis à l'intérieur de chacun — et
+il ne doit rien au framework qui la joue.
+
+## Garde-fous anti-abus v1
+
+Ce sont **des règles de game design avant d'être de l'anti-triche**, et c'est pour ça qu'elles
+survivent à une donnée certifiée par Apple : ce sont elles qui font qu'une journée de quatre
+heures ne vaut pas quatre fois une journée d'une heure. Elles protègent aussi le jour où une
+source déclarée reviendra.
+
+- rendements décroissants sur la journée (0-60 min ×1, 60-90 ×0.6, 90-120 ×0.3, au-delà ×0),
+  calculés workout par workout dans l'ordre chronologique
 - plafond d'XP quotidien par discipline
-- cooldown entre deux sessions
+- durée plancher (un faux départ sur la montre n'est pas une séance) et plafond (l'enregistrement
+  oublié est **écrêté**, jamais rejeté)
+- fenêtre d'antériorité de 30 jours : au-delà, un workout est **conservé sans être crédité**
+- chevauchement : deux enregistrements du même effort par deux applications ne comptent qu'une fois
 
-Les rendements décroissants suppriment l'intérêt de tricher tout en étant une vraie mécanique.
+Le cooldown entre séances et la règle « une seule séance active » ont disparu avec le
+chronomètre : Apple produit trois workouts d'affilée sans demander la permission à personne, et
+refuser le troisième reviendrait à refuser un fait qui a eu lieu.
 
 ## Conventions
 
@@ -266,12 +323,12 @@ tout seul à l'arrivée sur `main` — et le tableau le déplace en `Done` dans 
 « Item closed » du projet est actif.
 
 ```
-feat(training): démarre une session sur l'horloge serveur
+feat(training): la durée se calcule, elle ne se recopie pas
 
-Le client n'envoie que la discipline : startedAt vient de Shared\Clock,
-sinon l'antidatage est trivial.
+Le client envoie deux bornes du fournisseur, jamais une durée : une troisième
+valeur à réconcilier lui donnerait une prise sur ce qu'il gagne.
 
-Closes #6
+Closes #83
 ```
 
 - **Mots-clés qui ferment** : `Closes`, `Fixes`, `Resolves` (+ leurs variantes `close`/`fixed`/…),
@@ -293,12 +350,12 @@ Le format reste le conventionnel déjà en place — `feat(module):`, `fix(modul
 `chore:`, `docs:`, `test:` — corps en français, à l'impératif, qui explique le *pourquoi* et pas
 le *quoi* (le diff le dit déjà).
 
-Lots 0 et 1 (Identity) faits ; le reste est ouvert sur le tableau, dans l'ordre Training →
-Progression → **RewardSummary (premier jouable)** → Streak → Loot → Arbres → Classements →
-durcissement. Strava arrive après, comme simple adapter d'`ActivitySource`.
+Identity, Training, Progression et le **premier jouable** (import santé → `SyncSummary`) sont
+faits ; le reste est ouvert sur le tableau, dans l'ordre Streak → Loot → Arbres → Classements →
+durcissement. Strava arrive après, comme simple source supplémentaire.
 
 [ARCHITECTURE.md](ARCHITECTURE.md) est la vue d'ensemble, **en schémas** : la carte des modules et
-de leurs frontières, la vie d'une séance, la transaction de complétion, le modèle de données,
+de leurs frontières, la vie d'un import, la transaction d'import, le modèle de données,
 l'authentification, la chaîne du config-as-code. C'est ce qu'on ouvre pour comprendre le système
 tel qu'il est aujourd'hui — pas pour savoir ce qui reste à faire, ça vit sur le tableau.
 

@@ -39,10 +39,10 @@ Monolithe modulaire : `Shared`, `Identity`, `Training`, `Progression`, `Rewards`
 Un module ne connaît que `Shared` — Deptrac le vérifie en CI.
 
 👉 **[ARCHITECTURE.md](ARCHITECTURE.md) est la vue d'ensemble en schémas** : la carte des modules,
-la vie d'une séance, la transaction de complétion, le modèle de données, l'authentification et la
+la vie d'un import, la transaction d'import, le modèle de données, l'authentification et la
 chaîne du config-as-code. C'est le fichier à ouvrir en premier.
 
-Les invariants de conception (le serveur possède l'horloge, l'XP est un ledger append-only, un seul
+Les invariants de conception (le serveur arbitre l'horloge, l'XP est un ledger append-only, un seul
 vocabulaire de modificateurs, RNG serveur auditable) sont détaillés dans [CLAUDE.md](CLAUDE.md).
 
 ## Contrat d'API
