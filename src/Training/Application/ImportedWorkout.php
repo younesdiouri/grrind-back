@@ -33,4 +33,36 @@ final readonly class ImportedWorkout
         public ?int $averageHeartRate = null,
     ) {
     }
+
+    /**
+     * La durée telle que les bornes du fournisseur la donnent, plancher à zéro — même
+     * calcul que dans l'agrégat, parce que l'arbitrage a besoin de la connaître **avant**
+     * de décider s'il écrit un workout.
+     */
+    public function durationSeconds(): int
+    {
+        return max(0, $this->endedAt->getTimestamp() - $this->startedAt->getTimestamp());
+    }
+
+    /**
+     * Deux créneaux qui se recouvrent, bornes exclues : une séance qui finit à 8 h 00 et
+     * une qui commence à 8 h 00 s'enchaînent, elles ne se recouvrent pas.
+     */
+    public function overlaps(DateTimeImmutable $startedAt, DateTimeImmutable $endedAt): bool
+    {
+        return $this->startedAt < $endedAt && $this->endedAt > $startedAt;
+    }
+
+    /**
+     * Combien de mesures la montre a rendues. C'est ce qui départage deux enregistrements
+     * du même effort : entre l'entrée d'Apple Exercice et celle de Strava, on garde celle
+     * qui en dit le plus au joueur.
+     */
+    public function measurementCount(): int
+    {
+        return \count(array_filter(
+            [$this->distanceMeters, $this->calories, $this->elevationGainMeters, $this->averageHeartRate],
+            static fn (?int $measurement): bool => null !== $measurement,
+        ));
+    }
 }

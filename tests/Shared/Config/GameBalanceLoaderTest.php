@@ -26,7 +26,7 @@ final class GameBalanceLoaderTest extends TestCase
         $balance = self::loadShipped();
 
         self::assertSame(
-            ['minimum_duration_seconds' => 300, 'maximum_duration_seconds' => 14400],
+            ['minimum_duration_seconds' => 300, 'maximum_duration_seconds' => 14400, 'import_window_days' => 30],
             $balance->sections['training'],
         );
 
