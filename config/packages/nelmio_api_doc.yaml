@@ -27,9 +27,11 @@ when@dev:
                 description: |
                     L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.
 
-                    **Le serveur possède l'horloge.** Aucune route n'accepte une date ni une durée envoyée par le
-                    client : une séance s'ouvre, puis se ferme, et le serveur date les deux. Antidater est
-                    impossible par construction, pas par contrôle.
+                    **Le serveur arbitre l'horloge.** L'import accepte les bornes du **fournisseur santé** — une
+                    séance a eu lieu avant que Grrind en entende parler, aucune horloge serveur n'existe pour un
+                    fait passé. Ce qu'il n'accepte pas, c'est une **durée** : elle se recalcule des deux bornes.
+                    Le reste de l'arbitrage — fenêtre d'antériorité, chevauchements, plancher et plafond — refuse
+                    ce qui ne tient pas debout.
 
                     **Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un
                     en-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse
@@ -150,10 +152,11 @@ when@dev:
                                     - https://grrind.app/problems/invalid-refresh-token
                                     - https://grrind.app/problems/social-sign-in-rejected
                                     - https://grrind.app/problems/social-profile-incomplete
-                                    # Entraînement — vidé avec le chronomètre (#85). Les refus de
-                                    # l'import arrivent au #88 et au #91, et ils ne seront pas des
-                                    # erreurs HTTP : un workout écarté d'un lot de dix n'empêche pas
-                                    # les neuf autres d'être crédités.
+                                    # Entraînement — vidé avec le chronomètre (#85), et l'import (#88)
+                                    # ne l'a pas rempli : un workout écarté d'un lot de dix n'empêche
+                                    # pas les neuf autres d'être crédités, donc ce n'est pas une erreur
+                                    # HTTP mais une entrée de `skipped`. #91 ajoutera des raisons, pas
+                                    # des types de panne.
                                     # Progression
                                     - https://grrind.app/problems/title-unknown
                                     - https://grrind.app/problems/title-not-unlocked
@@ -279,6 +282,87 @@ when@dev:
                             startedAt: { type: string, format: date-time }
                             endedAt: { type: string, format: date-time }
                             durationSeconds: { type: integer }
+
+                    WorkoutImportRequest:
+                        type: object
+                        description: |
+                            Ce que la montre a enregistré depuis la dernière synchronisation. **Un lot, pas un
+                            workout** : revenir après dix jours d'absence avec trois séances à créditer est le cas
+                            nominal.
+
+                            Le client envoie le **type brut du fournisseur**, jamais une `discipline` : la
+                            traduction est serveur, ce qui permet d'ouvrir un sport sans publier sur les stores.
+                            Un type inconnu n'est pas une erreur — la séance est écartée et nommée dans la
+                            réponse.
+
+                            **La durée n'est pas un champ.** Elle se dérive de `startedAt` et `endedAt`, arbitrée
+                            par le serveur : l'accepter en entrée donnerait au client une prise sur ce qu'il gagne.
+                        required: [workouts]
+                        properties:
+                            workouts:
+                                type: array
+                                minItems: 1
+                                maxItems: 200
+                                items: { $ref: '#/components/schemas/ImportedWorkout' }
+
+                    ImportedWorkout:
+                        type: object
+                        description: "Une séance candidate. Les mesures sont toutes facultatives, et c'est structurel : aucun appareil ne fournit tout. `null` veut dire « non mesuré », jamais zéro."
+                        required: [externalId, source, activityType, startedAt, endedAt]
+                        properties:
+                            externalId:
+                                type: string
+                                maxLength: 128
+                                description: "`HKWorkout.uuid` côté Apple, `metadata.id` côté Health Connect. Il porte toute la protection contre le double crédit — le renvoyer à l'identique est ce qui rend une resynchronisation inoffensive."
+                            source: { type: string, enum: [APPLE_HEALTH, HEALTH_CONNECT] }
+                            activityType:
+                                type: string
+                                maxLength: 64
+                                description: "Le nom de case `HKWorkoutActivityType` côté Apple, la constante `EXERCISE_TYPE_*` côté Health Connect. Envoyé tel quel, sans interprétation."
+                                example: traditionalStrengthTraining
+                            startedAt: { type: string, format: date-time }
+                            endedAt: { type: string, format: date-time }
+                            distanceMeters: { type: integer, minimum: 0, nullable: true }
+                            calories: { type: integer, minimum: 0, nullable: true }
+                            elevationGainMeters: { type: integer, minimum: 0, nullable: true }
+                            averageHeartRate: { type: integer, minimum: 1, maximum: 300, nullable: true }
+
+                    WorkoutImport:
+                        type: object
+                        description: |
+                            Le résultat d'un lot. **Un import où tout est écarté est un succès** — c'est ce que
+                            rend un client qui resynchronise sans rien de neuf.
+
+                            Les deux tableaux sont toujours présents, même vides.
+
+                            Forme provisoire : le #92 remplace `imported` par une timeline animable portant l'XP,
+                            les niveaux et le streak. `skipped` y survivra tel quel.
+                        required: [imported, skipped]
+                        properties:
+                            imported:
+                                type: array
+                                items: { $ref: '#/components/schemas/TrainingSession' }
+                            skipped:
+                                type: array
+                                description: "Chaque séance écartée est **nommée**, pas comptée : le client doit pouvoir dire « le curling n'est pas encore un sport chez nous » plutôt que « 1 séance ignorée »."
+                                items:
+                                    type: object
+                                    required: [externalId, activityType, reason]
+                                    properties:
+                                        externalId: { type: string }
+                                        activityType: { type: string }
+                                        reason:
+                                            type: string
+                                            enum: [ALREADY_IMPORTED, UNSUPPORTED_ACTIVITY]
+                                            description: |
+                                                `ALREADY_IMPORTED` : déjà en base sous le même couple (source, identifiant). Banal
+                                                et attendu.
+
+                                                `UNSUPPORTED_ACTIVITY` : aucune discipline ne correspond. Rien n'est écrit, donc
+                                                rien n'est définitif — le jour où le sport entre dans la table serveur, la même
+                                                séance renvoyée est créditée.
+
+                                                #91 en ajoutera : fenêtre d'antériorité, chevauchement, durée sous le plancher.
 
                     SessionPage:
                         type: object

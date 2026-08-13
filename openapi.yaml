@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: GRRIND
-  description: "L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.\n\n**Le serveur possède l'horloge.** Aucune route n'accepte une date ni une durée envoyée par le\nclient : une séance s'ouvre, puis se ferme, et le serveur date les deux. Antidater est\nimpossible par construction, pas par contrôle.\n\n**Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un\nen-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse\nd'origine sans rien réexécuter.\n\n**Les erreurs sont en `application/problem+json`** (RFC 9457). Le membre `type` est un\nidentifiant stable sur lequel un client peut brancher un comportement ; le `detail` est du\ntexte, il peut changer.\n"
+  description: "L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.\n\n**Le serveur arbitre l'horloge.** L'import accepte les bornes du **fournisseur santé** — une\nséance a eu lieu avant que Grrind en entende parler, aucune horloge serveur n'existe pour un\nfait passé. Ce qu'il n'accepte pas, c'est une **durée** : elle se recalcule des deux bornes.\nLe reste de l'arbitrage — fenêtre d'antériorité, chevauchements, plancher et plafond — refuse\nce qui ne tient pas debout.\n\n**Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un\nen-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse\nd'origine sans rien réexécuter.\n\n**Les erreurs sont en `application/problem+json`** (RFC 9457). Le membre `type` est un\nidentifiant stable sur lequel un client peut brancher un comportement ; le `detail` est du\ntexte, il peut changer.\n"
   version: 1.0.0
 paths:
   /api/auth/login:
@@ -280,6 +280,35 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /api/workouts/import:
+    post:
+      tags:
+        - Entraînement
+      operationId: post_training_workout_import
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkoutImportRequest'
+      responses:
+        '200':
+          description: 'Le lot a été traité. Ce qui est entré, et ce qui a été écarté — un import où tout est écarté reste un succès.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutImport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
   /api/training/sessions:
@@ -575,6 +604,96 @@ components:
           format: date-time
         durationSeconds:
           type: integer
+      type: object
+    WorkoutImportRequest:
+      description: "Ce que la montre a enregistré depuis la dernière synchronisation. **Un lot, pas un\nworkout** : revenir après dix jours d'absence avec trois séances à créditer est le cas\nnominal.\n\nLe client envoie le **type brut du fournisseur**, jamais une `discipline` : la\ntraduction est serveur, ce qui permet d'ouvrir un sport sans publier sur les stores.\nUn type inconnu n'est pas une erreur — la séance est écartée et nommée dans la\nréponse.\n\n**La durée n'est pas un champ.** Elle se dérive de `startedAt` et `endedAt`, arbitrée\npar le serveur : l'accepter en entrée donnerait au client une prise sur ce qu'il gagne.\n"
+      required:
+        - workouts
+      properties:
+        workouts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportedWorkout'
+          maxItems: 200
+          minItems: 1
+      type: object
+    ImportedWorkout:
+      description: "Une séance candidate. Les mesures sont toutes facultatives, et c'est structurel : aucun appareil ne fournit tout. `null` veut dire « non mesuré », jamais zéro."
+      required:
+        - externalId
+        - source
+        - activityType
+        - startedAt
+        - endedAt
+      properties:
+        externalId:
+          description: "`HKWorkout.uuid` côté Apple, `metadata.id` côté Health Connect. Il porte toute la protection contre le double crédit — le renvoyer à l'identique est ce qui rend une resynchronisation inoffensive."
+          type: string
+          maxLength: 128
+        source:
+          type: string
+          enum:
+            - APPLE_HEALTH
+            - HEALTH_CONNECT
+        activityType:
+          description: 'Le nom de case `HKWorkoutActivityType` côté Apple, la constante `EXERCISE_TYPE_*` côté Health Connect. Envoyé tel quel, sans interprétation.'
+          type: string
+          example: traditionalStrengthTraining
+          maxLength: 64
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        distanceMeters:
+          type: integer
+          nullable: true
+          minimum: 0
+        calories:
+          type: integer
+          nullable: true
+          minimum: 0
+        elevationGainMeters:
+          type: integer
+          nullable: true
+          minimum: 0
+        averageHeartRate:
+          type: integer
+          nullable: true
+          maximum: 300
+          minimum: 1
+      type: object
+    WorkoutImport:
+      description: "Le résultat d'un lot. **Un import où tout est écarté est un succès** — c'est ce que\nrend un client qui resynchronise sans rien de neuf.\n\nLes deux tableaux sont toujours présents, même vides.\n\nForme provisoire : le #92 remplace `imported` par une timeline animable portant l'XP,\nles niveaux et le streak. `skipped` y survivra tel quel.\n"
+      required:
+        - imported
+        - skipped
+      properties:
+        imported:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrainingSession'
+        skipped:
+          description: "Chaque séance écartée est **nommée**, pas comptée : le client doit pouvoir dire « le curling n'est pas encore un sport chez nous » plutôt que « 1 séance ignorée »."
+          type: array
+          items:
+            required:
+              - externalId
+              - activityType
+              - reason
+            properties:
+              externalId:
+                type: string
+              activityType:
+                type: string
+              reason:
+                description: "`ALREADY_IMPORTED` : déjà en base sous le même couple (source, identifiant). Banal\net attendu.\n\n`UNSUPPORTED_ACTIVITY` : aucune discipline ne correspond. Rien n'est écrit, donc\nrien n'est définitif — le jour où le sport entre dans la table serveur, la même\nséance renvoyée est créditée.\n\n#91 en ajoutera : fenêtre d'antériorité, chevauchement, durée sous le plancher.\n"
+                type: string
+                enum:
+                  - ALREADY_IMPORTED
+                  - UNSUPPORTED_ACTIVITY
+            type: object
       type: object
     SessionPage:
       description: "Pagination par curseur, sur l'identifiant. `nextCursor` à `null` signifie la fin. L'ordre redevient chronologique au #93 : depuis l'import, l'UUID v7 date de l'écriture et non de la pratique."
@@ -917,6 +1036,69 @@ components:
           nullable: true
           default: null
           maxLength: 64
+      type: object
+    WorkoutSource:
+      type: string
+      enum:
+        - APPLE_HEALTH
+        - HEALTH_CONNECT
+    ImportedWorkoutRequest:
+      properties:
+        externalId:
+          type: string
+          default: ''
+          maxLength: 128
+        source:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/WorkoutSource'
+          default: null
+        activityType:
+          type: string
+          default: ''
+          maxLength: 64
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          default: null
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+          default: null
+        distanceMeters:
+          type: integer
+          nullable: true
+          default: null
+          minimum: 0
+        calories:
+          type: integer
+          nullable: true
+          default: null
+          minimum: 0
+        elevationGainMeters:
+          type: integer
+          nullable: true
+          default: null
+          minimum: 0
+        averageHeartRate:
+          type: integer
+          nullable: true
+          default: null
+          maximum: 300
+          minimum: 1
+      type: object
+    ImportWorkoutsRequest:
+      properties:
+        workouts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportedWorkoutRequest'
+          default: []
+          maxItems: 200
+          minItems: 1
       type: object
     Discipline:
       type: string

@@ -114,8 +114,10 @@ class Workout
      * `metadata.id` côté Health Connect. Il porte toute la protection contre le double
      * crédit — voir `uniq_workout_external` sur la classe.
      *
-     * Nul tant que la source n'en fournit pas. Personne ne l'écrit encore : l'import
-     * qui le remplit arrive au #88.
+     * Nul tant que la source n'en fournit pas. Les deux sources d'aujourd'hui en donnent
+     * toutes les deux un, et l'import l'exige — mais la colonne reste nullable, et l'index
+     * partiel avec elle : c'est l'unicité qui garde contre le double crédit, elle n'a pas à
+     * devenir le mécanisme qui *impose* un identifiant.
      */
     #[ORM\Column(length: 128, nullable: true)]
     private ?string $externalId = null;
@@ -132,6 +134,11 @@ class Workout
         DateTimeImmutable $startedAt,
         DateTimeImmutable $endedAt,
         DateTimeImmutable $now,
+        ?string $externalId,
+        ?int $distanceMeters,
+        ?int $calories,
+        ?int $elevationGainMeters,
+        ?int $averageHeartRate,
     ) {
         $this->id = Uuid::v7();
         $this->userId = $userId;
@@ -144,6 +151,11 @@ class Workout
         // appliqué suffit — donne un workout sans valeur, pas une durée négative qui
         // empoisonnerait le ledger.
         $this->durationSeconds = max(0, $endedAt->getTimestamp() - $startedAt->getTimestamp());
+        $this->externalId = $externalId;
+        $this->distanceMeters = $distanceMeters;
+        $this->calories = $calories;
+        $this->elevationGainMeters = $elevationGainMeters;
+        $this->averageHeartRate = $averageHeartRate;
         $this->createdAt = $now;
     }
 
@@ -153,6 +165,17 @@ class Workout
      * `$now` est l'heure du serveur et ne sert qu'à `createdAt` : le reste vient du
      * fournisseur. C'est exactement la frontière entre ce qu'on constate et ce qu'on
      * date nous-mêmes.
+     *
+     * Les mesures sont **recopiées sans être interprétées**. L'agrégat ne demande pas si
+     * une distance est plausible pour la durée : il n'a pas de quoi en juger — une
+     * distance sur un tapis, un vélo qui compte les tours de roue, une nage en piscine
+     * n'ont pas les mêmes ordres de grandeur — et surtout ce n'est pas ici qu'un abus se
+     * traite. Ce que le workout **vaut** se décide à l'import (#90, #91).
+     *
+     * Onze paramètres, appelés par leur nom depuis l'unique appelant. Les regrouper en un
+     * objet « mesures » n'achèterait rien tant qu'aucun code ne les manipule ensemble ;
+     * c'est le genre de classe qu'on ajoute quand elle sert, pas quand elle raccourcit une
+     * signature.
      */
     public static function record(
         Uuid $userId,
@@ -161,8 +184,25 @@ class Workout
         DateTimeImmutable $startedAt,
         DateTimeImmutable $endedAt,
         DateTimeImmutable $now,
+        ?string $externalId = null,
+        ?int $distanceMeters = null,
+        ?int $calories = null,
+        ?int $elevationGainMeters = null,
+        ?int $averageHeartRate = null,
     ): self {
-        return new self($userId, $discipline, $source, $startedAt, $endedAt, $now);
+        return new self(
+            $userId,
+            $discipline,
+            $source,
+            $startedAt,
+            $endedAt,
+            $now,
+            $externalId,
+            $distanceMeters,
+            $calories,
+            $elevationGainMeters,
+            $averageHeartRate,
+        );
     }
 
     public function id(): Uuid

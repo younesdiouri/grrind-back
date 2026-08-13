@@ -1,3 +1,29 @@
 framework:
     property_info:
         with_constructor_extractor: true
+
+# ————— Pourquoi ce tag ————————————————————————————————————————————————————————————————
+#
+# `with_constructor_extractor` fait passer `ConstructorExtractor` en tête (-999), et il ne
+# consulte que les services tagués `property_info.constructor_extractor`. Un seul l'est par
+# défaut, `ReflectionExtractor`, qui ne lit que la signature : un paramètre déclaré `array`
+# reste un `array` sans type d'élément. Le `PhpDocExtractor` qui saurait lire
+# `@param list<Foo> $foo` est bien plus bas dans la chaîne, et n'est jamais atteint.
+#
+# Conséquence concrète : `#[MapRequestPayload]` sur un DTO qui contient une **liste
+# d'objets** — `ImportWorkoutsRequest`, et tout lot qui suivra — désérialise des tableaux
+# associatifs bruts au lieu d'objets, et le contrôleur reçoit un `array` là où il attend un
+# DTO. La panne arrive à l'exécution, pas à la compilation.
+#
+# On enregistre donc l'extracteur de docblock comme extracteur de constructeur, au-dessus de
+# la réflexion : le point d'extension prévu, plutôt qu'un normalizer maison ou un
+# `denormalize()` à la main dans le contrôleur.
+#
+# Une **seconde instance** plutôt qu'un tag ajouté à `property_info.php_doc_extractor` : YAML
+# ne sait pas compléter une définition existante, la redéclarer l'écraserait. L'objet est
+# sans état et ne coûte rien.
+services:
+    app.property_info.php_doc_constructor_extractor:
+        class: Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor
+        tags:
+            - { name: property_info.constructor_extractor, priority: -1000 }
