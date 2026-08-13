@@ -671,11 +671,12 @@ components:
         - skipped
       properties:
         imported:
+          description: "Les séances **créditées**, dans l'ordre chronologique — celui du crédit, et celui de l'animation."
           type: array
           items:
             $ref: '#/components/schemas/TrainingSession'
         skipped:
-          description: "Chaque séance écartée est **nommée**, pas comptée : le client doit pouvoir dire « le curling n'est pas encore un sport chez nous » plutôt que « 1 séance ignorée »."
+          description: "Les séances qui n'ont **rien rapporté**, chacune **nommée** et non comptée : le client\ndoit pouvoir dire « le curling n'est pas encore un sport chez nous » plutôt que « 1\nséance ignorée ».\n\nÉcarté ne veut pas toujours dire absent. `OUT_OF_WINDOW` écarte le *crédit*, pas la\nséance : elle est bien en base et apparaîtra dans l'historique.\n"
           type: array
           items:
             required:
@@ -688,11 +689,14 @@ components:
               activityType:
                 type: string
               reason:
-                description: "`ALREADY_IMPORTED` : déjà en base sous le même couple (source, identifiant). Banal\net attendu.\n\n`UNSUPPORTED_ACTIVITY` : aucune discipline ne correspond. Rien n'est écrit, donc\nrien n'est définitif — le jour où le sport entre dans la table serveur, la même\nséance renvoyée est créditée.\n\n#91 en ajoutera : fenêtre d'antériorité, chevauchement, durée sous le plancher.\n"
+                description: "`ALREADY_IMPORTED` : déjà en base sous le même couple (source, identifiant). Banal\net attendu — c'est ce que rend un client qui a perdu son curseur.\n\n`UNSUPPORTED_ACTIVITY` : aucune discipline ne correspond. Rien n'est écrit, donc\nrien n'est définitif — le jour où le sport entre dans la table serveur, la même\nséance renvoyée est créditée.\n\n`OUT_OF_WINDOW` : trop ancienne pour rapporter de l'XP, mais **conservée**. Le\njoueur retrouve son passé sans le monnayer, et le premier import devient un moment\nde produit au lieu d'un mur.\n\n`OVERLAPS` : une autre séance couvre déjà ce créneau. Ce ne sont pas deux\nentraînements, c'est le même vu par deux applications — beaucoup de gens ont Apple\nExercice *et* Strava sans le savoir. C'est l'enregistrement le plus complet qui\ngagne, sauf si l'autre est déjà en base.\n\n`TOO_SHORT` : sous le plancher de durée. Un faux départ sur la montre n'est pas une\nséance, et rien n'est écrit.\n"
                 type: string
                 enum:
                   - ALREADY_IMPORTED
                   - UNSUPPORTED_ACTIVITY
+                  - OUT_OF_WINDOW
+                  - OVERLAPS
+                  - TOO_SHORT
             type: object
       type: object
     SessionPage:

@@ -7,6 +7,7 @@ namespace App\Training\Infrastructure\Doctrine;
 use App\Shared\Domain\Activity\WorkoutSource;
 use App\Training\Application\ListSessions;
 use App\Training\Domain\Workout;
+use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bridge\Doctrine\Types\UuidType;
@@ -82,6 +83,39 @@ class WorkoutRepository extends ServiceEntityRepository
         }
 
         return $known;
+    }
+
+    /**
+     * Les créneaux déjà occupés par les workouts du joueur qui touchent la période donnée.
+     *
+     * Une seule requête pour tout le lot, comme pour les doublons : la comparaison des
+     * chevauchements se fait ensuite en PHP, sur des paires de dates. Un `SELECT` par
+     * candidat serait deux cents requêtes pour une resynchronisation.
+     *
+     * La période demandée est **élargie par l'appelant** au-delà des bornes du lot : un
+     * workout déjà en base qui commence avant le lot et finit dedans le chevauche, et une
+     * requête calée sur les seules bornes du lot ne le verrait pas.
+     *
+     * @return list<array{DateTimeImmutable, DateTimeImmutable}>
+     */
+    public function busyIntervalsBetween(Uuid $userId, DateTimeImmutable $from, DateTimeImmutable $to): array
+    {
+        /** @var list<array{startedAt: DateTimeImmutable, endedAt: DateTimeImmutable}> $rows */
+        $rows = $this->createQueryBuilder('w')
+            ->select('w.startedAt', 'w.endedAt')
+            ->where('w.userId = :userId')
+            ->andWhere('w.startedAt < :to')
+            ->andWhere('w.endedAt > :from')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->setParameter('from', $from)
+            ->setParameter('to', $to)
+            ->getQuery()
+            ->getResult();
+
+        return array_map(
+            static fn (array $row): array => [$row['startedAt'], $row['endedAt']],
+            $rows,
+        );
     }
 
     /**

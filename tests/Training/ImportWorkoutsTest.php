@@ -134,16 +134,25 @@ final class ImportWorkoutsTest extends ApiTestCase
     }
 
     /**
-     * La même séance vue par les deux fournisseurs n'est **pas** un doublon : l'unicité est
-     * par source. Ce chevauchement-là se tranche au #91, avec ce qu'il faut de contexte.
+     * L'unicité est par source, et deux séances différentes qui portent le même identifiant
+     * chez deux fournisseurs sont bien deux séances : les identifiants d'Apple sont uniques
+     * chez Apple, pas chez nous.
+     *
+     * Elles sont datées à des heures distinctes **exprès** — les mêmes bornes en feraient un
+     * chevauchement, qui est une tout autre règle et se teste ailleurs.
      */
     public function testTheSameIdentifierUnderAnotherSourceIsImported(): void
     {
         $bob = $this->openAccount();
 
         $response = $this->import($bob, [
-            self::candidate(),
-            self::candidate(source: 'HEALTH_CONNECT', activityType: 'EXERCISE_TYPE_RUNNING'),
+            self::candidate(startedAt: '2026-08-11T07:00:00+00:00', endedAt: '2026-08-11T07:45:00+00:00'),
+            self::candidate(
+                source: 'HEALTH_CONNECT',
+                activityType: 'EXERCISE_TYPE_RUNNING',
+                startedAt: '2026-08-11T18:00:00+00:00',
+                endedAt: '2026-08-11T18:45:00+00:00',
+            ),
         ]);
 
         $body = self::decode($response);

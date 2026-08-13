@@ -13,3 +13,18 @@ minimum_duration_seconds: 300
 # Au-delà, la durée est écrêtée, pas rejetée : l'enregistrement oublié sur la montre
 # rend quatre heures créditées au lieu de tout perdre.
 maximum_duration_seconds: 14400
+
+# ————— La fenêtre d'antériorité ————————————————————————————————————————————————————————
+#
+# **C'est le garde-fou le plus important du virage santé.** Le jour où un joueur installe
+# Grrind, son téléphone contient parfois trois ans d'Apple Health. Crédité tel quel, il
+# atteint le niveau 60 avant d'avoir couru une seule fois *pour* Grrind, et le produit n'a
+# plus rien à lui proposer. Ça ne se rattrape pas après coup : le ledger est append-only.
+#
+# Au-delà de cette fenêtre, le workout est **importé sans être crédité**. Le joueur retrouve
+# son passé sans le monnayer : le premier import devient un moment de produit — « voilà tes
+# six derniers mois » — au lieu d'un mur, et le streak (Lot 5) aura de quoi se reconstruire.
+#
+# Trente jours parce que c'est la durée qu'un joueur reconnaît comme « récent » ; c'est
+# aussi la fenêtre servie au client (#93), qui n'a donc pas à la deviner.
+import_window_days: 30

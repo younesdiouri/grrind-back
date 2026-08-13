@@ -1,3 +1,4 @@
 # Mêmes valeurs, autre ordre : le rulesetVersion ne doit pas bouger.
 maximum_duration_seconds: 14400
 minimum_duration_seconds: 300
+import_window_days: 30
