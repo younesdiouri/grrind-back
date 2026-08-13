@@ -46,6 +46,18 @@ use Symfony\Component\Uid\Uuid;
     columns: ['user_id'],
     options: ['where' => "((status)::text = 'ACTIVE'::text)"],
 )]
+// Le double crédit ne se prévient pas dans le code : entre le SELECT qui cherche
+// l'`externalId` et l'INSERT qui l'écrit, deux synchronisations concurrentes passent
+// toutes les deux. C'est la base qui refuse la seconde.
+//
+// Partiel, parce qu'une source sans identifiant fournisseur reste possible et que
+// PostgreSQL considère deux NULL comme distincts : une contrainte totale sur une
+// colonne nullable n'interdirait rien. Prédicat écrit tel que PostgreSQL le relit.
+#[ORM\UniqueConstraint(
+    name: 'uniq_workout_external',
+    columns: ['user_id', 'source', 'external_id'],
+    options: ['where' => '(external_id IS NOT NULL)'],
+)]
 class Workout
 {
     #[ORM\Id]
@@ -79,6 +91,47 @@ class Workout
      */
     #[ORM\Column(nullable: true)]
     private ?int $durationSeconds = null;
+
+    /**
+     * Ce que la montre a mesuré. **Toutes nullables, et c'est structurel** : aucun
+     * appareil ne fournit tout — pas de cardio sur un modèle d'entrée de gamme, pas de
+     * distance sur un vélo d'appartement, pas de dénivelé sur un tapis. Le modèle ne
+     * peut pas exiger ce que le matériel ne mesure pas.
+     *
+     * L'absence est donc « non mesuré », jamais zéro, et le calcul d'XP (#90) doit la
+     * traiter comme « pas de bonus ». Un `0` en base voudra dire « mesuré, et nul » —
+     * un tour de piste plat a bien un dénivelé de zéro.
+     *
+     * Des entiers, jamais de flottant sur une valeur de jeu persistée : mètres et
+     * battements par minute. Le kilomètre décimal n'existe qu'à l'affichage.
+     *
+     * Les calories et la fréquence cardiaque n'entrent dans aucun calcul aujourd'hui.
+     * Elles sont stockées quand même parce qu'elles ne sont **pas rattrapables** :
+     * Apple ne les redonnera pas pour un workout déjà importé, et une décision de game
+     * design dans six mois ne peut pas ressusciter un historique qu'on n'a pas écrit.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?int $distanceMeters = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $calories = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $elevationGainMeters = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $averageHeartRate = null;
+
+    /**
+     * L'identifiant du workout chez le fournisseur : `HKWorkout.uuid` côté Apple,
+     * `metadata.id` côté Health Connect. Il porte toute la protection contre le double
+     * crédit — voir `uniq_workout_external` sur la classe.
+     *
+     * Nul tant que la source n'en fournit pas. Personne ne l'écrit encore : l'import
+     * qui le remplit arrive au #88.
+     */
+    #[ORM\Column(length: 128, nullable: true)]
+    private ?string $externalId = null;
 
     /** `startedAt` est un fait sportif, `createdAt` un fait système. Ils divergeront
      * quand une activité s'importera après coup. */
@@ -197,6 +250,31 @@ class Workout
     public function durationSeconds(): ?int
     {
         return $this->durationSeconds;
+    }
+
+    public function distanceMeters(): ?int
+    {
+        return $this->distanceMeters;
+    }
+
+    public function calories(): ?int
+    {
+        return $this->calories;
+    }
+
+    public function elevationGainMeters(): ?int
+    {
+        return $this->elevationGainMeters;
+    }
+
+    public function averageHeartRate(): ?int
+    {
+        return $this->averageHeartRate;
+    }
+
+    public function externalId(): ?string
+    {
+        return $this->externalId;
     }
 
     public function createdAt(): DateTimeImmutable
