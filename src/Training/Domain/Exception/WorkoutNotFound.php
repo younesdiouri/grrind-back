@@ -12,7 +12,7 @@ use Symfony\Component\Uid\Uuid;
  * la **même** erreur. Un 403 sur la séance d'autrui confirmerait son existence, et un
  * identifiant est justement ce qu'on essaie en boucle.
  */
-final class SessionNotFound extends NotFoundError
+final class WorkoutNotFound extends NotFoundError
 {
     public function __construct(Uuid $sessionId)
     {

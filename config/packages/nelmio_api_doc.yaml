@@ -248,6 +248,10 @@ when@dev:
                             tokens: { $ref: '#/components/schemas/TokenPair' }
 
                     # ————— Entraînement ————————————————————————————————————————————————
+                    # Le schéma garde son nom alors que l'entité s'appelle désormais `Workout`
+                    # (#83) : c'est du contrat, et le contrat ne se casse qu'une fois. Il
+                    # disparaît au #85 avec les routes du chronomètre, remplacé par le vrai
+                    # `Workout` des #88 et #93.
                     TrainingSession:
                         type: object
                         description: |

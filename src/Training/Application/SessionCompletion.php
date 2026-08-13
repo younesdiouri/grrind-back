@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Training\Application;
 
 use App\Shared\Application\SessionReward;
-use App\Training\Domain\TrainingSession;
+use App\Training\Domain\Workout;
 
 /**
  * Ce que rend la complétion d'une séance : la séance close, et ce qu'elle a rapporté.
@@ -20,7 +20,7 @@ use App\Training\Domain\TrainingSession;
 final readonly class SessionCompletion
 {
     public function __construct(
-        public TrainingSession $session,
+        public Workout $session,
         public SessionReward $reward,
     ) {
     }

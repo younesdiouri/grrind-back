@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  *
  * Le pass **aplatit** la configuration validée en paramètres nommés — `training.yaml`
  * donne `game.training.minimum_duration_seconds` — parce que c'est ce qu'un argument de
- * service sait consommer : `services.yaml` injecte des entiers dans `TrainingRules`, et
+ * service sait consommer : `services.yaml` injecte des entiers dans `WorkoutRules`, et
  * un paramètre absent casse la compilation en nommant le service fautif. Le domaine ne
  * voit jamais un tableau d'équilibrage.
  *

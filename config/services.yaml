@@ -29,7 +29,7 @@ services:
     # `game/v1/training.yaml`. Un paramètre absent casse la compilation du conteneur en
     # nommant ce service : l'équilibrage se valide au démarrage, pas à la première
     # requête d'un joueur.
-    App\Training\Domain\TrainingRules:
+    App\Training\Domain\WorkoutRules:
         arguments:
             $minimumDurationSeconds: '%game.training.minimum_duration_seconds%'
             $maximumDurationSeconds: '%game.training.maximum_duration_seconds%'

@@ -7,7 +7,7 @@ namespace App\Tests\Shared\Config;
 use App\Progression\Domain\XpRates;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Infrastructure\Config\GameBalancePass;
-use App\Training\Domain\TrainingRules;
+use App\Training\Domain\WorkoutRules;
 use App\Training\Infrastructure\Config\TrainingSection;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -58,8 +58,8 @@ final class GameBalancePassTest extends KernelTestCase
         self::assertMatchesRegularExpression('/^v1-[0-9a-f]{12}$/', (string) $container->getParameter('game.ruleset_version'));
 
         // Et que le domaine reçoit des objets typés, pas des tableaux d'équilibrage.
-        $rules = $container->get(TrainingRules::class);
-        self::assertInstanceOf(TrainingRules::class, $rules);
+        $rules = $container->get(WorkoutRules::class);
+        self::assertInstanceOf(WorkoutRules::class, $rules);
         self::assertSame(300, $rules->minimumDurationSeconds);
 
         // Le barème d'XP passe par son paramètre et non par son service : rien ne consomme

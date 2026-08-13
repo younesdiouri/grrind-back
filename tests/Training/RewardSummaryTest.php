@@ -10,7 +10,7 @@ use App\Shared\Domain\Modifier\ModifierType;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\ProgrammableModifiers;
-use App\Tests\Support\TrainingSessions;
+use App\Tests\Support\Workouts;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -28,7 +28,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class RewardSummaryTest extends ApiTestCase
 {
-    use TrainingSessions;
+    use Workouts;
 
     /**
      * Deux heures de natation, la séance qui traverse toutes les tranches de rendements
@@ -254,7 +254,7 @@ final class RewardSummaryTest extends ApiTestCase
     /**
      * Une séance close et rangée deux jours en arrière, **ledger compris**.
      *
-     * {@see TrainingSessions::ageSession()} recule la séance ; il ne recule pas la ligne
+     * {@see Workouts::ageSession()} recule la séance ; il ne recule pas la ligne
      * d'XP qu'elle a produite, et c'est celle-là que lisent les rendements décroissants.
      * Une seconde séance laissée le même jour tomberait dans la tranche à 0 % et ne
      * rapporterait rien — ce qui est le comportement voulu du jeu, et ce qui rend

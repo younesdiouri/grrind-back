@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Training\Application;
 
-use App\Training\Domain\Exception\SessionAlreadyActive;
-use App\Training\Domain\Exception\SessionInCooldown;
-use App\Training\Domain\TrainingRules;
-use App\Training\Domain\TrainingSession;
-use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
+use App\Training\Domain\Exception\WorkoutAlreadyActive;
+use App\Training\Domain\Exception\WorkoutInCooldown;
+use App\Training\Domain\Workout;
+use App\Training\Domain\WorkoutRules;
+use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Psr\Clock\ClockInterface;
@@ -22,30 +22,30 @@ use Psr\Log\LoggerInterface;
 final readonly class StartSessionHandler
 {
     public function __construct(
-        private TrainingSessionRepository $sessions,
+        private WorkoutRepository $sessions,
         private ClockInterface $clock,
-        private TrainingRules $rules,
+        private WorkoutRules $rules,
         private LoggerInterface $logger,
     ) {
     }
 
     /**
-     * @throws SessionAlreadyActive une séance tourne déjà
-     * @throws SessionInCooldown    la précédente est trop récente
+     * @throws WorkoutAlreadyActive une séance tourne déjà
+     * @throws WorkoutInCooldown    la précédente est trop récente
      */
-    public function __invoke(StartSession $command): TrainingSession
+    public function __invoke(StartSession $command): Workout
     {
         $now = $this->clock->now();
 
         $active = $this->sessions->activeOf($command->userId);
 
         if (null !== $active) {
-            throw new SessionAlreadyActive($active->id());
+            throw new WorkoutAlreadyActive($active->id());
         }
 
         $this->ensureCooldownElapsed($command, $now);
 
-        $session = TrainingSession::start($command->userId, $command->discipline, $now);
+        $session = Workout::start($command->userId, $command->discipline, $now);
 
         $this->sessions->add($session);
 
@@ -59,14 +59,14 @@ final readonly class StartSessionHandler
                 'exception' => $collision,
             ]);
 
-            throw new SessionAlreadyActive($this->sessions->activeIdOf($command->userId) ?? $session->id());
+            throw new WorkoutAlreadyActive($this->sessions->activeIdOf($command->userId) ?? $session->id());
         }
 
         return $session;
     }
 
     /**
-     * @throws SessionInCooldown
+     * @throws WorkoutInCooldown
      */
     private function ensureCooldownElapsed(StartSession $command, DateTimeImmutable $now): void
     {
@@ -81,7 +81,7 @@ final readonly class StartSessionHandler
         $remaining = $readyAt->getTimestamp() - $now->getTimestamp();
 
         if ($remaining > 0) {
-            throw new SessionInCooldown($readyAt, $remaining);
+            throw new WorkoutInCooldown($readyAt, $remaining);
         }
     }
 }

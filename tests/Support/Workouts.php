@@ -20,7 +20,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * @phpstan-require-extends ApiTestCase
  */
-trait TrainingSessions
+trait Workouts
 {
     protected function startSession(Account $account, string $discipline = 'RUNNING'): string
     {
@@ -65,7 +65,7 @@ trait TrainingSessions
     protected function ageSession(string $sessionId, int $seconds): void
     {
         $this->connection()->executeStatement(
-            'UPDATE training_session
+            'UPDATE workout
                 SET started_at = started_at - (:seconds * INTERVAL \'1 second\'),
                     ended_at = ended_at - (:seconds * INTERVAL \'1 second\')
               WHERE id = :id',
@@ -101,7 +101,7 @@ trait TrainingSessions
 
     protected function statusOf(string $sessionId): string
     {
-        $status = $this->connection()->fetchOne('SELECT status FROM training_session WHERE id = :id', ['id' => $sessionId]);
+        $status = $this->connection()->fetchOne('SELECT status FROM workout WHERE id = :id', ['id' => $sessionId]);
         self::assertIsString($status);
 
         return $status;

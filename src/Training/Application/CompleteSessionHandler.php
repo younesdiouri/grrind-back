@@ -7,12 +7,12 @@ namespace App\Training\Application;
 use App\Shared\Application\SessionRewards;
 use App\Shared\Domain\Event\DomainEvent;
 use App\Shared\Domain\Event\TrainingSessionCompleted;
-use App\Training\Domain\Exception\SessionNotActive;
-use App\Training\Domain\Exception\SessionNotFound;
-use App\Training\Domain\Exception\SessionTooShort;
-use App\Training\Domain\TrainingRules;
-use App\Training\Domain\TrainingSession;
-use App\Training\Infrastructure\Doctrine\TrainingSessionRepository;
+use App\Training\Domain\Exception\WorkoutNotActive;
+use App\Training\Domain\Exception\WorkoutNotFound;
+use App\Training\Domain\Exception\WorkoutTooShort;
+use App\Training\Domain\Workout;
+use App\Training\Domain\WorkoutRules;
+use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -25,7 +25,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *    courte est refusée avant qu'aucun verrou ne soit pris — inutile de faire attendre les
  *    autres écritures du joueur pour rendre un 409 ;
  * 2. **ouvrir la transaction et écrire la séance**. Le verrou de ligne sur
- *    `training_session` est posé par cet `UPDATE` et court jusqu'au COMMIT ;
+ *    `workout` est posé par cet `UPDATE` et court jusqu'au COMMIT ;
  * 3. **créditer**, par le port {@see SessionRewards}. C'est là que se pose le verrou
  *    pessimiste sur la ligne de progression, et que se déroule toute la séquence du Lot 3 :
  *    charge du jour, modificateurs, calcul, ledger, snapshot, titres ;
@@ -47,23 +47,23 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final readonly class CompleteSessionHandler
 {
     public function __construct(
-        private TrainingSessionRepository $sessions,
+        private WorkoutRepository $sessions,
         private ClockInterface $clock,
-        private TrainingRules $rules,
+        private WorkoutRules $rules,
         private SessionRewards $rewards,
         private MessageBusInterface $events,
     ) {
     }
 
     /**
-     * @throws SessionNotFound  la séance n'existe pas, ou n'est pas celle de ce joueur
-     * @throws SessionNotActive la séance est déjà close
-     * @throws SessionTooShort  la séance n'a pas atteint la durée plancher
+     * @throws WorkoutNotFound  la séance n'existe pas, ou n'est pas celle de ce joueur
+     * @throws WorkoutNotActive la séance est déjà close
+     * @throws WorkoutTooShort  la séance n'a pas atteint la durée plancher
      */
     public function __invoke(CompleteSession $command): SessionCompletion
     {
         $session = $this->sessions->ofPlayer($command->userId, $command->sessionId)
-            ?? throw new SessionNotFound($command->sessionId);
+            ?? throw new WorkoutNotFound($command->sessionId);
 
         // L'agrégat valide la transition et les seuils ; s'il refuse, rien n'est écrit et
         // aucune transaction n'a été ouverte.
@@ -85,7 +85,7 @@ final readonly class CompleteSessionHandler
 
     /** Construit ici, dans le module qui détient le fait ; classe dans `Shared`, sans
      * quoi personne ne pourrait s'y abonner. Voir {@see DomainEvent}. */
-    private static function completionOf(TrainingSession $session): TrainingSessionCompleted
+    private static function completionOf(Workout $session): TrainingSessionCompleted
     {
         $endedAt = $session->endedAt();
         $durationSeconds = $session->durationSeconds();

@@ -165,7 +165,7 @@ class XpTransactionRepository extends ServiceEntityRepository
      * de pagination, sans colonne d'ordre ni `OFFSET`. Il coïncide avec `createdAt` parce
      * que les deux naissent du même instant dans le constructeur — l'identifiant est tiré
      * là où la date est posée. Même geste qu'à
-     * {@see \App\Training\Infrastructure\Doctrine\TrainingSessionRepository::history()},
+     * {@see \App\Training\Infrastructure\Doctrine\WorkoutRepository::history()},
      * pour que le client n'ait qu'une pagination à écrire.
      *
      * `$take` est volontairement plus grand que `$query->limit` : l'appelant lit une ligne

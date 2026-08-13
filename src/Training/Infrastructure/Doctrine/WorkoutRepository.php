@@ -6,23 +6,23 @@ namespace App\Training\Infrastructure\Doctrine;
 
 use App\Training\Application\ListSessions;
 use App\Training\Domain\SessionStatus;
-use App\Training\Domain\TrainingSession;
+use App\Training\Domain\Workout;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * @extends ServiceEntityRepository<TrainingSession>
+ * @extends ServiceEntityRepository<Workout>
  */
-class TrainingSessionRepository extends ServiceEntityRepository
+class WorkoutRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
-        parent::__construct($registry, TrainingSession::class);
+        parent::__construct($registry, Workout::class);
     }
 
-    public function add(TrainingSession $session): void
+    public function add(Workout $session): void
     {
         $this->getEntityManager()->persist($session);
     }
@@ -31,16 +31,16 @@ class TrainingSessionRepository extends ServiceEntityRepository
      * Le propriétaire est une **condition de la recherche**, pas un contrôle qui suit :
      * aucun appelant ne peut oublier de vérifier à qui est la séance.
      */
-    public function ofPlayer(Uuid $userId, Uuid $sessionId): ?TrainingSession
+    public function ofPlayer(Uuid $userId, Uuid $sessionId): ?Workout
     {
         return $this->findOneBy(['id' => $sessionId, 'userId' => $userId]);
     }
 
     /**
      * La séance en cours du joueur, ou `null`. L'unicité est garantie par
-     * `uniq_training_session_active` ; l'ordre ne sert qu'à rester déterministe.
+     * `uniq_workout_active` ; l'ordre ne sert qu'à rester déterministe.
      */
-    public function activeOf(Uuid $userId): ?TrainingSession
+    public function activeOf(Uuid $userId): ?Workout
     {
         return $this->findOneBy(
             ['userId' => $userId, 'status' => SessionStatus::Active],
@@ -57,7 +57,7 @@ class TrainingSessionRepository extends ServiceEntityRepository
     public function activeIdOf(Uuid $userId): ?Uuid
     {
         $id = $this->getEntityManager()->getConnection()->fetchOne(
-            'SELECT id FROM training_session WHERE user_id = :userId AND status = :status',
+            'SELECT id FROM workout WHERE user_id = :userId AND status = :status',
             ['userId' => $userId->toRfc4122(), 'status' => SessionStatus::Active->value],
         );
 
@@ -69,7 +69,7 @@ class TrainingSessionRepository extends ServiceEntityRepository
      * traduit la décision du ticket #8 : abandonnée sous le plancher, elle n'a pas eu
      * lieu. Il couvre aussi les complétions, au-dessus du plancher par construction.
      */
-    public function lastCountedClosure(Uuid $userId, int $minimumDurationSeconds): ?TrainingSession
+    public function lastCountedClosure(Uuid $userId, int $minimumDurationSeconds): ?Workout
     {
         $previous = $this->createQueryBuilder('s')
             ->where('s.userId = :userId')
@@ -83,7 +83,7 @@ class TrainingSessionRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
 
-        \assert(null === $previous || $previous instanceof TrainingSession);
+        \assert(null === $previous || $previous instanceof Workout);
 
         return $previous;
     }
@@ -97,7 +97,7 @@ class TrainingSessionRepository extends ServiceEntityRepository
      * `$take` est volontairement plus grand que `$query->limit` : l'appelant lit une
      * ligne de plus pour savoir s'il existe une page suivante, et ne la rend pas.
      *
-     * @return list<TrainingSession>
+     * @return list<Workout>
      */
     public function history(ListSessions $query, int $take): array
     {
@@ -127,7 +127,7 @@ class TrainingSessionRepository extends ServiceEntityRepository
             $builder->andWhere('s.id < :cursor')->setParameter('cursor', $query->cursor, UuidType::NAME);
         }
 
-        /** @var list<TrainingSession> $sessions */
+        /** @var list<Workout> $sessions */
         $sessions = $builder->getQuery()->getResult();
 
         return $sessions;

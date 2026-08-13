@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Training\Infrastructure\Config;
 
 use App\Shared\Infrastructure\Config\GameBalanceSection;
-use App\Training\Domain\TrainingRules;
+use App\Training\Domain\WorkoutRules;
 use InvalidArgumentException;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -14,7 +14,7 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
  * Le schéma de `config/game/v1/training.yaml` — les garde-fous d'une séance.
  *
  * Il vit dans `Training` et non dans `Shared` : c'est ce module qui lit la section, et
- * c'est ce qui lui permet de faire valider la cohérence des seuils par `TrainingRules`
+ * c'est ce qui lui permet de faire valider la cohérence des seuils par `WorkoutRules`
  * lui-même. Le sens des valeurs est dans le YAML, à côté d'elles.
  */
 final class TrainingSection implements GameBalanceSection
@@ -43,7 +43,7 @@ final class TrainingSection implements GameBalanceSection
                     // seconde fois ici, où les deux formulations finiraient par diverger.
                     // Le coût est une construction jetée, une fois par compilation.
                     try {
-                        new TrainingRules(
+                        new WorkoutRules(
                             $values['minimum_duration_seconds'],
                             $values['maximum_duration_seconds'],
                             $values['cooldown_seconds'],

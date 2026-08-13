@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Training\Domain;
 
-use App\Training\Domain\TrainingRules;
+use App\Training\Domain\WorkoutRules;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -14,11 +14,11 @@ use PHPUnit\Framework\TestCase;
  * se refuser tout seul quand il n'a pas de sens. Une configuration incohérente tombe au
  * démarrage, pas le jour où un joueur croise le cas.
  */
-final class TrainingRulesTest extends TestCase
+final class WorkoutRulesTest extends TestCase
 {
     public function testAcceptsTheShippedBalance(): void
     {
-        $rules = new TrainingRules(300, 14400, 900);
+        $rules = new WorkoutRules(300, 14400, 900);
 
         self::assertSame(300, $rules->minimumDurationSeconds);
         self::assertSame(14400, $rules->maximumDurationSeconds);
@@ -30,7 +30,7 @@ final class TrainingRulesTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new TrainingRules($minimum, $maximum, $cooldown);
+        new WorkoutRules($minimum, $maximum, $cooldown);
     }
 
     /**

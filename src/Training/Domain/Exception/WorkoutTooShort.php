@@ -14,7 +14,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * Le temps restant part dans l'erreur : le client affiche « encore 2 min ».
  */
-final class SessionTooShort extends ConflictError
+final class WorkoutTooShort extends ConflictError
 {
     public function __construct(Uuid $sessionId, int $elapsedSeconds, int $minimumDurationSeconds)
     {

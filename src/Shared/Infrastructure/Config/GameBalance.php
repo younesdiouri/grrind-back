@@ -8,7 +8,7 @@ namespace App\Shared\Infrastructure\Config;
  * L'équilibrage du jeu, lu et validé, tel qu'il sera figé dans le conteneur compilé.
  *
  * C'est un objet de la compilation, pas de l'exécution : le code applicatif ne le voit
- * jamais. Il reçoit des objets typés — `TrainingRules` et ses semblables — construits
+ * jamais. Il reçoit des objets typés — `WorkoutRules` et ses semblables — construits
  * depuis les paramètres que {@see GameBalancePass} en tire. Aucun tableau d'équilibrage
  * ne se promène dans le domaine.
  */

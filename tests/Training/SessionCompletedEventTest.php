@@ -10,7 +10,7 @@ use App\Shared\Domain\Activity\TrustLevel;
 use App\Shared\Domain\Event\TrainingSessionCompleted;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\Messaging\SessionCompletedSpy;
-use App\Tests\Support\TrainingSessions;
+use App\Tests\Support\Workouts;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,7 +24,7 @@ use Symfony\Component\Messenger\Transport\TransportInterface;
  */
 final class SessionCompletedEventTest extends ApiTestCase
 {
-    use TrainingSessions;
+    use Workouts;
 
     protected function setUp(): void
     {
