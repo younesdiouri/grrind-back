@@ -34,7 +34,11 @@ final class ImportWorkoutsTest extends ApiTestCase
         self::assertCount(1, $body['imported']);
         self::assertSame([], $body['skipped']);
 
-        $workout = $body['imported'][0];
+        // Chaque élément d'`imported` est un `RewardSummary` entier, et la séance vit
+        // dans sa clé `session` — exactement l'objet que le client sait déjà jouer.
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+        $workout = $reward['session'];
         self::assertIsArray($workout);
         self::assertSame('RUNNING', $workout['discipline']);
         self::assertSame('APPLE_HEALTH', $workout['source']);
@@ -56,7 +60,9 @@ final class ImportWorkoutsTest extends ApiTestCase
 
         $body = self::decode($response);
         self::assertIsArray($body['imported']);
-        $workout = $body['imported'][0];
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+        $workout = $reward['session'];
         self::assertIsArray($workout);
         self::assertSame(2700, $workout['durationSeconds']);
     }

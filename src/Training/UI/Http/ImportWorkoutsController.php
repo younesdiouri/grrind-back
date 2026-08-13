@@ -10,7 +10,7 @@ use App\Training\Application\ImportWorkouts;
 use App\Training\Application\ImportWorkoutsHandler;
 use App\Training\UI\Http\Request\ImportedWorkoutRequest;
 use App\Training\UI\Http\Request\ImportWorkoutsRequest;
-use App\Training\UI\Http\Response\WorkoutImportResource;
+use App\Training\UI\Http\Response\SyncSummaryResource;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -48,8 +48,11 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class ImportWorkoutsController
 {
-    public function __construct(private ImportWorkoutsHandler $import)
-    {
+    public function __construct(
+        private ImportWorkoutsHandler $import,
+        /** Lié globalement dans `services.yaml` : le hash de l'équilibrage chargé au boot. */
+        private string $rulesetVersion,
+    ) {
     }
 
     #[Route('/api/workouts/import', name: 'training_workout_import', methods: ['POST'])]
@@ -59,8 +62,8 @@ final readonly class ImportWorkoutsController
     #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/WorkoutImportRequest'))]
     #[OA\Response(
         response: 200,
-        description: 'Le lot a été traité. Ce qui est entré, et ce qui a été écarté — un import où tout est écarté reste un succès.',
-        content: new OA\JsonContent(ref: '#/components/schemas/WorkoutImport'),
+        description: 'La synchronisation, prête à être jouée. Un import où tout est écarté reste un succès.',
+        content: new OA\JsonContent(ref: '#/components/schemas/SyncSummary'),
     )]
     #[OA\Response(response: 400, ref: '#/components/responses/BadRequest')]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
@@ -80,7 +83,7 @@ final readonly class ImportWorkoutsController
         // 200 et non 201 : un lot n'est pas une ressource. Il peut n'en créer aucune — le
         // cas le plus fréquent, un client qui resynchronise sans rien de neuf — et quand il
         // en crée trois, il n'y a pas d'URL unique à mettre dans `Location`.
-        return new JsonResponse(WorkoutImportResource::from($import)->toArray());
+        return new JsonResponse(SyncSummaryResource::from($import, $this->rulesetVersion)->toArray());
     }
 
     /**

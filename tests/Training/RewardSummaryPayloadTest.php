@@ -17,16 +17,13 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * **L'ordre des champs est l'ordre de l'animation**, et c'est le contrat le plus coûteux
- * à casser du produit.
+ * **L'ordre des champs est l'ordre de l'animation**, et c'est le contrat le plus coûteux à
+ * casser du produit.
  *
- * Ce test existait jusqu'ici à travers la route de complétion, qui vient de disparaître
- * (#85). Le laisser mourir avec elle rendrait l'ordre invérifiable pendant tout
- * l'intervalle qui mène au `SyncSummary` (#92) — c'est-à-dire pendant les tickets qui
- * touchent au payload. Il devient donc un test du **payload** et non de la route : moins
- * de couverture, mais sur exactement ce qu'on ne peut pas se permettre de perdre.
- *
- * Il reprendra sa forme fonctionnelle au #92, quand un producteur existera à nouveau.
+ * Ce test tient l'ordre **d'un** workout, sans HTTP et sans base : c'est du payload pur, et
+ * ça doit le rester pour qu'un changement de mise en scène échoue en une seconde et sans
+ * dépendre d'une route. {@see SyncSummaryPayloadTest} tient le niveau au-dessus, et
+ * {@see ImportSyncSummaryTest} vérifie que la vraie API rend bien tout ça.
  */
 final class RewardSummaryPayloadTest extends TestCase
 {

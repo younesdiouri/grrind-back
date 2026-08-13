@@ -327,22 +327,32 @@ when@dev:
                             elevationGainMeters: { type: integer, minimum: 0, nullable: true }
                             averageHeartRate: { type: integer, minimum: 1, maximum: 300, nullable: true }
 
-                    WorkoutImport:
+                    SyncSummary:
                         type: object
                         description: |
-                            Le résultat d'un lot. **Un import où tout est écarté est un succès** — c'est ce que
-                            rend un client qui resynchronise sans rien de neuf.
+                            **Le contrat le plus coûteux à casser du produit**, dans sa forme multi-workouts. Ce que
+                            le joueur reçoit quand sa montre a fini de parler.
 
-                            Les deux tableaux sont toujours présents, même vides.
+                            **L'ordre des champs est l'ordre de l'animation**, à deux niveaux : d'abord entre les
+                            workouts — `imported` est chronologique, celui du crédit — puis à l'intérieur de chacun.
 
-                            Forme provisoire : le #92 remplace `imported` par une timeline animable portant l'XP,
-                            les niveaux et le streak. `skipped` y survivra tel quel.
-                        required: [imported, skipped]
+                            **Rien n'est tronqué.** Au-delà d'une vingtaine de workouts, tout jouer prend plusieurs
+                            minutes : c'est une décision de mise en scène, et elle appartient au client. Le serveur
+                            envoie tout, le client décide de ce qu'il joue.
+                        required: [syncedAt, imported, skipped, totals, rulesetVersion]
                         properties:
+                            syncedAt:
+                                type: string
+                                format: date-time
+                                description: "L'horloge du serveur, et le seul instant de ce payload qui ne vienne pas d'un fournisseur. Sert de repère de dernière synchronisation réussie."
                             imported:
                                 type: array
-                                description: "Les séances **créditées**, dans l'ordre chronologique — celui du crédit, et celui de l'animation."
-                                items: { $ref: '#/components/schemas/TrainingSession' }
+                                description: |
+                                    Un `RewardSummary` par workout crédité, dans l'ordre chronologique. **C'est
+                                    exactement l'objet que le client sait déjà jouer**, palier de départ compris : la
+                                    barre part du bon endroit pour *chacun*, et l'enchaînement est continu sans un seul
+                                    recalcul côté client.
+                                items: { $ref: '#/components/schemas/RewardSummary' }
                             skipped:
                                 type: array
                                 description: |
@@ -380,6 +390,32 @@ when@dev:
 
                                                 `TOO_SHORT` : sous le plancher de durée. Un faux départ sur la montre n'est pas une
                                                 séance, et rien n'est écrit.
+                            totals:
+                                nullable: true
+                                description: |
+                                    Le raccourci de l'écran de résumé — « +847 XP · niveau 10 → 15 » — et ce que voit le
+                                    joueur qui saute l'animation.
+
+                                    **C'est un raccourci, jamais une source** : il est entièrement dérivé d'`imported`,
+                                    qui dit déjà tout. Deux vérités finissent toujours par diverger.
+
+                                    `null` quand rien n'a été crédité : il n'y a pas d'état d'arrivée quand rien n'est
+                                    arrivé, et « niveau 0 → 0 » mentirait à un joueur de niveau 12.
+                                allOf: [{ $ref: '#/components/schemas/SyncTotals' }]
+                            rulesetVersion:
+                                type: string
+                                description: "L'équilibrage sous lequel la synchronisation a été calculée. Affiché dans un rapport de bug : c'est ce qui rend une capture d'écran exploitable."
+
+                    SyncTotals:
+                        type: object
+                        required: [levelBefore, levelAfter, xpBefore, xpAfter, xpAwarded, workoutCount]
+                        properties:
+                            levelBefore: { type: integer, example: 10 }
+                            levelAfter: { type: integer, example: 15 }
+                            xpBefore: { type: integer }
+                            xpAfter: { type: integer }
+                            xpAwarded: { type: integer, description: "La somme des montants accordés, écarts non compris — un workout écarté n'a rien rapporté." }
+                            workoutCount: { type: integer, description: "Le nombre de workouts **crédités**, donc la longueur d'`imported`." }
 
                     SessionPage:
                         type: object
@@ -417,8 +453,8 @@ when@dev:
                     RewardSummary:
                         type: object
                         description: |
-                            **Le contrat le plus coûteux à casser du produit.** Ce que le joueur reçoit quand il
-                            appuie sur « terminer ».
+                            Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient
+                            autant qu'il y a eu de séances, dans l'ordre chronologique.
 
                             **L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en
                             bas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau

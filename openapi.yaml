@@ -298,11 +298,11 @@ paths:
               $ref: '#/components/schemas/WorkoutImportRequest'
       responses:
         '200':
-          description: 'Le lot a été traité. Ce qui est entré, et ce qui a été écarté — un import où tout est écarté reste un succès.'
+          description: 'La synchronisation, prête à être jouée. Un import où tout est écarté reste un succès.'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkoutImport'
+                $ref: '#/components/schemas/SyncSummary'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -664,17 +664,24 @@ components:
           maximum: 300
           minimum: 1
       type: object
-    WorkoutImport:
-      description: "Le résultat d'un lot. **Un import où tout est écarté est un succès** — c'est ce que\nrend un client qui resynchronise sans rien de neuf.\n\nLes deux tableaux sont toujours présents, même vides.\n\nForme provisoire : le #92 remplace `imported` par une timeline animable portant l'XP,\nles niveaux et le streak. `skipped` y survivra tel quel.\n"
+    SyncSummary:
+      description: "**Le contrat le plus coûteux à casser du produit**, dans sa forme multi-workouts. Ce que\nle joueur reçoit quand sa montre a fini de parler.\n\n**L'ordre des champs est l'ordre de l'animation**, à deux niveaux : d'abord entre les\nworkouts — `imported` est chronologique, celui du crédit — puis à l'intérieur de chacun.\n\n**Rien n'est tronqué.** Au-delà d'une vingtaine de workouts, tout jouer prend plusieurs\nminutes : c'est une décision de mise en scène, et elle appartient au client. Le serveur\nenvoie tout, le client décide de ce qu'il joue.\n"
       required:
+        - syncedAt
         - imported
         - skipped
+        - totals
+        - rulesetVersion
       properties:
+        syncedAt:
+          description: "L'horloge du serveur, et le seul instant de ce payload qui ne vienne pas d'un fournisseur. Sert de repère de dernière synchronisation réussie."
+          type: string
+          format: date-time
         imported:
-          description: "Les séances **créditées**, dans l'ordre chronologique — celui du crédit, et celui de l'animation."
+          description: "Un `RewardSummary` par workout crédité, dans l'ordre chronologique. **C'est\nexactement l'objet que le client sait déjà jouer**, palier de départ compris : la\nbarre part du bon endroit pour *chacun*, et l'enchaînement est continu sans un seul\nrecalcul côté client.\n"
           type: array
           items:
-            $ref: '#/components/schemas/TrainingSession'
+            $ref: '#/components/schemas/RewardSummary'
         skipped:
           description: "Les séances qui n'ont **rien rapporté**, chacune **nommée** et non comptée : le client\ndoit pouvoir dire « le curling n'est pas encore un sport chez nous » plutôt que « 1\nséance ignorée ».\n\nÉcarté ne veut pas toujours dire absent. `OUT_OF_WINDOW` écarte le *crédit*, pas la\nséance : elle est bien en base et apparaîtra dans l'historique.\n"
           type: array
@@ -698,6 +705,41 @@ components:
                   - OVERLAPS
                   - TOO_SHORT
             type: object
+        totals:
+          description: "Le raccourci de l'écran de résumé — « +847 XP · niveau 10 → 15 » — et ce que voit le\njoueur qui saute l'animation.\n\n**C'est un raccourci, jamais une source** : il est entièrement dérivé d'`imported`,\nqui dit déjà tout. Deux vérités finissent toujours par diverger.\n\n`null` quand rien n'a été crédité : il n'y a pas d'état d'arrivée quand rien n'est\narrivé, et « niveau 0 → 0 » mentirait à un joueur de niveau 12.\n"
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/SyncTotals'
+        rulesetVersion:
+          description: "L'équilibrage sous lequel la synchronisation a été calculée. Affiché dans un rapport de bug : c'est ce qui rend une capture d'écran exploitable."
+          type: string
+      type: object
+    SyncTotals:
+      required:
+        - levelBefore
+        - levelAfter
+        - xpBefore
+        - xpAfter
+        - xpAwarded
+        - workoutCount
+      properties:
+        levelBefore:
+          type: integer
+          example: 10
+        levelAfter:
+          type: integer
+          example: 15
+        xpBefore:
+          type: integer
+        xpAfter:
+          type: integer
+        xpAwarded:
+          description: "La somme des montants accordés, écarts non compris — un workout écarté n'a rien rapporté."
+          type: integer
+        workoutCount:
+          description: "Le nombre de workouts **crédités**, donc la longueur d'`imported`."
+          type: integer
       type: object
     SessionPage:
       description: "Pagination par curseur, sur l'identifiant. `nextCursor` à `null` signifie la fin. L'ordre redevient chronologique au #93 : depuis l'import, l'UUID v7 date de l'écriture et non de la pratique."
@@ -738,7 +780,7 @@ components:
           example: -55
       type: object
     RewardSummary:
-      description: "**Le contrat le plus coûteux à casser du produit.** Ce que le joueur reçoit quand il\nappuie sur « terminer ».\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau\nbascule, le titre tombe, puis le loot et la série. Un champ déplacé change la mise\nen scène.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, et les titres déjà\ntraduits.\n\n`loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5\net 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
+      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau\nbascule, le titre tombe, puis le loot et la série. Un champ déplacé change la mise\nen scène.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, et les titres déjà\ntraduits.\n\n`loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5\net 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
       required:
         - session
         - xp
