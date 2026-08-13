@@ -37,7 +37,7 @@ use App\Training\Application\SessionCompletion;
 final readonly class RewardSummaryResource
 {
     private function __construct(
-        public TrainingSessionResource $session,
+        public WorkoutResource $session,
         public SessionReward $reward,
     ) {
     }
@@ -45,7 +45,7 @@ final readonly class RewardSummaryResource
     public static function from(SessionCompletion $completion): self
     {
         return new self(
-            TrainingSessionResource::from($completion->session),
+            WorkoutResource::from($completion->session),
             $completion->reward,
         );
     }

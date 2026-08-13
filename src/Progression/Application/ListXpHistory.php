@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Progression\Application;
 
+use App\Shared\UI\Http\Cursor;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -21,7 +22,7 @@ final readonly class ListXpHistory
 {
     public function __construct(
         public Uuid $userId,
-        public ?Uuid $cursor = null,
+        public ?Cursor $cursor = null,
         public int $limit = 20,
     ) {
     }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Training\Infrastructure\Doctrine;
 
 use App\Shared\Domain\Activity\WorkoutSource;
-use App\Training\Application\ListSessions;
+use App\Training\Application\ListWorkouts;
 use App\Training\Domain\Workout;
 use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -129,49 +129,78 @@ class WorkoutRepository extends ServiceEntityRepository
     }
 
     /**
-     * L'ordre est celui de l'UUID v7, triable par construction : `id < :cursor` tient
-     * lieu de pagination, sans colonne d'ordre ni `OFFSET`.
+     * L'historique du joueur, de la séance la plus récente à la plus ancienne.
      *
-     * **Ce raccourci vient d'expirer.** Il tenait parce que l'identifiant se générait au
-     * moment où la séance commençait ; avec l'import, dix workouts vieux de dix jours
-     * reçoivent leurs UUID à la file, et l'ordre rendu devient celui de l'import et non
-     * celui de la pratique. La correction est un curseur composite `(startedAt, id)`,
-     * et elle appartient à #93 avec le reste de la route — la faire ici obligerait à
-     * réécrire deux fois la même pagination.
+     * **L'ordre est celui de la pratique, `(startedAt, id)`.** Il a été celui de l'UUID v7
+     * tant que l'identifiant naissait au moment où la séance commençait ; l'import a séparé
+     * les deux, et dix workouts vieux de dix jours recevaient leurs UUID à la file — donc
+     * l'historique suivait l'import, pas la pratique. L'identifiant reste comme
+     * **départage**, parce que deux workouts peuvent commencer à la même seconde et qu'une
+     * page qui s'arrêterait entre les deux les rendrait deux fois ou pas du tout.
      *
-     * `$take` est volontairement plus grand que `$query->limit` : l'appelant lit une
-     * ligne de plus pour savoir s'il existe une page suivante, et ne la rend pas.
+     * La comparaison lexicographique s'écrit à la main : DQL ne connaît pas les
+     * comparaisons de tuples, et `(a, b) < (x, y)` n'a pas d'équivalent portable.
+     *
+     * `$take` est volontairement plus grand que `$query->limit` : l'appelant lit une ligne
+     * de plus pour savoir s'il existe une page suivante, et ne la rend pas.
      *
      * @return list<Workout>
      */
-    public function history(ListSessions $query, int $take): array
+    public function history(ListWorkouts $query, int $take): array
     {
-        $builder = $this->createQueryBuilder('s')
-            ->where('s.userId = :userId')
+        $builder = $this->createQueryBuilder('w')
+            ->where('w.userId = :userId')
             ->setParameter('userId', $query->userId, UuidType::NAME)
-            ->orderBy('s.id', 'DESC')
+            ->orderBy('w.startedAt', 'DESC')
+            ->addOrderBy('w.id', 'DESC')
             ->setMaxResults($take);
 
         if (null !== $query->discipline) {
-            $builder->andWhere('s.discipline = :discipline')->setParameter('discipline', $query->discipline);
+            $builder->andWhere('w.discipline = :discipline')->setParameter('discipline', $query->discipline);
         }
 
         if (null !== $query->from) {
-            $builder->andWhere('s.startedAt >= :from')->setParameter('from', $query->from);
+            $builder->andWhere('w.startedAt >= :from')->setParameter('from', $query->from);
         }
 
         if (null !== $query->to) {
-            $builder->andWhere('s.startedAt <= :to')->setParameter('to', $query->to);
+            $builder->andWhere('w.startedAt <= :to')->setParameter('to', $query->to);
         }
 
         if (null !== $query->cursor) {
-            $builder->andWhere('s.id < :cursor')->setParameter('cursor', $query->cursor, UuidType::NAME);
+            $builder
+                ->andWhere('w.startedAt < :cursorAt OR (w.startedAt = :cursorAt AND w.id < :cursorId)')
+                ->setParameter('cursorAt', $query->cursor->at)
+                ->setParameter('cursorId', $query->cursor->id, UuidType::NAME);
         }
 
-        /** @var list<Workout> $sessions */
-        $sessions = $builder->getQuery()->getResult();
+        /** @var list<Workout> $workouts */
+        $workouts = $builder->getQuery()->getResult();
 
-        return $sessions;
+        return $workouts;
+    }
+
+    /**
+     * La fin du workout le plus récent que le joueur ait en base, ou `null` s'il n'en a
+     * aucun. C'est le repère que le client donne à HealthKit ou Health Connect pour ne
+     * demander que ce qui a bougé depuis.
+     *
+     * **Tous les workouts comptent, y compris ceux qu'on n'a pas crédités.** Un workout hors
+     * fenêtre est archivé, pas ignoré : le renvoyer ne ferait que produire un
+     * `ALREADY_IMPORTED` de plus. Ce que le client cherche, c'est la frontière de ce que le
+     * serveur **connaît**, pas celle de ce qu'il a payé.
+     */
+    public function lastImportedAt(Uuid $userId): ?DateTimeImmutable
+    {
+        $latest = $this->createQueryBuilder('w')
+            ->select('MAX(w.endedAt)')
+            ->where('w.userId = :userId')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        // Doctrine rend une chaîne sur une agrégation, et `null` sur une table vide.
+        return \is_string($latest) ? new DateTimeImmutable($latest) : null;
     }
 
     public function commit(): void

@@ -11,7 +11,7 @@ use App\Progression\Application\XpHistoryPage;
  * que ce soit plus tard sans casser le décodage du client.
  *
  * `nextCursor` à `null` signifie « plus rien après » — le client s'arrête là, sans total.
- * Même forme qu'à `GET /api/training/sessions`, au nom de la clé de liste près.
+ * Même forme qu'à `GET /api/workouts`, au nom de la clé de liste près — curseur opaque compris.
  */
 final readonly class XpHistoryPageResource
 {
@@ -28,7 +28,7 @@ final readonly class XpHistoryPageResource
     {
         return new self(
             array_map(XpTransactionResource::from(...), $page->transactions),
-            $page->nextCursor?->toRfc4122(),
+            $page->nextCursor?->encoded(),
         );
     }
 
