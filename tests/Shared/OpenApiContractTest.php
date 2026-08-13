@@ -92,6 +92,29 @@ final class OpenApiContractTest extends KernelTestCase
     }
 
     /**
+     * Le pendant du test précédent, dans l'autre sens : **un schéma que plus personne ne
+     * référence est du contrat mort.**.
+     *
+     * Les chemins ne peuvent pas pourrir — ils naissent des attributs des contrôleurs — mais
+     * les schémas sont écrits à la main, et une route supprimée laisse le sien derrière elle
+     * sans que rien ne s'en plaigne. C'est arrivé à `TrainingSession` et `SessionPage` au
+     * #93 ; ce test est ce qui l'aurait dit.
+     */
+    public function testNoSchemaIsLeftBehindWithoutAReference(): void
+    {
+        $references = [];
+        self::collectReferences($this->spec, $references);
+
+        foreach (self::handWrittenSchemas() as $name) {
+            self::assertContains(
+                '#/components/schemas/'.$name,
+                $references,
+                \sprintf('Le schéma "%s" n\'est référencé nulle part. Si sa route a disparu, il doit disparaître avec elle.', $name),
+            );
+        }
+    }
+
+    /**
      * Une opération sans réponse décrite passerait le test ci-dessus tout en ne disant
      * rien au client : elle est documentée « pour la forme ».
      */
@@ -228,6 +251,40 @@ final class OpenApiContractTest extends KernelTestCase
                 $node = $node[$segment];
             }
         }
+    }
+
+    /**
+     * Ceux de `nelmio_api_doc.yaml`, et eux seuls. Le générateur en produit d'autres à
+     * partir des DTO de requête — `XpHistoryQuery`, `RegisterRequest` — qu'il ne référence
+     * nulle part parce qu'il déplie leurs champs en paramètres. Ceux-là ne peuvent pas
+     * pourrir : ils naissent d'une classe qui existe.
+     *
+     * @return list<string>
+     */
+    private static function handWrittenSchemas(): array
+    {
+        $config = Yaml::parseFile(__DIR__.'/../../config/packages/nelmio_api_doc.yaml');
+        self::assertIsArray($config);
+
+        $node = $config;
+
+        foreach (['when@dev', 'nelmio_api_doc', 'documentation', 'components', 'schemas'] as $key) {
+            self::assertIsArray($node, 'Le fichier de configuration a changé de forme : ce test ne sait plus où chercher.');
+            self::assertArrayHasKey($key, $node);
+            $node = $node[$key];
+        }
+
+        $schemas = $node;
+        self::assertIsArray($schemas);
+
+        $names = array_keys($schemas);
+
+        foreach ($names as $name) {
+            self::assertIsString($name);
+        }
+
+        /** @var list<string> $names */
+        return $names;
     }
 
     /**
