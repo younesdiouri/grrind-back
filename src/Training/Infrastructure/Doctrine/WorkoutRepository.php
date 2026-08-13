@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Training\Infrastructure\Doctrine;
 
+use App\Shared\Domain\Activity\WorkoutSource;
 use App\Training\Application\ListSessions;
 use App\Training\Domain\Workout;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -33,6 +34,64 @@ class WorkoutRepository extends ServiceEntityRepository
     public function ofPlayer(Uuid $userId, Uuid $sessionId): ?Workout
     {
         return $this->findOneBy(['id' => $sessionId, 'userId' => $userId]);
+    }
+
+    /**
+     * Les couples (source, identifiant fournisseur) déjà en base parmi ceux proposés,
+     * rendus sous la forme que {@see \App\Training\Application\ImportWorkoutsHandler}
+     * interroge.
+     *
+     * Une seule requête pour tout le lot, et non une par workout : un client qui a perdu
+     * son curseur renvoie deux cents séances, dont deux cents sont des doublons.
+     *
+     * Le filtre porte sur le seul `externalId`, et la paire se reconstitue en PHP. C'est
+     * volontaire : la vraie condition est `(user_id, source, external_id)`, mais l'exprimer
+     * en SQL demanderait un `IN` sur des tuples que Doctrine ne sait pas paramétrer
+     * proprement. Le sur-ensemble ramené est minuscule — au pire les mêmes lignes vues sous
+     * l'autre source — et la comparaison exacte se fait sur la clé rendue.
+     *
+     * **Ce n'est pas ce qui garantit l'unicité.** Entre ce SELECT et l'INSERT qui suit,
+     * deux synchronisations concurrentes passent toutes les deux ; c'est `uniq_workout_external`
+     * qui refuse la seconde, et le verrou du #89 qui les sérialise. Ici on évite d'écrire
+     * des doublons évidents, on ne les rend pas impossibles.
+     *
+     * @param list<string> $externalIds
+     *
+     * @return array<string, true> indexé par "SOURCE\0EXTERNAL_ID"
+     */
+    public function knownProviderKeys(Uuid $userId, array $externalIds): array
+    {
+        if ([] === $externalIds) {
+            return [];
+        }
+
+        /** @var list<array{source: WorkoutSource, externalId: string}> $rows */
+        $rows = $this->createQueryBuilder('w')
+            ->select('w.source', 'w.externalId')
+            ->where('w.userId = :userId')
+            ->andWhere('w.externalId IN (:externalIds)')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->setParameter('externalIds', $externalIds)
+            ->getQuery()
+            ->getResult();
+
+        $known = [];
+
+        foreach ($rows as $row) {
+            $known[self::providerKey($row['source'], $row['externalId'])] = true;
+        }
+
+        return $known;
+    }
+
+    /**
+     * La clé de dédoublonnage, écrite ici pour que le dépôt et son appelant ne puissent
+     * pas en avoir deux versions. Le séparateur est un octet nul : il ne peut apparaître
+     * dans aucun identifiant de fournisseur, alors qu'un tiret, si.
+     */
+    public static function providerKey(WorkoutSource $source, string $externalId): string
+    {
+        return $source->value."\0".$externalId;
     }
 
     /**

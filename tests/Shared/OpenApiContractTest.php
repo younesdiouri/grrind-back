@@ -140,8 +140,7 @@ final class OpenApiContractTest extends KernelTestCase
      *
      * La liste est **comparée**, pas parcourue. Une boucle sur les routes attendues passait
      * sans rien vérifier le jour où il n'en restait aucune, ce que le retrait du chronomètre
-     * (#85) vient de provoquer : plus rien ne crédite jusqu'à `POST /api/workouts/import`
-     * (#88). Un test vide qui reste vert est pire qu'un test absent.
+     * (#85) avait provoqué. Un test vide qui reste vert est pire qu'un test absent.
      */
     public function testTheIdempotentRoutesAreExactlyTheOnesWeExpect(): void
     {
@@ -170,7 +169,7 @@ final class OpenApiContractTest extends KernelTestCase
         sort($idempotent);
 
         self::assertSame(
-            [],
+            ['POST /api/workouts/import'],
             $idempotent,
             'La liste des routes idempotentes a changé. Toute route qui crédite doit y entrer, '
             .'et la mettre à jour ici est le geste qui le fait relire.',
