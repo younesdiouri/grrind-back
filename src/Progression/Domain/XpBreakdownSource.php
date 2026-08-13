@@ -15,11 +15,26 @@ use App\Shared\Domain\Modifier\ModifierSource;
  * quatre sources de bonus correspondent une pour une aux contributeurs du
  * `ModifierResolver` (#18) ; les deux dernières sont des garde-fous, et leur contribution
  * est négative par construction.
+ *
+ * L'ordre de déclaration est **l'ordre d'animation** : ce que la séance vaut, ce que le
+ * terrain ajoute, ce que le personnage ajoute, puis ce que les garde-fous reprennent.
  */
 enum XpBreakdownSource: string
 {
-    /** Le socle : ce que la séance vaut avant tout modificateur. */
+    /** Le socle : le temps, une minute pour un point. */
     case Base = 'BASE';
+
+    /**
+     * Ce que les kilomètres ajoutent, et ce que le dénivelé ajoute. Deux lignes
+     * d'animation de plus, et c'est tout l'intérêt : « 45 de base, +62 pour tes 6,2 km »
+     * se lit et se joue, là où un total unique se subit.
+     *
+     * Elles s'ajoutent au socle sans être rabotées par les rendements décroissants : dix
+     * kilomètres restent dix kilomètres quelle que soit l'heure à laquelle on les a
+     * courus. C'est le plafond quotidien qui borne ce côté-là.
+     */
+    case Distance = 'DISTANCE';
+    case Elevation = 'ELEVATION';
 
     case Streak = 'STREAK';
     case Item = 'ITEM';

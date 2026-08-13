@@ -48,6 +48,8 @@ final readonly class LedgerSessionRewards implements SessionRewards
             // L'instant du sport, que l'événement porte déjà. C'est lui qui range l'écriture
             // dans une journée — un workout de mardi importé vendredi compte pour mardi.
             $workout->occurredAt(),
+            $workout->distanceMeters,
+            $workout->elevationGainMeters,
         ));
 
         $snapshot = $granted->snapshot;

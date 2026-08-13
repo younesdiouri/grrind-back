@@ -35,6 +35,15 @@ final readonly class GrantXp
         public Discipline $discipline,
         public int $durationSeconds,
         public DateTimeImmutable $occurredAt,
+        /**
+         * Ce que la montre a mesuré, et qui entre dans le calcul (#90). Contrairement au
+         * montant, ce n'est pas un état dérivé mais une **donnée du fait** : le module qui
+         * crédite ne peut pas aller la chercher, elle appartient au workout.
+         *
+         * `null` est « non mesuré », jamais zéro.
+         */
+        public ?int $distanceMeters = null,
+        public ?int $elevationGainMeters = null,
     ) {
     }
 }

@@ -36,6 +36,17 @@ final readonly class WorkoutImported implements DomainEvent
         public int $durationSeconds,
         public WorkoutSource $source,
         public TrustLevel $trust,
+        /**
+         * Ce que la montre a mesuré, et qui entre dans le calcul d'XP (#90). `null` est
+         * « non mesuré », jamais zéro : un tour de piste plat a bien un dénivelé de zéro,
+         * et un abonné qui confondrait les deux afficherait « +0 XP pour tes 0 km ».
+         *
+         * Seules ces deux-là voyagent. Les calories et la fréquence cardiaque sont
+         * stockées sur le workout mais n'entrent dans aucun calcul : les publier
+         * inviterait un abonné à s'en servir avant qu'on ait décidé ce qu'elles valent.
+         */
+        public ?int $distanceMeters = null,
+        public ?int $elevationGainMeters = null,
     ) {
     }
 

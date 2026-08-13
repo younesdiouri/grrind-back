@@ -63,18 +63,22 @@ final class GameBalancePassTest extends KernelTestCase
         self::assertSame(300, $container->getParameter('game.training.minimum_duration_seconds'));
         self::assertSame(14400, $container->getParameter('game.training.maximum_duration_seconds'));
 
-        // Le barème d'XP passe par son paramètre et non par son service : rien ne consomme
-        // encore `XpRates` — la transaction de complétion est au Lot 4 — donc le conteneur
-        // le retire. Que la compilation ait abouti prouve déjà que `XpSection` l'a
-        // construit sans broncher ; on vérifie ici qu'il couvre bien les six disciplines.
+        // Le barème d'XP passe par ses paramètres et non par son service : rien ne consomme
+        // `XpRates` dans ce conteneur de test, donc il le retire. Que la compilation ait
+        // abouti prouve déjà que `XpSection` l'a construit sans broncher ; on vérifie ici
+        // qu'il couvre bien toutes les disciplines.
+        $baseXpPerHour = $container->getParameter('game.xp.base_xp_per_hour');
         $disciplines = $container->getParameter('game.xp.disciplines');
+        self::assertIsInt($baseXpPerHour);
         self::assertIsArray($disciplines);
 
-        /** @var list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}> $disciplines */
-        $rates = new XpRates($disciplines);
+        /** @var list<array{discipline: string, daily_cap_xp: int, xp_per_km?: int, xp_per_100m_elevation?: int}> $disciplines */
+        $rates = new XpRates($baseXpPerHour, $disciplines);
 
+        // Le socle ne dépend plus de la discipline (#90) ; c'est le plafond quotidien qui
+        // reste par discipline, et c'est lui dont l'absence ferait échouer la construction.
         foreach (Discipline::cases() as $discipline) {
-            self::assertGreaterThan(0, $rates->perHourOf($discipline));
+            self::assertGreaterThan(0, $rates->dailyCapOf($discipline));
         }
     }
 

@@ -18,8 +18,9 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
  * les listes, donc `game.xp.disciplines` reste un paramètre unique que `XpRates` consomme
  * d'un bloc, au lieu de six paramètres à recâbler chaque fois qu'une discipline s'ouvre.
  *
- * La couverture des six disciplines et la cohérence des taux sont dites par `XpRates` :
- * même geste qu'à `TrainingSection`, une règle du domaine ne s'écrit pas deux fois.
+ * La couverture des disciplines et la cohérence des taux sont dites par `XpRates` : même
+ * geste qu'à `TrainingSection`, une règle du domaine ne s'écrit pas deux fois. Le schéma ne
+ * garde que ce qu'il est seul à pouvoir dire — un nœud absent contre un nœud à zéro.
  */
 final class XpSection implements GameBalanceSection
 {
@@ -34,14 +35,20 @@ final class XpSection implements GameBalanceSection
 
         $tree->getRootNode()
             ->children()
+                ->integerNode('base_xp_per_hour')->isRequired()->min(1)->end()
                 ->arrayNode('disciplines')
                     ->isRequired()
                     ->requiresAtLeastOneElement()
                     ->arrayPrototype()
                         ->children()
                             ->scalarNode('discipline')->isRequired()->cannotBeEmpty()->end()
-                            ->integerNode('xp_per_hour')->isRequired()->min(1)->end()
                             ->integerNode('daily_cap_xp')->isRequired()->min(1)->end()
+                            // Facultatifs, et `min(1)` : une clé absente vaut « pas de
+                            // bonus », une clé à zéro voudrait dire « bonus mesuré et nul »
+                            // et afficherait une ligne vide au joueur. Le schéma rend le
+                            // second cas inatteignable plutôt que de laisser choisir.
+                            ->integerNode('xp_per_km')->min(1)->end()
+                            ->integerNode('xp_per_100m_elevation')->min(1)->end()
                         ->end()
                     ->end()
                 ->end()
@@ -59,9 +66,9 @@ final class XpSection implements GameBalanceSection
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
-                    /** @var array{disciplines: list<array{discipline: string, xp_per_hour: int, daily_cap_xp: int}>, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $values */
+                    /** @var array{base_xp_per_hour: int, disciplines: list<array{discipline: string, daily_cap_xp: int, xp_per_km?: int, xp_per_100m_elevation?: int}>, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $values */
                     try {
-                        new XpRates($values['disciplines']);
+                        new XpRates($values['base_xp_per_hour'], $values['disciplines']);
                         new DiminishingReturns($values['diminishing_returns'], $values['diminishing_returns_beyond_percent']);
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);

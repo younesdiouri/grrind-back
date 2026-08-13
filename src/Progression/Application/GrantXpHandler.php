@@ -73,6 +73,8 @@ final readonly class GrantXpHandler
                 // sont à des jours d'écart, et c'est bien la charge de ce jour-là qui place
                 // le workout sur la courbe des rendements décroissants.
                 $this->dailyLoad->of($command->userId, $command->discipline, $command->occurredAt),
+                $command->distanceMeters,
+                $command->elevationGainMeters,
             );
 
             $this->ledger->add(XpTransaction::creditFor(

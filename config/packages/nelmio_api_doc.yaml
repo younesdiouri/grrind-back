@@ -381,9 +381,20 @@ when@dev:
                             Une contribution au total, entier signé. Un multiplicateur se résout en points
                             **avant** d'arriver ici : ce qui est écrit est ce que le joueur a reçu, pas la
                             formule. Les deux dernières sources sont des garde-fous, négatives au crédit.
+
+                            **Une ligne à zéro n'existe pas.** Une métrique non mesurée, un bonus trop petit
+                            pour peser, un garde-fou qui n'a rien repris : rien de tout ça n'occupe une ligne
+                            d'animation. Le client peut donc jouer chaque ligne sans la tester.
                         required: [source, amount]
                         properties:
-                            source: { type: string, enum: [BASE, STREAK, ITEM, SKILL, LEAGUE, DIMINISHING, DAILY_CAP] }
+                            source:
+                                type: string
+                                enum: [BASE, DISTANCE, ELEVATION, STREAK, ITEM, SKILL, LEAGUE, DIMINISHING, DAILY_CAP]
+                                description: |
+                                    `BASE` est le temps — une minute vaut un point. `DISTANCE` et `ELEVATION`
+                                    sont ce que le terrain ajoute, et n'apparaissent que sur les disciplines où
+                                    une montre les mesure de façon fiable. Les quatre suivantes sont les
+                                    contributeurs de modificateurs ; les deux dernières, les garde-fous.
                             amount: { type: integer, example: -55 }
 
                     RewardSummary:
