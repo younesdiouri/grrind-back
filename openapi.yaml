@@ -217,7 +217,6 @@ paths:
           required: false
           schema:
             type: string
-            format: uuid
             nullable: true
             default: null
         -
@@ -311,11 +310,11 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /api/training/sessions:
+  /api/workouts:
     get:
       tags:
         - Entraînement
-      operationId: get_training_session_list
+      operationId: get_training_workout_list
       parameters:
         -
           name: discipline
@@ -351,7 +350,6 @@ paths:
           required: false
           schema:
             type: string
-            format: uuid
             nullable: true
             default: null
         -
@@ -369,11 +367,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionPage'
+                $ref: '#/components/schemas/WorkoutPage'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/workouts/sync-state:
+    get:
+      tags:
+        - Entraînement
+      operationId: get_training_workout_sync_state
+      responses:
+        '200':
+          description: 'De quoi demander la bonne fenêtre au fournisseur santé.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncState'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 components:
   schemas:
     ProblemDetails:
@@ -558,8 +570,8 @@ components:
         tokens:
           $ref: '#/components/schemas/TokenPair'
       type: object
-    TrainingSession:
-      description: "Une séance **déjà faite**. Elle n'a pas d'état : `status` a disparu avec le\nchronomètre (#85), et `endedAt` comme `durationSeconds` ne sont plus nullables —\nun workout arrive terminé ou n'arrive pas.\n\n`durationSeconds` est calculée par le serveur à partir des deux bornes, jamais\nrecopiée d'un champ envoyé par le client.\n"
+    Workout:
+      description: "**La seule forme d'un workout dans toute l'API** — l'historique la sert, le `SyncSummary`\nl'embarque telle quelle. Un client décode un seul type.\n\nUne séance **déjà faite** : elle n'a pas d'état, et `endedAt` comme `durationSeconds` ne\nsont pas nullables. Un workout arrive terminé ou n'arrive pas.\n\n`durationSeconds` est calculée par le serveur à partir des deux bornes, jamais recopiée\nd'un champ envoyé par le client. C'est la durée **réellement mesurée** : au-delà du\nplafond, l'XP est calculée sur une durée écrêtée, mais l'historique dit ce qui s'est\npassé.\n\n**Les mesures sont nullables, et c'est structurel** : aucun appareil ne fournit tout.\n`null` veut dire « non mesuré », jamais zéro — un tour de piste plat a bien un dénivelé\nde zéro.\n"
       required:
         - id
         - discipline
@@ -568,6 +580,11 @@ components:
         - startedAt
         - endedAt
         - durationSeconds
+        - distanceMeters
+        - calories
+        - elevationGainMeters
+        - averageHeartRate
+        - externalId
       properties:
         id:
           type: string
@@ -585,7 +602,7 @@ components:
             - MOBILITY
             - CLIMBING
         source:
-          description: "L'agrégateur de plateforme qui a rapporté la séance, pas l'appareil qui l'a\nmesurée : une montre Garmin arrive en `APPLE_HEALTH` sur iPhone et en\n`HEALTH_CONNECT` sur Android. `STRAVA` a quitté le contrat — elle n'avait pas de\nproducteur, et un client déployé n'a pas à traiter un cas mort en attendant son\nadapter.\n"
+          description: "L'agrégateur de plateforme qui a rapporté la séance, pas l'appareil qui l'a\nmesurée : une montre Garmin arrive en `APPLE_HEALTH` sur iPhone et en\n`HEALTH_CONNECT` sur Android.\n"
           type: string
           enum:
             - APPLE_HEALTH
@@ -604,6 +621,52 @@ components:
           format: date-time
         durationSeconds:
           type: integer
+        distanceMeters:
+          type: integer
+          nullable: true
+        calories:
+          type: integer
+          nullable: true
+        elevationGainMeters:
+          type: integer
+          nullable: true
+        averageHeartRate:
+          type: integer
+          nullable: true
+        externalId:
+          description: "L'identifiant chez le fournisseur, rendu parce que c'est le client qui l'a envoyé : il peut ainsi rapprocher sa liste HealthKit de ce que le serveur connaît déjà, sans deviner."
+          type: string
+          nullable: true
+      type: object
+    WorkoutPage:
+      description: "Une page d'historique, **dans l'ordre de la pratique** : `startedAt` décroissant, puis\nl'identifiant pour départager deux séances commencées à la même seconde.\n\n`nextCursor` est une **chaîne opaque** — le client la renvoie telle quelle, il n'a rien à\ny lire. `null` signifie la fin ; il n'y a pas de total, un défilement infini n'en a aucun\nusage.\n"
+      required:
+        - workouts
+        - nextCursor
+      properties:
+        workouts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workout'
+        nextCursor:
+          type: string
+          nullable: true
+      type: object
+    SyncState:
+      description: "De quoi demander la bonne fenêtre à HealthKit ou Health Connect.\n\n**Le curseur vient du serveur.** Le client peut garder sa date de dernière\nsynchronisation en local, et il le fera pour éviter un aller-retour au démarrage — mais\nil ne doit pas en *dépendre* : réinstallation, changement d'appareil, second appareil sur\nle même compte. Le cache local est une optimisation, pas la vérité.\n\n**La fenêtre est servie et pas codée en dur** : elle doit pouvoir bouger sans publication\nsur les stores. Une app qui demanderait trente jours pendant que le serveur en accepte\nsoixante enverrait moins que ce qu'elle pourrait.\n"
+      required:
+        - lastImportedAt
+        - importWindowDays
+      properties:
+        lastImportedAt:
+          description: "La fin du workout le plus récent que le serveur ait en base — pas la date du dernier\nappel d'import, qui a pu ne rien apporter. Les séances archivées hors fenêtre comptent :\nce qu'on désigne ici est la frontière de ce que le serveur **connaît**, pas de ce qu'il a\npayé. `null` sur un compte qui n'a jamais synchronisé.\n"
+          type: string
+          format: date-time
+          nullable: true
+        importWindowDays:
+          description: "Au-delà, une séance est conservée mais ne rapporte pas d'XP. C'est ce qui empêche trois ans d'archives d'amener un joueur au niveau 60 avant sa première course pour Grrind."
+          type: integer
+          example: 30
       type: object
     WorkoutImportRequest:
       description: "Ce que la montre a enregistré depuis la dernière synchronisation. **Un lot, pas un\nworkout** : revenir après dix jours d'absence avec trois séances à créditer est le cas\nnominal.\n\nLe client envoie le **type brut du fournisseur**, jamais une `discipline` : la\ntraduction est serveur, ce qui permet d'ouvrir un sport sans publier sur les stores.\nUn type inconnu n'est pas une erreur — la séance est écartée et nommée dans la\nréponse.\n\n**La durée n'est pas un champ.** Elle se dérive de `startedAt` et `endedAt`, arbitrée\npar le serveur : l'accepter en entrée donnerait au client une prise sur ce qu'il gagne.\n"
@@ -741,21 +804,6 @@ components:
           description: "Le nombre de workouts **crédités**, donc la longueur d'`imported`."
           type: integer
       type: object
-    SessionPage:
-      description: "Pagination par curseur, sur l'identifiant. `nextCursor` à `null` signifie la fin. L'ordre redevient chronologique au #93 : depuis l'import, l'UUID v7 date de l'écriture et non de la pratique."
-      required:
-        - sessions
-        - nextCursor
-      properties:
-        sessions:
-          type: array
-          items:
-            $ref: '#/components/schemas/TrainingSession'
-        nextCursor:
-          type: string
-          format: uuid
-          nullable: true
-      type: object
     XpLine:
       description: "Une contribution au total, entier signé. Un multiplicateur se résout en points\n**avant** d'arriver ici : ce qui est écrit est ce que le joueur a reçu, pas la\nformule. Les deux dernières sources sont des garde-fous, négatives au crédit.\n\n**Une ligne à zéro n'existe pas.** Une métrique non mesurée, un bonus trop petit\npour peser, un garde-fou qui n'a rien repris : rien de tout ça n'occupe une ligne\nd'animation. Le client peut donc jouer chaque ligne sans la tester.\n"
       required:
@@ -792,7 +840,7 @@ components:
         - rulesetVersion
       properties:
         session:
-          $ref: '#/components/schemas/TrainingSession'
+          $ref: '#/components/schemas/Workout'
         xp:
           required:
             - awarded
@@ -996,6 +1044,7 @@ components:
           format: date-time
       type: object
     XpHistoryPage:
+      description: "Même pagination qu'à `GET /api/workouts`, curseur opaque compris : deux paginations qui divergeraient coûteraient deux implémentations côté client. L'ordre est celui du sport — `occurredAt` décroissant, puis l'identifiant pour départager."
       required:
         - transactions
         - nextCursor
@@ -1006,7 +1055,6 @@ components:
             $ref: '#/components/schemas/XpTransaction'
         nextCursor:
           type: string
-          format: uuid
           nullable: true
       type: object
     RefreshTokenRequest:
@@ -1070,7 +1118,6 @@ components:
       properties:
         cursor:
           type: string
-          format: uuid
           nullable: true
           default: null
         limit:
@@ -1162,7 +1209,7 @@ components:
         - HIKING
         - MOBILITY
         - CLIMBING
-    SessionHistoryQuery:
+    WorkoutHistoryQuery:
       properties:
         discipline:
           nullable: true
@@ -1182,7 +1229,6 @@ components:
           default: null
         cursor:
           type: string
-          format: uuid
           nullable: true
           default: null
         limit:

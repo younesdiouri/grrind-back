@@ -161,18 +161,15 @@ class XpTransactionRepository extends ServiceEntityRepository
     /**
      * L'historique du joueur, du plus récent au plus ancien.
      *
-     * L'ordre est celui de l'UUID v7, triable par construction : `id < :cursor` tient lieu
-     * de pagination, sans colonne d'ordre ni `OFFSET`.
+     * **L'ordre est celui du sport, `(occurredAt, id)`** — le même geste et le même curseur
+     * qu'à {@see \App\Training\Infrastructure\Doctrine\WorkoutRepository::history()}, pour
+     * que le client n'ait qu'une pagination à écrire.
      *
-     * **Ce raccourci vient d'expirer, exactement comme celui de
-     * {@see \App\Training\Infrastructure\Doctrine\WorkoutRepository::history()}.** L'ordre
-     * de l'UUID coïncidait avec celui de la date tant que les deux naissaient du même
-     * instant ; l'import date une écriture du jour du sport et non de son écriture, donc dix
-     * workouts vieux de dix jours reçoivent leurs identifiants à la file et l'historique
-     * rendu suit l'import, pas la pratique. La correction est un curseur composite
-     * `(occurredAt, id)` — et elle appartient au #93, avec celle de l'historique des
-     * workouts : les deux paginations doivent rester la même pour que le client n'en écrive
-     * qu'une.
+     * Il a été celui de l'UUID v7 tant que l'identifiant et la date naissaient du même
+     * instant. L'import a séparé les deux : une écriture est datée du jour du sport, pas de
+     * son insertion, donc dix workouts vieux de dix jours recevaient leurs identifiants à la
+     * file et l'historique suivait l'import. L'identifiant reste comme **départage**, deux
+     * écritures pouvant porter le même instant.
      *
      * `$take` est volontairement plus grand que `$query->limit` : l'appelant lit une ligne
      * de plus pour savoir s'il existe une page suivante, et ne la rend pas.
@@ -184,11 +181,15 @@ class XpTransactionRepository extends ServiceEntityRepository
         $builder = $this->createQueryBuilder('t')
             ->where('t.userId = :userId')
             ->setParameter('userId', $query->userId, UuidType::NAME)
-            ->orderBy('t.id', 'DESC')
+            ->orderBy('t.occurredAt', 'DESC')
+            ->addOrderBy('t.id', 'DESC')
             ->setMaxResults($take);
 
         if (null !== $query->cursor) {
-            $builder->andWhere('t.id < :cursor')->setParameter('cursor', $query->cursor, UuidType::NAME);
+            $builder
+                ->andWhere('t.occurredAt < :cursorAt OR (t.occurredAt = :cursorAt AND t.id < :cursorId)')
+                ->setParameter('cursorAt', $query->cursor->at)
+                ->setParameter('cursorId', $query->cursor->id, UuidType::NAME);
         }
 
         /** @var list<XpTransaction> $transactions */

@@ -249,20 +249,24 @@ when@dev:
                             tokens: { $ref: '#/components/schemas/TokenPair' }
 
                     # ————— Entraînement ————————————————————————————————————————————————
-                    # Le schéma garde son nom alors que l'entité s'appelle `Workout` (#83) :
-                    # il disparaît au #93 avec la route qui le sert, remplacé par un
-                    # `Workout` qui portera aussi les métriques du #84. Le renommer d'ici là
-                    # ferait deux ruptures pour un seul changement.
-                    TrainingSession:
+                    Workout:
                         type: object
                         description: |
-                            Une séance **déjà faite**. Elle n'a pas d'état : `status` a disparu avec le
-                            chronomètre (#85), et `endedAt` comme `durationSeconds` ne sont plus nullables —
-                            un workout arrive terminé ou n'arrive pas.
+                            **La seule forme d'un workout dans toute l'API** — l'historique la sert, le `SyncSummary`
+                            l'embarque telle quelle. Un client décode un seul type.
 
-                            `durationSeconds` est calculée par le serveur à partir des deux bornes, jamais
-                            recopiée d'un champ envoyé par le client.
-                        required: [id, discipline, source, trust, startedAt, endedAt, durationSeconds]
+                            Une séance **déjà faite** : elle n'a pas d'état, et `endedAt` comme `durationSeconds` ne
+                            sont pas nullables. Un workout arrive terminé ou n'arrive pas.
+
+                            `durationSeconds` est calculée par le serveur à partir des deux bornes, jamais recopiée
+                            d'un champ envoyé par le client. C'est la durée **réellement mesurée** : au-delà du
+                            plafond, l'XP est calculée sur une durée écrêtée, mais l'historique dit ce qui s'est
+                            passé.
+
+                            **Les mesures sont nullables, et c'est structurel** : aucun appareil ne fournit tout.
+                            `null` veut dire « non mesuré », jamais zéro — un tour de piste plat a bien un dénivelé
+                            de zéro.
+                        required: [id, discipline, source, trust, startedAt, endedAt, durationSeconds, distanceMeters, calories, elevationGainMeters, averageHeartRate, externalId]
                         properties:
                             id: { type: string, format: uuid }
                             discipline: { type: string, enum: [RUNNING, WALKING, CYCLING, SWIMMING, STRENGTH, HIIT, HIKING, MOBILITY, CLIMBING] }
@@ -272,9 +276,7 @@ when@dev:
                                 description: |
                                     L'agrégateur de plateforme qui a rapporté la séance, pas l'appareil qui l'a
                                     mesurée : une montre Garmin arrive en `APPLE_HEALTH` sur iPhone et en
-                                    `HEALTH_CONNECT` sur Android. `STRAVA` a quitté le contrat — elle n'avait pas de
-                                    producteur, et un client déployé n'a pas à traiter un cas mort en attendant son
-                                    adapter.
+                                    `HEALTH_CONNECT` sur Android.
                             trust:
                                 type: string
                                 enum: [DECLARED, PROVIDER_VERIFIED]
@@ -282,6 +284,59 @@ when@dev:
                             startedAt: { type: string, format: date-time }
                             endedAt: { type: string, format: date-time }
                             durationSeconds: { type: integer }
+                            distanceMeters: { type: integer, nullable: true }
+                            calories: { type: integer, nullable: true }
+                            elevationGainMeters: { type: integer, nullable: true }
+                            averageHeartRate: { type: integer, nullable: true }
+                            externalId:
+                                type: string
+                                nullable: true
+                                description: "L'identifiant chez le fournisseur, rendu parce que c'est le client qui l'a envoyé : il peut ainsi rapprocher sa liste HealthKit de ce que le serveur connaît déjà, sans deviner."
+
+                    WorkoutPage:
+                        type: object
+                        description: |
+                            Une page d'historique, **dans l'ordre de la pratique** : `startedAt` décroissant, puis
+                            l'identifiant pour départager deux séances commencées à la même seconde.
+
+                            `nextCursor` est une **chaîne opaque** — le client la renvoie telle quelle, il n'a rien à
+                            y lire. `null` signifie la fin ; il n'y a pas de total, un défilement infini n'en a aucun
+                            usage.
+                        required: [workouts, nextCursor]
+                        properties:
+                            workouts:
+                                type: array
+                                items: { $ref: '#/components/schemas/Workout' }
+                            nextCursor: { type: string, nullable: true }
+
+                    SyncState:
+                        type: object
+                        description: |
+                            De quoi demander la bonne fenêtre à HealthKit ou Health Connect.
+
+                            **Le curseur vient du serveur.** Le client peut garder sa date de dernière
+                            synchronisation en local, et il le fera pour éviter un aller-retour au démarrage — mais
+                            il ne doit pas en *dépendre* : réinstallation, changement d'appareil, second appareil sur
+                            le même compte. Le cache local est une optimisation, pas la vérité.
+
+                            **La fenêtre est servie et pas codée en dur** : elle doit pouvoir bouger sans publication
+                            sur les stores. Une app qui demanderait trente jours pendant que le serveur en accepte
+                            soixante enverrait moins que ce qu'elle pourrait.
+                        required: [lastImportedAt, importWindowDays]
+                        properties:
+                            lastImportedAt:
+                                type: string
+                                format: date-time
+                                nullable: true
+                                description: |
+                                    La fin du workout le plus récent que le serveur ait en base — pas la date du dernier
+                                    appel d'import, qui a pu ne rien apporter. Les séances archivées hors fenêtre comptent :
+                                    ce qu'on désigne ici est la frontière de ce que le serveur **connaît**, pas de ce qu'il a
+                                    payé. `null` sur un compte qui n'a jamais synchronisé.
+                            importWindowDays:
+                                type: integer
+                                example: 30
+                                description: "Au-delà, une séance est conservée mais ne rapporte pas d'XP. C'est ce qui empêche trois ans d'archives d'amener un joueur au niveau 60 avant sa première course pour Grrind."
 
                     WorkoutImportRequest:
                         type: object
@@ -417,16 +472,6 @@ when@dev:
                             xpAwarded: { type: integer, description: "La somme des montants accordés, écarts non compris — un workout écarté n'a rien rapporté." }
                             workoutCount: { type: integer, description: "Le nombre de workouts **crédités**, donc la longueur d'`imported`." }
 
-                    SessionPage:
-                        type: object
-                        description: "Pagination par curseur, sur l'identifiant. `nextCursor` à `null` signifie la fin. L'ordre redevient chronologique au #93 : depuis l'import, l'UUID v7 date de l'écriture et non de la pratique."
-                        required: [sessions, nextCursor]
-                        properties:
-                            sessions:
-                                type: array
-                                items: { $ref: '#/components/schemas/TrainingSession' }
-                            nextCursor: { type: string, format: uuid, nullable: true }
-
                     # ————— Progression —————————————————————————————————————————————————
                     XpLine:
                         type: object
@@ -470,7 +515,7 @@ when@dev:
                             rendre optionnelle pour toujours.
                         required: [session, xp, level, titlesUnlocked, loot, streak, unlockableNodes, rulesetVersion]
                         properties:
-                            session: { $ref: '#/components/schemas/TrainingSession' }
+                            session: { $ref: '#/components/schemas/Workout' }
                             xp:
                                 type: object
                                 required: [awarded, breakdown]
@@ -590,12 +635,13 @@ when@dev:
 
                     XpHistoryPage:
                         type: object
+                        description: "Même pagination qu'à `GET /api/workouts`, curseur opaque compris : deux paginations qui divergeraient coûteraient deux implémentations côté client. L'ordre est celui du sport — `occurredAt` décroissant, puis l'identifiant pour départager."
                         required: [transactions, nextCursor]
                         properties:
                             transactions:
                                 type: array
                                 items: { $ref: '#/components/schemas/XpTransaction' }
-                            nextCursor: { type: string, format: uuid, nullable: true }
+                            nextCursor: { type: string, nullable: true }
 
             # Par défaut tout est authentifié : c'est l'état d'`^/api`, et l'oubli
             # dangereux est dans l'autre sens. Les routes publiques le disent une par une.

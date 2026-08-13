@@ -11,6 +11,7 @@ use App\Progression\Infrastructure\Translation\TitleTranslator;
 use App\Progression\UI\Http\Request\XpHistoryQuery;
 use App\Progression\UI\Http\Response\ProgressionResource;
 use App\Progression\UI\Http\Response\XpHistoryPageResource;
+use App\Shared\UI\Http\Cursor;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
@@ -76,7 +77,7 @@ final readonly class ProgressionController
     ): JsonResponse {
         $page = ($this->listHistory)(new ListXpHistory(
             Uuid::fromString($user->getUserIdentifier()),
-            $query->cursor,
+            Cursor::fromQuery($query, $query->cursor),
             $query->limit,
         ));
 
