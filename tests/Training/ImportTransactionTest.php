@@ -35,13 +35,13 @@ final class ImportTransactionTest extends ApiTestCase
         $response = $this->import($bob, [self::candidate(durationSeconds: 1800)]);
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 
-        // Une demi-heure de course à 90 XP l'heure, sans aucun modificateur actif ni
+        // Une demi-heure, une minute pour un point, sans aucun modificateur actif ni
         // rendement décroissant déclenché : le socle seul, et il est au ledger.
-        self::assertSame(45, $this->ledgerTotalOf($bob));
+        self::assertSame(30, $this->ledgerTotalOf($bob));
 
         // Le snapshot est reprojeté dans la foulée — c'est ce que le client lira ensuite sur
         // `GET /api/progression`, sans attendre un consommateur de l'outbox.
-        self::assertSame(45, $this->snapshotTotalOf($bob));
+        self::assertSame(30, $this->snapshotTotalOf($bob));
     }
 
     /**
@@ -58,9 +58,9 @@ final class ImportTransactionTest extends ApiTestCase
             self::candidate(externalId: 'HK-3', startedAt: '2026-08-05T07:00:00+00:00', durationSeconds: 1800),
         ]);
 
-        // Trois journées distinctes, donc aucun rendement décroissant : 45 chacune.
+        // Trois journées distinctes, donc aucun rendement décroissant : 30 chacune.
         self::assertSame(3, $this->ledgerSize());
-        self::assertSame(135, $this->snapshotTotalOf($bob));
+        self::assertSame(90, $this->snapshotTotalOf($bob));
     }
 
     /**
@@ -69,9 +69,9 @@ final class ImportTransactionTest extends ApiTestCase
      * itération — en voyant les workouts crédités plus tôt dans la **même boucle**, pas
      * seulement ce qui était en base au BEGIN.
      *
-     * Trois heures de course le même jour : la première heure pleine, la deuxième à 60 %,
-     * la demi-heure suivante à 30 %. Si la boucle relisait la même charge à chaque fois,
-     * les trois vaudraient 90 et le total serait 270.
+     * Deux heures de course le même jour, en trois séances : la première heure pleine, la
+     * demi-heure suivante à 60 %, la dernière à 30 %. Si la boucle relisait la même charge à
+     * chaque fois, les trois vaudraient leur plein et le total serait 120.
      */
     public function testTheDailyLoadSeesTheWorkoutsCreditedEarlierInTheSameBatch(): void
     {
@@ -83,9 +83,9 @@ final class ImportTransactionTest extends ApiTestCase
             self::candidate(externalId: 'HK-SOIR', startedAt: '2026-08-05T18:00:00+00:00', durationSeconds: 1800),
         ]);
 
-        // 90 sur la première heure, puis 27 et 27 sur les deux demi-heures de la tranche
-        // 60-90 puis 90-120, pondérées à 60 % et 30 %.
-        self::assertSame(90 + 27 + 13, $this->snapshotTotalOf($bob));
+        // 60 sur la première heure, puis 18 et 9 sur les deux demi-heures des tranches
+        // 60-90 et 90-120, pondérées à 60 % et 30 %.
+        self::assertSame(60 + 18 + 9, $this->snapshotTotalOf($bob));
     }
 
     /**
@@ -122,9 +122,9 @@ final class ImportTransactionTest extends ApiTestCase
             self::candidate(externalId: 'HK-MARDI', startedAt: '2026-08-04T07:00:00+00:00', durationSeconds: 3600),
         ]);
 
-        // Deux heures pleines à 90, sur deux journées : aucun rendement décroissant. Sur
-        // une seule journée, la seconde ne vaudrait que 54.
-        self::assertSame(180, $this->snapshotTotalOf($bob));
+        // Deux heures pleines à 60, sur deux journées : aucun rendement décroissant. Sur
+        // une seule journée, la seconde ne vaudrait que 27.
+        self::assertSame(120, $this->snapshotTotalOf($bob));
 
         $days = $this->connection()->fetchFirstColumn(
             "SELECT to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') FROM xp_transaction ORDER BY occurred_at",
@@ -208,7 +208,7 @@ final class ImportTransactionTest extends ApiTestCase
         ]);
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-        self::assertSame(45, $this->snapshotTotalOf($bob));
+        self::assertSame(30, $this->snapshotTotalOf($bob));
     }
 
     /**

@@ -711,15 +711,18 @@ components:
           nullable: true
       type: object
     XpLine:
-      description: "Une contribution au total, entier signé. Un multiplicateur se résout en points\n**avant** d'arriver ici : ce qui est écrit est ce que le joueur a reçu, pas la\nformule. Les deux dernières sources sont des garde-fous, négatives au crédit.\n"
+      description: "Une contribution au total, entier signé. Un multiplicateur se résout en points\n**avant** d'arriver ici : ce qui est écrit est ce que le joueur a reçu, pas la\nformule. Les deux dernières sources sont des garde-fous, négatives au crédit.\n\n**Une ligne à zéro n'existe pas.** Une métrique non mesurée, un bonus trop petit\npour peser, un garde-fou qui n'a rien repris : rien de tout ça n'occupe une ligne\nd'animation. Le client peut donc jouer chaque ligne sans la tester.\n"
       required:
         - source
         - amount
       properties:
         source:
+          description: "`BASE` est le temps — une minute vaut un point. `DISTANCE` et `ELEVATION`\nsont ce que le terrain ajoute, et n'apparaissent que sur les disciplines où\nune montre les mesure de façon fiable. Les quatre suivantes sont les\ncontributeurs de modificateurs ; les deux dernières, les garde-fous.\n"
           type: string
           enum:
             - BASE
+            - DISTANCE
+            - ELEVATION
             - STREAK
             - ITEM
             - SKILL

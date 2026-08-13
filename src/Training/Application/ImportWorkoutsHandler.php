@@ -160,6 +160,8 @@ final readonly class ImportWorkoutsHandler
             $workout->durationSeconds(),
             $workout->source(),
             $workout->trust(),
+            $workout->distanceMeters(),
+            $workout->elevationGainMeters(),
         );
     }
 }

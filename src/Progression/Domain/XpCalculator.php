@@ -14,6 +14,14 @@ use App\Shared\Domain\Modifier\ModifierType;
  * aucune horloge, aucun réseau. C'est ce qui permet de la tester par table de cas plutôt
  * que par scénario, et de rejouer un calcul de l'an dernier pour comprendre un montant.
  *
+ * ## La formule, en une phrase
+ *
+ *     une minute = un point, plus les kilomètres, plus le dénivelé.
+ *
+ * Le socle ne dépend plus de la discipline (#90) : un taux horaire par sport était une
+ * calibration inventée avant d'avoir un seul joueur, et elle coûtait six lignes à défendre
+ * à chaque discussion d'équilibrage. Ce qui distingue les disciplines est désormais mesuré.
+ *
  * ## La règle de composition : additive, sur le socle
  *
  * Chaque modificateur contribue d'un pourcentage **du socle**, pas du sous-total courant.
@@ -38,8 +46,14 @@ use App\Shared\Domain\Modifier\ModifierType;
  * 1. **le socle**, au prorata de la durée retenue ;
  * 2. **les rendements décroissants**, qui rabotent le socle selon ce que le joueur a déjà
  *    accumulé aujourd'hui ;
- * 3. **les bonus**, en pourcentage du socle **après** rabotage ;
- * 4. **le plafond quotidien** de la discipline, qui écrête le total.
+ * 3. **la distance et le dénivelé**, qui s'ajoutent au socle **sans être rabotés** : ils
+ *    mesurent une quantité de terrain, pas du temps, et dix kilomètres restent dix
+ *    kilomètres quelle que soit l'heure à laquelle on les a courus ;
+ * 4. **les bonus**, en pourcentage du socle **après** rabotage — et non du sous-total
+ *    incluant le terrain, sans quoi un même streak vaudrait trois fois plus sur un trail
+ *    que sur une séance de fonte, pour une raison que personne ne pourrait raconter ;
+ * 5. **le plafond quotidien** de la discipline, qui écrête le total et borne le seul côté
+ *    que les rendements décroissants ne bornent pas.
  *
  * Placer les rendements décroissants avant les bonus plutôt qu'après donne exactement le
  * même montant — les deux opérations sont linéaires — mais une arithmétique entière plus
@@ -60,19 +74,42 @@ final readonly class XpCalculator
     }
 
     /**
-     * @param int            $durationSeconds la durée **retenue**, déjà écrêtée par `Training`
-     * @param list<Modifier> $modifiers       l'ensemble actif du joueur, tel que `ModifierResolver` le rend
-     * @param DailyLoad      $today           ce que le joueur a déjà fait dans **sa** journée
+     * @param int            $durationSeconds     la durée **retenue**, déjà écrêtée par `Training`
+     * @param list<Modifier> $modifiers           l'ensemble actif du joueur, tel que `ModifierResolver` le rend
+     * @param DailyLoad      $today               ce que le joueur a déjà fait dans **sa** journée
+     * @param ?int           $distanceMeters      `null` est « non mesuré », jamais zéro
+     * @param ?int           $elevationGainMeters idem : aucune montre ne mesure tout
      */
-    public function calculate(Discipline $discipline, int $durationSeconds, array $modifiers, DailyLoad $today): XpAward
-    {
-        $fullBase = $this->rates->baseFor($discipline, $durationSeconds);
-        $base = $this->rates->baseFor($discipline, $this->diminishing->retain($today->secondsSoFar, $durationSeconds));
+    public function calculate(
+        Discipline $discipline,
+        int $durationSeconds,
+        array $modifiers,
+        DailyLoad $today,
+        ?int $distanceMeters = null,
+        ?int $elevationGainMeters = null,
+    ): XpAward {
+        $fullBase = $this->rates->baseFor($durationSeconds);
+        $base = $this->rates->baseFor($this->diminishing->retain($today->secondsSoFar, $durationSeconds));
 
         $lines = [new XpBreakdownLine(XpBreakdownSource::Base, $fullBase)];
 
         if ($base !== $fullBase) {
             $lines[] = new XpBreakdownLine(XpBreakdownSource::Diminishing, $base - $fullBase);
+        }
+
+        // Une métrique absente ne produit pas de ligne, et une métrique nulle non plus :
+        // « +0 XP pour tes 0 km » à un joueur qui vient de soulever de la fonte n'explique
+        // rien. C'est la même règle que pour un bonus trop petit pour peser.
+        //
+        // Elles sont calculées sur `$distanceMeters` brut, pas sur le socle rogné : dix
+        // kilomètres restent dix kilomètres quelle que soit l'heure à laquelle on les a
+        // courus. C'est le plafond quotidien qui borne ce côté-là.
+        if (0 !== $distance = $this->rates->distanceBonusOf($discipline, $distanceMeters)) {
+            $lines[] = new XpBreakdownLine(XpBreakdownSource::Distance, $distance);
+        }
+
+        if (0 !== $elevation = $this->rates->elevationBonusOf($discipline, $elevationGainMeters)) {
+            $lines[] = new XpBreakdownLine(XpBreakdownSource::Elevation, $elevation);
         }
 
         foreach (self::bonusPercentages($discipline, $modifiers) as $source => $percentage) {

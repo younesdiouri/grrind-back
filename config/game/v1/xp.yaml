@@ -1,42 +1,64 @@
-# Ce qu'une heure de pratique vaut, avant tout modificateur et avant tout garde-fou.
+# Ce qu'une séance rapporte, avant tout modificateur et avant tout garde-fou.
 #
-# Le socle est linéaire au prorata de la durée retenue : `durée × xp_per_hour ÷ 3600`, en
-# arithmétique entière, tronqué vers le bas — une séance ne peut jamais rapporter plus que
-# ce que le barème annonce. La courbe non linéaire vient des rendements décroissants,
-# déclarés plus bas.
+# ————— Une formule qu'on explique en une phrase ————————————————————————————————————————
 #
-# Toutes les disciplines doivent être couvertes, chacune une fois. Une discipline oubliée
-# fait échouer le démarrage plutôt que de rapporter zéro à un joueur.
+#     une minute = un point, plus les kilomètres, plus le dénivelé.
 #
-# Ce barème à l'heure et par discipline **disparaît au #90**, remplacé par « 1 minute =
-# 1 XP » plus un bonus de distance et de dénivelé. Les trois lignes ajoutées avec les
-# disciplines de la V1 santé (#86) ne sont donc pas un équilibrage réfléchi : elles sont
-# ce qu'il faut pour que le démarrage passe d'ici là, calées sur l'intensité relative.
+# Le barème précédent donnait un taux horaire par discipline — 90 en course, 100 en
+# natation, 85 en escalade. Il n'était ni juste ni faux : il était **non mesuré**, inventé
+# avant d'avoir un seul joueur, et il coûtait six lignes à défendre à chaque discussion
+# d'équilibrage.
 #
-# L'équilibrage tient en une phrase par ligne : « une heure de natation vaut 100 XP ».
-# Les écarts traduisent l'intensité, pas la préférence — la mobilité est un entretien, la
-# natation coûte cher, la musculation se compte moins bien à la minute que le reste.
+# La V1 santé a une seule question à poser : *est-ce que le fait que mon activité réelle
+# alimente mon personnage est fun ?* Une formule qu'un joueur comprend sans y penser ne
+# pollue pas la réponse. La formule RPG parfaite se construira après, sur des joueurs
+# réels, et le `rulesetVersion` est précisément ce qui permet de la changer sans toucher à
+# l'historique déjà écrit.
 #
-# `daily_cap_xp` est un **filet, pas une laisse** : deux heures de barème, donc au-dessus
-# des ~130 XP de socle qu'un joueur peut atteindre en une journée une fois les rendements
-# décroissants passés. Il ne se fait sentir que quand les bonus s'empilent. Le limiteur qui
-# se ressent, et qui est une vraie mécanique de jeu, ce sont les tranches ci-dessous.
+# ————— Pourquoi toutes les disciplines n'ont pas de bonus de distance ——————————————————
+#
+# `STRENGTH`, `HIIT`, `MOBILITY` et `CLIMBING` sont à la durée seule. Pas parce qu'elles
+# valent moins : parce qu'aucune montre ne leur donne une seconde dimension fiable. Une
+# dimension qu'on n'aurait que sur la moitié des appareils créerait deux jeux au lieu d'un,
+# et le joueur au bracelet d'entrée de gamme serait puni pour son matériel.
+#
+# Le dénivelé n'est déclaré que sur `HIKING`, où il *est* l'effort. Une course en côte le
+# gagnera peut-être plus tard ; ce sera une ligne ici, et rien d'autre.
+#
+# Une clé absente vaut « pas de bonus » — elle ne vaut pas zéro. La distinction se voit
+# côté joueur : une séance de fonte n'affiche pas « +0 XP pour tes 0 km ».
+base_xp_per_hour: 60
+
+# `daily_cap_xp` est un **filet, pas une laisse.** Il n'existe que pour qu'aucune journée ne
+# devienne aberrante ; le limiteur qui se ressent, et qui est une vraie mécanique de jeu,
+# ce sont les rendements décroissants plus bas. Les disciplines à la durée seule sont
+# bornées de fait par ces tranches — 87 minutes retenues au maximum sur une journée — donc
+# leur plafond ne sert que face à un empilement de modificateurs.
+#
+# Les disciplines à distance ont un plafond plus haut parce qu'elles peuvent légitimement
+# aller plus loin : un trail de trente kilomètres est une vraie journée de sport, pas un
+# abus, et le refuser serait exactement le genre de garde-fou qui punit le joueur assidu.
 disciplines:
-    - { discipline: RUNNING, xp_per_hour: 90, daily_cap_xp: 180 }
-    - { discipline: WALKING, xp_per_hour: 40, daily_cap_xp: 80 }
-    - { discipline: CYCLING, xp_per_hour: 70, daily_cap_xp: 140 }
-    - { discipline: SWIMMING, xp_per_hour: 100, daily_cap_xp: 200 }
-    - { discipline: STRENGTH, xp_per_hour: 80, daily_cap_xp: 160 }
-    - { discipline: HIIT, xp_per_hour: 110, daily_cap_xp: 220 }
-    - { discipline: HIKING, xp_per_hour: 65, daily_cap_xp: 130 }
-    - { discipline: MOBILITY, xp_per_hour: 50, daily_cap_xp: 100 }
-    - { discipline: CLIMBING, xp_per_hour: 85, daily_cap_xp: 170 }
+    - { discipline: RUNNING, daily_cap_xp: 400, xp_per_km: 10 }
+    - { discipline: WALKING, daily_cap_xp: 200, xp_per_km: 5 }
+    - { discipline: CYCLING, daily_cap_xp: 400, xp_per_km: 3 }
+    - { discipline: SWIMMING, daily_cap_xp: 300, xp_per_km: 50 }
+    - { discipline: HIKING, daily_cap_xp: 500, xp_per_km: 8, xp_per_100m_elevation: 20 }
+    - { discipline: STRENGTH, daily_cap_xp: 200 }
+    - { discipline: HIIT, daily_cap_xp: 200 }
+    - { discipline: MOBILITY, daily_cap_xp: 200 }
+    - { discipline: CLIMBING, daily_cap_xp: 200 }
 
 # Rendements décroissants sur le **cumul de la journée**, toutes disciplines confondues, et
 # dans le fuseau du joueur. C'est le garde-fou anti-abus qui ne se ressent pas comme une
 # punition : au-delà d'un certain temps d'entraînement quotidien, continuer rapporte de
 # moins en moins, ce qui supprime l'intérêt de tricher tout en restant une règle de jeu
 # qu'un sportif trouve juste.
+#
+# Ils portent sur le **socle**, donc sur le temps. La distance et le dénivelé s'y ajoutent
+# sans être rabotés, et c'est cohérent avec ce qu'ils mesurent : dix kilomètres restent dix
+# kilomètres, quelle que soit l'heure de la journée à laquelle on les a courus. C'est le
+# plafond quotidien qui borne ce côté-là.
 #
 # Le découpage est **par tranche**, pas par palier global : une séance à cheval sur deux
 # tranches est coupée en deux, chaque morceau à son propre poids. Une séance de 20 min
@@ -51,5 +73,5 @@ diminishing_returns:
     - { up_to_minutes: 120, weight_percent: 30 }
 
 # Au-delà de la dernière tranche : plus rien. La séance existe, elle compte pour le streak
-# et pour l'historique, mais elle ne rapporte plus d'XP.
+# et pour l'historique, mais son temps ne rapporte plus d'XP.
 diminishing_returns_beyond_percent: 0

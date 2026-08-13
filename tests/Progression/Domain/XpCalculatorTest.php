@@ -21,8 +21,10 @@ use PHPUnit\Framework\TestCase;
  * Le calcul par table de cas. Aucune infra : c'est tout l'intérêt d'une fonction pure, et
  * c'est ce qui permettra de rejouer un calcul de l'an dernier pour expliquer un montant.
  *
- * Le barème de test est fixe et indépendant de celui qui est livré — une heure de course
- * vaut 90, ce qui donne au socle les chiffres de l'exemple du ticket.
+ * Le barème de test est fixe et indépendant de celui qui est livré — une heure vaut 90 et
+ * non les 60 livrés, ce qui donne au socle les chiffres de l'exemple du produit et fait
+ * tomber les troncatures sur des valeurs qui se lisent. Un rééquilibrage ne doit pas casser
+ * une table de cas qui parle d'arithmétique.
  */
 final class XpCalculatorTest extends TestCase
 {
@@ -190,6 +192,146 @@ final class XpCalculatorTest extends TestCase
         ];
     }
 
+    /**
+     * Le cas du produit : « 45 de base, +62 pour tes 6,2 km ». Deux lignes d'animation, pas
+     * un total unique — c'est ce que la distance achète.
+     */
+    public function testTheDistanceAddsItsOwnLine(): void
+    {
+        $award = self::calculator()->calculate(Discipline::Running, 30 * 60, [], DailyLoad::untouched(), distanceMeters: 6200);
+
+        self::assertSame(
+            [[XpBreakdownSource::Base, 45], [XpBreakdownSource::Distance, 62]],
+            self::linesOf($award->breakdown->lines),
+        );
+        self::assertSame(107, $award->amount());
+    }
+
+    /**
+     * Le dénivelé n'est déclaré que sur la randonnée, où il *est* l'effort.
+     */
+    public function testTheElevationAddsItsOwnLineWhereTheDisciplineDeclaresIt(): void
+    {
+        $award = self::calculator()->calculate(
+            Discipline::Hiking,
+            2 * 3600,
+            [],
+            DailyLoad::untouched(),
+            distanceMeters: 9000,
+            elevationGainMeters: 640,
+        );
+
+        self::assertSame(
+            [
+                // Deux heures pleines de socle, rognées par les tranches : 60 min à 100 %,
+                // 30 à 60 % et 30 à 30 %, soit 87 min retenues sur 120.
+                [XpBreakdownSource::Base, 180],
+                [XpBreakdownSource::Diminishing, -50],
+                [XpBreakdownSource::Distance, 72],
+                [XpBreakdownSource::Elevation, 128],
+            ],
+            self::linesOf($award->breakdown->lines),
+        );
+    }
+
+    /**
+     * Une discipline sans seconde dimension fiable n'en reçoit pas, même si la montre a
+     * envoyé quelque chose : le barème décide, pas l'appareil. Sans ça, un joueur au
+     * bracelet bavard jouerait à un autre jeu que son voisin.
+     */
+    public function testADisciplineWithoutADistanceRateIgnoresWhatTheWatchMeasured(): void
+    {
+        $award = self::calculator()->calculate(
+            Discipline::Strength,
+            3600,
+            [],
+            DailyLoad::untouched(),
+            distanceMeters: 4000,
+            elevationGainMeters: 300,
+        );
+
+        self::assertSame([[XpBreakdownSource::Base, 90]], self::linesOf($award->breakdown->lines));
+    }
+
+    /**
+     * « Non mesuré » et « mesuré, et nul » se traitent pareil **côté lignes** : ni l'un ni
+     * l'autre n'occupe une ligne d'animation. « +0 XP pour tes 0 km » à un joueur qui vient
+     * de soulever de la fonte n'explique rien.
+     */
+    public function testNeitherAnUnmeasuredNorAZeroMetricProducesALine(): void
+    {
+        $unmeasured = self::calculator()->calculate(Discipline::Running, 3600, [], DailyLoad::untouched());
+        $flat = self::calculator()->calculate(Discipline::Hiking, 3600, [], DailyLoad::untouched(), elevationGainMeters: 0);
+
+        self::assertSame([[XpBreakdownSource::Base, 90]], self::linesOf($unmeasured->breakdown->lines));
+        self::assertSame([[XpBreakdownSource::Base, 90]], self::linesOf($flat->breakdown->lines));
+    }
+
+    /**
+     * Une distance trop courte pour valoir un point n'occupe pas de ligne non plus — même
+     * règle qu'un bonus trop petit pour peser. 80 mètres à 10 XP le kilomètre tronquent à
+     * zéro.
+     */
+    public function testADistanceTooShortToBeWorthAPointDoesNotProduceALine(): void
+    {
+        $award = self::calculator()->calculate(Discipline::Running, 600, [], DailyLoad::untouched(), distanceMeters: 80);
+
+        self::assertSame([[XpBreakdownSource::Base, 15]], self::linesOf($award->breakdown->lines));
+    }
+
+    /**
+     * Le terrain n'est **pas** raboté par les rendements décroissants : dix kilomètres
+     * restent dix kilomètres quelle que soit l'heure à laquelle on les a courus. C'est le
+     * plafond quotidien qui borne ce côté-là, et il le fait plus bas dans la séquence.
+     */
+    public function testTheTerrainEscapesTheDiminishingReturnsButNotTheDailyCap(): void
+    {
+        // 130 min déjà faites : le socle est entièrement rogné. La distance, elle, tient.
+        $award = self::calculator()->calculate(
+            Discipline::Running,
+            30 * 60,
+            [],
+            new DailyLoad(130 * 60, 0),
+            distanceMeters: 5000,
+        );
+
+        self::assertSame(
+            [
+                [XpBreakdownSource::Base, 45],
+                [XpBreakdownSource::Diminishing, -45],
+                [XpBreakdownSource::Distance, 50],
+            ],
+            self::linesOf($award->breakdown->lines),
+        );
+        self::assertSame(50, $award->amount());
+    }
+
+    /**
+     * Les bonus en pourcentage portent sur le socle rogné, **terrain non compris**. Sinon
+     * un même streak vaudrait trois fois plus sur un trail que sur une séance de fonte,
+     * pour une raison que personne ne pourrait raconter.
+     */
+    public function testTheBonusesDoNotApplyToTheTerrain(): void
+    {
+        $award = self::calculator()->calculate(
+            Discipline::Running,
+            3600,
+            [self::bonus(ModifierSource::Streak, 20)],
+            DailyLoad::untouched(),
+            distanceMeters: 3000,
+        );
+
+        self::assertSame(
+            [
+                [XpBreakdownSource::Base, 90],
+                [XpBreakdownSource::Distance, 30],
+                // 20 % de 90, pas de 120.
+                [XpBreakdownSource::Streak, 18],
+            ],
+            self::linesOf($award->breakdown->lines),
+        );
+    }
+
     public function testTheBonusesApplyToTheTrimmedBase(): void
     {
         // 50 min déjà faites : socle plein 30, retenu 24. Le streak porte sur 24, pas sur
@@ -214,7 +356,7 @@ final class XpCalculatorTest extends TestCase
         // Le plafond est par discipline : avoir saturé la course n'entame pas la natation.
         $award = self::calculator()->calculate(Discipline::Swimming, 30 * 60, [], new DailyLoad(0, 0));
 
-        self::assertSame([[XpBreakdownSource::Base, 50]], self::linesOf($award->breakdown->lines));
+        self::assertSame([[XpBreakdownSource::Base, 45]], self::linesOf($award->breakdown->lines));
     }
 
     public function testIgnoresAModifierScopedToAnotherDiscipline(): void
@@ -225,7 +367,7 @@ final class XpCalculatorTest extends TestCase
             new Modifier(ModifierType::XpMultiplier, 20, ModifierSource::Item, Discipline::Running),
         ], DailyLoad::untouched());
 
-        self::assertSame([[XpBreakdownSource::Base, 100]], self::linesOf($award->breakdown->lines));
+        self::assertSame([[XpBreakdownSource::Base, 90]], self::linesOf($award->breakdown->lines));
     }
 
     public function testAppliesAModifierScopedToTheSessionDiscipline(): void
@@ -286,16 +428,23 @@ final class XpCalculatorTest extends TestCase
     private static function calculator(): XpCalculator
     {
         return new XpCalculator(
-            new XpRates([
-                ['discipline' => 'RUNNING', 'xp_per_hour' => 90, 'daily_cap_xp' => 180],
-                ['discipline' => 'WALKING', 'xp_per_hour' => 40, 'daily_cap_xp' => 80],
-                ['discipline' => 'CYCLING', 'xp_per_hour' => 70, 'daily_cap_xp' => 140],
-                ['discipline' => 'SWIMMING', 'xp_per_hour' => 100, 'daily_cap_xp' => 200],
-                ['discipline' => 'STRENGTH', 'xp_per_hour' => 80, 'daily_cap_xp' => 160],
-                ['discipline' => 'HIIT', 'xp_per_hour' => 110, 'daily_cap_xp' => 220],
-                ['discipline' => 'HIKING', 'xp_per_hour' => 65, 'daily_cap_xp' => 130],
-                ['discipline' => 'MOBILITY', 'xp_per_hour' => 50, 'daily_cap_xp' => 100],
-                ['discipline' => 'CLIMBING', 'xp_per_hour' => 85, 'daily_cap_xp' => 170],
+            // 90 XP l'heure plutôt que les 60 livrés : le socle d'une heure vaut alors 90,
+            // ce qui donne au breakdown les chiffres de l'exemple du produit — « 90 base,
+            // +18 streak, +13 bottes ». Le barème de test n'a aucune raison de suivre
+            // l'équilibrage, et en le suivant il rendrait ces tests illisibles à chaque
+            // recalibrage.
+            new XpRates(90, [
+                ['discipline' => 'RUNNING', 'daily_cap_xp' => 180, 'xp_per_km' => 10],
+                ['discipline' => 'WALKING', 'daily_cap_xp' => 180, 'xp_per_km' => 5],
+                ['discipline' => 'CYCLING', 'daily_cap_xp' => 180, 'xp_per_km' => 3],
+                ['discipline' => 'SWIMMING', 'daily_cap_xp' => 200, 'xp_per_km' => 50],
+                ['discipline' => 'HIKING', 'daily_cap_xp' => 500, 'xp_per_km' => 8, 'xp_per_100m_elevation' => 20],
+                // Les quatre sans seconde dimension : aucune montre ne leur en donne une
+                // fiable, et c'est ce que ces lignes-là servent à vérifier.
+                ['discipline' => 'STRENGTH', 'daily_cap_xp' => 160],
+                ['discipline' => 'HIIT', 'daily_cap_xp' => 220],
+                ['discipline' => 'MOBILITY', 'daily_cap_xp' => 100],
+                ['discipline' => 'CLIMBING', 'daily_cap_xp' => 170],
             ]),
             new DiminishingReturns([
                 ['up_to_minutes' => 60, 'weight_percent' => 100],

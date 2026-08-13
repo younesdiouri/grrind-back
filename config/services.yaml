@@ -42,11 +42,13 @@ services:
             $appleHealth: '%game.activity_types.apple_health%'
             $healthConnect: '%game.activity_types.health_connect%'
 
-    # Le barème de base, d'un bloc : `disciplines` est une liste dans le YAML, donc le
-    # chargeur n'y descend pas et le paramètre reste unique. Ouvrir une discipline se fait
-    # dans le YAML, sans revenir ici.
+    # Le barème de base. `disciplines` est une liste dans le YAML, donc le chargeur n'y
+    # descend pas et le paramètre reste unique : ouvrir une discipline, ou lui donner un
+    # bonus de distance, se fait dans le YAML sans revenir ici. Le socle, lui, est un
+    # scalaire et se câble explicitement — il ne dépend plus de la discipline (#90).
     App\Progression\Domain\XpRates:
         arguments:
+            $baseXpPerHour: '%game.xp.base_xp_per_hour%'
             $disciplines: '%game.xp.disciplines%'
 
     App\Progression\Domain\LevelCurve:
