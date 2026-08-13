@@ -8,7 +8,6 @@ use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\Workouts;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Symfony\Component\Uid\Uuid;
 
 /**
  * Les mesures rapportées par la montre, et l'unicité qui empêche le double crédit.
@@ -31,7 +30,7 @@ final class WorkoutMetricsTest extends ApiTestCase
     public function testAWorkoutWithoutMeasurementsStoresNullAndNotZero(): void
     {
         $bob = $this->openAccount();
-        $session = $this->pastSession($bob);
+        $session = $this->recordWorkout($bob);
 
         $row = $this->connection()->fetchAssociative(
             'SELECT distance_meters, calories, elevation_gain_meters, average_heart_rate, external_id
@@ -54,11 +53,11 @@ final class WorkoutMetricsTest extends ApiTestCase
     public function testTheSameProviderWorkoutCannotBeStoredTwice(): void
     {
         $bob = $this->openAccount();
-        $this->importedWorkout($bob, 'HEALTHKIT', 'HK-2026-08-12-001');
+        $this->imported($bob, 'HEALTHKIT', 'HK-2026-08-12-001');
 
         $this->expectException(UniqueConstraintViolationException::class);
 
-        $this->importedWorkout($bob, 'HEALTHKIT', 'HK-2026-08-12-001');
+        $this->imported($bob, 'HEALTHKIT', 'HK-2026-08-12-001');
     }
 
     /**
@@ -71,8 +70,8 @@ final class WorkoutMetricsTest extends ApiTestCase
         $bob = $this->openAccount();
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
 
-        $this->importedWorkout($bob, 'HEALTHKIT', 'HK-PARTAGE');
-        $this->importedWorkout($alice, 'HEALTHKIT', 'HK-PARTAGE');
+        $this->imported($bob, 'HEALTHKIT', 'HK-PARTAGE');
+        $this->imported($alice, 'HEALTHKIT', 'HK-PARTAGE');
 
         self::assertSame(2, $this->countWorkoutsWithExternalId('HK-PARTAGE'));
     }
@@ -86,8 +85,8 @@ final class WorkoutMetricsTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
-        $this->importedWorkout($bob, 'HEALTHKIT', 'SEANCE-DU-12');
-        $this->importedWorkout($bob, 'STRAVA', 'SEANCE-DU-12');
+        $this->imported($bob, 'HEALTHKIT', 'SEANCE-DU-12');
+        $this->imported($bob, 'STRAVA', 'SEANCE-DU-12');
 
         self::assertSame(2, $this->countWorkoutsWithExternalId('SEANCE-DU-12'));
     }
@@ -103,8 +102,8 @@ final class WorkoutMetricsTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
-        $this->importedWorkout($bob, 'MANUAL_TIMER', null);
-        $this->importedWorkout($bob, 'MANUAL_TIMER', null);
+        $this->imported($bob, 'MANUAL_TIMER', null);
+        $this->imported($bob, 'MANUAL_TIMER', null);
 
         self::assertSame(2, $this->countWorkouts(
             'user_id = :userId AND external_id IS NULL',
@@ -115,29 +114,17 @@ final class WorkoutMetricsTest extends ApiTestCase
     /**
      * Écrit directement en base : la route d'import arrive au #88, et ce qui est en jeu
      * ici est la contrainte, qu'aucune route ne doit pouvoir contourner de toute façon.
-     * Statut `COMPLETED` pour ne pas croiser `uniq_workout_active`, qui n'est pas le
-     * sujet.
      */
-    private function importedWorkout(Account $account, string $source, ?string $externalId): void
+    private function imported(Account $account, string $source, ?string $externalId): void
     {
-        $this->connection()->executeStatement(
-            'INSERT INTO workout (id, user_id, discipline, source, trust, status, started_at, ended_at, duration_seconds, created_at,
-                                  distance_meters, calories, elevation_gain_meters, average_heart_rate, external_id)
-             VALUES (:id, :userId, :discipline, :source, :trust, :status, NOW() - INTERVAL \'1 hour\', NOW(), 3600, NOW(),
-                     :distance, :calories, :elevation, :heartRate, :externalId)',
-            [
-                'id' => Uuid::v7()->toRfc4122(),
-                'userId' => $account->id->toRfc4122(),
-                'discipline' => 'RUNNING',
-                'source' => $source,
-                'trust' => 'PROVIDER_VERIFIED',
-                'status' => 'COMPLETED',
-                'distance' => 10500,
-                'calories' => 620,
-                'elevation' => 84,
-                'heartRate' => 148,
-                'externalId' => $externalId,
-            ],
+        $this->recordWorkout(
+            $account,
+            source: $source,
+            externalId: $externalId,
+            distanceMeters: 10500,
+            calories: 620,
+            elevationGainMeters: 84,
+            averageHeartRate: 148,
         );
     }
 

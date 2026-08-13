@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Training\UI\Http\Request;
 
 use App\Shared\Domain\Activity\Discipline;
-use App\Training\Domain\SessionStatus;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -26,7 +25,6 @@ final readonly class SessionHistoryQuery
     public const int MAX_LIMIT = 50;
 
     public function __construct(
-        public ?SessionStatus $status = null,
         public ?Discipline $discipline = null,
         public ?DateTimeImmutable $from = null,
         public ?DateTimeImmutable $to = null,

@@ -11,7 +11,7 @@ use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
 /**
- * Le schéma de `config/game/v1/training.yaml` — les garde-fous d'une séance.
+ * Le schéma de `config/game/v1/training.yaml` — les seuils d'un workout retenu.
  *
  * Il vit dans `Training` et non dans `Shared` : c'est ce module qui lit la section, et
  * c'est ce qui lui permet de faire valider la cohérence des seuils par `WorkoutRules`
@@ -32,11 +32,10 @@ final class TrainingSection implements GameBalanceSection
             ->children()
                 ->integerNode('minimum_duration_seconds')->isRequired()->min(0)->end()
                 ->integerNode('maximum_duration_seconds')->isRequired()->min(1)->end()
-                ->integerNode('cooldown_seconds')->isRequired()->min(0)->end()
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
-                    /** @var array{minimum_duration_seconds: int, maximum_duration_seconds: int, cooldown_seconds: int} $values les `integerNode` ci-dessus ont déjà fait ce travail */
+                    /** @var array{minimum_duration_seconds: int, maximum_duration_seconds: int} $values les `integerNode` ci-dessus ont déjà fait ce travail */
 
                     // La cohérence entre seuils est une règle du domaine, pas du format :
                     // on la fait dire par l'objet qui la porte plutôt que de l'écrire une
@@ -46,7 +45,6 @@ final class TrainingSection implements GameBalanceSection
                         new WorkoutRules(
                             $values['minimum_duration_seconds'],
                             $values['maximum_duration_seconds'],
-                            $values['cooldown_seconds'],
                         );
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);

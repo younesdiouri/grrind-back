@@ -7,7 +7,6 @@ namespace App\Tests\Shared\Config;
 use App\Progression\Domain\XpRates;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Infrastructure\Config\GameBalancePass;
-use App\Training\Domain\WorkoutRules;
 use App\Training\Infrastructure\Config\TrainingSection;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -29,7 +28,6 @@ final class GameBalancePassTest extends KernelTestCase
         // casse la compilation en nommant le service qui l'attendait.
         self::assertSame(300, $container->getParameter('game.training.minimum_duration_seconds'));
         self::assertSame(14400, $container->getParameter('game.training.maximum_duration_seconds'));
-        self::assertSame(900, $container->getParameter('game.training.cooldown_seconds'));
     }
 
     public function testExposesTheRulesetVersion(): void
@@ -57,10 +55,13 @@ final class GameBalancePassTest extends KernelTestCase
 
         self::assertMatchesRegularExpression('/^v1-[0-9a-f]{12}$/', (string) $container->getParameter('game.ruleset_version'));
 
-        // Et que le domaine reçoit des objets typés, pas des tableaux d'équilibrage.
-        $rules = $container->get(WorkoutRules::class);
-        self::assertInstanceOf(WorkoutRules::class, $rules);
-        self::assertSame(300, $rules->minimumDurationSeconds);
+        // `WorkoutRules` passe par ses paramètres et non par son service, comme
+        // `XpRates` juste en dessous : plus rien ne le consomme depuis le retrait du
+        // chronomètre (#85) — c'est l'import qui l'appliquera (#91) — donc le conteneur
+        // le retire. Que la compilation ait abouti prouve déjà que `TrainingSection` l'a
+        // construit et validé sans broncher.
+        self::assertSame(300, $container->getParameter('game.training.minimum_duration_seconds'));
+        self::assertSame(14400, $container->getParameter('game.training.maximum_duration_seconds'));
 
         // Le barème d'XP passe par son paramètre et non par son service : rien ne consomme
         // encore `XpRates` — la transaction de complétion est au Lot 4 — donc le conteneur

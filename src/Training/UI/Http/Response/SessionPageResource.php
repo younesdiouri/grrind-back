@@ -32,7 +32,7 @@ final readonly class SessionPageResource
     }
 
     /**
-     * @return array{sessions: list<array<string, string|int|null>>, nextCursor: string|null}
+     * @return array{sessions: list<array<string, string|int>>, nextCursor: string|null}
      */
     public function toArray(): array
     {

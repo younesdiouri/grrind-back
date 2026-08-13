@@ -11,11 +11,10 @@ use DateTimeInterface;
  * Représentation publique d'une séance, séparée de l'entité pour qu'un champ ajouté au
  * domaine ne parte pas sur le réseau par accident.
  *
- * Tous les champs sont toujours présents, jamais omis — `source` et `trust` alors qu'ils
- * ne valent encore que `MANUAL_TIMER` / `DECLARED`, `endedAt` et `durationSeconds` à
- * `null` tant que la séance court. Une séance ouverte et une séance close sont **une
- * seule forme** : le client décode un seul type, et un champ qui apparaît et
- * disparaît finit lu de travers.
+ * Tous les champs sont toujours présents, jamais omis. Il n'y a plus de `status` : un
+ * workout est un fait passé, il n'a pas d'état — et `endedAt` comme `durationSeconds`
+ * ne sont plus nullables pour la même raison. Un champ qui apparaît et disparaît finit
+ * lu de travers, un champ qui ne peut plus être nul ment en restant optionnel.
  *
  * Ce que la complétion rapporte décrit une *récompense*, pas une séance : ça vit dans
  * {@see RewardSummaryResource}, qui embarque cette forme-ci telle quelle plutôt que de la
@@ -26,12 +25,11 @@ final readonly class TrainingSessionResource
     public function __construct(
         public string $id,
         public string $discipline,
-        public string $status,
         public string $source,
         public string $trust,
         public string $startedAt,
-        public ?string $endedAt,
-        public ?int $durationSeconds,
+        public string $endedAt,
+        public int $durationSeconds,
     ) {
     }
 
@@ -40,24 +38,22 @@ final readonly class TrainingSessionResource
         return new self(
             $session->id()->toRfc4122(),
             $session->discipline()->value,
-            $session->status()->value,
             $session->source()->value,
             $session->trust()->value,
             $session->startedAt()->format(DateTimeInterface::ATOM),
-            $session->endedAt()?->format(DateTimeInterface::ATOM),
+            $session->endedAt()->format(DateTimeInterface::ATOM),
             $session->durationSeconds(),
         );
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, string|int>
      */
     public function toArray(): array
     {
         return [
             'id' => $this->id,
             'discipline' => $this->discipline,
-            'status' => $this->status,
             'source' => $this->source,
             'trust' => $this->trust,
             'startedAt' => $this->startedAt,

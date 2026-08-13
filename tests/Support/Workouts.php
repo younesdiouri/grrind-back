@@ -4,89 +4,70 @@ declare(strict_types=1);
 
 namespace App\Tests\Support;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use Doctrine\DBAL\Connection;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * De quoi écrire des tests de séances sans attendre le temps réel.
+ * De quoi écrire des tests sur des workouts avant que la route d'import existe (#88).
  *
- * Le serveur possède l'horloge et **aucune route ne permet d'antidater** — c'est
- * l'invariant du projet, pas un oubli. Une suite de tests a pourtant besoin de séances
- * qui durent une demi-heure et de cooldowns écoulés. Elle les obtient en reculant la
- * séance *déjà écrite* directement en base : le serveur continue de dater ce qu'il
- * date, on ne fait que déplacer le passé. C'est plus honnête qu'une horloge simulée,
- * qui prouverait que le code marche avec une fausse heure et non avec la vraie.
+ * Les workouts sont écrits **directement en base**. Ce n'est pas un contournement : le
+ * chronomètre a disparu (#85) et rien ne les crée plus par HTTP, donc il n'y a pas de
+ * « vraie route » à préférer. Les suites qui vérifieront le comportement de l'import
+ * taperont sur l'import ; celles qui vérifient une lecture ou une contrainte de base ont
+ * besoin de lignes, pas d'un parcours.
+ *
+ * Les bornes viennent de l'appelant, comme elles viendront de la montre : c'est le seul
+ * endroit du projet où les dates ne sont pas celles du serveur, et c'est le nouveau
+ * modèle, pas une facilité de test.
  *
  * @phpstan-require-extends ApiTestCase
  */
 trait Workouts
 {
-    protected function startSession(Account $account, string $discipline = 'RUNNING'): string
-    {
-        $response = $this->post('/api/training/sessions', ['discipline' => $discipline], $account->headers);
-        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
-
-        $id = self::decode($response)['id'];
-        self::assertIsString($id);
-
-        return $id;
-    }
-
-    protected function completeSession(Account $account, string $sessionId): Response
-    {
-        return $this->closeSession($account, $sessionId, 'complete');
-    }
-
-    protected function abandonSession(Account $account, string $sessionId): Response
-    {
-        return $this->closeSession($account, $sessionId, 'abandon');
-    }
-
     /**
-     * Une clé d'idempotence neuve à chaque appel : l'empreinte porte sur le chemin,
-     * donc recycler la même clé d'une séance à l'autre serait un abus de clé — et
-     * c'est un 409, pas un rejeu.
+     * Un workout terminé, daté par l'appelant. Les valeurs par défaut décrivent une
+     * demi-heure de course finie il y a une heure — assez loin pour ne croiser aucune
+     * fenêtre, assez récent pour rester dans l'historique.
      */
-    protected function closeSession(Account $account, string $sessionId, string $action): Response
-    {
-        return $this->post(
-            \sprintf('/api/training/sessions/%s/%s', $sessionId, $action),
-            [],
-            $account->headers + ['Idempotency-Key' => Uuid::v4()->toRfc4122()],
-        );
-    }
+    protected function recordWorkout(
+        Account $account,
+        string $discipline = 'RUNNING',
+        int $durationSeconds = 1800,
+        ?DateTimeImmutable $endedAt = null,
+        string $source = 'MANUAL_TIMER',
+        ?string $externalId = null,
+        ?int $distanceMeters = null,
+        ?int $calories = null,
+        ?int $elevationGainMeters = null,
+        ?int $averageHeartRate = null,
+    ): string {
+        $endedAt ??= new DateTimeImmutable('-1 hour');
+        $startedAt = $endedAt->modify(\sprintf('-%d seconds', $durationSeconds));
+        $id = Uuid::v7()->toRfc4122();
 
-    /**
-     * Recule la séance entière dans le passé, durée inchangée. Sur une séance en cours,
-     * ça allonge d'autant le temps écoulé ; sur une séance close, ça éloigne sa fin et
-     * purge donc le cooldown.
-     */
-    protected function ageSession(string $sessionId, int $seconds): void
-    {
         $this->connection()->executeStatement(
-            'UPDATE workout
-                SET started_at = started_at - (:seconds * INTERVAL \'1 second\'),
-                    ended_at = ended_at - (:seconds * INTERVAL \'1 second\')
-              WHERE id = :id',
-            ['seconds' => $seconds, 'id' => $sessionId],
+            'INSERT INTO workout (id, user_id, discipline, source, trust, started_at, ended_at, duration_seconds, created_at,
+                                  distance_meters, calories, elevation_gain_meters, average_heart_rate, external_id)
+             VALUES (:id, :userId, :discipline, :source, :trust, :startedAt, :endedAt, :durationSeconds, NOW(),
+                     :distance, :calories, :elevation, :heartRate, :externalId)',
+            [
+                'id' => $id,
+                'userId' => $account->id->toRfc4122(),
+                'discipline' => $discipline,
+                'source' => $source,
+                'trust' => 'MANUAL_TIMER' === $source ? 'DECLARED' : 'PROVIDER_VERIFIED',
+                'startedAt' => $startedAt->format(DateTimeInterface::ATOM),
+                'endedAt' => $endedAt->format(DateTimeInterface::ATOM),
+                'durationSeconds' => $durationSeconds,
+                'distance' => $distanceMeters,
+                'calories' => $calories,
+                'elevation' => $elevationGainMeters,
+                'heartRate' => $averageHeartRate,
+                'externalId' => $externalId,
+            ],
         );
-    }
-
-    /**
-     * Une séance close et rangée dans le passé, cooldown compris : la brique de tout
-     * test d'historique. Elle passe par les vraies routes — c'est le stockage qu'on
-     * recule, pas le comportement qu'on contourne.
-     */
-    protected function pastSession(Account $account, string $discipline = 'RUNNING', int $durationSeconds = 1800): string
-    {
-        $id = $this->startSession($account, $discipline);
-        $this->ageSession($id, $durationSeconds);
-
-        $response = $this->completeSession($account, $id);
-        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
-
-        $this->ageSession($id, 3600);
 
         return $id;
     }
@@ -97,13 +78,5 @@ trait Workouts
         self::assertInstanceOf(Connection::class, $connection);
 
         return $connection;
-    }
-
-    protected function statusOf(string $sessionId): string
-    {
-        $status = $this->connection()->fetchOne('SELECT status FROM workout WHERE id = :id', ['id' => $sessionId]);
-        self::assertIsString($status);
-
-        return $status;
     }
 }

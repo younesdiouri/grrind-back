@@ -107,8 +107,8 @@ when@dev:
                         description: |
                             Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et
                             `detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une
-                            séance déjà active donne `activeSessionId`, un cooldown donne `remainingSeconds`
-                            et `readyAt` — pour que le client se recale au lieu d'afficher un refus sec.
+                            violation de validation donne `violations` — pour que le client se recale au lieu
+                            d'afficher un refus sec.
                         required: [type, title, status, detail]
                         additionalProperties: true
                         properties:
@@ -150,12 +150,10 @@ when@dev:
                                     - https://grrind.app/problems/invalid-refresh-token
                                     - https://grrind.app/problems/social-sign-in-rejected
                                     - https://grrind.app/problems/social-profile-incomplete
-                                    # Entraînement
-                                    - https://grrind.app/problems/session-not-found
-                                    - https://grrind.app/problems/session-not-active
-                                    - https://grrind.app/problems/session-already-active
-                                    - https://grrind.app/problems/session-too-short
-                                    - https://grrind.app/problems/session-cooldown
+                                    # Entraînement — vidé avec le chronomètre (#85). Les refus de
+                                    # l'import arrivent au #88 et au #91, et ils ne seront pas des
+                                    # erreurs HTTP : un workout écarté d'un lot de dix n'empêche pas
+                                    # les neuf autres d'être crédités.
                                     # Progression
                                     - https://grrind.app/problems/title-unknown
                                     - https://grrind.app/problems/title-not-unlocked
@@ -248,36 +246,35 @@ when@dev:
                             tokens: { $ref: '#/components/schemas/TokenPair' }
 
                     # ————— Entraînement ————————————————————————————————————————————————
-                    # Le schéma garde son nom alors que l'entité s'appelle désormais `Workout`
-                    # (#83) : c'est du contrat, et le contrat ne se casse qu'une fois. Il
-                    # disparaît au #85 avec les routes du chronomètre, remplacé par le vrai
-                    # `Workout` des #88 et #93.
+                    # Le schéma garde son nom alors que l'entité s'appelle `Workout` (#83) :
+                    # il disparaît au #93 avec la route qui le sert, remplacé par un
+                    # `Workout` qui portera aussi les métriques du #84. Le renommer d'ici là
+                    # ferait deux ruptures pour un seul changement.
                     TrainingSession:
                         type: object
                         description: |
-                            Une séance, ouverte ou close — **une seule forme**, jamais deux. `endedAt` et
-                            `durationSeconds` valent `null` tant qu'elle court, plutôt que de disparaître : un
-                            champ qui apparaît et disparaît finit lu de travers.
+                            Une séance **déjà faite**. Elle n'a pas d'état : `status` a disparu avec le
+                            chronomètre (#85), et `endedAt` comme `durationSeconds` ne sont plus nullables —
+                            un workout arrive terminé ou n'arrive pas.
 
-                            `durationSeconds` est la durée **retenue**, déjà écrêtée au plafond. Ce n'est pas
-                            `endedAt - startedAt` sur une séance trop longue, et c'est elle qui fait foi.
-                        required: [id, discipline, status, source, trust, startedAt, endedAt, durationSeconds]
+                            `durationSeconds` est calculée par le serveur à partir des deux bornes, jamais
+                            recopiée d'un champ envoyé par le client.
+                        required: [id, discipline, source, trust, startedAt, endedAt, durationSeconds]
                         properties:
                             id: { type: string, format: uuid }
                             discipline: { type: string, enum: [RUNNING, CYCLING, SWIMMING, STRENGTH, MOBILITY, CLIMBING] }
-                            status: { type: string, enum: [ACTIVE, COMPLETED, ABANDONED] }
                             source:
                                 type: string
                                 enum: [MANUAL_TIMER, STRAVA, HEALTHKIT]
-                                description: "Toute activité est une source attribuée. `MANUAL_TIMER` en v1 ; les autres arrivent sans changer ce contrat."
+                                description: "Toute activité est une source attribuée. Les valeurs de l'import santé arrivent au #87."
                             trust: { type: string, enum: [DECLARED, PROVIDER_VERIFIED] }
                             startedAt: { type: string, format: date-time }
-                            endedAt: { type: string, format: date-time, nullable: true }
-                            durationSeconds: { type: integer, nullable: true }
+                            endedAt: { type: string, format: date-time }
+                            durationSeconds: { type: integer }
 
                     SessionPage:
                         type: object
-                        description: "Pagination par curseur, sur l'identifiant — UUID v7, donc triable, donc chronologique. `nextCursor` à `null` signifie la fin."
+                        description: "Pagination par curseur, sur l'identifiant. `nextCursor` à `null` signifie la fin. L'ordre redevient chronologique au #93 : depuis l'import, l'UUID v7 date de l'écriture et non de la pratique."
                         required: [sessions, nextCursor]
                         properties:
                             sessions:
