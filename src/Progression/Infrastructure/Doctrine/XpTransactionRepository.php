@@ -86,8 +86,8 @@ class XpTransactionRepository extends ServiceEntityRepository
             // une seule lecture de la journée, un seul parcours d'index.
             ->addSelect('COALESCE(SUM(CASE WHEN t.discipline = :discipline THEN t.amount ELSE 0 END), 0) AS xp')
             ->where('t.userId = :userId')
-            ->andWhere('t.createdAt >= :startsAt')
-            ->andWhere('t.createdAt < :endsAt')
+            ->andWhere('t.occurredAt >= :startsAt')
+            ->andWhere('t.occurredAt < :endsAt')
             ->setParameter('userId', $userId, UuidType::NAME)
             ->setParameter('discipline', $discipline)
             ->setParameter('startsAt', $day->startsAt)
@@ -162,11 +162,17 @@ class XpTransactionRepository extends ServiceEntityRepository
      * L'historique du joueur, du plus récent au plus ancien.
      *
      * L'ordre est celui de l'UUID v7, triable par construction : `id < :cursor` tient lieu
-     * de pagination, sans colonne d'ordre ni `OFFSET`. Il coïncide avec `createdAt` parce
-     * que les deux naissent du même instant dans le constructeur — l'identifiant est tiré
-     * là où la date est posée. Même geste qu'à
-     * {@see \App\Training\Infrastructure\Doctrine\WorkoutRepository::history()},
-     * pour que le client n'ait qu'une pagination à écrire.
+     * de pagination, sans colonne d'ordre ni `OFFSET`.
+     *
+     * **Ce raccourci vient d'expirer, exactement comme celui de
+     * {@see \App\Training\Infrastructure\Doctrine\WorkoutRepository::history()}.** L'ordre
+     * de l'UUID coïncidait avec celui de la date tant que les deux naissaient du même
+     * instant ; l'import date une écriture du jour du sport et non de son écriture, donc dix
+     * workouts vieux de dix jours reçoivent leurs identifiants à la file et l'historique
+     * rendu suit l'import, pas la pratique. La correction est un curseur composite
+     * `(occurredAt, id)` — et elle appartient au #93, avec celle de l'historique des
+     * workouts : les deux paginations doivent rester la même pour que le client n'en écrive
+     * qu'une.
      *
      * `$take` est volontairement plus grand que `$query->limit` : l'appelant lit une ligne
      * de plus pour savoir s'il existe une page suivante, et ne la rend pas.

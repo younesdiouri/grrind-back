@@ -9,6 +9,7 @@ use App\Progression\Application\GrantXpHandler;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\ApiTestCase;
+use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
@@ -71,7 +72,7 @@ final class ProgressionStateTest extends ApiTestCase
     public function testReportsWhatTheSnapshotHolds(): void
     {
         $account = $this->openAccount();
-        $granted = ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600));
+        $granted = ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         $state = self::decode($this->get('/api/progression', $account->headers));
 
@@ -89,7 +90,7 @@ final class ProgressionStateTest extends ApiTestCase
     public function testIsServedFromTheSnapshotAndNotFromARecountOfTheLedger(): void
     {
         $account = $this->openAccount();
-        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600));
+        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         // Une divergence forcée : le snapshot dit une chose, le ledger en dit une autre.
         // Servir le ledger ici rendrait la réponse juste par accident et masquerait
@@ -104,7 +105,7 @@ final class ProgressionStateTest extends ApiTestCase
     public function testListsWhatIsAcquiredWithAFullBarAndItsDate(): void
     {
         $account = $this->openAccount();
-        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800));
+        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
 
         $state = self::decode($this->get('/api/progression', $account->headers));
 
@@ -126,7 +127,7 @@ final class ProgressionStateTest extends ApiTestCase
     public function testShowsTheTitleTheAccountWears(): void
     {
         $account = $this->openAccount();
-        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800));
+        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
 
         $this->send('PUT', '/api/titles/active', ['titleId' => 'first_steps'], $account->headers);
 
@@ -145,7 +146,7 @@ final class ProgressionStateTest extends ApiTestCase
         $mine = $this->openAccount();
         $theirs = $this->openAccount('alice@grrind.app', 'Alice');
 
-        ($this->grantXp)(new GrantXp($theirs->id, Uuid::v7(), Discipline::Running, 3600));
+        ($this->grantXp)(new GrantXp($theirs->id, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         // Le joueur vient du jeton : aucune route ne prend d'identifiant de compte, donc
         // aucune ne peut être détournée.

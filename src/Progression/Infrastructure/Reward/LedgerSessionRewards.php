@@ -14,7 +14,7 @@ use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\SessionRewards;
 use App\Shared\Application\XpLine;
-use App\Shared\Domain\Event\TrainingSessionCompleted;
+use App\Shared\Domain\Event\WorkoutImported;
 
 /**
  * L'implémentation du port {@see SessionRewards} : c'est par cette classe, et uniquement
@@ -38,13 +38,16 @@ final readonly class LedgerSessionRewards implements SessionRewards
     ) {
     }
 
-    public function creditFor(TrainingSessionCompleted $completion): SessionReward
+    public function creditFor(WorkoutImported $workout): SessionReward
     {
         $granted = ($this->grantXp)(new GrantXp(
-            $completion->userId,
-            $completion->sessionId,
-            $completion->discipline,
-            $completion->durationSeconds,
+            $workout->userId,
+            $workout->workoutId,
+            $workout->discipline,
+            $workout->durationSeconds,
+            // L'instant du sport, que l'événement porte déjà. C'est lui qui range l'écriture
+            // dans une journée — un workout de mardi importé vendredi compte pour mardi.
+            $workout->occurredAt(),
         ));
 
         $snapshot = $granted->snapshot;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Training\UI\Http\Response;
 
+use App\Training\Application\SessionCompletion;
 use App\Training\Application\SkippedWorkout;
 use App\Training\Application\WorkoutImport;
 
@@ -34,7 +35,14 @@ final readonly class WorkoutImportResource
     public static function from(WorkoutImport $import): self
     {
         return new self(
-            array_map(TrainingSessionResource::from(...), $import->imported),
+            // Seule la séance est rendue, pas encore sa récompense : le lot les tient déjà
+            // toutes (`SessionCompletion`), et c'est le `SyncSummary` (#92) qui en fera la
+            // timeline animable. Les publier ici sous une forme provisoire imposerait au
+            // client de décoder deux contrats successifs pour le même écran.
+            array_map(
+                static fn (SessionCompletion $credited): TrainingSessionResource => TrainingSessionResource::from($credited->session),
+                $import->imported,
+            ),
             array_map(
                 static fn (SkippedWorkout $skipped): array => [
                     'externalId' => $skipped->externalId,

@@ -38,7 +38,7 @@ final readonly class XpTransactionResource
         public int $durationSeconds,
         public array $breakdown,
         public string $rulesetVersion,
-        public string $createdAt,
+        public string $occurredAt,
     ) {
     }
 
@@ -58,7 +58,7 @@ final readonly class XpTransactionResource
                 $transaction->breakdown()->lines,
             ),
             $transaction->rulesetVersion(),
-            $transaction->createdAt()->format(DateTimeInterface::ATOM),
+            $transaction->occurredAt()->format(DateTimeInterface::ATOM),
         );
     }
 
@@ -76,7 +76,7 @@ final readonly class XpTransactionResource
             'durationSeconds' => $this->durationSeconds,
             'breakdown' => $this->breakdown,
             'rulesetVersion' => $this->rulesetVersion,
-            'createdAt' => $this->createdAt,
+            'occurredAt' => $this->occurredAt,
         ];
     }
 }

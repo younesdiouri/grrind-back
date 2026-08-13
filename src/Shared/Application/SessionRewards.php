@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Shared\Application;
 
-use App\Shared\Domain\Event\TrainingSessionCompleted;
+use App\Shared\Domain\Event\WorkoutImported;
 
 /**
- * Créditer une séance close, et dire ce qu'elle a rapporté.
+ * Créditer un workout importé, et dire ce qu'il a rapporté.
  *
  * **Pourquoi un port, alors que la règle n°0 dit d'en écrire le moins possible.** La
- * transaction de complétion appartient à `Training` — c'est lui qui possède la séance et
- * son changement d'état — mais l'XP, la courbe et les titres appartiennent à
- * `Progression`. Deptrac interdit la flèche, et c'est heureux : c'est celle qui ferait de
- * `Training` le module qui sait tout.
+ * transaction d'import appartient à `Training` — c'est lui qui possède le workout et son
+ * écriture — mais l'XP, la courbe et les titres appartiennent à `Progression`. Deptrac
+ * interdit la flèche, et c'est heureux : c'est celle qui ferait de `Training` le module qui
+ * sait tout.
  *
  * L'événement de domaine, l'autre chemin autorisé, ne convient pas : il est consommé
  * **après** le COMMIT, alors que la réponse HTTP doit porter le `RewardSummary` et que le
@@ -31,17 +31,22 @@ use App\Shared\Domain\Event\TrainingSessionCompleted;
 interface SessionRewards
 {
     /**
-     * **Appelé dans la transaction de complétion, jamais en dehors.** L'implémentation pose
-     * un verrou sur la ligne de progression du joueur ; hors transaction, il se relâcherait
+     * **Appelé dans la transaction d'import, jamais en dehors.** L'implémentation pose un
+     * verrou sur la ligne de progression du joueur ; hors transaction, il se relâcherait
      * aussitôt et ne sérialiserait rien.
      *
-     * L'argument est l'événement de complétion lui-même, et non un DTO jumeau : il porte
-     * déjà exactement ce qu'il faut — qui, quelle discipline, quelle durée **retenue** — et
-     * une seconde forme des mêmes champs finirait par en diverger d'un.
+     * Appelé **N fois** dans un lot, et c'est sans conséquence sur le verrou : un verrou de
+     * ligne est ré-entrant dans une transaction, donc il est pris au premier workout et
+     * tenu jusqu'au COMMIT. Deux synchronisations concurrentes du même compte s'attendent
+     * une fois, pas dix.
      *
-     * Une panne se propage plutôt que de se rattraper : une séance close sans XP créditée
-     * est une perte silencieuse pour le joueur, et c'est le rôle de la transaction
-     * appelante de tout défaire.
+     * L'argument est l'événement lui-même, et non un DTO jumeau : il porte déjà exactement
+     * ce qu'il faut — qui, quelle discipline, quelle durée **retenue**, et surtout **quand**
+     * — et une seconde forme des mêmes champs finirait par en diverger d'un.
+     *
+     * Une panne se propage plutôt que de se rattraper : un workout écrit sans XP créditée
+     * est une perte silencieuse pour le joueur, et c'est le rôle de la transaction appelante
+     * de tout défaire.
      */
-    public function creditFor(TrainingSessionCompleted $completion): SessionReward;
+    public function creditFor(WorkoutImported $workout): SessionReward;
 }

@@ -34,9 +34,9 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: XpTransactionRepository::class)]
 #[ORM\Table(name: 'xp_transaction')]
-// La journée d'un joueur : c'est l'index des garde-fous quotidiens, lus à chaque
-// complétion de séance, et celui de la reconstruction du snapshot (#20).
-#[ORM\Index(name: 'idx_xp_transaction_user_created', columns: ['user_id', 'created_at'])]
+// La journée d'un joueur : c'est l'index des garde-fous quotidiens, lus à chaque workout
+// importé, et celui de la reconstruction du snapshot (#20).
+#[ORM\Index(name: 'idx_xp_transaction_user_occurred', columns: ['user_id', 'occurred_at'])]
 // L'historique paginé (#19), qui se lit « les écritures d'un joueur, les plus récentes
 // d'abord » et pagine sur l'identifiant. Un second index sur la même table plutôt qu'un
 // tri sur celui du dessus : `ORDER BY id DESC` ne sait pas s'en servir, et remonter la clé
@@ -105,8 +105,22 @@ class XpTransaction
     #[ORM\OrderBy(['position' => 'ASC'])]
     private Collection $lines;
 
+    /**
+     * **L'instant du sport, pas celui de l'écriture.** C'est ce qui rattache une écriture à
+     * une journée, et donc ce que lisent les garde-fous quotidiens : rendements décroissants
+     * sur le temps cumulé, plafond d'XP par discipline.
+     *
+     * La distinction n'existait pas tant que Grrind tenait le chronomètre — on créditait au
+     * moment où la séance se fermait. Avec l'import, dix workouts vieux de dix jours
+     * arrivent à la même seconde : les dater de leur écriture les entasserait tous sur la
+     * journée de l'import, où le plafond quotidien en écraserait neuf. Le joueur qui
+     * synchronise une fois par semaine perdrait sa semaine.
+     *
+     * L'instant de l'écriture n'est pas perdu pour autant : l'identifiant est un UUID v7, il
+     * l'encode. C'est une des raisons de ce choix, et c'est ici qu'elle sert.
+     */
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
-    private DateTimeImmutable $createdAt;
+    private DateTimeImmutable $occurredAt;
 
     private function __construct(
         Uuid $userId,
@@ -116,7 +130,7 @@ class XpTransaction
         int $durationSeconds,
         XpBreakdown $breakdown,
         string $rulesetVersion,
-        DateTimeImmutable $now,
+        DateTimeImmutable $occurredAt,
     ) {
         $this->id = Uuid::v7();
         $this->userId = $userId;
@@ -126,7 +140,7 @@ class XpTransaction
         $this->durationSeconds = $durationSeconds;
         $this->rulesetVersion = $rulesetVersion;
         $this->amount = $breakdown->total();
-        $this->createdAt = $now;
+        $this->occurredAt = $occurredAt;
         $this->lines = new ArrayCollection();
 
         foreach ($breakdown->lines as $position => $line) {
@@ -135,9 +149,12 @@ class XpTransaction
     }
 
     /**
-     * L'XP accordée pour une séance close. Le total peut valoir zéro — une séance
-     * entièrement rognée par les rendements décroissants reste une séance, et le
-     * breakdown est précisément ce qui le fait comprendre.
+     * L'XP accordée pour un workout. Le total peut valoir zéro — une séance entièrement
+     * rognée par les rendements décroissants reste une séance, et le breakdown est
+     * précisément ce qui le fait comprendre.
+     *
+     * `$occurredAt` est l'instant du **sport**, pas celui de l'appel : c'est lui qui range
+     * l'écriture dans une journée. Voir la propriété du même nom.
      */
     public static function creditFor(
         Uuid $userId,
@@ -145,7 +162,7 @@ class XpTransaction
         Discipline $discipline,
         int $durationSeconds,
         XpAward $award,
-        DateTimeImmutable $now,
+        DateTimeImmutable $occurredAt,
     ): self {
         return new self(
             $userId,
@@ -155,7 +172,7 @@ class XpTransaction
             $durationSeconds,
             $award->breakdown,
             $award->rulesetVersion,
-            $now,
+            $occurredAt,
         );
     }
 
@@ -164,8 +181,14 @@ class XpTransaction
      * `rulesetVersion` de l'écriture annulée et non celle du jour : on rend ce qu'on avait
      * donné, sous les règles qui l'avaient donné. Recalculer aux règles courantes ferait
      * d'un rééquilibrage une redistribution silencieuse.
+     *
+     * Elle reprend aussi son `occurredAt`, et il n'y a pas d'instant à passer : une
+     * annulation doit se poser sur **la journée qu'elle annule**, sinon la somme du jour ne
+     * se solde plus. Une séance de mardi invalidée jeudi rendrait l'XP de mardi tout en
+     * creusant le compteur de jeudi — deux jours faux au lieu d'aucun. L'instant de
+     * l'annulation reste lisible dans l'UUID v7 de la ligne.
      */
-    public static function reversalOf(self $credit, DateTimeImmutable $now): self
+    public static function reversalOf(self $credit): self
     {
         return new self(
             $credit->userId,
@@ -178,7 +201,7 @@ class XpTransaction
             -$credit->durationSeconds,
             $credit->breakdown()->negated(),
             $credit->rulesetVersion,
-            $now,
+            $credit->occurredAt,
         );
     }
 
@@ -231,8 +254,8 @@ class XpTransaction
         ));
     }
 
-    public function createdAt(): DateTimeImmutable
+    public function occurredAt(): DateTimeImmutable
     {
-        return $this->createdAt;
+        return $this->occurredAt;
     }
 }

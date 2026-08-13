@@ -15,6 +15,7 @@ use App\Shared\Domain\Modifier\ModifierType;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\ProgrammableModifiers;
+use DateTimeImmutable;
 use Symfony\Bridge\Doctrine\Middleware\Debug\DebugDataHolder;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
@@ -54,7 +55,7 @@ final class XpHistoryTest extends ApiTestCase
 
         // Un bonus réel, pour que le détail ait plus d'une ligne à expliquer.
         ProgrammableModifiers::grant(new Modifier(ModifierType::XpMultiplier, 20, ModifierSource::Streak));
-        $granted = ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600));
+        $granted = ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         $page = self::decode($this->get('/api/progression/history', $account->headers));
         self::assertIsArray($page['transactions']);
@@ -158,7 +159,7 @@ final class XpHistoryTest extends ApiTestCase
         $mine = $this->openAccount();
         $theirs = $this->openAccount('alice@grrind.app', 'Alice');
 
-        ($this->grantXp)(new GrantXp($theirs->id, Uuid::v7(), Discipline::Running, 3600));
+        ($this->grantXp)(new GrantXp($theirs->id, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
         // Le propriétaire est une condition de la recherche, pas un contrôle qui suit.
         self::assertSame([], self::decode($this->get('/api/progression/history', $mine->headers))['transactions']);
@@ -180,7 +181,7 @@ final class XpHistoryTest extends ApiTestCase
 
         foreach ([Discipline::Running, Discipline::Cycling, Discipline::Swimming] as $discipline) {
             $sessionId = Uuid::v7();
-            ($this->grantXp)(new GrantXp($account->id, $sessionId, $discipline, 1800));
+            ($this->grantXp)(new GrantXp($account->id, $sessionId, $discipline, 1800, new DateTimeImmutable()));
             $sessions[] = $sessionId->toRfc4122();
         }
 

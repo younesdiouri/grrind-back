@@ -9,6 +9,7 @@ use App\Progression\Application\GrantXpHandler;
 use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\ArgumentResolver\ArgumentResolverInterface;
@@ -206,7 +207,7 @@ final class RebuildProgressionTest extends ApiTestCase
 
     private function earnXp(Account $account): void
     {
-        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600));
+        ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
     }
 
     /**

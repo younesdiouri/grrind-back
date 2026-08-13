@@ -81,7 +81,7 @@ final class DailyLoadTest extends ApiTestCase
         $player = $this->openAccount()->id;
         $credit = $this->credit($player, Discipline::Running, 90, 3600, '2026-03-02T10:00:00+00:00');
 
-        $this->ledger->add(XpTransaction::reversalOf($credit, new DateTimeImmutable('2026-03-02T11:00:00+00:00')));
+        $this->ledger->add(XpTransaction::reversalOf($credit));
         $this->ledger->commit();
 
         // Montant *et* durée s'annulent par simple somme : la séance invalidée cesse de
