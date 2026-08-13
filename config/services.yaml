@@ -34,6 +34,14 @@ services:
             $minimumDurationSeconds: '%game.training.minimum_duration_seconds%'
             $maximumDurationSeconds: '%game.training.maximum_duration_seconds%'
 
+    # La traduction des types de séance des fournisseurs santé, une liste par source. Ajouter
+    # un sport ou corriger une correspondance se fait dans le YAML, sans publier sur l'App
+    # Store et sans revenir ici.
+    App\Shared\Domain\Activity\ActivityTypeMap:
+        arguments:
+            $appleHealth: '%game.activity_types.apple_health%'
+            $healthConnect: '%game.activity_types.health_connect%'
+
     # Le barème de base, d'un bloc : `disciplines` est une liste dans le YAML, donc le
     # chargeur n'y descend pas et le paramètre reste unique. Ouvrir une discipline se fait
     # dans le YAML, sans revenir ici.
