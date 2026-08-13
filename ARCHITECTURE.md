@@ -28,7 +28,7 @@ flowchart TB
     subgraph api["API — un seul déploiement, FrankenPHP en mode worker"]
         direction TB
         identity["<b>Identity</b><br/>comptes · JWT · refresh tokens<br/>profil · fuseau"]
-        training["<b>Training</b><br/>séances · horloge serveur<br/>garde-fous"]
+        training["<b>Training</b><br/>workouts · import santé<br/>arbitrage · historique"]
         progression["<b>Progression</b><br/>ledger XP · niveaux<br/>titres · arbres"]
         rewards["<b>Rewards</b><br/>loot · inventaire<br/><i>pas encore écrit</i>"]
         engagement["<b>Engagement</b><br/>streak · ligues<br/><i>pas encore écrit</i>"]
@@ -56,7 +56,7 @@ l'autre, il passe par l'un des deux seuls chemins autorisés :
 flowchart LR
     subgraph ev["1 · Événement de domaine — asynchrone, sans retour"]
         direction LR
-        t["Training"] -->|"TrainingSessionCompleted"| out[("outbox")]
+        t["Training"] -->|"WorkoutImported"| out[("outbox")]
         out --> p1["Progression"]
         out -.-> r1["Rewards"]
         out -.-> e1["Engagement"]
@@ -80,8 +80,8 @@ sinon un changement de fuseau suivi d'une séance compterait sur l'ancien.
 
 Un port se justifie **un par un** dans son docblock. Il y en a cinq en tout, et c'est
 volontaire : `PlayerTimezones`, `PlayerTitles`, `SessionRewards` (par lequel `Training`
-crédite l'XP sans connaître `Progression`), `SocialProfileResolver` (aucun test ne peut
-appeler Google), et `ModifierContributor`.
+crédite l'XP sans connaître `Progression` — appelé **une fois par workout** d'un lot),
+`SocialProfileResolver` (aucun test ne peut appeler Google), et `ModifierContributor`.
 
 Ce dernier est le seul **en éventail** — plusieurs implémentations, un seul consommateur :
 
@@ -118,10 +118,27 @@ joueur serait sous-payé sans que personne le voie.
 
 ---
 
-## 2. La vie d'une séance
+## 2. La vie d'un import
 
-C'est le parcours central du produit. **Le serveur possède l'horloge** : le client n'envoie
-jamais de date, il annonce seulement une intention.
+C'est le parcours central du produit. **Le serveur n'a plus l'horloge, il l'arbitre** : les
+bornes viennent du fournisseur santé — un workout a eu lieu avant que Grrind en entende parler
+— et le serveur décide de ce qu'il en retient.
+
+```mermaid
+flowchart LR
+    w["⌚ Montre<br/><i>Apple Watch, Garmin,<br/>Pixel Watch…</i>"]
+    hk["🍎 Apple Health<br/>🤖 Health Connect<br/><i>l'agrégateur de plateforme</i>"]
+    app["📱 app mobile<br/><i>module natif Swift / Kotlin</i>"]
+    api["POST /api/workouts/import<br/><i>le lot brut, types fournisseur compris</i>"]
+    xp["XP + progression<br/><i>une transaction, N workouts</i>"]
+    sum["SyncSummary<br/><i>un RewardSummary par workout</i>"]
+    anim["🎬 animations"]
+
+    w --> hk --> app --> api --> xp --> sum --> anim
+```
+
+**Grrind ne parle qu'aux agrégateurs.** Garmin, Samsung et Nike Run Club écrivent tous dedans ;
+c'est la bonne granularité, et c'est pour ça que `WorkoutSource` n'a que deux valeurs.
 
 ```mermaid
 sequenceDiagram
@@ -129,58 +146,84 @@ sequenceDiagram
     participant C as 📱 Client
     participant T as Training
     participant DB as PostgreSQL
-    participant OB as outbox
     participant P as Progression
+    participant OB as outbox
 
-    C->>T: POST /api/training/sessions — discipline
-    T->>DB: INSERT training_session — ACTIVE, startedAt = horloge serveur
-    Note over T,DB: index unique partiel : une seule séance ACTIVE par compte.<br/>Deux requêtes simultanées, une seule passe.
-    T-->>C: 201 — la séance
+    C->>T: GET /api/workouts/sync-state
+    T-->>C: lastImportedAt · importWindowDays
+    Note over C: demande au fournisseur ce qui a bougé depuis
 
-    Note over C: le joueur s'entraîne
-
-    C->>T: POST /sessions/id/complete + Idempotency-Key
+    C->>T: POST /api/workouts/import + Idempotency-Key
     T->>DB: réserve la clé d'idempotence
     alt clé déjà vue
         DB-->>T: réponse figée
-        T-->>C: la même réponse qu'au premier appel
+        T-->>C: le même SyncSummary qu'au premier appel
     else première fois
-        T->>T: valide la transition · refuse sous le plancher · écrête au plafond
+        T->>T: trie par startedAt · écarte doublons,<br/>types inconnus, durées sous le plancher
+        T->>T: départage les chevauchements du lot<br/><i>le plus complet gagne</i>
         rect rgb(222,240,222)
-            T->>DB: UPDATE session — COMPLETED, durée retenue
-            T->>OB: TrainingSessionCompleted
+            loop chaque workout, dans l'ordre chronologique
+                T->>DB: INSERT workout
+                alt hors fenêtre d'antériorité
+                    Note over T,DB: conservé, jamais crédité
+                else dans la fenêtre
+                    T->>P: creditFor(WorkoutImported)
+                    P->>DB: 🔒 verrou · ledger · snapshot · titres
+                    P-->>T: SessionReward
+                    T->>OB: WorkoutImported
+                end
+            end
         end
-        Note over T,OB: un seul COMMIT. La séance et son événement,<br/>ou ni l'un ni l'autre.
-        T-->>C: 200
+        Note over T,OB: un seul COMMIT. Les workouts, leur XP et leurs<br/>événements — ou rien du tout.
+        T-->>C: 200 — SyncSummary
     end
 
     OB->>P: consommé en asynchrone par le worker
 ```
 
-Trois choses que ce schéma dit et qu'il faut avoir en tête :
+Quatre choses que ce schéma dit et qu'il faut avoir en tête :
 
-- **La durée retenue n'est pas `endedAt - startedAt`.** Le plafond écrête : un chronomètre
-  oublié rend quatre heures créditées au lieu de tout perdre. C'est la durée retenue qui fait foi.
-- **L'`Idempotency-Key` est obligatoire** sur les écritures métier. Les clients mobiles rejouent
-  leurs requêtes ; sans elle, une requête perdue en route puis renvoyée afficherait un échec
-  pour une action réussie.
-- **Un abandon ne produit pas d'événement.** Il n'y a rien à apprendre à quiconque d'une
-  séance qui ne compte pas.
+- **Un import est un ensemble, pas une transaction tout-ou-rien.** Un workout *écarté* n'annule
+  rien — neuf séances valides ne peuvent pas échouer parce que la dixième est une partie de
+  curling. Une *panne*, elle, défait tout : un workout écrit sans XP créditée est une perte
+  silencieuse.
+- **L'ordre chronologique n'est pas cosmétique.** Les rendements décroissants se calculent sur ce
+  que le joueur a déjà fait ce jour-là, donc la charge du jour se relit à chaque itération. Le
+  même lot envoyé dans un autre ordre doit donner le même ledger.
+- **Le verrou est pris une fois** et tenu jusqu'au COMMIT — un verrou de ligne est ré-entrant
+  dans une transaction. C'est lui qui sérialise deux appareils du même compte.
+- **L'`Idempotency-Key` ne fait pas doublon avec l'unicité `(user, source, externalId)`.**
+  Celle-ci empêche le double crédit ; celle-là rend la **réponse** d'origine. Sans elle, un
+  client qui rejoue reçoit une synchronisation vide au lieu de sa mise en scène — l'XP serait
+  juste, l'animation perdue.
 
-Les états d'une séance sont sans retour :
+Un workout n'a **pas d'état** : il naît terminé. Ce qui avait un cycle de vie, c'était la séance
+chronométrée ; le fait rapporté par une montre est déjà passé quand il arrive. Ce qui reste, ce
+sont les cinq façons dont un candidat peut ne pas être crédité :
 
 ```mermaid
-stateDiagram-v2
-    [*] --> ACTIVE : POST /sessions
-    ACTIVE --> COMPLETED : /complete — au-delà du plancher
-    ACTIVE --> ABANDONED : /abandon
-    ACTIVE --> ACTIVE : /complete sous le plancher → 422, la séance continue
-    COMPLETED --> [*]
-    ABANDONED --> [*]
+flowchart TB
+    c(["candidat"]) --> dup{"déjà en base<br/>ou dans le lot ?"}
+    dup -->|oui| ai["ALREADY_IMPORTED"]
+    dup -->|non| act{"activité traduite ?"}
+    act -->|non| ua["UNSUPPORTED_ACTIVITY"]
+    act -->|oui| min{"au-dessus du<br/>plancher ?"}
+    min -->|non| ts["TOO_SHORT"]
+    min -->|oui| ov{"chevauche un<br/>autre workout ?"}
+    ov -->|oui| ovl["OVERLAPS"]
+    ov -->|non| win{"dans la fenêtre<br/>de 30 jours ?"}
+    win -->|non| oow["OUT_OF_WINDOW<br/><b>écrit, jamais crédité</b>"]
+    win -->|oui| ok(["crédité"])
 ```
 
-Rien ne ramène une séance dans la course. Une erreur se corrige par une transaction d'XP
-négative, jamais par une réécriture d'historique.
+**Seul `OUT_OF_WINDOW` laisse une ligne en base.** Le joueur retrouve son passé sans le
+monnayer : le premier import devient un moment de produit — « voilà tes six derniers mois » — au
+lieu d'un mur. C'est le garde-fou le plus important du virage, parce qu'un téléphone contient
+parfois trois ans d'Apple Health et que le ledger est append-only : crédité tel quel, le joueur
+atteint le niveau 60 avant sa première course *pour* Grrind, et ça ne se rattrape pas.
+
+Rien ne réécrit un workout crédité. Une erreur se corrige par une transaction d'XP négative,
+jamais par une réécriture d'historique.
 
 ---
 
@@ -209,8 +252,9 @@ flowchart TB
 ```
 
 **Ce qui existe aujourd'hui**, c'est tout sauf la case en pointillés, et c'est branché sur
-la complétion de séance : `CompleteSessionHandler` ouvre la transaction, écrit la séance,
-appelle `GrantXpHandler` par le port `SessionRewards`, et rend le `RewardSummary`.
+l'import : `ImportWorkoutsHandler` ouvre la transaction, écrit chaque workout, appelle
+`GrantXpHandler` par le port `SessionRewards`, et rend le `SyncSummary`. Ce bloc-là est **répété
+une fois par workout crédité**, dans l'ordre chronologique — le verrou n'est pris qu'au premier.
 
 **Le port, et pourquoi il en faut un.** Deptrac interdit à `Training` d'importer
 `Progression`, et l'événement de domaine — l'autre chemin autorisé — se consomme *après*
@@ -221,11 +265,11 @@ chacun le leur, entre le crédit et l'outbox.
 
 ```mermaid
 flowchart LR
-    ts["<b>Training</b><br/>CompleteSessionHandler<br/><i>possède la transaction</i>"]
+    ts["<b>Training</b><br/>ImportWorkoutsHandler<br/><i>possède la transaction</i>"]
     port{{"<b>Shared</b><br/>SessionRewards<br/><i>le contrat</i>"}}
     pg["<b>Progression</b><br/>LedgerSessionRewards<br/>→ GrantXpHandler"]
 
-    ts -->|"creditFor(TrainingSessionCompleted)"| port
+    ts -->|"creditFor(WorkoutImported)"| port
     port -.->|implémenté par| pg
     pg -->|SessionReward| ts
 ```
@@ -234,11 +278,19 @@ flowchart LR
 Le `wrapInTransaction` de `GrantXpHandler` n'en rouvre pas une seconde : DBAL en fait un
 point de sauvegarde, le verrou de ligne court jusqu'au COMMIT extérieur.
 
-**Ce qui sort du COMMIT : le `RewardSummary`.** C'est le contrat le plus coûteux à casser du
-produit, et **l'ordre de ses clés est l'ordre de l'animation** — le client le joue de haut
-en bas, il ne le réordonne pas. `loot`, `streak` et `unlockableNodes` sont présents et vides
-jusqu'aux Lots 6, 5 et 7 : une clé qui apparaîtrait plus tard obligerait un client déjà
-déployé à la rendre optionnelle pour toujours.
+**Ce qui sort du COMMIT : le `SyncSummary`.** C'est le contrat le plus coûteux à casser du
+produit, et **l'ordre de ses clés est l'ordre de l'animation**, maintenant à deux niveaux : entre
+les workouts d'abord — `imported` est chronologique — puis à l'intérieur de chacun. Le client le
+joue de haut en bas, il ne le réordonne pas.
+
+Chaque élément d'`imported` est **exactement** le `RewardSummary` d'un workout. C'est ce qui rend
+une synchronisation de dix séances aussi simple à animer qu'une seule. `totals` résume la
+timeline — « +847 XP · niveau 10 → 15 » — et n'en est jamais la source : il est dérivé de la
+liste, et vaut `null` quand rien n'a été crédité.
+
+`loot`, `streak` et `unlockableNodes` sont présents et vides jusqu'aux Lots 6, 5 et 7 : une clé
+qui apparaîtrait plus tard obligerait un client déjà déployé à la rendre optionnelle pour
+toujours.
 
 Le palier de départ y est donné **en entier** — `before`, `xpIntoLevelBefore`,
 `xpToNextLevelBefore` — et pas seulement son numéro. Le client place la barre, puis la
@@ -248,28 +300,49 @@ niveaux à franchir, ce qui est un cas normal (#79).
 
 ```jsonc
 {
-  "session":     { /* la séance close, forme identique partout dans l'API */ },
-  "xp":          { "awarded": 145,
-                   "breakdown": [ { "source": "BASE",        "amount":  200 },
-                                  { "source": "DIMINISHING", "amount":  -55 } ] },
-  "level":       { "before": 1, "xpIntoLevelBefore": 0, "xpToNextLevelBefore": 100,
-                   "after": 2, "reached": [2],
-                   "totalXp": 145, "xpIntoLevel": 45, "xpToNextLevel": 115,
-                   "skillPointsGranted": 1 },
-  "titlesUnlocked": [ /* PlayerTitle, déjà traduit — rien à recharger */ ],
-  "loot": [], "streak": null, "unlockableNodes": [],
+  "syncedAt": "2026-08-13T19:04:00Z",     // l'horloge du serveur, seul instant qui n'en vienne pas du fournisseur
+  "imported": [
+    {
+      "session":  { /* le workout, forme identique partout dans l'API */ },
+      "xp":       { "awarded": 145,
+                    "breakdown": [ { "source": "BASE",        "amount":  60 },
+                                   { "source": "DISTANCE",    "amount": 100 },
+                                   { "source": "DIMINISHING", "amount": -15 } ] },
+      "level":    { "before": 1, "xpIntoLevelBefore": 0, "xpToNextLevelBefore": 100,
+                    "after": 2, "reached": [2],
+                    "totalXp": 145, "xpIntoLevel": 45, "xpToNextLevel": 115,
+                    "skillPointsGranted": 1 },
+      "titlesUnlocked": [ /* PlayerTitle, déjà traduit — rien à recharger */ ],
+      "loot": [], "streak": null, "unlockableNodes": [],
+      "rulesetVersion": "…"
+    }
+    // … un par workout crédité, dans l'ordre chronologique
+  ],
+  "skipped": [ { "externalId": "…", "activityType": "curling", "reason": "UNSUPPORTED_ACTIVITY" } ],
+  "totals":  { "levelBefore": 1, "levelAfter": 2, "xpBefore": 0, "xpAfter": 145,
+               "xpAwarded": 145, "workoutCount": 1 },   // `null` si rien n'a été crédité
   "rulesetVersion": "…"
 }
 ```
 
+**`skipped` n'est pas du bruit.** Chaque séance écartée est **nommée**, avec son type d'activité
+brut : un workout qui disparaît sans un mot est un bug du point de vue du joueur, même quand le
+serveur a raison de l'écarter.
+
 Pourquoi cet ordre, en trois phrases :
 
 - **Le verrou d'abord.** Il porte sur *une ligne* — deux joueurs ne s'attendent jamais. Sans
-  lui, deux complétions simultanées lisent le même total, calculent le même niveau et
+  lui, deux synchronisations simultanées lisent le même total, calculent le même niveau et
   s'écrasent l'une l'autre.
 - **La lecture du jour et des modificateurs après le verrou.** Sinon les rendements
-  décroissants se contourneraient en clôturant deux séances à la même seconde, et un ensemble
-  de bonus lu avant la transaction créditerait un streak déjà périmé.
+  décroissants se contourneraient en créditant deux workouts à la même seconde, et un ensemble
+  de bonus lu avant la transaction créditerait un streak déjà périmé. C'est aussi ce qui rend un
+  lot correct workout par workout : la charge est relue à chaque itération, donc le deuxième
+  workout d'une journée voit le premier même s'ils arrivent ensemble.
+- **La journée est celle du sport, pas celle de l'import.** L'écriture au ledger porte
+  `occurred_at` ; dix workouts importés d'un coup appartiennent à dix journées différentes, et
+  les dater de leur insertion les entasserait tous sous le plafond quotidien du jour de la
+  synchronisation.
 - **Le snapshot relit le ledger, il ne s'incrémente pas.** Un `+=` transformerait chaque
   divergence en dette permanente ; là, un écart se résorbe tout seul au crédit suivant.
 
@@ -277,18 +350,34 @@ Et le calcul lui-même, qui est une **fonction pure et versionnée** :
 
 ```mermaid
 flowchart LR
-    d["durée retenue<br/>+ discipline"] --> base["socle<br/><i>durée × xp_par_heure / 3600</i>"]
-    base --> dim["− rendements décroissants<br/><i>selon le temps déjà fait aujourd'hui</i>"]
-    dim --> bonus["+ bonus<br/><i>en % du socle raboté, additifs</i>"]
+    d["durée retenue"] --> base["socle<br/><i>une minute = un point</i>"]
+    base --> dim["− rendements décroissants<br/><i>selon le temps déjà fait ce jour-là</i>"]
+    dim --> terr["+ distance + dénivelé<br/><i>selon la discipline, non rabotés</i>"]
+    m["distance · D+"] --> terr
+    terr --> bonus["+ bonus<br/><i>en % du socle raboté, additifs</i>"]
     mods["modificateurs actifs<br/><i>ModifierResolver</i>"] --> bonus
     bonus --> cap["− dépassement du plafond<br/>quotidien de la discipline"]
     cap --> out["<b>XpAward</b><br/>montant + rulesetVersion<br/>+ le détail de chaque ligne"]
 ```
 
-**Les bonus sont additifs sur le socle**, pas multiplicatifs : `90 + 18 + 13 = 121`, et non
-`90 × 1,20 × 1,15`. Chaque ligne du détail reste ainsi vraie isolément — « +18 grâce à ta
-série » ne dépend pas de ce qui a été appliqué avant. Et chaque garde-fou a **sa ligne dans le
-détail** : montrer ce qui a été rogné est ce qui sépare une mécanique d'une punition.
+**La formule tient en une phrase** : une minute vaut un point, plus les kilomètres, plus le
+dénivelé. Le taux horaire par discipline a disparu — c'était une calibration inventée avant
+d'avoir un seul joueur, et six lignes à défendre à chaque discussion d'équilibrage. Ce qui
+distingue les disciplines est désormais **mesuré**, ou assumé comme absent : `STRENGTH`, `HIIT`,
+`MOBILITY` et `CLIMBING` sont à la durée seule parce qu'aucune montre ne leur donne une seconde
+dimension fiable, et une dimension qu'on n'aurait que sur la moitié des appareils créerait deux
+jeux au lieu d'un.
+
+**Le terrain échappe aux rendements décroissants** : dix kilomètres restent dix kilomètres quelle
+que soit l'heure à laquelle on les a courus. Ce sont les *minutes* qui décroissent. C'est le
+plafond quotidien qui borne ce côté-là.
+
+**Les bonus sont additifs sur le socle raboté**, terrain non compris, et pas multiplicatifs :
+`90 + 18 + 13 = 121`, et non `90 × 1,20 × 1,15`. Chaque ligne du détail reste ainsi vraie
+isolément — « +18 grâce à ta série » ne dépend pas de ce qui a été appliqué avant, et un même
+streak ne vaut pas trois fois plus sur un trail que sur une séance de fonte. Et chaque garde-fou
+a **sa ligne dans le détail** : montrer ce qui a été rogné est ce qui sépare une mécanique d'une
+punition.
 
 ---
 
@@ -314,22 +403,26 @@ erDiagram
         string token_hash UK "SHA-256 seul, jamais le jeton"
         timestamptz consumed_at "le rejeu révoque la famille"
     }
-    training_session {
+    workout {
         uuid id PK
         uuid user_id "pas de FK — autre module"
-        enum status "index unique partiel sur ACTIVE"
-        timestamptz started_at "horloge serveur"
-        int duration_seconds "la durée RETENUE, écrêtée"
-        enum source "MANUAL_TIMER puis STRAVA"
+        timestamptz started_at "l'horloge du fournisseur"
+        timestamptz ended_at "les deux bornes, jamais nulles"
+        int duration_seconds "calculée des bornes, jamais recopiée"
+        enum source "APPLE_HEALTH | HEALTH_CONNECT"
         enum trust "DECLARED puis PROVIDER_VERIFIED"
+        string external_id "UK partiel avec (user, source)"
+        int distance_meters "null = non mesuré, jamais zéro"
+        int elevation_gain_meters "idem — aucun appareil ne fournit tout"
     }
     xp_transaction {
         uuid id PK
         uuid user_id
-        uuid source_id "la séance — UK avec reason"
+        uuid source_id "le workout — UK avec reason"
         int amount "signé, somme de ses lignes"
         enum reason "COMPLETED | INVALIDATED"
         int duration_seconds "signée elle aussi"
+        timestamptz occurred_at "le jour du SPORT, pas de l'écriture"
         string ruleset_version "les règles du jour du calcul"
     }
     progression_snapshot {
@@ -352,16 +445,22 @@ erDiagram
 
 Quatre lectures de ce schéma :
 
-- **Aucune clé étrangère ne traverse une frontière de module.** `training_session.user_id` et
+- **Aucune clé étrangère ne traverse une frontière de module.** `workout.user_id` et
   `xp_transaction.user_id` ne référencent rien : la frontière vaut pour les tables autant que
   pour les classes.
+- **`uniq_workout_external` est ce qui empêche le double crédit**, et c'est la base qui le tient,
+  pas le code : entre le `SELECT` qui cherche l'identifiant et l'`INSERT` qui l'écrit, deux
+  synchronisations concurrentes passent toutes les deux. Il est **partiel** — `WHERE external_id
+  IS NOT NULL` — parce que PostgreSQL considère deux `NULL` comme distincts et qu'une contrainte
+  totale n'interdirait rien.
 - **`xp_transaction` est la vérité, `progression_snapshot` est un cache.** Le niveau est une
   projection ; le snapshot se reconstruit intégralement du ledger, et `app:progression:rebuild`
   le prouve — `--dry-run` compare toute la base sans rien écrire, une passe normale réécrit ce
-  qui a dérivé, par le chemin exact de la complétion de séance.
+  qui a dérivé, par le chemin exact du crédit d'un workout.
 - **Le ledger est append-only.** Aucun mutateur sur les entités, et un listener Doctrine refuse
-  `UPDATE` et `DELETE`. Une séance invalidée écrit une transaction **négative** ; on ne supprime
-  rien.
+  `UPDATE` et `DELETE`. Un workout invalidé écrit une transaction **négative** ; on ne supprime
+  rien. L'annulation reprend l'`occurred_at` du crédit, pour se solder sur la journée qu'elle
+  annule et pas sur celle où on s'en aperçoit.
 - **`player_title` ne se vide jamais.** Un titre débloqué ne se reprend pas, même si une séance
   annulée fait repasser le compteur sous le seuil : l'XP est une monnaie, un titre est un
   souvenir.
@@ -478,11 +577,9 @@ le `detail`.
 | `POST /api/auth/logout` | refresh token | 204 |
 | `POST /api/auth/social/{google\|apple}` | code d'autorisation | 200, compte + jetons |
 | `GET · PATCH /api/me` | Bearer | profil, titre porté, prochain titre |
-| `POST /api/training/sessions` | Bearer | 201, séance ouverte |
-| `POST /api/training/sessions/{id}/complete` | Bearer + `Idempotency-Key` | 200, séance close |
-| `POST /api/training/sessions/{id}/abandon` | Bearer + `Idempotency-Key` | 200, séance abandonnée |
-| `GET /api/training/sessions` | Bearer | 200, page d'historique + `nextCursor` |
-| `GET /api/training/sessions/active` | Bearer | 200 séance en cours, ou **204** |
+| `POST /api/workouts/import` | Bearer + `Idempotency-Key` | 200, `SyncSummary` |
+| `GET /api/workouts` | Bearer | 200, page d'historique + `nextCursor` |
+| `GET /api/workouts/sync-state` | Bearer | 200, `lastImportedAt` + `importWindowDays` |
 | `GET /api/titles` | Bearer | 200, catalogue situé + titre porté |
 | `PUT /api/titles/active` | Bearer | 200, catalogue après changement |
 | `GET /api/progression` | Bearer | 200, état du joueur — servi du snapshot |
@@ -496,9 +593,15 @@ le seul snapshot : lister ce qu'on a débloqué ne demande aucune agrégation, s
 pas encore en demande une.
 
 **Une forme par concept, partout.** `register`, `login`, `refresh` et `social` rendent le même
-`AuthResource`. Une séance ouverte et une séance close sont le même objet, avec des champs à
-`null`. Un titre a la même forme dans le profil et dans le catalogue. Le client décode un
-seul type par concept — un champ qui apparaît et disparaît selon la route finit lu de travers.
+`AuthResource`. Un workout a la même forme dans l'historique et dans un `SyncSummary`. Un titre a
+la même forme dans le profil et dans le catalogue. Le client décode un seul type par concept — un
+champ qui apparaît et disparaît selon la route finit lu de travers.
+
+**Une seule pagination.** Les deux historiques — workouts et ledger — partagent le même curseur
+composite et opaque, `(date, identifiant)`. Il a été un simple UUID v7 tant que l'identifiant
+naissait à l'instant du fait ; l'import a séparé les deux, et l'ordre rendu devenait celui de la
+synchronisation plutôt que celui de la pratique. La date seule ne suffirait pas non plus : deux
+séances peuvent commencer à la même seconde.
 
 ---
 
@@ -544,8 +647,36 @@ défaire. Le raisonnement complet est dans le docblock du fichier concerné.
 - **`GET /api/progression` sert les colonnes du snapshot telles quelles**, sans les reprojeter
   de son total. Reprojeter masquerait précisément la divergence que la reconstruction (#20)
   existe pour détecter, et ferait de chaque ouverture d'app une réparation silencieuse.
-- **Une clôture trop courte est refusée, pas requalifiée en abandon.** Entre deux options, celle
-  qui ne détruit rien.
+- **Pas d'app Watch Grrind en V1.** Apple Exercice fait déjà le travail pour les sept sports
+  visés, et une app de plus au poignet n'ajouterait qu'un endroit où oublier de lancer le
+  chronomètre. Elle redeviendra pertinente le jour où une activité demandera une interaction
+  *propre à Grrind* — l'escalade voie par voie, typiquement — pas avant.
+- **Pas de saisie manuelle.** L'échappatoire déclarative brouillerait la seule question que cette
+  V1 pose : *est-ce que voir mon activité réelle alimenter mon personnage est fun ?* Une réponse
+  obtenue sur des séances saisies à la main ne dirait rien de celle-là. Le modèle est prêt à
+  l'accueillir — `TrustLevel::Declared` existe pour ça — c'est le produit qui n'en veut pas
+  encore.
+- **Un workout hors fenêtre est conservé sans être crédité**, et non ignoré. Le joueur retrouve
+  son passé sans le monnayer, le streak (Lot 5) aura de quoi se reconstruire, et le premier
+  import devient un moment de produit au lieu d'un mur.
+- **Aucune ligne de ledger pour un workout archivé.** L'idée d'une écriture à zéro paraît plus
+  cohérente avec l'append-only ; elle est en fait un piège : `recordOf()` compte les séances par
+  `SUM(CASE WHEN reason = COMPLETED THEN 1 ELSE -1 END)`, donc une troisième raison *retirerait*
+  une séance au relevé qui débloque les titres. L'append-only protège les crédits contre la
+  réécriture, il n'oblige pas à enregistrer les non-événements.
+- **Sur un chevauchement, c'est l'enregistrement le plus complet qui gagne**, pas le premier
+  arrivé — mais **jamais** contre une ligne déjà en base. Deux applications ne démarrent jamais à
+  la même seconde, donc « le premier » revient à tirer au sort ; détrôner une ligne déjà créditée
+  demanderait de la supprimer et de contrepasser son écriture.
+- **`lastImportedAt` compte les archives.** Ce que le client cherche est la frontière de ce que
+  le serveur *connaît*, pas de ce qu'il a payé : la borner aux séances créditées ferait
+  re-télécharger et ré-envoyer tout l'archivé à chaque synchronisation.
+- **Le ledger est daté par le sport, pas par son écriture.** L'instant de l'insertion n'est pas
+  perdu pour autant : l'identifiant est un UUID v7, il l'encode — et c'est une des raisons de ce
+  choix.
+- **`totals` du `SyncSummary` vaut `null` quand rien n'a été crédité**, plutôt que des zéros. Il
+  n'y a pas d'état d'arrivée quand rien n'est arrivé, et « niveau 0 → 0 » mentirait à un joueur
+  de niveau 12.
 - **Pas de Redis en v1**, et le déclencheur est écrit : le jour où il y a plus d'un conteneur
   applicatif **et** un besoin d'état partagé. Le verrou de complétion est pessimiste sur une
   ligne ; un verrou distribué serait un affaiblissement.
@@ -577,8 +708,18 @@ Les pièges qui se reproduisent. Les autres sont datés, corrigés, et vivent da
   `NOT NULL` sans défaut qui échouent sur une table peuplée.
 - **Après tout `composer require`, lire `git status`.** Les recettes Flex écrasent des fichiers
   de config existants — `deptrac.yaml` et `compose.yaml` y sont déjà passés.
-- **Un index partiel se déclare tel que PostgreSQL le *relit***, casts compris, sinon chaque
-  diff reproposera le même `DROP` + `CREATE`.
+- **Un index partiel se déclare tel que PostgreSQL le *relit***, parenthèses et casts compris,
+  sinon chaque diff reproposera le même `DROP` + `CREATE`. Doctrine compare des chaînes :
+  `external_id IS NOT NULL` et `(external_id IS NOT NULL)` sont deux prédicats différents pour
+  lui. Ça s'est reproduit sur `uniq_workout_active` puis sur `uniq_workout_external`, et ça se
+  reproduira sur le prochain — le diagnostic tient en une requête :
+  `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '…'`.
+- **Le Serializer ne descend pas dans une liste d'objets sans qu'on le lui dise.**
+  `with_constructor_extractor: true` — posé par la recette Flex — met `ConstructorExtractor` en
+  tête, et il ne consulte que `ReflectionExtractor`, qui lit la signature : un `array` reste un
+  `array` sans type d'élément. `#[MapRequestPayload]` rend alors des tableaux bruts, et le
+  contrôleur casse à l'exécution. La correction est dans `config/packages/property_info.yaml`, et
+  elle vaut pour **tout** DTO portant une liste.
 - **Doctrine hydrate une projection de champ à travers son type.** `->select('u.timezone')` rend
   un `Timezone`, pas une chaîne. Se méfier de tout repli silencieux sur une valeur plausible.
 - **Symfony ne charge pas `.env.local` en environnement `test`** — d'où le `.env.test.local` que
