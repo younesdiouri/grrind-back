@@ -13,6 +13,7 @@
         "league/oauth2-google": "^5.0",
         "lexik/jwt-authentication-bundle": "^3.2",
         "patrickbussmann/oauth2-apple": "^0.4.0",
+        "phpdocumentor/reflection-docblock": "^6.0",
         "symfony/clock": "8.1.*",
         "symfony/console": "8.1.*",
         "symfony/doctrine-messenger": "8.1.*",

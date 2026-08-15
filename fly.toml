@@ -8,8 +8,15 @@ primary_region = 'iad'
 
 [build]
 
+[env]
+  # Sans ça, Caddy active l'auto-HTTPS sur le nom "localhost" et ne sert plus rien en
+  # clair sur :80 (juste une redirection vers :443, jamais joignable) — `compose.yaml`
+  # le fixe déjà pour le dev, il manquait ici. fly-proxy termine le TLS lui-même et
+  # attend du HTTP en clair sur `internal_port`.
+  SERVER_NAME = ':80'
+
 [http_service]
-  internal_port = 8080
+  internal_port = 80
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
