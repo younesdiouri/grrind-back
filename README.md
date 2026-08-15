@@ -60,8 +60,10 @@ régénère et refuse un fichier en retard, et `OpenApiContractTest` refuse une 
 
 ## Déploiement
 
-Rien n'est déployé à ce jour ; la cible visée est ECS Fargate — un service pour l'API en mode
-worker FrankenPHP, un service pour le consommateur Messenger, RDS PostgreSQL 17.
+**Un déploiement alpha tourne sur Fly.io** (`grrind-back`, Postgres géré par Supabase) pour
+tester avec de premiers utilisateurs pendant que le reste du jeu se construit. La cible visée
+pour la suite reste ECS Fargate — un service pour l'API en mode worker FrankenPHP, un service
+pour le consommateur Messenger, RDS PostgreSQL 17 — décidée au jalon *Lot 9 — Durcissement*.
 
 **Les migrations sont une étape de déploiement à part entière, jouée avant que les nouvelles
 tâches prennent du trafic.** Elle tourne dans l'image de prod, pour que ce qui migre la base soit
@@ -73,15 +75,18 @@ DATABASE_URL="postgresql://…" make migrate-prod
 
 La commande sort en code non nul si une migration échoue — c'est ce qui doit interrompre le
 déploiement. Elle ne dépend que de `DATABASE_URL` : ni clés JWT, ni secrets OAuth. En local elle
-vise la base de la stack ; sur ECS, c'est une tâche one-off dans la même définition de tâche que
-l'API, lancée avant la bascule.
+vise la base de la stack ; sur ECS, ce sera une tâche one-off dans la même définition de tâche que
+l'API, lancée avant la bascule. (Contre Supabase, la connexion directe est IPv6 uniquement : si
+`make migrate-prod` échoue avec *Network is unreachable* depuis un poste sans sortie IPv6,
+`flyctl ssh console -C "php bin/console doctrine:migrations:migrate …"` joue les migrations
+depuis une machine qui, elle, en a une.)
 
-Deux points à trancher avant le premier déploiement, ticketés sur le jalon *Lot 9 — Durcissement* :
-**RDS Proxy est incompatible avec le `LISTEN/NOTIFY`** dont dépend l'outbox ([#56]), et les clés
-JWT sont aujourd'hui référencées par *chemin de fichier* alors qu'un gestionnaire de secrets
-injecte une valeur ([#54]).
+Les clés JWT n'ont pas besoin d'un fichier monté : `lexik_jwt_authentication.secret_key` /
+`public_key` acceptent le contenu PEM brut directement (cf. le README du bundle — « path to the
+secret key OR raw secret key »), c'est ce que `JWT_SECRET_KEY` / `JWT_PUBLIC_KEY` portent en
+secret Fly. Reste tranché au *Lot 9* : **RDS Proxy est incompatible avec le `LISTEN/NOTIFY`**
+dont dépend l'outbox ([#56]).
 
-[#54]: https://github.com/younesdiouri/grrind-back/issues/54
 [#56]: https://github.com/younesdiouri/grrind-back/issues/56
 
 ## Avancement
