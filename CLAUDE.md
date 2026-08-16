@@ -89,6 +89,23 @@ make down
 
 Si une commande manque au Makefile, on l'ajoute au Makefile — on ne contourne pas.
 
+**La seule exception est `flyctl`**, et c'en est une vraie : il pilote une infrastructure
+distante, pas le code local. Le déployer par Docker n'achèterait rien et ajouterait une
+couche entre la commande et ce qu'elle fait. Il tourne donc sur l'hôte, et c'est le seul.
+
+### Déployer
+
+Le skill **`deploy`** (`.claude/skills/deploy/SKILL.md`) porte les deux commandes exactes —
+`flyctl deploy`, puis les migrations par `flyctl ssh console` — et surtout les pièges qui
+ont déjà coûté du temps : les machines s'arrêtent toutes seules (`min_machines_running = 0`),
+et **`make migrate-prod` ne peut pas joindre Supabase depuis un poste de dev** parce que la
+connexion directe y est IPv6 uniquement. C'est pour ça que la migration part d'une machine
+Fly plutôt que de la machine locale.
+
+Un déploiement n'est pas fini tant qu'une requête réelle n'a pas répondu, et le test de
+fumée doit vérifier **un refus autant qu'un succès** : les décisions les plus coûteuses du
+projet sont des 404 là où on attendrait un 403, et aucun chemin nominal ne les montre.
+
 ## Stack
 
 | Brique | Choix |
