@@ -52,6 +52,12 @@ services:
             $baseXpPerHour: '%game.xp.base_xp_per_hour%'
             $disciplines: '%game.xp.disciplines%'
 
+    # La taille d'une guilde, tirée de `game/v1/community.yaml`. Même raison que
+    # `WorkoutRules` : le domaine reçoit un objet validé, pas un entier venu d'un YAML.
+    App\Community\Domain\GuildRules:
+        arguments:
+            $maximumMembers: '%game.community.maximum_members%'
+
     App\Progression\Domain\LevelCurve:
         arguments:
             $levels: '%game.levels.levels%'

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Community\Infrastructure\Config\CommunitySection;
 use App\Progression\Infrastructure\Config\LevelsSection;
 use App\Progression\Infrastructure\Config\TitlesSection;
 use App\Progression\Infrastructure\Config\XpSection;
@@ -25,7 +26,7 @@ class Kernel extends BaseKernel
      *
      * La liste est ici et non dans `GameBalancePass` parce que le pass vit dans `Shared`,
      * qui ne connaît aucun module. Le `Kernel` n'appartient à aucune couche : c'est le
-     * seul endroit où les six modules peuvent se rencontrer.
+     * seul endroit où les sept modules peuvent se rencontrer.
      */
     protected function build(ContainerBuilder $container): void
     {
@@ -36,6 +37,7 @@ class Kernel extends BaseKernel
             new XpSection(),
             new LevelsSection(),
             new TitlesSection(),
+            new CommunitySection(),
         ));
     }
 }

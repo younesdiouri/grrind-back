@@ -421,6 +421,8 @@ components:
             - 'https://grrind.app/problems/social-profile-incomplete'
             - 'https://grrind.app/problems/title-unknown'
             - 'https://grrind.app/problems/title-not-unlocked'
+            - 'https://grrind.app/problems/guild-is-full'
+            - 'https://grrind.app/problems/player-already-in-a-guild'
         title:
           type: string
           example: Conflict

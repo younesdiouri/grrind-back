@@ -42,6 +42,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Progression/Domain'
                 prefix: 'App\Progression\Domain'
                 alias: Progression
+            Community:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Community/Domain'
+                prefix: 'App\Community\Domain'
+                alias: Community
 
 when@test:
     doctrine:
