@@ -44,7 +44,12 @@ final class OpenApiContractTest extends KernelTestCase
      *
      * @var list<int>
      */
-    private const array TRANSPORT_STATUSES = [400, 404, 405, 415];
+    /**
+     * Les statuts que le noyau produit sans qu'aucune erreur de domaine les nomme. 403 est
+     * arrivé avec `#[IsGranted]` (#115) : c'est le composant Security qui lève, pas nous,
+     * donc aucun `type(): string` du code ne le déclare.
+     */
+    private const array TRANSPORT_STATUSES = [400, 403, 404, 405, 415];
 
     /** @var array<string, mixed> */
     private array $spec;

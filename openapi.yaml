@@ -4,6 +4,87 @@ info:
   description: "L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.\n\n**Le serveur arbitre l'horloge.** L'import accepte les bornes du **fournisseur santé** — une\nséance a eu lieu avant que Grrind en entende parler, aucune horloge serveur n'existe pour un\nfait passé. Ce qu'il n'accepte pas, c'est une **durée** : elle se recalcule des deux bornes.\nLe reste de l'arbitrage — fenêtre d'antériorité, chevauchements, plancher et plafond — refuse\nce qui ne tient pas debout.\n\n**Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un\nen-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse\nd'origine sans rien réexécuter.\n\n**Les erreurs sont en `application/problem+json`** (RFC 9457). Le membre `type` est un\nidentifiant stable sur lequel un client peut brancher un comportement ; le `detail` est du\ntexte, il peut changer.\n"
   version: 1.0.0
 paths:
+  /api/guilds:
+    post:
+      tags:
+        - Guildes
+      operationId: post_community_guild_found
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuildName'
+      responses:
+        '201':
+          description: "La guilde est fondée et l'appelant en est le fondateur : les deux dans le même geste."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guild'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: "Le joueur appartient déjà à une guilde (`player-already-in-a-guild`). Il doit la quitter avant d'en fonder une autre."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  '/api/guilds/{id}':
+    delete:
+      tags:
+        - Guildes
+      operationId: delete_community_guild_dissolve
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: "La guilde et toutes ses adhésions sont parties dans la même transaction. Ses membres sont libres d'en fonder ou d'en rejoindre une autre."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Guildes
+      operationId: patch_community_guild_rename
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuildName'
+      responses:
+        '200':
+          description: 'La guilde renommée.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guild'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /api/auth/login:
     post:
       tags:
@@ -403,6 +484,7 @@ components:
           enum:
             - 'https://grrind.app/problems/bad-request'
             - 'https://grrind.app/problems/not-found'
+            - 'https://grrind.app/problems/forbidden'
             - 'https://grrind.app/problems/method-not-allowed'
             - 'https://grrind.app/problems/unsupported-media-type'
             - 'https://grrind.app/problems/validation-failed'
@@ -423,6 +505,7 @@ components:
             - 'https://grrind.app/problems/title-not-unlocked'
             - 'https://grrind.app/problems/guild-is-full'
             - 'https://grrind.app/problems/player-already-in-a-guild'
+            - 'https://grrind.app/problems/guild-not-found'
         title:
           type: string
           example: Conflict
@@ -497,6 +580,50 @@ components:
                 - SESSIONS
                 - SECONDS
           type: object
+      type: object
+    GuildName:
+      description: "Le nom seul. **Il n'est pas unique**, et il ne le deviendra pas : on n'entre\ndans une guilde que par un code d'invitation, donc rien ne dépend de pouvoir la\ndésigner par son nom. Deux guildes homonymes sont un cas normal.\n"
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: 'Les Lève-Tôt'
+          maxLength: 40
+          minLength: 1
+      type: object
+    Guild:
+      description: "Une guilde, vue par l'un de ses membres. Elle **ne produit aucune valeur de\njeu** en v1 : ni XP, ni modificateur, ni loot. Elle réunit des joueurs, c'est\ntout.\n"
+      required:
+        - id
+        - name
+        - createdAt
+        - memberCount
+        - capacity
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 40
+        createdAt:
+          type: string
+          format: date-time
+        memberCount:
+          type: integer
+          example: 12
+        capacity:
+          description: "La capacité vient de l'équilibrage du serveur et voyage avec la\nréponse : l'écran affiche « 12 / 30 », et embarquer le dénominateur\ndans l'app obligerait à repasser par l'App Store pour le corriger.\n"
+          type: integer
+          example: 30
+        role:
+          description: "Le rôle de **l'appelant**, pas une propriété de la guilde. Il sert à\ndécider quoi dessiner — le bouton « dissoudre » n'existe que pour le\nfondateur — jamais à autoriser : le serveur reste seul juge, et\nl'action est de toute façon revérifiée.\n"
+          type: string
+          enum:
+            - FOUNDER
+            - MEMBER
       type: object
     UserProfile:
       required:
@@ -1059,6 +1186,20 @@ components:
           type: string
           nullable: true
       type: object
+    FoundGuildRequest:
+      properties:
+        name:
+          type: string
+          default: ''
+          maxLength: 40
+      type: object
+    RenameGuildRequest:
+      properties:
+        name:
+          type: string
+          default: ''
+          maxLength: 40
+      type: object
     RefreshTokenRequest:
       properties:
         refreshToken:
@@ -1264,6 +1405,12 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
+    Forbidden:
+      description: "L'appelant est bien identifié, la ressource existe, et il n'a pas le droit\ndemandé. **C'est ce qui distingue ce statut du 404** : un 403 ne se rend qu'à\nquelqu'un qui savait déjà que la ressource existe — un membre de la guilde qui\nn'en est pas le fondateur. À un non-membre, l'API répond 404, sans quoi elle\ndirait quels UUID désignent une guilde.\n"
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
     UnprocessableEntity:
       description: 'Le corps est bien formé mais son contenu est refusé.'
       content:
@@ -1289,6 +1436,8 @@ security:
   -
     bearerAuth: []
 tags:
+  -
+    name: Guildes
   -
     name: Authentification
   -
