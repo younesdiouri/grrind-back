@@ -74,6 +74,16 @@ when@dev:
                         content:
                             application/problem+json:
                                 schema: { $ref: '#/components/schemas/ProblemDetails' }
+                    Forbidden:
+                        description: |
+                            L'appelant est bien identifié, la ressource existe, et il n'a pas le droit
+                            demandé. **C'est ce qui distingue ce statut du 404** : un 403 ne se rend qu'à
+                            quelqu'un qui savait déjà que la ressource existe — un membre de la guilde qui
+                            n'en est pas le fondateur. À un non-membre, l'API répond 404, sans quoi elle
+                            dirait quels UUID désignent une guilde.
+                        content:
+                            application/problem+json:
+                                schema: { $ref: '#/components/schemas/ProblemDetails' }
                     UnprocessableEntity:
                         description: "Le corps est bien formé mais son contenu est refusé."
                         content:
@@ -134,6 +144,7 @@ when@dev:
                                     # contrat qui les tait force le client à garder un cas fourre-tout.
                                     - https://grrind.app/problems/bad-request
                                     - https://grrind.app/problems/not-found
+                                    - https://grrind.app/problems/forbidden
                                     - https://grrind.app/problems/method-not-allowed
                                     - https://grrind.app/problems/unsupported-media-type
                                     - https://grrind.app/problems/validation-failed
@@ -167,6 +178,7 @@ when@dev:
                                     # d'extension, pour que l'app puisse l'écrire dans la phrase.
                                     - https://grrind.app/problems/guild-is-full
                                     - https://grrind.app/problems/player-already-in-a-guild
+                                    - https://grrind.app/problems/guild-not-found
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }
@@ -210,6 +222,44 @@ when@dev:
                                     current: { type: integer, description: "Écrêté à `target` — une barre ne dépasse pas." }
                                     target: { type: integer }
                                     unit: { type: string, enum: [LEVELS, XP, SESSIONS, SECONDS] }
+
+                    GuildName:
+                        type: object
+                        required: [name]
+                        description: |
+                            Le nom seul. **Il n'est pas unique**, et il ne le deviendra pas : on n'entre
+                            dans une guilde que par un code d'invitation, donc rien ne dépend de pouvoir la
+                            désigner par son nom. Deux guildes homonymes sont un cas normal.
+                        properties:
+                            name: { type: string, minLength: 1, maxLength: 40, example: Les Lève-Tôt }
+
+                    Guild:
+                        type: object
+                        required: [id, name, createdAt, memberCount, capacity, role]
+                        description: |
+                            Une guilde, vue par l'un de ses membres. Elle **ne produit aucune valeur de
+                            jeu** en v1 : ni XP, ni modificateur, ni loot. Elle réunit des joueurs, c'est
+                            tout.
+                        properties:
+                            id: { type: string, format: uuid }
+                            name: { type: string, maxLength: 40 }
+                            createdAt: { type: string, format: date-time }
+                            memberCount: { type: integer, example: 12 }
+                            capacity:
+                                type: integer
+                                example: 30
+                                description: |
+                                    La capacité vient de l'équilibrage du serveur et voyage avec la
+                                    réponse : l'écran affiche « 12 / 30 », et embarquer le dénominateur
+                                    dans l'app obligerait à repasser par l'App Store pour le corriger.
+                            role:
+                                type: string
+                                enum: [FOUNDER, MEMBER]
+                                description: |
+                                    Le rôle de **l'appelant**, pas une propriété de la guilde. Il sert à
+                                    décider quoi dessiner — le bouton « dissoudre » n'existe que pour le
+                                    fondateur — jamais à autoriser : le serveur reste seul juge, et
+                                    l'action est de toute façon revérifiée.
 
                     UserProfile:
                         type: object
