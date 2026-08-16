@@ -160,6 +160,13 @@ when@dev:
                                     # Progression
                                     - https://grrind.app/problems/title-unknown
                                     - https://grrind.app/problems/title-not-unlocked
+                                    # Communauté — les deux refus qu'une guilde prononce elle-même.
+                                    # Les deux sont des 409 : la requête était légitime, c'est l'état
+                                    # qui la refuse, et il peut changer sans que le client s'y prenne
+                                    # autrement. `guild-is-full` porte sa capacité en membre
+                                    # d'extension, pour que l'app puisse l'écrire dans la phrase.
+                                    - https://grrind.app/problems/guild-is-full
+                                    - https://grrind.app/problems/player-already-in-a-guild
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }

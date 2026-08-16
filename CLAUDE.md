@@ -116,6 +116,7 @@ src/
   Progression/    # Ledger XP, courbe de niveaux, titres, arbres de compétences
   Rewards/        # Tables de loot, tirages, inventaire, équipement
   Engagement/     # Streak, classements, ligues
+  Community/      # Guildes, adhésions, invitations
 ```
 
 Chaque module suit la même découpe :
@@ -368,4 +369,4 @@ reproduisent.
 
 Le mapping Doctrine n'a **pas** d'`auto_mapping` : chaque module déclare le sien dans
 `config/packages/doctrine.yaml` au moment de son lot. Idem pour les layers Deptrac, déjà déclarés
-dans `deptrac.yaml` pour les six modules.
+dans `deptrac.yaml` pour les sept modules.

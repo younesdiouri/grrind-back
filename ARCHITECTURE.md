@@ -18,7 +18,7 @@ Les schémas sont en Mermaid : GitHub les rend nativement dans cette page.
 
 ## 1. La carte
 
-Un seul déploiement, six modules à frontières dures. **Un module ne connaît que `Shared`** —
+Un seul déploiement, sept modules à frontières dures. **Un module ne connaît que `Shared`** —
 Deptrac le vérifie en CI, et le build casse sur une flèche interdite.
 
 ```mermaid
@@ -32,18 +32,21 @@ flowchart TB
         progression["<b>Progression</b><br/>ledger XP · niveaux<br/>titres · arbres"]
         rewards["<b>Rewards</b><br/>loot · inventaire<br/><i>pas encore écrit</i>"]
         engagement["<b>Engagement</b><br/>streak · ligues<br/><i>pas encore écrit</i>"]
+        community["<b>Community</b><br/>guildes · adhésions<br/>invitations"]
         shared["<b>Shared</b><br/>vocabulaire d'activité · événements de domaine<br/>ports · idempotence · horloge"]
     end
 
     app --> identity
     app --> training
     app --> progression
+    app --> community
 
     identity --> shared
     training --> shared
     progression --> shared
     rewards -.-> shared
     engagement -.-> shared
+    community --> shared
 
     classDef todo stroke-dasharray:4 4,opacity:0.5
     class rewards,engagement todo

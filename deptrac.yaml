@@ -36,6 +36,11 @@ deptrac:
         - type: directory
           value: src/Engagement/.*
 
+    - name: Community
+      collectors:
+        - type: directory
+          value: src/Community/.*
+
   ruleset:
     # Shared ne dépend d'aucun module métier : c'est ce qui le garde partageable.
     Shared: ~
@@ -48,4 +53,8 @@ deptrac:
     Rewards:
       - Shared
     Engagement:
+      - Shared
+    # La guilde réunit des joueurs sans rien savoir d'eux : ni `Identity` ni `Progression`
+    # n'apparaissent ici. Ce qu'elle affiche d'un membre arrive par les ports de `Shared`.
+    Community:
       - Shared
