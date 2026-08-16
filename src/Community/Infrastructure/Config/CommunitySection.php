@@ -32,12 +32,13 @@ final class CommunitySection implements GameBalanceSection
         $tree->getRootNode()
             ->children()
                 ->integerNode('maximum_members')->isRequired()->min(2)->end()
+                ->integerNode('invite_code_lifetime_hours')->isRequired()->min(1)->end()
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
-                    /** @var array{maximum_members: int} $values l'`integerNode` ci-dessus a déjà fait ce travail */
+                    /** @var array{maximum_members: int, invite_code_lifetime_hours: int} $values les `integerNode` ci-dessus ont déjà fait ce travail */
                     try {
-                        new GuildRules($values['maximum_members']);
+                        new GuildRules($values['maximum_members'], $values['invite_code_lifetime_hours']);
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);
                     }

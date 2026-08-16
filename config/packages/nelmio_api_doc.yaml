@@ -84,6 +84,16 @@ when@dev:
                         content:
                             application/problem+json:
                                 schema: { $ref: '#/components/schemas/ProblemDetails' }
+                    TooManyRequests:
+                        description: |
+                            Trop d'essais. L'en-tête `Retry-After` dit combien de secondes attendre, et le
+                            client doit l'honorer plutôt que de réessayer en boucle. Aujourd'hui seul
+                            `POST /api/guilds/join` est limité : un code d'invitation est court par
+                            nécessité — il se dicte à voix haute — et c'est ce plafond qui rend le tirage au
+                            hasard sans issue.
+                        content:
+                            application/problem+json:
+                                schema: { $ref: '#/components/schemas/ProblemDetails' }
                     UnprocessableEntity:
                         description: "Le corps est bien formé mais son contenu est refusé."
                         content:
@@ -146,6 +156,7 @@ when@dev:
                                     - https://grrind.app/problems/not-found
                                     - https://grrind.app/problems/forbidden
                                     - https://grrind.app/problems/method-not-allowed
+                                    - https://grrind.app/problems/too-many-requests
                                     - https://grrind.app/problems/unsupported-media-type
                                     - https://grrind.app/problems/validation-failed
                                     - https://grrind.app/problems/internal-error
@@ -179,6 +190,11 @@ when@dev:
                                     - https://grrind.app/problems/guild-is-full
                                     - https://grrind.app/problems/player-already-in-a-guild
                                     - https://grrind.app/problems/guild-not-found
+                                    # Un seul type pour « inconnu », « expiré » et « révoqué ».
+                                    # Les distinguer ferait de la route un oracle qui dit quels
+                                    # codes existent — le client affiche la même phrase dans les
+                                    # trois cas, et c'est la bonne phrase.
+                                    - https://grrind.app/problems/invite-code-not-usable
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }
@@ -260,6 +276,43 @@ when@dev:
                                     décider quoi dessiner — le bouton « dissoudre » n'existe que pour le
                                     fondateur — jamais à autoriser : le serveur reste seul juge, et
                                     l'action est de toute façon revérifiée.
+
+                    GuildInviteCode:
+                        type: object
+                        required: [code, expiresAt]
+                        description: |
+                            Le laissez-passer d'une guilde. Il **remplace l'annuaire au lieu de le
+                            compléter** : aucune recherche de joueur n'existe, et une recherche par adresse
+                            rendrait l'API capable de confirmer qu'une adresse a un compte. Le code se
+                            partage hors de l'app, et seul un joueur déjà inscrit et connecté peut le
+                            consommer.
+                        properties:
+                            code:
+                                type: string
+                                minLength: 8
+                                maxLength: 8
+                                example: K7QM3XPB
+                                description: |
+                                    Huit caractères sur un alphabet **amputé de ce qui se confond** : ni
+                                    `O` ni `0`, ni `I`, `L` ou `1`. Un code se lit au téléphone et se
+                                    recopie d'une capture d'écran.
+                            expiresAt:
+                                type: string
+                                format: date-time
+                                description: |
+                                    Une date et non une durée restante : l'écran affiche « valable jusqu'à
+                                    demain 18 h », et des secondes se périmeraient dans la réponse
+                                    elle-même.
+
+                    GuildJoin:
+                        type: object
+                        required: [code]
+                        description: |
+                            **Aucun identifiant de guilde** : c'est le code qui la désigne, sans quoi il
+                            suffirait d'un UUID pour entrer. Le serveur normalise la casse et les espaces,
+                            donc un code collé depuis un message passe tel quel.
+                        properties:
+                            code: { type: string, minLength: 8, maxLength: 8, example: K7QM3XPB }
 
                     UserProfile:
                         type: object

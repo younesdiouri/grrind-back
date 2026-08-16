@@ -1,0 +1,24 @@
+framework:
+    rate_limiter:
+        # ————— Rejoindre une guilde ————————————————————————————————————————————————————
+        #
+        # Un code d'invitation est court par nécessité : il se dicte à voix haute. Huit
+        # caractères sur trente et un font ≈ 8,5 × 10¹¹ combinaisons, ce qui est hors de
+        # portée d'un humain mais pas d'une boucle. Ce limiteur est ce qui transforme
+        # « improbable » en « impossible » : à dix essais par quart d'heure, essayer un
+        # millionième de l'espace demanderait plus de deux mille ans.
+        #
+        # La clé est **le joueur**, pas l'IP : l'IP change d'un réseau mobile à l'autre au
+        # milieu d'un trajet, et deux colocataires la partagent. Seul un compte authentifié
+        # peut consommer un code, donc l'identité est disponible et c'est la bonne unité.
+        #
+        # `sliding_window` et non `fixed_window` : une fenêtre fixe laisse passer vingt
+        # essais à cheval sur sa frontière, ce qui double le débit réel au moment précis où
+        # quelqu'un cherche à le saturer.
+        #
+        # Dix, parce qu'un joueur qui recopie un code à la main se trompe deux ou trois
+        # fois — les caractères ambigus sont déjà écartés de l'alphabet — et jamais dix.
+        guild_join:
+            policy: 'sliding_window'
+            limit: 10
+            interval: '15 minutes'

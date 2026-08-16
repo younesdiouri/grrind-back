@@ -44,7 +44,7 @@ final class GuildTest extends TestCase
         $guild = Guild::found('Les Lève-Tôt', Uuid::v7(), self::at(self::NOW));
         $newcomer = Uuid::v7();
 
-        $membership = $guild->admit($newcomer, new GuildRules(30), self::at('2026-08-16T11:00:00+00:00'));
+        $membership = $guild->admit($newcomer, new GuildRules(30, 48), self::at('2026-08-16T11:00:00+00:00'));
 
         self::assertSame(GuildRole::Member, $membership->role());
         self::assertFalse($membership->isFounder());
@@ -55,7 +55,7 @@ final class GuildTest extends TestCase
     public function testRefusesAMemberBeyondTheCapacity(): void
     {
         // Le fondateur occupe déjà une place : à trois de plafond, il reste deux entrées.
-        $rules = new GuildRules(3);
+        $rules = new GuildRules(3, 48);
         $guild = Guild::found('Les Lève-Tôt', Uuid::v7(), self::at(self::NOW));
 
         $guild->admit(Uuid::v7(), $rules, self::at(self::NOW));
@@ -70,22 +70,22 @@ final class GuildTest extends TestCase
     {
         $guild = Guild::found('Les Lève-Tôt', Uuid::v7(), self::at(self::NOW));
 
-        $guild->admit(Uuid::v7(), new GuildRules(2), self::at(self::NOW));
+        $guild->admit(Uuid::v7(), new GuildRules(2, 48), self::at(self::NOW));
 
         $this->expectException(GuildIsFull::class);
 
-        $guild->admit(Uuid::v7(), new GuildRules(2), self::at(self::NOW));
+        $guild->admit(Uuid::v7(), new GuildRules(2, 48), self::at(self::NOW));
     }
 
     public function testRefusesAPlayerWhoIsAlreadyIn(): void
     {
         $guild = Guild::found('Les Lève-Tôt', Uuid::v7(), self::at(self::NOW));
         $member = Uuid::v7();
-        $guild->admit($member, new GuildRules(30), self::at(self::NOW));
+        $guild->admit($member, new GuildRules(30, 48), self::at(self::NOW));
 
         $this->expectException(PlayerAlreadyInAGuild::class);
 
-        $guild->admit($member, new GuildRules(30), self::at(self::NOW));
+        $guild->admit($member, new GuildRules(30, 48), self::at(self::NOW));
     }
 
     public function testTheFounderCannotBeAdmittedAgain(): void
@@ -95,12 +95,12 @@ final class GuildTest extends TestCase
 
         $this->expectException(PlayerAlreadyInAGuild::class);
 
-        $guild->admit($founder, new GuildRules(30), self::at(self::NOW));
+        $guild->admit($founder, new GuildRules(30, 48), self::at(self::NOW));
     }
 
     public function testAFullGuildRefusesEvenBeforeLookingAtTheNewcomer(): void
     {
-        $rules = new GuildRules(2);
+        $rules = new GuildRules(2, 48);
         $guild = Guild::found('Les Lève-Tôt', Uuid::v7(), self::at(self::NOW));
         $guild->admit(Uuid::v7(), $rules, self::at(self::NOW));
 
@@ -122,8 +122,8 @@ final class GuildTest extends TestCase
         // des appels — un import ou une reprise peut les présenter autrement.
         $late = Uuid::v7();
         $early = Uuid::v7();
-        $guild->admit($late, new GuildRules(30), self::at('2026-08-18T10:00:00+00:00'));
-        $guild->admit($early, new GuildRules(30), self::at('2026-08-17T10:00:00+00:00'));
+        $guild->admit($late, new GuildRules(30, 48), self::at('2026-08-18T10:00:00+00:00'));
+        $guild->admit($early, new GuildRules(30, 48), self::at('2026-08-17T10:00:00+00:00'));
 
         $order = array_map(
             static fn ($membership): string => $membership->playerId()->toRfc4122(),
@@ -139,7 +139,7 @@ final class GuildTest extends TestCase
         // après quelqu'un qui est encore là.
         $guild = Guild::found('Les Lève-Tôt', Uuid::v7(), self::at('2026-08-20T10:00:00+00:00'));
         $older = Uuid::v7();
-        $guild->admit($older, new GuildRules(30), self::at('2026-08-10T10:00:00+00:00'));
+        $guild->admit($older, new GuildRules(30, 48), self::at('2026-08-10T10:00:00+00:00'));
 
         self::assertTrue($guild->members()[0]->isFounder());
     }

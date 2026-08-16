@@ -57,6 +57,7 @@ services:
     App\Community\Domain\GuildRules:
         arguments:
             $maximumMembers: '%game.community.maximum_members%'
+            $inviteCodeLifetimeHours: '%game.community.invite_code_lifetime_hours%'
 
     App\Progression\Domain\LevelCurve:
         arguments:
