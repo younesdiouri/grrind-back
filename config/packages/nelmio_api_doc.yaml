@@ -195,6 +195,12 @@ when@dev:
                                     # codes existent — le client affiche la même phrase dans les
                                     # trois cas, et c'est la bonne phrase.
                                     - https://grrind.app/problems/invite-code-not-usable
+                                    # Sortie de guilde. `player-is-not-a-member` est explicite là où
+                                    # `guild-not-found` est muet, et ce n'est pas une incohérence : le
+                                    # seul appelant est le fondateur en train d'exclure quelqu'un, et
+                                    # il a la liste de ses membres sous les yeux. Rien à lui cacher.
+                                    - https://grrind.app/problems/player-is-not-a-member
+                                    - https://grrind.app/problems/founder-cannot-exclude-himself
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }

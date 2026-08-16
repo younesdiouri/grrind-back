@@ -204,6 +204,59 @@ paths:
                 $ref: '#/components/schemas/MyGuild'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/guilds/mine/leave:
+    post:
+      tags:
+        - Guildes
+      operationId: post_community_guild_leave
+      responses:
+        '204':
+          description: "Le joueur est sorti. Trois issues invisibles pour lui, et toutes dans la même transaction :\nil s'en va simplement ; il était fondateur et la guilde passe **au membre le plus ancien** ;\nil était le dernier et la guilde est dissoute, code d'invitation compris."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "Le joueur n'a pas de guilde à quitter (`guild-not-found`)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  '/api/guilds/{id}/members/{playerId}':
+    delete:
+      tags:
+        - Guildes
+      operationId: delete_community_guild_exclude
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: playerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: "Le membre est sorti. **Il peut revenir avec un code valide** : il n'y a pas de liste\nnoire en v1, et le recours du fondateur est de révoquer le code — ce qui referme la\nguilde pour tout le monde."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "La guilde est invisible à l'appelant (`guild-not-found`), ou le joueur visé n'en est pas membre (`player-is-not-a-member`)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: "Le fondateur a tenté de s'exclure lui-même (`founder-cannot-exclude-himself`). Il doit passer par `POST /api/guilds/mine/leave`, qui sait gérer la succession."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   /api/auth/login:
     post:
       tags:
@@ -627,6 +680,8 @@ components:
             - 'https://grrind.app/problems/player-already-in-a-guild'
             - 'https://grrind.app/problems/guild-not-found'
             - 'https://grrind.app/problems/invite-code-not-usable'
+            - 'https://grrind.app/problems/player-is-not-a-member'
+            - 'https://grrind.app/problems/founder-cannot-exclude-himself'
         title:
           type: string
           example: Conflict
