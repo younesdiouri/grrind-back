@@ -43,6 +43,56 @@ class UnlockedTitleRepository extends ServiceEntityRepository
         return $unlocked;
     }
 
+    /**
+     * Les dates de déblocage de plusieurs joueurs pour un petit jeu de titres, **en une
+     * requête**, indexées par « UUID\0identifiant ».
+     *
+     * Les deux listes sont croisées en SQL puis appariées en PHP : DQL ne sait pas
+     * paramétrer un `IN` sur des tuples, et le sur-ensemble ramené est minuscule — l'appelant
+     * ne demande que les titres réellement portés, soit une poignée de valeurs distinctes
+     * quelle que soit la taille de la guilde. Filtrer sur les seuls joueurs ramènerait tout
+     * leur mur des titres pour n'en garder qu'une ligne chacun.
+     *
+     * @param list<Uuid>   $userIds
+     * @param list<string> $titleIds
+     *
+     * @return array<string, DateTimeImmutable>
+     */
+    public function unlockedAtOf(array $userIds, array $titleIds): array
+    {
+        if ([] === $userIds || [] === $titleIds) {
+            return [];
+        }
+
+        /** @var list<array{userId: Uuid, titleId: string, unlockedAt: DateTimeImmutable}> $rows */
+        $rows = $this->createQueryBuilder('t')
+            ->select('t.userId', 't.titleId', 't.unlockedAt')
+            ->where('t.userId IN (:userIds)')
+            ->andWhere('t.titleId IN (:titleIds)')
+            ->setParameter('userIds', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $userIds))
+            ->setParameter('titleIds', $titleIds)
+            ->getQuery()
+            ->getResult();
+
+        $unlocked = [];
+
+        foreach ($rows as $row) {
+            $unlocked[self::pairKey($row['userId'], $row['titleId'])] = $row['unlockedAt'];
+        }
+
+        return $unlocked;
+    }
+
+    /**
+     * La clé du couple, écrite ici pour que le dépôt et son appelant ne puissent pas en
+     * avoir deux versions. Séparateur nul : il ne peut apparaître ni dans un UUID ni dans
+     * un identifiant de titre, alors qu'un tiret, si.
+     */
+    public static function pairKey(Uuid $userId, string $titleId): string
+    {
+        return $userId->toRfc4122()."\0".$titleId;
+    }
+
     public function record(Uuid $userId, Title $title, DateTimeImmutable $now): void
     {
         $this->getEntityManager()->persist(new UnlockedTitle($userId, $title, $now));

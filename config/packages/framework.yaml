@@ -9,3 +9,13 @@ framework:
 when@test:
     framework:
         test: true
+
+        # `collect: false` : le profiler est branché mais ne collecte rien tant qu'un test
+        # ne le demande pas par `enableProfiler()`. Il ne sert qu'à une chose ici —
+        # **compter les requêtes SQL d'une réponse** — et c'est ce qui protège les ports
+        # batch du #117 : une guilde de dix membres doit coûter le même nombre de requêtes
+        # qu'une de deux, et rien d'autre qu'un compteur ne peut le prouver. Sans ce
+        # garde-fou, la première refonte qui transformerait une lecture en boucle passerait
+        # la revue sans un mot, et le N+1 n'apparaîtrait qu'en production.
+        profiler:
+            collect: false

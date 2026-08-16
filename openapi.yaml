@@ -33,6 +33,28 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
   '/api/guilds/{id}':
+    get:
+      tags:
+        - Guildes
+      operationId: get_community_guild_show
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "La même charge utile que `/api/guilds/mine`, sans l'enveloppe : ici la guilde existe forcément, puisqu'un non-membre reçoit 404."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
     delete:
       tags:
         - Guildes
@@ -168,6 +190,20 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /api/guilds/mine:
+    get:
+      tags:
+        - Guildes
+      operationId: get_community_guild_mine
+      responses:
+        '200':
+          description: "La guilde du joueur et ses membres, ou `{\"guild\": null}` s'il n'en a pas. **Pas d'erreur dans ce second cas** : ouvrir l'onglet quand on n'a pas de guilde est une situation normale, pas une panne, et c'est l'écran qui invite à en fonder une."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyGuild'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/auth/login:
     post:
       tags:
@@ -737,6 +773,88 @@ components:
           example: K7QM3XPB
           maxLength: 8
           minLength: 8
+      type: object
+    Player:
+      description: "Un joueur **tel que les autres joueurs le voient** — la seule forme sous\nlaquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par\n`GET /api/players/{id}`, et étalée dans chaque membre d'une guilde.\n\n**Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni\nrôle applicatif. Ce sont des données de compte, pas de profil public — et les\nports qui alimentent cette ressource ne les rendent tout simplement pas.\n"
+      required:
+        - id
+        - displayName
+        - registeredAt
+        - level
+        - xpIntoLevel
+        - xpToNextLevel
+        - title
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          description: "**Non unique, et il ne le deviendra pas ici.** Deux membres homonymes\nsont un cas normal ; c'est l'`id` qui distingue.\n"
+          type: string
+        registeredAt:
+          type: string
+          format: date-time
+        level:
+          type: integer
+          example: 12
+        xpIntoLevel:
+          type: integer
+          example: 340
+        xpToNextLevel:
+          description: "`null` au niveau maximum : il n'y a plus de suivant, et zéro voudrait dire « atteint »."
+          type: integer
+          nullable: true
+        title:
+          description: "Le titre **porté**, `null` si le joueur n'en affiche aucun. Le\n*prochain* titre visé n'y est pas : il n'a de sens que sur son propre\nprofil, et personne n'a à savoir ce qu'un co-équipier est en train de\nviser. C'est `GET /api/me` qui le sert.\n"
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/PlayerTitle'
+      type: object
+    GuildMember:
+      description: "Un membre : le joueur public, plus ce que la guilde sait de lui. Les champs de\n`Player` sont **étalés** et non imbriqués — le client dessine une ligne, pas\ndeux objets, et `GET /api/players/{id}` sert exactement le même bloc.\n"
+      allOf:
+        -
+          $ref: '#/components/schemas/Player'
+        -
+          required:
+            - role
+            - joinedAt
+          properties:
+            role:
+              type: string
+              enum:
+                - FOUNDER
+                - MEMBER
+            joinedAt:
+              type: string
+              format: date-time
+          type: object
+    GuildDetail:
+      description: "La guilde et ses membres d'un bloc — **c'est l'écran**. L'onglet ne s'ouvre\njamais sans les deux, et les séparer coûterait un aller-retour pour un écran\nqui n'a rien à afficher entre-temps.\n"
+      allOf:
+        -
+          $ref: '#/components/schemas/Guild'
+        -
+          required:
+            - members
+          properties:
+            members:
+              description: "**Le fondateur d'abord, puis par date d'entrée croissante.** Un\nordre décidé par le serveur, jamais celui que rend la base : sans\n`ORDER BY`, PostgreSQL sert les lignes comme il veut et change\nd'avis quand la table grossit. Une liste qui se réordonne toute\nseule entre deux ouvertures d'écran est un bug qu'on ne sait pas\nreproduire.\n"
+              type: array
+              items:
+                $ref: '#/components/schemas/GuildMember'
+          type: object
+    MyGuild:
+      description: "L'enveloppe de `GET /api/guilds/mine`. Elle existe parce que « pas de guilde »\ndoit être une réponse et non une erreur : c'est la requête d'ouverture de\nl'onglet, et un joueur sans guilde est dans un état normal — l'écran l'invite à\nen fonder une.\n"
+      required:
+        - guild
+      properties:
+        guild:
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/GuildDetail'
       type: object
     UserProfile:
       required:

@@ -81,10 +81,19 @@ L'événement quand le destinataire peut attendre et n'a rien à répondre. Le p
 réponse est nécessaire tout de suite — le fuseau du joueur ne peut pas arriver en différé,
 sinon un changement de fuseau suivi d'une séance compterait sur l'ancien.
 
-Un port se justifie **un par un** dans son docblock. Il y en a cinq en tout, et c'est
+Un port se justifie **un par un** dans son docblock. Il y en a sept en tout, et c'est
 volontaire : `PlayerTimezones`, `PlayerTitles`, `SessionRewards` (par lequel `Training`
 crédite l'XP sans connaître `Progression` — appelé **une fois par workout** d'un lot),
-`SocialProfileResolver` (aucun test ne peut appeler Google), et `ModifierContributor`.
+`SocialProfileResolver` (aucun test ne peut appeler Google), `ModifierContributor`, et les
+deux derniers venus, `PlayerProfiles` et `PlayerProgressions`.
+
+Ces deux-là sont **batch par construction** — leur signature prend une liste d'identifiants,
+pas un identifiant — et c'est la seule chose qui les distingue vraiment des autres. La liste
+des membres d'une guilde demande N joueurs d'un coup ; un port qui en rendrait un à la fois
+deviendrait un N+1 au premier écran, et le problème n'apparaîtrait qu'en production sur les
+grosses guildes. En prenant une liste, la signature elle-même interdit d'écrire la boucle.
+Un test compte les requêtes d'une guilde de deux membres puis d'une de douze et exige le
+même nombre : c'est ce qui empêche la dérive de repasser en revue sans un mot.
 
 Ce dernier est le seul **en éventail** — plusieurs implémentations, un seul consommateur :
 
