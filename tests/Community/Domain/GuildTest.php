@@ -6,6 +6,7 @@ namespace App\Tests\Community\Domain;
 
 use App\Community\Domain\Exception\GuildIsFull;
 use App\Community\Domain\Exception\PlayerAlreadyInAGuild;
+use App\Community\Domain\Exception\PlayerIsNotAMember;
 use App\Community\Domain\Guild;
 use App\Community\Domain\GuildRole;
 use App\Community\Domain\GuildRules;
@@ -142,6 +143,88 @@ final class GuildTest extends TestCase
         $guild->admit($older, new GuildRules(30, 48), self::at('2026-08-10T10:00:00+00:00'));
 
         self::assertTrue($guild->members()[0]->isFounder());
+    }
+
+    public function testAPlainMemberLeavesWithoutTouchingTheRest(): void
+    {
+        $founder = Uuid::v7();
+        $guild = Guild::found('Les Lève-Tôt', $founder, self::at(self::NOW));
+        $member = Uuid::v7();
+        $guild->admit($member, new GuildRules(30, 48), self::at(self::NOW));
+
+        self::assertFalse($guild->part($member), 'Il reste le fondateur : rien à dissoudre.');
+        self::assertFalse($guild->hasMember($member));
+        self::assertTrue($guild->isFoundedBy($founder));
+        self::assertSame(1, $guild->size());
+    }
+
+    /**
+     * La règle du #118 : une seule, et aucune désignation manuelle. C'est ce qui rend le
+     * départ du fondateur possible sans qu'il emporte la guilde avec lui.
+     */
+    public function testTheFounderHandsOverToTheOldestMember(): void
+    {
+        $guild = Guild::found('Les Lève-Tôt', $founder = Uuid::v7(), self::at('2026-08-16T10:00:00+00:00'));
+
+        $late = Uuid::v7();
+        $early = Uuid::v7();
+        $guild->admit($late, new GuildRules(30, 48), self::at('2026-08-18T10:00:00+00:00'));
+        $guild->admit($early, new GuildRules(30, 48), self::at('2026-08-17T10:00:00+00:00'));
+
+        self::assertFalse($guild->part($founder));
+
+        self::assertTrue($guild->isFoundedBy($early), 'Le doyen des restants hérite, quel que soit l\'ordre des arrivées.');
+        self::assertFalse($guild->isFoundedBy($late));
+        self::assertSame(2, $guild->size());
+    }
+
+    /**
+     * L'ordre est ce qui fait la différence : promouvoir avant de retirer ferait du
+     * partant le doyen à succéder à lui-même.
+     */
+    public function testTheDepartingFounderIsNeverHisOwnSuccessor(): void
+    {
+        // Le fondateur est le plus ancien de tous — le cas nominal, puisqu'il a fondé.
+        $guild = Guild::found('Les Lève-Tôt', $founder = Uuid::v7(), self::at('2026-08-01T10:00:00+00:00'));
+        $member = Uuid::v7();
+        $guild->admit($member, new GuildRules(30, 48), self::at('2026-08-10T10:00:00+00:00'));
+
+        $guild->part($founder);
+
+        self::assertFalse($guild->hasMember($founder));
+        self::assertTrue($guild->isFoundedBy($member));
+    }
+
+    public function testTheLastMemberLeavingEmptiesTheGuild(): void
+    {
+        $founder = Uuid::v7();
+        $guild = Guild::found('Les Lève-Tôt', $founder, self::at(self::NOW));
+
+        self::assertTrue($guild->part($founder), 'Une guilde vide n\'a personne pour la dissoudre : c\'est au partant de le dire.');
+        self::assertSame(0, $guild->size());
+    }
+
+    public function testAStrangerCannotBePushedOut(): void
+    {
+        $guild = Guild::found('Les Lève-Tôt', Uuid::v7(), self::at(self::NOW));
+
+        $this->expectException(PlayerIsNotAMember::class);
+
+        $guild->part(Uuid::v7());
+    }
+
+    /** Une place libérée est une place reprise : le plafond compte les présents. */
+    public function testLeavingReopensASeat(): void
+    {
+        $rules = new GuildRules(2, 48);
+        $guild = Guild::found('Les Lève-Tôt', Uuid::v7(), self::at(self::NOW));
+        $member = Uuid::v7();
+        $guild->admit($member, $rules, self::at(self::NOW));
+
+        $guild->part($member);
+        $guild->admit(Uuid::v7(), $rules, self::at(self::NOW));
+
+        self::assertSame(2, $guild->size());
     }
 
     public function testRenamingTrimsWithoutTouchingTheMembers(): void

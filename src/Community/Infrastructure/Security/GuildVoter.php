@@ -26,8 +26,6 @@ use Symfony\Component\Uid\Uuid;
  * (voir `App\Identity\Domain\User::getUserIdentifier()`). Le voter reçoit ce dont il a
  * besoin — un UUID — sans rien apprendre du compte.
  *
- * `GUILD_KICK` n'est pas ici : l'exclusion arrive avec le #118, avec ses règles à elle.
- *
  * @see https://symfony.com/doc/current/security/voters.html
  *
  * @extends Voter<string, Guild>
@@ -44,6 +42,16 @@ final class GuildVoter extends Voter
     public const string DISSOLVE = 'GUILD_DISSOLVE';
 
     /**
+     * Exclure un membre. Fondateur seul.
+     *
+     * Un attribut distinct de `GUILD_EDIT` alors que les deux répondent « fondateur » : la
+     * question posée n'est pas la même, et le jour où un rôle intermédiaire apparaîtra,
+     * c'est celui-là qui bougera sans toucher au renommage. Les fusionner coûterait ce
+     * jour-là exactement le travail qu'on économise aujourd'hui.
+     */
+    public const string KICK = 'GUILD_KICK';
+
+    /**
      * Déclaré pour que le voter soit **cachable** : sans lui, Symfony l'interroge pour
      * chaque attribut de chaque décision de toute l'API, y compris `IS_AUTHENTICATED_FULLY`
      * sur des routes qui n'ont jamais vu une guilde.
@@ -52,7 +60,7 @@ final class GuildVoter extends Voter
      */
     public function supportsAttribute(string $attribute): bool
     {
-        return \in_array($attribute, [self::VIEW, self::EDIT, self::DISSOLVE], true);
+        return \in_array($attribute, [self::VIEW, self::EDIT, self::DISSOLVE, self::KICK], true);
     }
 
     /** `is_a()` et non une comparaison stricte : Doctrine sert des proxies, pas des `Guild`. */
@@ -80,7 +88,7 @@ final class GuildVoter extends Voter
 
         return match ($attribute) {
             self::VIEW => self::seenBy($subject, $playerId, $vote),
-            self::EDIT, self::DISSOLVE => self::ledBy($subject, $playerId, $vote),
+            self::EDIT, self::DISSOLVE, self::KICK => self::ledBy($subject, $playerId, $vote),
             default => false,
         };
     }

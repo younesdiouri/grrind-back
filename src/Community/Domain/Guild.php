@@ -6,6 +6,7 @@ namespace App\Community\Domain;
 
 use App\Community\Domain\Exception\GuildIsFull;
 use App\Community\Domain\Exception\PlayerAlreadyInAGuild;
+use App\Community\Domain\Exception\PlayerIsNotAMember;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
 use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -150,6 +151,68 @@ class Guild
         $this->memberships->add($membership);
 
         return $membership;
+    }
+
+    /**
+     * Fait sortir un joueur, et **rend `true` quand il ne reste personne** — auquel cas
+     * l'appelant dissout la guilde dans la même transaction.
+     *
+     * Les deux règles de la sortie sont ici parce qu'elles se lisent sur l'ensemble des
+     * adhésions et sur rien d'autre :
+     *
+     *  - **le fondateur qui part transmet au membre le plus ancien.** Une seule règle,
+     *    aucune désignation manuelle : rien à écrire côté client, rien à tester en plus, et
+     *    surtout aucun état « guilde sans fondateur » qui puisse exister ne serait-ce qu'un
+     *    instant. La succession n'est pas une fonctionnalité, c'est ce qui rend le départ
+     *    possible — sans elle, la seule sortie honnête du fondateur serait de dissoudre sur
+     *    le dos des autres ;
+     *  - **le dernier à partir éteint la lumière.** Une guilde vide n'a personne pour la
+     *    dissoudre ni pour y faire entrer quelqu'un : la laisser vivre créerait une ligne
+     *    que rien ne peut plus atteindre.
+     *
+     * L'ordre compte : on retire d'abord, on regarde ensuite. Promouvoir avant de retirer
+     * ferait du partant le doyen à succéder à lui-même.
+     *
+     * @throws PlayerIsNotAMember
+     */
+    public function part(Uuid $playerId): bool
+    {
+        $leaving = $this->membershipOf($playerId);
+
+        if (null === $leaving) {
+            throw new PlayerIsNotAMember();
+        }
+
+        $wasFounder = $leaving->isFounder();
+
+        $this->memberships->removeElement($leaving);
+
+        if ($this->memberships->isEmpty()) {
+            return true;
+        }
+
+        if ($wasFounder) {
+            $this->oldestMember()->promoteToFounder();
+        }
+
+        return false;
+    }
+
+    /**
+     * Le doyen des membres restants. Départagé par l'identifiant pour la même raison que
+     * l'ordre d'affichage : deux joueurs peuvent être entrés dans la même seconde, et une
+     * succession qui dépendrait de l'ordre rendu par la base ne serait pas reproductible.
+     */
+    public function oldestMember(): GuildMembership
+    {
+        $members = $this->memberships->toArray();
+
+        usort($members, static fn (GuildMembership $left, GuildMembership $right): int => [$left->joinedAt(), $left->id()->toRfc4122()] <=> [$right->joinedAt(), $right->id()->toRfc4122()]);
+
+        $oldest = reset($members);
+        \assert($oldest instanceof GuildMembership, 'Appelé sur une guilde vide : le seul appelant vérifie d\'abord qu\'il reste quelqu\'un.');
+
+        return $oldest;
     }
 
     public function membershipOf(Uuid $playerId): ?GuildMembership
