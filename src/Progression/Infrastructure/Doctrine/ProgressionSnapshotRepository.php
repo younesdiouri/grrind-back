@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Infrastructure\Doctrine;
 
 use App\Progression\Domain\LevelCurve;
+use App\Progression\Domain\LevelStanding;
 use App\Progression\Domain\ProgressionSnapshot;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
@@ -27,6 +28,54 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
     public function ofPlayer(Uuid $userId): ?ProgressionSnapshot
     {
         return $this->find($userId);
+    }
+
+    /**
+     * Les paliers de plusieurs joueurs, **en une requête**, indexés par UUID en RFC 4122.
+     *
+     * Les colonnes sont reprises telles quelles et non reprojetées depuis le total, pour la
+     * même raison qu'à {@see \App\Progression\Application\ProgressionStateProvider} :
+     * reprojeter masquerait la divergence que la commande de reconstruction (#20) existe
+     * pour détecter.
+     *
+     * Un joueur sans ligne est **absent** de la table de retour : il n'a rien fait, et
+     * lire son état n'a pas à lui en créer une. C'est l'appelant qui décide de l'état
+     * neutre — voir {@see \App\Shared\Application\PlayerProgression::untouched()}.
+     *
+     * Une projection scalaire et non les entités : trente snapshots hydratés dans l'unité
+     * de travail pour afficher trente barres, c'est trente objets à suivre jusqu'au
+     * `flush` d'une requête qui n'écrit rien.
+     *
+     * @param list<Uuid> $userIds
+     *
+     * @return array<string, LevelStanding>
+     */
+    public function standingsOf(array $userIds): array
+    {
+        if ([] === $userIds) {
+            return [];
+        }
+
+        /** @var list<array{userId: Uuid, level: int, xpIntoLevel: int, xpToNextLevel: int|null, earnedSkillPoints: int}> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->select('s.userId', 's.level', 's.xpIntoLevel', 's.xpToNextLevel', 's.earnedSkillPoints')
+            ->where('s.userId IN (:ids)')
+            ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $userIds))
+            ->getQuery()
+            ->getResult();
+
+        $standings = [];
+
+        foreach ($rows as $row) {
+            $standings[$row['userId']->toRfc4122()] = new LevelStanding(
+                $row['level'],
+                $row['xpIntoLevel'],
+                $row['xpToNextLevel'],
+                $row['earnedSkillPoints'],
+            );
+        }
+
+        return $standings;
     }
 
     /**

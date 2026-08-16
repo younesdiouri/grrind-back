@@ -48,6 +48,37 @@ class ActiveTitleRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les titres affichés de plusieurs joueurs, **en une requête**, indexés par UUID en
+     * RFC 4122. Un joueur qui n'en porte aucun est absent de la table.
+     *
+     * @param list<Uuid> $userIds
+     *
+     * @return array<string, string>
+     */
+    public function titleIdsOf(array $userIds): array
+    {
+        if ([] === $userIds) {
+            return [];
+        }
+
+        /** @var list<array{userId: Uuid, titleId: string}> $rows */
+        $rows = $this->createQueryBuilder('a')
+            ->select('a.userId', 'a.titleId')
+            ->where('a.userId IN (:ids)')
+            ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $userIds))
+            ->getQuery()
+            ->getResult();
+
+        $titleIds = [];
+
+        foreach ($rows as $row) {
+            $titleIds[$row['userId']->toRfc4122()] = $row['titleId'];
+        }
+
+        return $titleIds;
+    }
+
+    /**
      * Pose le titre affiché, en remplaçant celui d'avant.
      *
      * `INSERT … ON CONFLICT DO UPDATE` plutôt qu'un `SELECT` suivi d'un `INSERT` ou d'un

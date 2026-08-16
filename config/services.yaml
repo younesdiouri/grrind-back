@@ -83,6 +83,13 @@ services:
     # affiche dans le profil sans jamais connaître ni le catalogue ni la table.
     App\Shared\Application\PlayerTitles: '@App\Progression\Infrastructure\Translation\TranslatedPlayerTitles'
 
+    # Les deux ports **batch** du #117 : la liste des membres d'une guilde demande N joueurs
+    # d'un coup, et un port qui en rendrait un à la fois deviendrait un N+1 au premier écran.
+    # `Community` les consomme, `Identity` et `Progression` les implémentent, et aucune
+    # flèche ne va de l'un à l'autre.
+    App\Shared\Application\PlayerProfiles: '@App\Identity\Infrastructure\Doctrine\AccountPlayerProfiles'
+    App\Shared\Application\PlayerProgressions: '@App\Progression\Infrastructure\Translation\TranslatedPlayerProgressions'
+
     # Le troisième et dernier port : `Training` clôt la séance, `Progression` la crédite, et
     # aucun des deux ne nomme l'autre. C'est ce câblage-là qui fait la transaction de
     # complétion — sans lui, une séance se fermerait sans rapporter un point.

@@ -314,6 +314,89 @@ when@dev:
                         properties:
                             code: { type: string, minLength: 8, maxLength: 8, example: K7QM3XPB }
 
+                    Player:
+                        type: object
+                        required: [id, displayName, registeredAt, level, xpIntoLevel, xpToNextLevel, title]
+                        description: |
+                            Un joueur **tel que les autres joueurs le voient** — la seule forme sous
+                            laquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par
+                            `GET /api/players/{id}`, et étalée dans chaque membre d'une guilde.
+
+                            **Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni
+                            rôle applicatif. Ce sont des données de compte, pas de profil public — et les
+                            ports qui alimentent cette ressource ne les rendent tout simplement pas.
+                        properties:
+                            id: { type: string, format: uuid }
+                            displayName:
+                                type: string
+                                description: |
+                                    **Non unique, et il ne le deviendra pas ici.** Deux membres homonymes
+                                    sont un cas normal ; c'est l'`id` qui distingue.
+                            registeredAt: { type: string, format: date-time }
+                            level: { type: integer, example: 12 }
+                            xpIntoLevel: { type: integer, example: 340 }
+                            xpToNextLevel:
+                                type: integer
+                                nullable: true
+                                description: "`null` au niveau maximum : il n'y a plus de suivant, et zéro voudrait dire « atteint »."
+                            title:
+                                nullable: true
+                                allOf:
+                                    - $ref: '#/components/schemas/PlayerTitle'
+                                description: |
+                                    Le titre **porté**, `null` si le joueur n'en affiche aucun. Le
+                                    *prochain* titre visé n'y est pas : il n'a de sens que sur son propre
+                                    profil, et personne n'a à savoir ce qu'un co-équipier est en train de
+                                    viser. C'est `GET /api/me` qui le sert.
+
+                    GuildMember:
+                        description: |
+                            Un membre : le joueur public, plus ce que la guilde sait de lui. Les champs de
+                            `Player` sont **étalés** et non imbriqués — le client dessine une ligne, pas
+                            deux objets, et `GET /api/players/{id}` sert exactement le même bloc.
+                        allOf:
+                            - $ref: '#/components/schemas/Player'
+                            - type: object
+                              required: [role, joinedAt]
+                              properties:
+                                  role: { type: string, enum: [FOUNDER, MEMBER] }
+                                  joinedAt: { type: string, format: date-time }
+
+                    GuildDetail:
+                        description: |
+                            La guilde et ses membres d'un bloc — **c'est l'écran**. L'onglet ne s'ouvre
+                            jamais sans les deux, et les séparer coûterait un aller-retour pour un écran
+                            qui n'a rien à afficher entre-temps.
+                        allOf:
+                            - $ref: '#/components/schemas/Guild'
+                            - type: object
+                              required: [members]
+                              properties:
+                                  members:
+                                      type: array
+                                      description: |
+                                          **Le fondateur d'abord, puis par date d'entrée croissante.** Un
+                                          ordre décidé par le serveur, jamais celui que rend la base : sans
+                                          `ORDER BY`, PostgreSQL sert les lignes comme il veut et change
+                                          d'avis quand la table grossit. Une liste qui se réordonne toute
+                                          seule entre deux ouvertures d'écran est un bug qu'on ne sait pas
+                                          reproduire.
+                                      items: { $ref: '#/components/schemas/GuildMember' }
+
+                    MyGuild:
+                        type: object
+                        required: [guild]
+                        description: |
+                            L'enveloppe de `GET /api/guilds/mine`. Elle existe parce que « pas de guilde »
+                            doit être une réponse et non une erreur : c'est la requête d'ouverture de
+                            l'onglet, et un joueur sans guilde est dans un état normal — l'écran l'invite à
+                            en fonder une.
+                        properties:
+                            guild:
+                                nullable: true
+                                allOf:
+                                    - $ref: '#/components/schemas/GuildDetail'
+
                     UserProfile:
                         type: object
                         required: [id, email, displayName, timezone, registeredAt, title, nextTitle]
