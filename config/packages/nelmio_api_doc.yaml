@@ -201,6 +201,12 @@ when@dev:
                                     # il a la liste de ses membres sous les yeux. Rien à lui cacher.
                                     - https://grrind.app/problems/player-is-not-a-member
                                     - https://grrind.app/problems/founder-cannot-exclude-himself
+                                    # Joueur inconnu et joueur qui n'est pas un co-équipier : une
+                                    # seule erreur, et jamais de 403. Un 403 confirmerait qu'un
+                                    # compte porte cet UUID, et les UUID v7 encodent leur instant
+                                    # de création — l'API deviendrait un moyen d'énumérer les
+                                    # comptes ouverts un jour donné.
+                                    - https://grrind.app/problems/player-not-found
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }

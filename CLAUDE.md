@@ -286,7 +286,18 @@ l'énumération de comptes et rehash opportuniste viennent du composant, pas de 
 L'identifiant de sécurité reste l'UUID et non l'e-mail : changer d'adresse n'invalide aucun jeton.
 C'est `UserLoaderInterface` sur le dépôt qui sert les deux firewalls — l'UUID du claim `sub` pour
 `^/api`, l'adresse normalisée pour le login. Les contrôleurs authentifiés reçoivent le `User` par
-`#[CurrentUser]` : **aucune route ne prend d'identifiant de compte en paramètre.**
+`#[CurrentUser]` : **aucune route ne prend d'identifiant de compte pour servir les données du
+joueur courant.**
+
+Cette phrase disait « aucune route ne prend d'identifiant de compte », point. Elle a bien protégé
+le produit tant qu'il était solo, et elle a été **réécrite** au ticket 119 plutôt que contournée :
+voir le profil d'un co-équipier, c'est lire les données d'un autre compte, et aucune reformulation
+n'y échappe. Ce qui n'a pas bougé est l'essentiel — `/api/me`, `/api/progression` et
+`/api/workouts` n'acceptent toujours aucun identifiant, et c'est là qu'était le risque de
+détournement. Une route qui sert les données de **quelqu'un d'autre** en prend un, et elle est
+gardée par un voter : `GET /api/players/{id}`, autorisée pour soi-même ou un membre de la même
+guilde, **404 et jamais 403** — un 403 confirmerait qu'un compte porte cet UUID, et les UUID v7
+se devinent par plage temporelle.
 
 **Social sign-in.** `POST /api/auth/social/{google|apple}`. Le client natif mène l'écran
 d'autorisation et envoie le code ; le serveur seul l'échange. La clé de liaison est le couple

@@ -524,8 +524,18 @@ Ce qui compte, et qui n'est pas visible dans le code parce que c'est le framewor
 
 - **L'identifiant de sécurité est l'UUID, pas l'adresse.** Changer d'e-mail n'invalide aucun
   jeton, et l'adresse ne voyage pas dans le claim `sub`.
-- **Aucune route ne prend d'identifiant de compte en paramètre.** Le `User` vient du jeton, via
-  `#[CurrentUser]`. Une route ne peut donc pas être détournée pour lire le profil d'un autre.
+- **Aucune route ne prend d'identifiant de compte pour servir les données du joueur courant.**
+  Le `User` vient du jeton, via `#[CurrentUser]` : `/api/me`, `/api/progression` et
+  `/api/workouts` ne peuvent pas être détournés pour lire ce qui appartient à un autre.
+
+  La formulation d'origine s'arrêtait à « aucune route ne prend d'identifiant de compte », et
+  elle a été **réécrite** au ticket 119 — pas contournée. Voir le profil d'un co-équipier, c'est
+  lire les données d'un autre compte. `GET /api/players/{id}` en prend donc un, et l'autorisation
+  est portée par un voter (`PLAYER_VIEW` : soi-même, ou un membre de la même guilde) plutôt que
+  par la bonne volonté du contrôleur. Le refus est **404 et jamais 403** : un 403 confirmerait
+  qu'un compte porte cet UUID, et les UUID v7 encodent leur instant de création — l'API
+  deviendrait un moyen d'énumérer les comptes ouverts un jour donné. La réponse ne contient
+  ni adresse, ni fuseau, ni rôle : ce sont des données de compte, pas de profil public.
 - **Le social sign-in relie par le couple (fournisseur, `sub`), jamais par l'adresse.**
   Rattacher un compte préexistant exige que le fournisseur **certifie** l'adresse — sinon il
   suffirait de créer chez Google un compte portant l'adresse de la victime.
