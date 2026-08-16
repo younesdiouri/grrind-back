@@ -85,6 +85,89 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  '/api/guilds/{id}/invite-code':
+    post:
+      tags:
+        - Guildes
+      operationId: post_community_invite_code_issue
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: "Le nouveau code. **Il révoque le précédent** : une guilde n'a jamais deux codes vivants, et régénérer est le geste par lequel on coupe un code qui a trop circulé."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildInviteCode'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Guildes
+      operationId: delete_community_invite_code_revoke
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: "Plus aucun code ne mène à cette guilde. Révoquer alors qu'il n'y avait rien à révoquer rend le même 204 : l'état visé est atteint."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/guilds/join:
+    post:
+      tags:
+        - Guildes
+      summary: "Le limiteur est **configuré, pas écrit** : la politique et les seuils vivent dans\n`config/packages/rate_limiter.yaml`, et l'attribut ne fait que désigner la clé."
+      description: "Cette clé est le joueur et non l'IP — une IP mobile change en cours de trajet et se\npartage entre colocataires, alors que seul un compte authentifié peut consommer un\ncode. `args[\"user\"]` est l'argument du contrôleur, disponible parce que l'attribut\nest traité sur `kernel.controller_arguments`, après résolution."
+      operationId: post_community_guild_join
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuildJoin'
+      responses:
+        '200':
+          description: "Le joueur est entré. La guilde est rendue en entier, pour que l'écran s'affiche sans second appel."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guild'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 'Le code ne mène à rien : **inconnu, expiré ou révoqué, indistinctement** (`invite-code-not-usable`). Les distinguer dirait quels codes existent.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: 'Le joueur appartient déjà à une guilde (`player-already-in-a-guild`), ou celle-ci est complète (`guild-is-full`, qui porte sa `capacity`).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/auth/login:
     post:
       tags:
@@ -486,6 +569,7 @@ components:
             - 'https://grrind.app/problems/not-found'
             - 'https://grrind.app/problems/forbidden'
             - 'https://grrind.app/problems/method-not-allowed'
+            - 'https://grrind.app/problems/too-many-requests'
             - 'https://grrind.app/problems/unsupported-media-type'
             - 'https://grrind.app/problems/validation-failed'
             - 'https://grrind.app/problems/internal-error'
@@ -506,6 +590,7 @@ components:
             - 'https://grrind.app/problems/guild-is-full'
             - 'https://grrind.app/problems/player-already-in-a-guild'
             - 'https://grrind.app/problems/guild-not-found'
+            - 'https://grrind.app/problems/invite-code-not-usable'
         title:
           type: string
           example: Conflict
@@ -624,6 +709,34 @@ components:
           enum:
             - FOUNDER
             - MEMBER
+      type: object
+    GuildInviteCode:
+      description: "Le laissez-passer d'une guilde. Il **remplace l'annuaire au lieu de le\ncompléter** : aucune recherche de joueur n'existe, et une recherche par adresse\nrendrait l'API capable de confirmer qu'une adresse a un compte. Le code se\npartage hors de l'app, et seul un joueur déjà inscrit et connecté peut le\nconsommer.\n"
+      required:
+        - code
+        - expiresAt
+      properties:
+        code:
+          description: "Huit caractères sur un alphabet **amputé de ce qui se confond** : ni\n`O` ni `0`, ni `I`, `L` ou `1`. Un code se lit au téléphone et se\nrecopie d'une capture d'écran.\n"
+          type: string
+          example: K7QM3XPB
+          maxLength: 8
+          minLength: 8
+        expiresAt:
+          description: "Une date et non une durée restante : l'écran affiche « valable jusqu'à\ndemain 18 h », et des secondes se périmeraient dans la réponse\nelle-même.\n"
+          type: string
+          format: date-time
+      type: object
+    GuildJoin:
+      description: "**Aucun identifiant de guilde** : c'est le code qui la désigne, sans quoi il\nsuffirait d'un UUID pour entrer. Le serveur normalise la casse et les espaces,\ndonc un code collé depuis un message passe tel quel.\n"
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          example: K7QM3XPB
+          maxLength: 8
+          minLength: 8
       type: object
     UserProfile:
       required:
@@ -1200,6 +1313,15 @@ components:
           default: ''
           maxLength: 40
       type: object
+    JoinGuildRequest:
+      properties:
+        code:
+          type: string
+          pattern: '[A-Z0-9]+'
+          default: ''
+          maxLength: 8
+          minLength: 8
+      type: object
     RefreshTokenRequest:
       properties:
         refreshToken:
@@ -1407,6 +1529,12 @@ components:
             $ref: '#/components/schemas/ProblemDetails'
     Forbidden:
       description: "L'appelant est bien identifié, la ressource existe, et il n'a pas le droit\ndemandé. **C'est ce qui distingue ce statut du 404** : un 403 ne se rend qu'à\nquelqu'un qui savait déjà que la ressource existe — un membre de la guilde qui\nn'en est pas le fondateur. À un non-membre, l'API répond 404, sans quoi elle\ndirait quels UUID désignent une guilde.\n"
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    TooManyRequests:
+      description: "Trop d'essais. L'en-tête `Retry-After` dit combien de secondes attendre, et le\nclient doit l'honorer plutôt que de réessayer en boucle. Aujourd'hui seul\n`POST /api/guilds/join` est limité : un code d'invitation est court par\nnécessité — il se dicte à voix haute — et c'est ce plafond qui rend le tirage au\nhasard sans issue.\n"
       content:
         application/problem+json:
           schema:

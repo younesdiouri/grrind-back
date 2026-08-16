@@ -51,7 +51,7 @@ final class GuildMembershipUniquenessTest extends ApiTestCase
         $entityManager->persist(Guild::found('Les Lève-Tôt', $player, new DateTimeImmutable()));
 
         $other = Guild::found('Les Couche-Tard', Uuid::v7(), new DateTimeImmutable());
-        $other->admit($player, new GuildRules(30), new DateTimeImmutable());
+        $other->admit($player, new GuildRules(30, 48), new DateTimeImmutable());
         $entityManager->persist($other);
 
         $this->expectException(UniqueConstraintViolationException::class);
@@ -66,7 +66,7 @@ final class GuildMembershipUniquenessTest extends ApiTestCase
         $member = Uuid::v7();
 
         $guild = Guild::found('Les Lève-Tôt', $founder, new DateTimeImmutable());
-        $guild->admit($member, new GuildRules(30), new DateTimeImmutable());
+        $guild->admit($member, new GuildRules(30, 48), new DateTimeImmutable());
         $entityManager->persist($guild);
         $entityManager->flush();
 

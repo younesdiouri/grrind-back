@@ -27,6 +27,9 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Entity(repositoryClass: GuildMembershipRepository::class)]
 #[ORM\Table(name: 'community_guild_membership')]
 #[ORM\UniqueConstraint(name: 'uniq_community_membership_player', columns: ['player_id'])]
+// Le nom est déclaré ici autant que dans la migration : sans ça, le diff propose de le
+// renommer en son hash à chaque génération, et ce faux positif revient à chaque ticket.
+#[ORM\Index(name: 'idx_community_membership_guild', columns: ['guild_id'])]
 class GuildMembership
 {
     #[ORM\Id]

@@ -14,3 +14,16 @@
 # C'est aussi ce qui donne son sens au verrou pris sur la ligne de la guilde au moment de
 # rejoindre (#116) : une limite qu'on n'atteint jamais est une limite qu'on ne teste jamais.
 maximum_members: 30
+
+# ————— La durée de vie d'un code d'invitation ——————————————————————————————————————————
+#
+# Le code se partage **hors de l'app** — un message, une capture d'écran, une phrase dite à
+# voix haute — donc il doit survivre au trajet : quelques minutes ne suffiraient pas, et
+# l'invitant n'est pas là pour en régénérer un.
+#
+# Mais il ne doit pas survivre à son intention. Un code qui traîne indéfiniment dans une
+# conversation de groupe finit par faire entrer quelqu'un que personne n'attendait, et le
+# seul recours du fondateur serait de le révoquer à la main — donc de se souvenir qu'il
+# existe. Quarante-huit heures couvrent « je t'invite ce week-end » sans couvrir « on avait
+# parlé de ça le mois dernier ».
+invite_code_lifetime_hours: 48
