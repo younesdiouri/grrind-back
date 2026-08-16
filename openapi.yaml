@@ -257,6 +257,33 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  '/api/players/{id}':
+    get:
+      tags:
+        - Guildes
+      operationId: get_community_player_show
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Le profil public. **Exactement le bloc servi dans la liste des membres** : mêmes ports, même ressource, donc un seul type à décoder côté client.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "Le joueur n'existe pas, **ou n'est ni soi-même ni un co-équipier** (`player-not-found`).\nLes deux cas rendent la même réponse, et **jamais 403** : un 403 confirmerait qu'un\ncompte porte cet UUID, et les UUID v7 encodent leur instant de création — l'API\ndeviendrait un moyen d'énumérer les comptes ouverts un jour donné."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   /api/auth/login:
     post:
       tags:
@@ -682,6 +709,7 @@ components:
             - 'https://grrind.app/problems/invite-code-not-usable'
             - 'https://grrind.app/problems/player-is-not-a-member'
             - 'https://grrind.app/problems/founder-cannot-exclude-himself'
+            - 'https://grrind.app/problems/player-not-found'
         title:
           type: string
           example: Conflict

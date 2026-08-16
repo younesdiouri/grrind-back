@@ -17,8 +17,19 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Le `User` vient du jeton : aucune route ne prend d'identifiant de compte en paramètre,
- * donc aucune ne peut être détournée pour lire le profil d'un autre.
+ * Le `User` vient du jeton : **aucune route ne prend d'identifiant de compte pour servir les
+ * données du joueur courant**, donc aucune de celles-là ne peut être détournée pour lire ce qui
+ * appartient à un autre.
+ *
+ * La phrase s'arrêtait à « aucune route ne prend d'identifiant de compte » ; elle a été réécrite
+ * au ticket 119, et pas contournée. Voir le profil d'un co-équipier, c'est lire les données d'un
+ * autre compte : `GET /api/players/{id}` en prend un, vit dans `Community` — seul module capable
+ * de répondre à « sommes-nous de la même guilde » — et est gardé par un voter, avec un 404 et
+ * jamais un 403. Ce qui compte ici n'a pas bougé : cette route-ci n'accepte toujours aucun
+ * identifiant, et c'est là qu'était le risque.
+ *
+ * Ce contrôleur reste par ailleurs le seul à servir l'adresse, le fuseau et le prochain titre
+ * visé. Le profil public n'en expose aucun.
  *
  * Le firewall étant stateless, le compte est relu à chaque requête — un profil modifié
  * entre deux appels est à jour.
