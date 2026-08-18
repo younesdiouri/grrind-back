@@ -64,12 +64,21 @@ ce qui rend la commande disponible dans une image bâtie `--no-dev`. Si un jour 
 bascule en dev, la migration échouera en prod avec *command not found* alors que tout
 marche en local — le même piège que `phpdocumentor/reflection-docblock` au #113.
 
-**4. `fly.toml` se contredit sur la mémoire.** Le bloc `[[vm]]` porte à la fois
-`memory = '1gb'` et `memory_mb = 256`, et **c'est `memory_mb` qui gagne** : les machines
-tournent en `shared-cpu-1x:256MB`. C'est serré pour FrankenPHP en mode worker avec preload
-opcache. Si l'app démarre puis meurt, regarder `flyctl logs -a grrind-back` avant de
-chercher ailleurs ; le correctif est de supprimer la ligne `memory_mb`. Laissé en l'état
-tant que ça tient — ne pas le changer en passant, ça mérite son ticket.
+**4. `fly.toml` s'est contredit sur la mémoire, une fois.** Le bloc `[[vm]]` portait à la
+fois `memory = '1gb'` et `memory_mb = 256`, et c'était `memory_mb` qui gagnait : les
+machines tournaient en `shared-cpu-1x:256MB`, serré pour FrankenPHP en mode worker avec
+preload opcache. Passé à **512MB** le 2026-08-18 (les deux champs s'accordent maintenant),
+parce qu'un Symfony qui tourne le justifiait. Si l'app démarre puis meurt, `flyctl logs
+-a grrind-back` avant de chercher ailleurs.
+
+**5. Le dashboard Fly ouvre une PR automatique après un scale fait depuis l'UI**
+(`flyio-scale-from-ui`, auteur `app/fly-io`), pour resynchroniser `fly.toml`. **Ne pas la
+merger telle quelle** : elle ajoute un *second* bloc `[[vm]]` scopé par `processes` au lieu
+de modifier celui qui existe, et repart de la dernière version de `main` — donc écrase
+silencieusement un changement local pas encore commité (ça nous est arrivé avec le passage
+en région `cdg`, fait juste avant). Le geste correct est de reporter la valeur qu'elle
+contient (mémoire, taille de VM) à la main dans le bloc `[[vm]]` existant, de fermer la PR
+du bot sans la merger, et de committer depuis le poste de dev comme d'habitude.
 
 ## Ce qu'on ne fait pas (encore)
 
