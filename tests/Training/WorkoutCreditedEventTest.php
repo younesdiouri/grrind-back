@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Training;
 
+use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\Messaging\WorkoutCreditedSpy;
@@ -33,8 +34,10 @@ final class WorkoutCreditedEventTest extends ApiTestCase
     }
 
     /**
-     * Le payload est autoportant sur ce qu'un abonné asynchrone a besoin de savoir pour
-     * annoncer un gain : qui, combien, sous quel équilibrage, et si un niveau est tombé.
+     * Le payload est autoportant : c'est le point du ticket #133, qui doit pouvoir annoncer
+     * « Younes : 45 min de course, +90 XP » et se taire si la séance est trop vieille, **sans
+     * attendre ni corréler `WorkoutImported`**. Discipline, fin et durée voyagent donc ici
+     * aussi, dupliquées à dessein — voir le docblock de `WorkoutCredited`.
      */
     public function testTheEventCarriesWhatTheSessionEarned(): void
     {
@@ -49,6 +52,8 @@ final class WorkoutCreditedEventTest extends ApiTestCase
         self::assertIsArray($reward['session']);
         $workoutId = $reward['session']['id'];
         self::assertIsString($workoutId);
+        $endedAt = $reward['session']['endedAt'];
+        self::assertIsString($endedAt);
         $level = $reward['level'];
         self::assertIsArray($level);
 
@@ -58,12 +63,39 @@ final class WorkoutCreditedEventTest extends ApiTestCase
 
         self::assertSame($workoutId, $event->workoutId->toRfc4122());
         self::assertTrue($bob->id->equals($event->userId));
+        self::assertSame(Discipline::Running, $event->discipline);
+        self::assertSame($endedAt, $event->endedAt->format(DateTimeInterface::ATOM));
+        self::assertSame(1800, $event->durationSeconds);
         self::assertSame(30, $event->xpGranted, 'Une demi-heure, une minute pour un point, sans modificateur ni rendement décroissant.');
         self::assertNotSame('', $event->rulesetVersion);
 
         // Le même franchissement que la réponse HTTP : un abonné n'a rien à recalculer.
         self::assertSame($level['before'], $event->levelBefore);
         self::assertSame($level['after'], $event->levelAfter);
+    }
+
+    /**
+     * `durationSeconds` est la durée **retenue**, écrêtée au plafond — jamais l'écart brut
+     * des deux bornes. Un abonné qui recalculerait `endedAt - startedAt` recréditerait
+     * l'enregistrement oublié sur la montre, exactement ce que l'écrêtage existe pour
+     * empêcher côté ledger (#91) ; l'événement ne doit pas rouvrir la porte côté outbox.
+     */
+    public function testDurationSecondsIsTheRetainedDurationNotTheRawSpan(): void
+    {
+        $bob = $this->openAccount();
+        // Cinq heures mesurées, un plafond à quatre (`maximum_duration_seconds`, #91) :
+        // la montre est restée en marche, elle ne fait pas gagner une heure de plus.
+        $this->import($bob, [self::candidate(durationSeconds: 18000)]);
+
+        $this->consumeTheOutbox();
+        $event = WorkoutCreditedSpy::$received[0];
+
+        self::assertSame(14400, $event->durationSeconds, 'Écrêtée au plafond, pas les 18000 secondes réellement mesurées.');
+        self::assertSame(
+            18000,
+            $event->endedAt->getTimestamp() - $event->occurredAt()->getTimestamp(),
+            '`endedAt` reste la fin réelle : seule la durée créditée est écrêtée, pas la borne elle-même.',
+        );
     }
 
     /**

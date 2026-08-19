@@ -68,9 +68,17 @@ final readonly class LedgerSessionRewards implements SessionRewards
         // Publié ici et non par `Training` : lui ne sait pas ce que la séance a rapporté,
         // seulement qu'elle a été soumise au crédit. Toujours dans la transaction ouverte
         // par l'appelant — le transport Doctrine partage sa connexion, donc son COMMIT.
+        //
+        // `discipline`, `endedAt` et `durationSeconds` sont repris tels quels de `$workout`
+        // — la durée y est déjà la valeur retenue, écrêtée au plafond — et non recalculés :
+        // les deux événements décrivent le même `Workout`, aucun des deux ne doit dériver
+        // l'autre (voir le docblock de `WorkoutCredited`).
         $this->events->dispatch(new WorkoutCredited(
             $workout->workoutId,
             $workout->userId,
+            $workout->discipline,
+            $workout->endedAt,
+            $workout->durationSeconds,
             $granted->award->amount(),
             $granted->award->rulesetVersion,
             $before->level,
