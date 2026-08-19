@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Application;
 
+use App\Shared\Domain\NotificationCategory;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -36,14 +37,23 @@ use Symfony\Component\Uid\Uuid;
  * règle de plateforme tranchée dans l'implémentation
  * ({@see \App\Identity\Infrastructure\Doctrine\UserDeviceRepository::of()}), pas ici dans
  * le contrat ni chez l'appelant.
+ *
+ * **Depuis le #132, filtré aussi sur la préférence du compte.** Une catégorie coupée dans
+ * les préférences du joueur ({@see \App\Identity\Domain\User::notifiesOn()}) rend une
+ * liste **vide**, jamais la liste complète à filtrer chez l'appelant — c'est le lien
+ * explicite que le ticket posait : « un joueur qui a coupé la catégorie n'est pas une
+ * cible, plutôt qu'une cible qu'on filtre à l'envoi ». La préférence vit sur le compte et
+ * non sur `UserDevice` : couper une catégorie sur l'iPhone la coupe aussi pour l'iPad du
+ * même joueur, elle ne se règle pas appareil par appareil.
  */
 interface PushTargets
 {
     /**
-     * @return list<string> les jetons Expo joignables **de l'environnement courant**, vide
-     *                      si le joueur n'a enregistré aucun appareil ou n'existe pas —
-     *                      pas d'exception : un destinataire introuvable n'est pas une
-     *                      erreur, juste rien à notifier
+     * @return list<string> les jetons Expo joignables **de l'environnement courant**, pour
+     *                      cette catégorie — vide si le joueur n'a enregistré aucun
+     *                      appareil, n'existe pas, ou a coupé la catégorie dans ses
+     *                      préférences — pas d'exception : un destinataire introuvable
+     *                      n'est pas une erreur, juste rien à notifier
      */
-    public function of(Uuid $userId): array;
+    public function of(Uuid $userId, NotificationCategory $category): array;
 }

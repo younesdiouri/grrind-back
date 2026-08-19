@@ -7,6 +7,7 @@ namespace App\Identity\UI\Http;
 use App\Identity\Application\UpdateProfile;
 use App\Identity\Application\UpdateProfileHandler;
 use App\Identity\Domain\User;
+use App\Identity\UI\Http\Request\NotificationPreferenceRequest;
 use App\Identity\UI\Http\Request\UpdateProfileRequest;
 use App\Identity\UI\Http\Response\UserResource;
 use App\Shared\Application\PlayerTitles;
@@ -67,8 +68,35 @@ final readonly class MeController
     #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
     public function update(#[CurrentUser] User $user, #[MapRequestPayload] UpdateProfileRequest $request): JsonResponse
     {
-        $updated = ($this->updateProfile)($user, new UpdateProfile($request->displayName, $request->timezone));
+        $updated = ($this->updateProfile)($user, new UpdateProfile(
+            $request->displayName,
+            $request->timezone,
+            self::preferencesOf($request->notificationPreferences),
+        ));
 
         return new JsonResponse(UserResource::from($updated, $this->titles->of($updated->id()))->toArray());
+    }
+
+    /**
+     * Le DTO de requête décrit ce qu'un client HTTP a le droit d'envoyer, la commande ce
+     * que le métier consomme — même séparation que `ImportWorkoutsController::candidate()`.
+     * Les valeurs non nulles sont garanties par la validation, qui a déjà rendu un 422
+     * sinon.
+     *
+     * @param list<NotificationPreferenceRequest> $preferences
+     *
+     * @return array<string, bool>
+     */
+    private static function preferencesOf(array $preferences): array
+    {
+        $byCategory = [];
+
+        foreach ($preferences as $preference) {
+            \assert(null !== $preference->category && null !== $preference->enabled);
+
+            $byCategory[$preference->category->value] = $preference->enabled;
+        }
+
+        return $byCategory;
     }
 }

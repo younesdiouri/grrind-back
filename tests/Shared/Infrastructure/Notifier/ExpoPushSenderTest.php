@@ -7,6 +7,7 @@ namespace App\Tests\Shared\Infrastructure\Notifier;
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRejection;
 use App\Shared\Application\PushTargets;
+use App\Shared\Domain\NotificationCategory;
 use App\Shared\Infrastructure\Notifier\ExpoPushSender;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -131,7 +132,7 @@ final class ExpoPushSenderTest extends TestCase
 
     private static function notification(): PushNotification
     {
-        return new PushNotification('Un coéquipier a rejoint', 'Dis bonjour à Bob.', 'guild-member-joined', 'guild-roster');
+        return new PushNotification('Un coéquipier a rejoint', 'Dis bonjour à Bob.', NotificationCategory::GuildActivity, 'guild-roster');
     }
 
     /**
@@ -147,7 +148,7 @@ final class ExpoPushSenderTest extends TestCase
             ) {
             }
 
-            public function of(Uuid $userId): array
+            public function of(Uuid $userId, NotificationCategory $category): array
             {
                 return $userId->equals($this->forPlayer) ? $this->tokens : [];
             }

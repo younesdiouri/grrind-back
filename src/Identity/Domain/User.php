@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Identity\Domain;
 
 use App\Identity\Infrastructure\Doctrine\UserRepository;
+use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\Timezone;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
@@ -69,6 +70,21 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $registeredAt;
+
+    /**
+     * Les catégories de notification que le joueur a coupées — présence, pas absence :
+     * comme `$roles`, ne stocker que l'exception évite de semer une ligne « activé » pour
+     * chaque compte à la sortie de chaque nouvelle catégorie. Le défaut à l'inscription
+     * (#132) est donc « activé » gratuitement, sans backfill, pour toute catégorie qui
+     * n'existait pas encore quand le compte a été ouvert.
+     *
+     * Porté par le compte et non par `UserDevice` : un joueur qui coupe `GUILD_ACTIVITY`
+     * sur son iPhone ne veut pas être rattrapé sur son iPad.
+     *
+     * @var list<string>
+     */
+    #[ORM\Column(type: Types::JSON)]
+    private array $disabledNotificationCategories = [];
 
     private function __construct(
         Uuid $id,
@@ -177,5 +193,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function moveTo(Timezone $timezone): void
     {
         $this->timezone = $timezone;
+    }
+
+    /**
+     * Le joueur veut-il être notifié pour cette catégorie — lu par
+     * {@see \App\Identity\Infrastructure\Doctrine\UserDeviceRepository::of()} pour rendre
+     * une liste de cibles vide plutôt qu'une liste que l'appelant devrait filtrer.
+     */
+    public function notifiesOn(NotificationCategory $category): bool
+    {
+        return !\in_array($category->value, $this->disabledNotificationCategories, true);
+    }
+
+    public function setNotificationPreference(NotificationCategory $category, bool $enabled): void
+    {
+        if ($enabled) {
+            $this->disabledNotificationCategories = array_values(
+                array_diff($this->disabledNotificationCategories, [$category->value]),
+            );
+
+            return;
+        }
+
+        if (!\in_array($category->value, $this->disabledNotificationCategories, true)) {
+            $this->disabledNotificationCategories[] = $category->value;
+        }
     }
 }

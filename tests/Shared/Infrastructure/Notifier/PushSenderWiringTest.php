@@ -6,6 +6,7 @@ namespace App\Tests\Shared\Infrastructure\Notifier;
 
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushSender;
+use App\Shared\Domain\NotificationCategory;
 use App\Tests\Support\ApiTestCase;
 
 /**
@@ -34,7 +35,7 @@ final class PushSenderWiringTest extends ApiTestCase
         $sender = self::getContainer()->get(PushSender::class);
         self::assertInstanceOf(PushSender::class, $sender);
 
-        $tickets = $sender->send($bob->id, new PushNotification('Titre', 'Corps', 'wiring-test', 'wiring'));
+        $tickets = $sender->send($bob->id, new PushNotification('Titre', 'Corps', NotificationCategory::GuildActivity, 'wiring'));
 
         self::assertCount(1, $tickets);
         self::assertSame('wiring-token', $tickets[0]->pushToken);
@@ -48,6 +49,6 @@ final class PushSenderWiringTest extends ApiTestCase
         $sender = self::getContainer()->get(PushSender::class);
         self::assertInstanceOf(PushSender::class, $sender);
 
-        self::assertSame([], $sender->send($bob->id, new PushNotification('Titre', 'Corps', 'wiring-test', 'wiring')));
+        self::assertSame([], $sender->send($bob->id, new PushNotification('Titre', 'Corps', NotificationCategory::GuildActivity, 'wiring')));
     }
 }

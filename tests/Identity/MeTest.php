@@ -23,6 +23,7 @@ final class MeTest extends ApiTestCase
         self::assertSame(self::EMAIL, $body['email']);
         self::assertSame('Bob', $body['displayName']);
         self::assertSame('Europe/Paris', $body['timezone']);
+        self::assertSame(['GUILD_ACTIVITY' => true], $body['notificationPreferences'], 'Le défaut à l\'inscription est activé (#132).');
     }
 
     public function testRefusesAnAnonymousCall(): void
@@ -85,6 +86,61 @@ final class MeTest extends ApiTestCase
     public function testRejectsAnEmptyDisplayName(): void
     {
         $response = $this->send('PATCH', '/api/me', ['displayName' => '   '], $this->authenticated());
+
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    }
+
+    public function testCuttingACategoryTurnsItOffWithoutTouchingTheOthers(): void
+    {
+        $headers = $this->authenticated();
+
+        $response = $this->send('PATCH', '/api/me', [
+            'notificationPreferences' => [
+                ['category' => 'GUILD_ACTIVITY', 'enabled' => false],
+            ],
+        ], $headers);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+        self::assertSame(['GUILD_ACTIVITY' => false], self::decode($response)['notificationPreferences']);
+    }
+
+    public function testACategoryAbsentFromThePatchStaysUntouched(): void
+    {
+        $headers = $this->authenticated();
+
+        $this->send('PATCH', '/api/me', [
+            'notificationPreferences' => [
+                ['category' => 'GUILD_ACTIVITY', 'enabled' => false],
+            ],
+        ], $headers);
+
+        // Un PATCH qui ne parle pas des préférences ne doit rien y remettre à zéro —
+        // même garantie que `displayName`/`timezone`.
+        $this->send('PATCH', '/api/me', ['displayName' => 'Bobby'], $headers);
+
+        self::assertSame(['GUILD_ACTIVITY' => false], self::decode($this->get('/api/me', $headers))['notificationPreferences']);
+    }
+
+    public function testThePreferenceSurvivesTheRequest(): void
+    {
+        $headers = $this->authenticated();
+
+        $this->send('PATCH', '/api/me', [
+            'notificationPreferences' => [
+                ['category' => 'GUILD_ACTIVITY', 'enabled' => false],
+            ],
+        ], $headers);
+
+        self::assertSame(['GUILD_ACTIVITY' => false], self::decode($this->get('/api/me', $headers))['notificationPreferences']);
+    }
+
+    public function testRejectsAnUnknownCategory(): void
+    {
+        $response = $this->send('PATCH', '/api/me', [
+            'notificationPreferences' => [
+                ['category' => 'NOT_A_CATEGORY', 'enabled' => false],
+            ],
+        ], $this->authenticated());
 
         self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
     }

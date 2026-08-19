@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Application;
 
+use App\Shared\Domain\NotificationCategory;
+
 /**
  * Le contenu d'une notification GRRIND, dans son propre vocabulaire — pas celui d'Expo.
  *
@@ -24,13 +26,13 @@ final readonly class PushNotification
         public string $title,
         public string $body,
         /**
-         * Un identifiant opaque du type d'événement (ex. `guild-invite`,
-         * `session-credited`) — aucun catalogue fermé n'existe encore, aucun ticket ne
-         * l'a tranché. Il deviendra un enum backed le jour où un premier consommateur
-         * fixera les valeurs closes, comme {@see \App\Identity\Domain\DevicePlatform} l'a
-         * fait pour les plateformes.
+         * Resté une chaîne libre depuis le #130, faute d'un premier consommateur pour
+         * fixer le catalogue. Le #132 le tranche : {@see NotificationCategory} sert
+         * aussi bien de clé aux préférences de `/api/me` que de type d'événement ici —
+         * c'est la même notion, un joueur qui coupe `GUILD_ACTIVITY` coupe précisément
+         * les envois qui portent cette catégorie.
          */
-        public string $category,
+        public NotificationCategory $category,
         /**
          * La clé qui fait qu'une notification plus récente doit remplacer l'ancienne
          * plutôt que de s'empiler à côté. Ni Expo ni son API n'offrent de remplacement
