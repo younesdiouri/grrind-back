@@ -18,7 +18,7 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\KernelInterface;
-use Symfony\Component\Messenger\Transport\TransportInterface;
+use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
 /**
  * `Training` ne connaît pas `Progression`, ni les classements du Lot 8 — Deptrac l'interdit,
@@ -60,17 +60,21 @@ final class WorkoutImportedEventTest extends ApiTestCase
      * Le payload est autoportant : un abonné n'a aucune raison de rappeler `Training`.
      * `durationSeconds` en particulier est la durée **retenue** — la recalculer depuis les
      * deux bornes ignorerait l'écrêtage à venir (#91).
+     *
+     * Lu par le spion plutôt que par `TransportInterface::get()` : depuis `WorkoutCredited`
+     * (#128), le premier message de la file n'est plus forcément celui-ci — `Progression`
+     * publie le sien avant que `Training` ne publie celui-là. Consommer et filtrer par type
+     * est la seule lecture qui ne dépend pas de l'ordre.
      */
     public function testTheEventCarriesTheWholeFact(): void
     {
         $bob = $this->openAccount();
         $this->import($bob, [self::candidate(activityType: 'cycling', startedAt: '2026-08-05T07:00:00+00:00')]);
 
-        $envelopes = iterator_to_array($this->outbox()->get());
-        self::assertCount(1, $envelopes);
+        $this->consumeTheOutbox();
+        self::assertCount(1, WorkoutImportedSpy::$received);
 
-        $event = $envelopes[0]->getMessage();
-        self::assertInstanceOf(WorkoutImported::class, $event);
+        $event = WorkoutImportedSpy::$received[0];
 
         self::assertTrue($bob->id->equals($event->userId));
         self::assertSame(Discipline::Cycling, $event->discipline);
@@ -90,9 +94,8 @@ final class WorkoutImportedEventTest extends ApiTestCase
         $bob = $this->openAccount();
         $this->import($bob, [self::candidate(startedAt: '2026-08-01T06:30:00+00:00')]);
 
-        $envelopes = iterator_to_array($this->outbox()->get());
-        $event = $envelopes[0]->getMessage();
-        self::assertInstanceOf(WorkoutImported::class, $event);
+        $this->consumeTheOutbox();
+        $event = WorkoutImportedSpy::$received[0];
 
         self::assertSame('2026-08-01T06:30:00+00:00', $event->occurredAt()->format(DateTimeInterface::ATOM));
         self::assertEquals($event->startedAt, $event->occurredAt());
@@ -129,19 +132,26 @@ final class WorkoutImportedEventTest extends ApiTestCase
     }
 
     /**
-     * Le vrai worker, celui du `compose.yaml`, sur un message et pas un de plus : c'est la
-     * seule façon de prouver que le routage va bien de l'événement à un abonné qui ne l'a
-     * jamais déclaré.
+     * Le vrai worker, celui du `compose.yaml`, sur la file entière et pas un message de
+     * moins : c'est la seule façon de prouver que le routage va bien de l'événement à un
+     * abonné qui ne l'a jamais déclaré.
+     *
+     * La limite se lit en base plutôt qu'en dur : depuis `WorkoutCredited` (#128), un
+     * workout crédité publie deux faits, et une limite figée à 1 laisserait la moitié de la
+     * file derrière elle.
      */
     private function consumeTheOutbox(): void
     {
+        $pending = $this->connection()->fetchOne('SELECT COUNT(*) FROM messenger_messages');
+        self::assertIsNumeric($pending);
+
         $application = new Application(self::bootedKernel());
         $application->setAutoExit(false);
 
         $tester = new CommandTester($application->find('messenger:consume'));
         $status = $tester->execute([
             'receivers' => ['outbox'],
-            '--limit' => 1,
+            '--limit' => max(1, (int) $pending),
             '--time-limit' => 10,
         ]);
 
@@ -156,29 +166,46 @@ final class WorkoutImportedEventTest extends ApiTestCase
         return $kernel;
     }
 
-    private function outbox(): TransportInterface
-    {
-        $transport = self::getContainer()->get('messenger.transport.outbox');
-        self::assertInstanceOf(TransportInterface::class, $transport);
-
-        return $transport;
-    }
-
     /**
      * Compté en base et non par `TransportInterface::get()`, qui ne rend qu'un message à la
      * fois : c'est le nombre de faits en attente qu'on vérifie, pas ce qu'un worker
      * recevrait au prochain tour.
+     *
+     * Filtré sur le type, et décodé plutôt que lu dans `headers` : le sérialiseur du projet
+     * (`PhpSerializer`, sous une signature) n'y écrit pas de `type` — la classe n'est
+     * connue qu'une fois le corps décodé. Filtrer est nécessaire depuis `WorkoutCredited`
+     * (#128) : l'outbox porte deux faits par workout crédité, et cette suite ne parle que
+     * de celui qui est son sujet.
      */
     private function outboxSize(): int
     {
-        $pending = $this->connection()->fetchOne(
-            'SELECT COUNT(*) FROM messenger_messages WHERE queue_name = :queue',
-            ['queue' => 'default'],
-        );
+        return \count($this->pendingMessagesOfType(WorkoutImported::class));
+    }
 
-        self::assertIsNumeric($pending);
+    /**
+     * @return list<object>
+     */
+    private function pendingMessagesOfType(string $class): array
+    {
+        $serializer = self::getContainer()->get(SerializerInterface::class);
+        self::assertInstanceOf(SerializerInterface::class, $serializer);
 
-        return (int) $pending;
+        // `headers` n'est pas relu : le `PhpSerializer` du projet ne s'en sert pas pour
+        // décoder — la classe voyage dans le corps sérialisé — et une file vide ici
+        // satisfait déjà la signature attendue par `decode()`.
+        $rows = $this->connection()->fetchAllAssociative('SELECT body FROM messenger_messages');
+        $messages = [];
+
+        foreach ($rows as $row) {
+            self::assertIsString($row['body']);
+            $message = $serializer->decode(['body' => $row['body'], 'headers' => []])->getMessage();
+
+            if ($message instanceof $class) {
+                $messages[] = $message;
+            }
+        }
+
+        return $messages;
     }
 
     /**
