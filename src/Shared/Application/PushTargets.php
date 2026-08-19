@@ -27,14 +27,23 @@ use Symfony\Component\Uid\Uuid;
  *
  * Le jeton est une chaîne Expo (`ExponentPushToken[…]`), pas un device token APNs brut :
  * c'est symfony/expo-notifier qui portera l'appel HTTP, posé aux tickets suivants (#130+).
+ *
+ * **Déjà filtré sur l'environnement d'exécution.** `UserDevice` porte un `DeviceEnvironment`
+ * (`DEVELOPMENT`/`PRODUCTION`) parce qu'un même joueur peut avoir un jeton de chaque —
+ * client de dev Expo et build publié. Rendre les deux ici obligerait chaque consommateur à
+ * connaître cette distinction et à se souvenir de filtrer ; un notifier qui l'oublie envoie
+ * une campagne de production aux téléphones des développeurs. Le filtrage est donc une
+ * règle de plateforme tranchée dans l'implémentation
+ * ({@see \App\Identity\Infrastructure\Doctrine\UserDeviceRepository::of()}), pas ici dans
+ * le contrat ni chez l'appelant.
  */
 interface PushTargets
 {
     /**
-     * @return list<string> les jetons Expo joignables, vide si le joueur n'a enregistré
-     *                      aucun appareil ou n'existe pas — pas d'exception : un
-     *                      destinataire introuvable n'est pas une erreur, juste rien à
-     *                      notifier
+     * @return list<string> les jetons Expo joignables **de l'environnement courant**, vide
+     *                      si le joueur n'a enregistré aucun appareil ou n'existe pas —
+     *                      pas d'exception : un destinataire introuvable n'est pas une
+     *                      erreur, juste rien à notifier
      */
     public function of(Uuid $userId): array;
 }

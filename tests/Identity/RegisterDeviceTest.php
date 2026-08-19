@@ -58,7 +58,7 @@ final class RegisterDeviceTest extends ApiTestCase
      * se dupliquer — sinon l'ancien compte continue de recevoir les notifications d'un
      * appareil qui ne lui appartient plus.
      */
-    public function testATokenReusedByAnotherAccountChangesOwnerInstedOfDuplicating(): void
+    public function testATokenReusedByAnotherAccountChangesOwnerInsteadOfDuplicating(): void
     {
         $bob = $this->openAccount('bob@grrind.app', 'Bob');
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
