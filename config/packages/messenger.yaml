@@ -23,3 +23,10 @@ framework:
             # Shared\Domain\Event est routé du seul fait qu'il l'implémente, plutôt
             # qu'on découvre trois lots plus tard qu'il est resté synchrone.
             App\Shared\Domain\Event\DomainEvent: outbox
+
+            # Pas un `DomainEvent` — un message interne à `Community` (#133), routé
+            # explicitement vers la même file. Toujours dispatché avec un `DelayStamp` —
+            # voir le docblock d'`AnnounceGuildActivity` pour pourquoi ce délai, et non
+            # l'ordre du transport seul, est ce qui garantit qu'il est traité après les
+            # séances créditées du même lot.
+            App\Community\Application\AnnounceGuildActivity: outbox

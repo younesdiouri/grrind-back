@@ -1,0 +1,59 @@
+# Les garde-fous qui empêchent une séance créditée de noyer une guilde de notifications
+# (#133). Ce sont des règles de game design, du même ordre que les garde-fous anti-abus de
+# `training.yaml` : ce qui protège un joueur d'un import massif protège aussi ses
+# co-équipiers d'un push par séance.
+#
+# Ce fichier est de la donnée, pas de la configuration Symfony : il est lu et validé à la
+# compilation du conteneur par App\Community\Infrastructure\Config\NotificationsSection, et
+# il entre dans le `rulesetVersion`. Une clé inconnue fait échouer le démarrage.
+#
+# Le plafond par destinataire n'est **pas** ici — voir le docblock de `NotificationsSection`
+# pour pourquoi il vit dans `config/packages/rate_limiter.yaml`, à côté de `guild_join`.
+
+# ————— Fraîcheur ————————————————————————————————————————————————————————————————————
+#
+# Le joueur qui rentre de dix jours d'absence fait dix séances d'un coup : elles sont
+# toutes vraies, aucune n'est neuve. Deux heures couvrent le délai normal entre la fin
+# d'une séance et sa synchronisation — la montre qui traîne dans une poche, le téléphone en
+# charge — sans laisser passer l'historique d'un rattrapage.
+freshness_window_minutes: 120
+
+# ————— Délai avant l'annonce ————————————————————————————————————————————————————————
+#
+# **Ce n'est pas un délai de calibrage de l'agrégation — c'est ce qui la rend vraie.**
+# `AnnounceGuildActivity` doit toujours être traitée après toutes les `WorkoutCredited`
+# déjà en file pour le même lot, sinon deux séances créditées la même seconde produisent
+# deux annonces au lieu d'une. Deux faits vérifiés dans
+# `vendor/symfony/doctrine-messenger/Transport/Connection.php` disent que cet ordre n'est
+# **pas** garanti sans lui :
+#
+#   - la requête qui sert les messages disponibles trie seulement par `available_at ASC`
+#     (`Connection::get()`) — aucun départage par `id` en cas d'égalité ;
+#   - `available_at` est un `Types::DATETIME_IMMUTABLE`, que DBAL rend en `TIMESTAMP(0)`
+#     sur PostgreSQL — précision à la **seconde**, largement dans la portée d'un import qui
+#     publie dix événements en quelques millisecondes.
+#
+# Sans délai, deux messages qui partagent la même seconde n'ont donc pas d'ordre spécifié :
+# ça fonctionne aujourd'hui par accident, sur la façon dont Postgres parcourt son index, et
+# ça casse dès qu'un second worker consomme la même file (#57) — un worker peut traiter
+# l'annonce pendant qu'un autre écrit encore des séances du même lot.
+#
+# Une minute suffit largement à sortir de l'égalité à la seconde, et elle est invisible
+# pour le produit : « un co-équipier s'est entraîné » ne se périme pas en soixante
+# secondes. Bénéfice accessoire : une seconde synchronisation qui arrive dans la foulée
+# tombe dans la même fenêtre et rejoint la même annonce au lieu d'en ouvrir une seconde.
+#
+# **Le mode dégradé reste possible, et c'est volontaire.** Si une séance créditée arrive
+# après que le délai s'est écoulé pour les précédentes, l'annonce est déjà partie : la
+# séance en retard rouvre une fenêtre et une seconde annonce part. Dégradé, pas corrompu —
+# aucune séance n'est perdue, aucun destinataire n'est notifié à tort, seulement notifié
+# deux fois au lieu d'une. Voir `GuildActivityNotifierTest::testAnAnnouncementFlushedBetweenTwoSessionsProducesTwoAnnouncements()`.
+announcement_delay_seconds: 60
+
+# ————— Heures calmes ———————————————————————————————————————————————————————————————
+#
+# Dans le fuseau du **destinataire**, jamais celui de l'auteur ni du serveur : une séance à
+# 5h du matin à Tokyo ne doit réveiller personne à Paris, et réciproquement. De 22h à 8h
+# couvre une nuit standard sans empiéter sur une fin de soirée ou un lève-tôt.
+quiet_hours_start_hour: 22
+quiet_hours_end_hour: 8
