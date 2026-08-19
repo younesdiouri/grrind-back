@@ -189,7 +189,9 @@ final class FirstPlayableTest extends ApiTestCase
         self::assertSame('true', $replay->headers->get(IdempotencyListener::REPLAY_HEADER));
         self::assertSame($first->getContent(), $replay->getContent());
         self::assertSame(self::SEEDED_DAYS + 5, $this->ledgerSize());
-        self::assertSame(5, $this->outboxSize());
+        // 10 et non 5 depuis #128 : `WorkoutImported` et `WorkoutCredited` publient chacun
+        // leur fait pour les cinq workouts crédités du lot.
+        self::assertSame(10, $this->outboxSize());
     }
 
     /**

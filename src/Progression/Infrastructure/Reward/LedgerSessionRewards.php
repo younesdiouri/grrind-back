@@ -14,7 +14,9 @@ use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\SessionRewards;
 use App\Shared\Application\XpLine;
+use App\Shared\Domain\Event\WorkoutCredited;
 use App\Shared\Domain\Event\WorkoutImported;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * L'implémentation du port {@see SessionRewards} : c'est par cette classe, et uniquement
@@ -29,12 +31,20 @@ use App\Shared\Domain\Event\WorkoutImported;
  * transaction ouverte par `Training`. Le `wrapInTransaction` imbriqué ne rouvre rien : DBAL
  * en fait un point de sauvegarde, le verrou de ligne court jusqu'au COMMIT extérieur, et
  * une exception levée après le crédit défait bien le crédit.
+ *
+ * **C'est aussi elle qui publie {@see WorkoutCredited}** (#128) : `Progression` est le seul
+ * module qui sait ce qu'une séance a rapporté, et cette méthode est le seul endroit où ce
+ * fait existe. La publication a lieu ici, sous le même point de sauvegarde que le crédit,
+ * donc dans la transaction que `Training` tient ouverte — un rollback en aval défait le
+ * crédit et l'annonce ensemble. Elle n'a lieu que si `creditFor` est appelée : un workout
+ * hors fenêtre n'atteint jamais cette classe, donc rien ne se publie pour lui.
  */
 final readonly class LedgerSessionRewards implements SessionRewards
 {
     public function __construct(
         private GrantXpHandler $grantXp,
         private TitleTranslator $titles,
+        private MessageBusInterface $events,
     ) {
     }
 
@@ -54,6 +64,27 @@ final readonly class LedgerSessionRewards implements SessionRewards
 
         $snapshot = $granted->snapshot;
         $before = $granted->standingBefore;
+
+        // Publié ici et non par `Training` : lui ne sait pas ce que la séance a rapporté,
+        // seulement qu'elle a été soumise au crédit. Toujours dans la transaction ouverte
+        // par l'appelant — le transport Doctrine partage sa connexion, donc son COMMIT.
+        //
+        // `discipline`, `endedAt` et `durationSeconds` sont repris tels quels de `$workout`
+        // — la durée y est déjà la valeur retenue, écrêtée au plafond — et non recalculés :
+        // les deux événements décrivent le même `Workout`, aucun des deux ne doit dériver
+        // l'autre (voir le docblock de `WorkoutCredited`).
+        $this->events->dispatch(new WorkoutCredited(
+            $workout->workoutId,
+            $workout->userId,
+            $workout->discipline,
+            $workout->endedAt,
+            $workout->durationSeconds,
+            $granted->award->amount(),
+            $granted->award->rulesetVersion,
+            $before->level,
+            $snapshot->level(),
+            $workout->occurredAt(),
+        ));
 
         return new SessionReward(
             $granted->award->amount(),

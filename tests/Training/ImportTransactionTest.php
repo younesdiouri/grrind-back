@@ -164,6 +164,11 @@ final class ImportTransactionTest extends ApiTestCase
     /**
      * L'événement part une fois par workout crédité, jamais un agrégat : le classement
      * compte des activités, pas des synchronisations.
+     *
+     * **Deux faits par workout crédité depuis #128** — `WorkoutImported` et
+     * `WorkoutCredited` — d'où le compte à 4 et non 2 : `Training` annonce qu'un workout a
+     * eu lieu, `Progression` annonce ce qu'il a rapporté, et les deux naissent ou meurent
+     * ensemble avec la même transaction.
      */
     public function testOneEventPerCreditedWorkoutAndNoneForTheSkippedOnes(): void
     {
@@ -175,12 +180,15 @@ final class ImportTransactionTest extends ApiTestCase
             self::candidate(externalId: 'HK-CURLING', activityType: 'curling', startedAt: '2026-08-05T07:00:00+00:00'),
         ]);
 
-        self::assertSame(2, $this->outboxSize());
+        self::assertSame(4, $this->outboxSize());
     }
 
     /**
      * Le rejeu de la clé d'idempotence rend la réponse conservée sans réexécuter la règle :
      * sans ça, l'outbox contiendrait deux fois les mêmes faits.
+     *
+     * 2 et non 1 depuis #128 : `WorkoutImported` et `WorkoutCredited` pour l'unique workout
+     * crédité — voir la note de {@see testOneEventPerCreditedWorkoutAndNoneForTheSkippedOnes}.
      */
     public function testAReplayedRequestDoesNotPublishTwice(): void
     {
@@ -190,7 +198,7 @@ final class ImportTransactionTest extends ApiTestCase
         $this->import($bob, $lot);
         $this->import($bob, $lot);
 
-        self::assertSame(1, $this->outboxSize());
+        self::assertSame(2, $this->outboxSize());
         self::assertSame(1, $this->ledgerSize());
     }
 
