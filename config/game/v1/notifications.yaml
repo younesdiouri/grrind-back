@@ -28,7 +28,7 @@ freshness_window_minutes: 120
 # **pas** garanti sans lui :
 #
 #   - la requête qui sert les messages disponibles trie seulement par `available_at ASC`
-#     (`Connection::get()`) — aucun département par `id` en cas d'égalité ;
+#     (`Connection::get()`) — aucun départage par `id` en cas d'égalité ;
 #   - `available_at` est un `Types::DATETIME_IMMUTABLE`, que DBAL rend en `TIMESTAMP(0)`
 #     sur PostgreSQL — précision à la **seconde**, largement dans la portée d'un import qui
 #     publie dix événements en quelques millisecondes.
