@@ -74,6 +74,12 @@ services:
             $freshnessWindowMinutes: '%game.notifications.freshness_window_minutes%'
             $announcementDelaySeconds: '%game.notifications.announcement_delay_seconds%'
 
+    # Le seuil d'abandon d'une fenêtre (#134), tiré du même fichier — voir le docblock de
+    # `PendingGuildActivityRepository::recordSession()` pour ce qu'il déclenche.
+    App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository:
+        arguments:
+            $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
+
     App\Progression\Domain\LevelCurve:
         arguments:
             $levels: '%game.levels.levels%'
@@ -209,6 +215,8 @@ when@test:
         # panne au milieu de la boucle d'envoi sans en provoquer une vraie.
         App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository:
             public: true
+            arguments:
+                $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
 
         App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository:
             public: true

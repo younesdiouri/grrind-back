@@ -11,11 +11,16 @@ use Symfony\Component\Config\Definition\Builder\TreeBuilder;
  * Le schéma de `config/game/v1/notifications.yaml` — les garde-fous qui empêchent une
  * séance créditée de noyer une guilde de pushes (#133).
  *
- * Pas de délégation à un objet du domaine, contrairement à `CommunitySection` : les quatre
+ * Pas de délégation à un objet du domaine, contrairement à `CommunitySection` : les cinq
  * réglages n'ont aucune cohérence à faire respecter entre eux — chaque combinaison
  * d'heures calmes valides est une combinaison valide, et `announcement_delay_seconds` ne
  * contraint rien d'autre qu'un minimum — donc les bornes du `TreeBuilder` suffisent, même
  * geste que `XpSection`.
+ *
+ * **`stale_window_minutes` (#134) n'a aucune cohérence à faire respecter avec
+ * `announcement_delay_seconds` non plus** — voir le docblock du fichier YAML pour
+ * pourquoi la valeur est un multiple franc choisi à la main plutôt qu'une expression des
+ * deux : le composant Config n'a pas de multiplication à offrir ici.
  *
  * **Le plafond par destinataire n'y est pas**, malgré ce que suggérait le ticket, qui
  * range les quatre réglages au même endroit. Il vit dans
@@ -43,6 +48,7 @@ final class NotificationsSection implements GameBalanceSection
             ->children()
                 ->integerNode('freshness_window_minutes')->isRequired()->min(1)->end()
                 ->integerNode('announcement_delay_seconds')->isRequired()->min(1)->end()
+                ->integerNode('stale_window_minutes')->isRequired()->min(1)->end()
                 ->integerNode('quiet_hours_start_hour')->isRequired()->min(0)->max(23)->end()
                 ->integerNode('quiet_hours_end_hour')->isRequired()->min(0)->max(23)->end()
             ->end()

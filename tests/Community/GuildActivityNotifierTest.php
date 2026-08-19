@@ -296,6 +296,57 @@ final class GuildActivityNotifierTest extends ApiTestCase
     }
 
     /**
+     * Le scénario que la revue du #134 a mis en évidence : un handler qui épuise ses trois
+     * tentatives (`messenger.yaml`) laisse la fenêtre ouverte pour de bon, puisque `close()`
+     * ne se déclenche plus qu'en sortie normale. Sans `stale_window_minutes`, plus aucune
+     * séance suivante de cet auteur ne redéclencherait d'annonce — la guilde deviendrait
+     * muette en silence. Une fenêtre vieillie au-delà du seuil doit donc repartir, sur le
+     * même `windowId`, et sans renotifier qui que ce soit déjà servi avant l'abandon.
+     */
+    public function testAnAbandonedWindowReopensWithoutDoublyNotifyingAlreadyServedRecipients(): void
+    {
+        [$author, $recipients] = $this->guildOfFour();
+
+        $this->import($author, [self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 90)]);
+        $this->consumeTheOutbox();
+
+        $windowId = $this->currentWindowId($author);
+        $alreadyNotified = $recipients[0];
+
+        // Comme si le worker était mort après avoir notifié ce seul destinataire, sur les
+        // trois tentatives permises — le message est parti sur le transport `failed`, plus
+        // personne ne le rejoue, et la fenêtre reste ouverte sans que `close()` n'ait jamais
+        // été appelée.
+        $deliveries = self::getContainer()->get(NotificationDeliveryRepository::class);
+        self::assertInstanceOf(NotificationDeliveryRepository::class, $deliveries);
+        self::assertTrue($deliveries->claim($windowId, $alreadyNotified->id, NotificationCategory::GuildActivity, new DateTimeImmutable()));
+
+        // `stale_window_minutes` (notifications.yaml) vaut quinze minutes : on recule
+        // `opened_at` bien au-delà pour que `recordSession()` traite la fenêtre comme
+        // abandonnée plutôt que comme une annonce encore en vol.
+        $this->connection()->executeStatement(
+            "UPDATE community_pending_guild_activity SET opened_at = NOW() - INTERVAL '20 minutes' WHERE author_id = :authorId",
+            ['authorId' => $author->id->toRfc4122()],
+        );
+
+        $this->import($author, [self::freshCandidate(externalId: 'HK-2', endedMinutesAgo: 5)], key: 'import-suivant');
+        $this->consumeTheOutbox();
+
+        self::assertSame(
+            $windowId->toRfc4122(),
+            $this->currentWindowId($author)->toRfc4122(),
+            'Une fenêtre abandonnée se réutilise, elle n\'en ouvre pas une seconde : c\'est ce qui garde la trace de livraison déjà écrite valide pour la suite.',
+        );
+
+        $this->flushPendingAnnouncement($author);
+
+        $notifiedIds = array_map(static fn (array $sent): string => $sent['recipientId']->toRfc4122(), SpyingPushSender::$sent);
+
+        self::assertCount(2, SpyingPushSender::$sent, 'La fenêtre abandonnée doit repartir vers les deux destinataires jamais servis.');
+        self::assertNotContains($alreadyNotified->id->toRfc4122(), $notifiedIds, 'Celui déjà notifié avant l\'abandon ne doit pas recevoir de second push.');
+    }
+
+    /**
      * @return array{0: Account, 1: list<Account>, 2: string}
      */
     private function guildOfFour(): array

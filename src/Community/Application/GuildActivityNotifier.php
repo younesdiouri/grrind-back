@@ -59,10 +59,16 @@ final readonly class GuildActivityNotifier
             $event->discipline,
             $event->durationSeconds,
             $event->xpGranted,
+            $this->clock->now(),
         );
 
-        // Une annonce est déjà programmée pour cet auteur : elle lira cette séance-ci en
-        // plus des précédentes à son tour, inutile d'en programmer une seconde.
+        // `null` : une annonce fraîche est déjà programmée pour cet auteur, elle lira
+        // cette séance-ci en plus des précédentes à son tour — inutile d'en reprogrammer
+        // une seconde. Un `windowId` non nul, en revanche, ne veut pas toujours dire
+        // « fenêtre neuve » : voir le docblock de `PendingGuildActivityRepository::recordSession()`
+        // (#134) — une fenêtre abandonnée (handler qui a épuisé ses trois tentatives) en
+        // rend un aussi, pour qu'une annonce reparte. Cette méthode n'a pas à distinguer
+        // les deux cas : dans les deux, une annonce doit partir.
         if (null === $windowId) {
             return;
         }
