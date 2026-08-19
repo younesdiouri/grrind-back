@@ -6,6 +6,7 @@ namespace App\Identity\UI\Http\Response;
 
 use App\Identity\Domain\User;
 use App\Shared\Application\PlayerTitleStanding;
+use App\Shared\Domain\NotificationCategory;
 use DateTimeInterface;
 
 /**
@@ -19,6 +20,9 @@ use DateTimeInterface;
  */
 final readonly class UserResource
 {
+    /**
+     * @param array<string, bool> $notificationPreferences clé = {@see NotificationCategory}::value
+     */
     public function __construct(
         public string $id,
         public string $email,
@@ -26,6 +30,7 @@ final readonly class UserResource
         public string $timezone,
         public string $registeredAt,
         public PlayerTitleStanding $titles,
+        public array $notificationPreferences,
     ) {
     }
 
@@ -38,6 +43,7 @@ final readonly class UserResource
             $user->timezone()->toString(),
             $user->registeredAt()->format(DateTimeInterface::ATOM),
             $titles,
+            self::preferencesOf($user),
         );
     }
 
@@ -56,6 +62,25 @@ final readonly class UserResource
             // acquis et l'autre comme un objectif, à deux endroits différents de l'écran.
             'title' => $this->titles->active?->toArray(),
             'nextTitle' => $this->titles->next?->toArray(),
+            'notificationPreferences' => $this->notificationPreferences,
         ];
+    }
+
+    /**
+     * Toutes les catégories, jamais seulement celles coupées : le client n'a pas à
+     * connaître le défaut (« activé ») pour afficher un interrupteur, il lit l'état
+     * exact de chacune.
+     *
+     * @return array<string, bool>
+     */
+    private static function preferencesOf(User $user): array
+    {
+        $preferences = [];
+
+        foreach (NotificationCategory::cases() as $category) {
+            $preferences[$category->value] = $user->notifiesOn($category);
+        }
+
+        return $preferences;
     }
 }

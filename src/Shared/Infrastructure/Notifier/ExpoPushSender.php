@@ -58,7 +58,7 @@ final readonly class ExpoPushSender implements PushSender
     {
         $tickets = [];
 
-        foreach ($this->pushTargets->of($userId) as $pushToken) {
+        foreach ($this->pushTargets->of($userId, $notification->category) as $pushToken) {
             $tickets[] = $this->sendTo($pushToken, $notification);
         }
 
@@ -73,8 +73,8 @@ final readonly class ExpoPushSender implements PushSender
             new ExpoOptions(
                 to: $pushToken,
                 options: [
-                    'categoryId' => $notification->category,
-                    'channelId' => $notification->category,
+                    'categoryId' => $notification->category->value,
+                    'channelId' => $notification->category->value,
                 ],
                 data: ['groupingKey' => $notification->groupingKey],
             ),
@@ -87,7 +87,7 @@ final readonly class ExpoPushSender implements PushSender
             $sent = $this->texter->send($message);
 
             $this->logger->info('Notification push envoyée.', [
-                'category' => $notification->category,
+                'category' => $notification->category->value,
                 'transport' => $sent?->getTransport(),
                 'ticketId' => $sent?->getMessageId(),
             ]);
@@ -97,7 +97,7 @@ final readonly class ExpoPushSender implements PushSender
             $rejection = self::rejectionFrom($e->getMessage());
 
             $this->logger->warning('Notification push refusée par Expo.', [
-                'category' => $notification->category,
+                'category' => $notification->category->value,
                 'rejection' => $rejection->value,
                 'reason' => $e->getMessage(),
             ]);

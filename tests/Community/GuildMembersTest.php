@@ -270,8 +270,8 @@ final class GuildMembersTest extends ApiTestCase
             $player = Uuid::v7();
 
             $connection->executeStatement(
-                'INSERT INTO identity_user (id, email, roles, display_name, timezone, registered_at) VALUES (?, ?, ?, ?, ?, NOW())',
-                [$player->toRfc4122(), 'membre'.$seat.'@grrind.app', '[]', 'Membre '.$seat, 'Europe/Paris'],
+                'INSERT INTO identity_user (id, email, roles, display_name, timezone, registered_at, disabled_notification_categories) VALUES (?, ?, ?, ?, ?, NOW(), ?)',
+                [$player->toRfc4122(), 'membre'.$seat.'@grrind.app', '[]', 'Membre '.$seat, 'Europe/Paris', '[]'],
             );
 
             $connection->executeStatement(

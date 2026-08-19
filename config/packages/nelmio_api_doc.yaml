@@ -411,7 +411,7 @@ when@dev:
 
                     UserProfile:
                         type: object
-                        required: [id, email, displayName, timezone, registeredAt, title, nextTitle]
+                        required: [id, email, displayName, timezone, registeredAt, title, nextTitle, notificationPreferences]
                         properties:
                             id: { type: string, format: uuid }
                             email: { type: string, format: email }
@@ -429,6 +429,14 @@ when@dev:
                                 description: "Le plus proche d'aboutir parmi ceux qui restent. `null` quand il les a tous."
                                 nullable: true
                                 allOf: [{ $ref: '#/components/schemas/PlayerTitle' }]
+                            notificationPreferences:
+                                type: object
+                                description: |
+                                    Toutes les catégories connues, jamais seulement celles coupées (#132) — le
+                                    client lit l'état exact de chacune plutôt que de connaître le défaut. Clé =
+                                    valeur de `NotificationCategory`, valeur = activée.
+                                additionalProperties: { type: boolean }
+                                example: { GUILD_ACTIVITY: true }
 
                     TokenPair:
                         type: object
