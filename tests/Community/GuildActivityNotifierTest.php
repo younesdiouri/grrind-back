@@ -1,0 +1,338 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Community;
+
+use App\Tests\Support\Account;
+use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\Messaging\WorkoutCreditedSpy;
+use App\Tests\Support\SpyingPushSender;
+use DateTimeImmutable;
+use DateTimeInterface;
+use DateTimeZone;
+use Doctrine\DBAL\Connection;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\KernelInterface;
+
+/**
+ * `GuildActivityNotifier` (#133) : une séance créditée réveille la guilde, sans la noyer.
+ *
+ * {@see self::testABatchImportedAtOnceProducesOnePushPerRecipient()} est le test qui dit si
+ * le ticket est fait — c'est celui que la description du ticket met en avant. Les autres
+ * couvrent chacune des règles qui l'y amènent : fraîcheur, agrégation, heures calmes, et
+ * l'absence de destinataire quand l'auteur n'a pas de guilde.
+ */
+final class GuildActivityNotifierTest extends ApiTestCase
+{
+    /**
+     * Un fuseau IANA réel sans heure d'été par décalage UTC entier, pour
+     * {@see self::timezoneShiftingUtcHourTo()}.
+     *
+     * @var array<int, string>
+     */
+    private const array ZONE_BY_UTC_OFFSET = [
+        0 => 'UTC',
+        1 => 'Africa/Lagos',
+        2 => 'Africa/Johannesburg',
+        3 => 'Africa/Nairobi',
+        4 => 'Asia/Dubai',
+        5 => 'Asia/Karachi',
+        6 => 'Asia/Dhaka',
+        7 => 'Asia/Bangkok',
+        8 => 'Asia/Shanghai',
+        9 => 'Asia/Tokyo',
+        10 => 'Australia/Brisbane',
+        11 => 'Pacific/Noumea',
+        12 => 'Pacific/Wallis',
+        13 => 'Pacific/Tongatapu',
+        14 => 'Pacific/Kiritimati',
+        -1 => 'Atlantic/Cape_Verde',
+        -2 => 'America/Noronha',
+        -3 => 'America/Sao_Paulo',
+        -4 => 'America/La_Paz',
+        -5 => 'America/Bogota',
+        -6 => 'America/Guatemala',
+        -7 => 'America/Phoenix',
+        -8 => 'Pacific/Pitcairn',
+        -9 => 'Pacific/Gambier',
+        -10 => 'Pacific/Honolulu',
+        -11 => 'Pacific/Pago_Pago',
+    ];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        WorkoutCreditedSpy::forget();
+        SpyingPushSender::forget();
+    }
+
+    /**
+     * Le test du ticket : un joueur qui rentre après une absence synchronise plusieurs
+     * séances d'un coup, toutes fraîches. Sa guilde ne reçoit qu'**une** annonce chacune,
+     * pas une par séance — trois séances créditées, jamais trois pushes.
+     */
+    public function testABatchImportedAtOnceProducesOnePushPerRecipient(): void
+    {
+        [$author, $recipients] = $this->guildOfFour();
+
+        $response = $this->import($author, [
+            self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 110),
+            self::freshCandidate(externalId: 'HK-2', endedMinutesAgo: 70),
+            self::freshCandidate(externalId: 'HK-3', endedMinutesAgo: 30),
+        ]);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+
+        $this->consumeTheOutbox();
+
+        self::assertCount(3, WorkoutCreditedSpy::$received, 'Les trois séances doivent avoir été créditées pour que le test prouve quelque chose.');
+        $totalXp = array_sum(array_map(static fn ($event) => $event->xpGranted, WorkoutCreditedSpy::$received));
+
+        self::assertCount(\count($recipients), SpyingPushSender::$sent, 'Un push par destinataire, pas un par séance : trois séances créditées ne doivent produire ni zéro ni neuf envois.');
+
+        $recipientIds = array_map(static fn (Account $account): string => $account->id->toRfc4122(), $recipients);
+
+        foreach (SpyingPushSender::$sent as $sent) {
+            self::assertContains($sent['recipientId']->toRfc4122(), $recipientIds, 'Aucun push ne doit viser l\'auteur lui-même ni un joueur d\'une autre guilde.');
+            self::assertSame('GUILD_ACTIVITY', $sent['notification']->category->value);
+            self::assertStringContainsString('3 séances', $sent['notification']->body);
+            self::assertStringContainsString('+'.$totalXp.' XP', $sent['notification']->body);
+        }
+
+        // Un seul destinataire par identifiant : la boucle ci-dessus n'a pas pu compter
+        // deux fois le même joueur pour se donner l'illusion d'un seul push chacun.
+        $notifiedIds = array_map(static fn (array $sent): string => $sent['recipientId']->toRfc4122(), SpyingPushSender::$sent);
+        self::assertCount(\count($recipients), array_unique($notifiedIds));
+    }
+
+    /** Le second cas du même test : tout le lot est ancien, personne n'est notifié. */
+    public function testABatchOfOldSessionsProducesNoPush(): void
+    {
+        [$author] = $this->guildOfFour();
+
+        $this->import($author, [
+            self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 200),
+            self::freshCandidate(externalId: 'HK-2', endedMinutesAgo: 300),
+        ]);
+
+        $this->consumeTheOutbox();
+
+        self::assertCount(2, WorkoutCreditedSpy::$received, 'Un workout ancien reste crédité : seule l\'annonce est retenue, pas l\'XP.');
+        self::assertCount(0, SpyingPushSender::$sent);
+    }
+
+    /**
+     * Une seule séance créditée porte le message détaillé — discipline, durée, XP — plutôt
+     * que la forme agrégée réservée à plusieurs séances.
+     */
+    public function testASingleFreshSessionUsesTheDetailedMessage(): void
+    {
+        [$author] = $this->guildOfFour();
+
+        $this->import($author, [self::freshCandidate(durationSeconds: 2700)]);
+
+        $this->consumeTheOutbox();
+
+        self::assertCount(1, WorkoutCreditedSpy::$received);
+        $xp = WorkoutCreditedSpy::$received[0]->xpGranted;
+
+        self::assertNotCount(0, SpyingPushSender::$sent);
+
+        foreach (SpyingPushSender::$sent as $sent) {
+            self::assertStringContainsString('45 min de course', $sent['notification']->body);
+            self::assertStringContainsString('+'.$xp.' XP', $sent['notification']->body);
+        }
+    }
+
+    /** Pas de guilde, pas de destinataire — et surtout, aucune erreur. */
+    public function testAPlayerWithoutAGuildNotifiesNoOne(): void
+    {
+        $solo = $this->openAccount('solo@grrind.app', 'Solo');
+
+        $response = $this->import($solo, [self::freshCandidate()]);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+
+        $this->consumeTheOutbox();
+
+        self::assertCount(1, WorkoutCreditedSpy::$received);
+        self::assertCount(0, SpyingPushSender::$sent);
+    }
+
+    /**
+     * Les heures calmes se lisent dans le fuseau du **destinataire** : le même événement
+     * réveille l'un et laisse l'autre tranquille.
+     */
+    public function testQuietHoursAreEvaluatedPerRecipient(): void
+    {
+        $author = $this->openAccount('author@grrind.app', 'Author');
+        $guildId = $this->foundGuild($author);
+
+        $awake = $this->openAccount('awake@grrind.app', 'Awake');
+        $asleep = $this->openAccount('asleep@grrind.app', 'Asleep');
+
+        $this->join($awake, $this->issueCode($author, $guildId));
+        $this->join($asleep, $this->issueCode($author, $guildId));
+
+        // Heures calmes : 22h-8h (notifications.yaml). Le fuseau de chacun est choisi à
+        // l'instant du test pour placer son heure locale loin des deux bornes — 15h pour
+        // l'un, 2h du matin pour l'autre — plutôt que de figer deux fuseaux dont l'écart
+        // avec « maintenant » varie avec le jour où le test tourne.
+        $this->send('PATCH', '/api/me', ['timezone' => self::timezoneShiftingUtcHourTo(15)], $awake->headers);
+        $this->send('PATCH', '/api/me', ['timezone' => self::timezoneShiftingUtcHourTo(2)], $asleep->headers);
+
+        $this->import($author, [self::freshCandidate()]);
+        $this->consumeTheOutbox();
+
+        $notifiedIds = array_map(static fn (array $sent): string => $sent['recipientId']->toRfc4122(), SpyingPushSender::$sent);
+
+        self::assertContains($awake->id->toRfc4122(), $notifiedIds);
+        self::assertNotContains($asleep->id->toRfc4122(), $notifiedIds);
+    }
+
+    /**
+     * @return array{0: Account, 1: list<Account>, 2: string}
+     */
+    private function guildOfFour(): array
+    {
+        $author = $this->openAccount('author@grrind.app', 'Author');
+        $guildId = $this->foundGuild($author);
+
+        $recipients = [];
+
+        foreach (['margot@grrind.app', 'noe@grrind.app', 'lea@grrind.app'] as $index => $email) {
+            $recipient = $this->openAccount($email, 'Membre'.$index);
+            $this->join($recipient, $this->issueCode($author, $guildId));
+            $recipients[] = $recipient;
+        }
+
+        return [$author, $recipients, $guildId];
+    }
+
+    private function foundGuild(Account $founder, string $name = 'Les Increvables'): string
+    {
+        $response = $this->post('/api/guilds', ['name' => $name], $founder->headers);
+        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
+
+        $id = self::decode($response)['id'];
+        self::assertIsString($id);
+
+        return $id;
+    }
+
+    private function issueCode(Account $founder, string $guildId): string
+    {
+        $response = $this->post('/api/guilds/'.$guildId.'/invite-code', [], $founder->headers);
+        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
+
+        $code = self::decode($response)['code'];
+        self::assertIsString($code);
+
+        return $code;
+    }
+
+    private function join(Account $player, string $code): Response
+    {
+        $response = $this->post('/api/guilds/join', ['code' => $code], $player->headers);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+
+        return $response;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $workouts
+     */
+    private function import(Account $account, array $workouts, string $key = 'import-du-jour'): Response
+    {
+        return $this->post(
+            '/api/workouts/import',
+            ['workouts' => $workouts],
+            $account->headers + ['Idempotency-Key' => $key],
+        );
+    }
+
+    /**
+     * Le fuseau dont l'heure locale vaut `$targetLocalHour` **à l'instant où le test
+     * tourne** — pas un fuseau fixé une fois pour toutes, dont l'écart avec l'heure réelle
+     * changerait selon le jour de l'exécution et rendrait ce test dépendant de l'heure à
+     * laquelle la suite passe.
+     */
+    private static function timezoneShiftingUtcHourTo(int $targetLocalHour): string
+    {
+        $utcHour = (int) new DateTimeImmutable('now', new DateTimeZone('UTC'))->format('G');
+        $offset = ($targetLocalHour - $utcHour + 24) % 24;
+
+        if ($offset > 14) {
+            $offset -= 24;
+        }
+
+        return self::ZONE_BY_UTC_OFFSET[$offset];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function freshCandidate(
+        string $externalId = 'HK-001',
+        int $endedMinutesAgo = 5,
+        int $durationSeconds = 1800,
+    ): array {
+        $endedAt = new DateTimeImmutable(\sprintf('-%d minutes', $endedMinutesAgo));
+        $startedAt = $endedAt->modify(\sprintf('-%d seconds', $durationSeconds));
+
+        return [
+            'externalId' => $externalId,
+            'source' => 'APPLE_HEALTH',
+            'activityType' => 'running',
+            'startedAt' => $startedAt->format(DateTimeInterface::ATOM),
+            'endedAt' => $endedAt->format(DateTimeInterface::ATOM),
+        ];
+    }
+
+    /**
+     * Draine l'outbox entière, y compris ce qu'un message en cours de traitement y ajoute
+     * — `AnnounceGuildActivity` est dispatchée *pendant* le traitement de `WorkoutCredited`,
+     * donc un unique appel borné au nombre de messages présents au démarrage la manquerait.
+     */
+    private function consumeTheOutbox(): void
+    {
+        while (($pending = $this->outboxSize()) > 0) {
+            $application = new Application(self::bootedKernel());
+            $application->setAutoExit(false);
+
+            $tester = new CommandTester($application->find('messenger:consume'));
+            $status = $tester->execute([
+                'receivers' => ['outbox'],
+                '--limit' => $pending,
+                '--time-limit' => 10,
+            ]);
+
+            self::assertSame(0, $status, $tester->getDisplay());
+        }
+    }
+
+    private static function bootedKernel(): KernelInterface
+    {
+        $kernel = self::$kernel;
+        self::assertInstanceOf(KernelInterface::class, $kernel);
+
+        return $kernel;
+    }
+
+    private function outboxSize(): int
+    {
+        $pending = $this->connection()->fetchOne('SELECT COUNT(*) FROM messenger_messages');
+        self::assertIsNumeric($pending);
+
+        return (int) $pending;
+    }
+
+    private function connection(): Connection
+    {
+        $connection = self::getContainer()->get('doctrine.dbal.default_connection');
+        self::assertInstanceOf(Connection::class, $connection);
+
+        return $connection;
+    }
+}

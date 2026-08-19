@@ -59,6 +59,18 @@ services:
             $maximumMembers: '%game.community.maximum_members%'
             $inviteCodeLifetimeHours: '%game.community.invite_code_lifetime_hours%'
 
+    # Les heures calmes d'un destinataire (#133), tirées de `game/v1/notifications.yaml`.
+    App\Community\Domain\QuietHours:
+        arguments:
+            $startHour: '%game.notifications.quiet_hours_start_hour%'
+            $endHour: '%game.notifications.quiet_hours_end_hour%'
+
+    # La fraîcheur d'une séance créditée : au-delà, c'est de l'historique, pas une raison
+    # de réveiller la guilde.
+    App\Community\Application\GuildActivityNotifier:
+        arguments:
+            $freshnessWindowMinutes: '%game.notifications.freshness_window_minutes%'
+
     App\Progression\Domain\LevelCurve:
         arguments:
             $levels: '%game.levels.levels%'
@@ -173,6 +185,14 @@ when@test:
         # Route protégée qui sert de sonde à l'idempotence.
         App\Tests\Support\Http\:
             resource: '../tests/Support/Http/'
+
+        # N'écrase pas l'alias global `PushSender` — voir son docblock — seulement ce
+        # que consomme `AnnounceGuildActivityHandler` (#133), pour observer ses envois
+        # sans dépendre des logs du transport Expo nul.
+        App\Tests\Support\SpyingPushSender: ~
+        App\Community\Application\AnnounceGuildActivityHandler:
+            arguments:
+                $pushSender: '@App\Tests\Support\SpyingPushSender'
 
         # L'abonné qui prouve qu'un module tiers réagit à un workout importé sans être
         # nommé nulle part. Il n'est pas autoconfiguré par le `App\Tests\` du dessus — il

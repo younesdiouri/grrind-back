@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Shared\Config;
 
 use App\Community\Infrastructure\Config\CommunitySection;
+use App\Community\Infrastructure\Config\NotificationsSection;
 use App\Progression\Infrastructure\Config\LevelsSection;
 use App\Progression\Infrastructure\Config\TitlesSection;
 use App\Progression\Infrastructure\Config\XpSection;
@@ -33,7 +34,7 @@ final class GameBalanceLoaderTest extends TestCase
 
         // Toutes les sections déclarées, et rien d'autre : c'est la garde contre le
         // fichier oublié qui l'affirme, section par section.
-        self::assertSame(['activity_types', 'community', 'levels', 'titles', 'training', 'xp'], array_keys($balance->sections));
+        self::assertSame(['activity_types', 'community', 'levels', 'notifications', 'titles', 'training', 'xp'], array_keys($balance->sections));
     }
 
     public function testDerivesTheRulesetVersionFromTheFolderAndItsContent(): void
@@ -95,7 +96,7 @@ final class GameBalanceLoaderTest extends TestCase
     private static function loadShipped(): GameBalance
     {
         return new GameBalanceLoader(\dirname(__DIR__, 3).'/config/game/v1')
-            ->load(new TrainingSection(), new ActivityTypesSection(), new XpSection(), new LevelsSection(), new TitlesSection(), new CommunitySection());
+            ->load(new TrainingSection(), new ActivityTypesSection(), new XpSection(), new LevelsSection(), new TitlesSection(), new CommunitySection(), new NotificationsSection());
     }
 
     /** Les fixtures ne contiennent qu'un `training.yaml` : une seule section à déclarer. */

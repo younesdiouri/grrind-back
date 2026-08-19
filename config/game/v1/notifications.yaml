@@ -1,0 +1,27 @@
+# Les garde-fous qui empêchent une séance créditée de noyer une guilde de notifications
+# (#133). Ce sont des règles de game design, du même ordre que les garde-fous anti-abus de
+# `training.yaml` : ce qui protège un joueur d'un import massif protège aussi ses
+# co-équipiers d'un push par séance.
+#
+# Ce fichier est de la donnée, pas de la configuration Symfony : il est lu et validé à la
+# compilation du conteneur par App\Community\Infrastructure\Config\NotificationsSection, et
+# il entre dans le `rulesetVersion`. Une clé inconnue fait échouer le démarrage.
+#
+# Le plafond par destinataire n'est **pas** ici — voir le docblock de `NotificationsSection`
+# pour pourquoi il vit dans `config/packages/rate_limiter.yaml`, à côté de `guild_join`.
+
+# ————— Fraîcheur ————————————————————————————————————————————————————————————————————
+#
+# Le joueur qui rentre de dix jours d'absence fait dix séances d'un coup : elles sont
+# toutes vraies, aucune n'est neuve. Deux heures couvrent le délai normal entre la fin
+# d'une séance et sa synchronisation — la montre qui traîne dans une poche, le téléphone en
+# charge — sans laisser passer l'historique d'un rattrapage.
+freshness_window_minutes: 120
+
+# ————— Heures calmes ———————————————————————————————————————————————————————————————
+#
+# Dans le fuseau du **destinataire**, jamais celui de l'auteur ni du serveur : une séance à
+# 5h du matin à Tokyo ne doit réveiller personne à Paris, et réciproquement. De 22h à 8h
+# couvre une nuit standard sans empiéter sur une fin de soirée ou un lève-tôt.
+quiet_hours_start_hour: 22
+quiet_hours_end_hour: 8
