@@ -30,3 +30,8 @@ framework:
             # l'ordre du transport seul, est ce qui garantit qu'il est traité après les
             # séances créditées du même lot.
             App\Community\Application\AnnounceGuildActivity: outbox
+
+            # Même geste, côté `Shared` (#131) : un déclencheur sans charge utile, jamais
+            # traité avant le `DelayStamp` posé par `ExpoPushSender` ou par le handler
+            # lui-même — voir le docblock de `CheckExpoPushReceipts`.
+            App\Shared\Infrastructure\Notifier\CheckExpoPushReceipts: outbox
