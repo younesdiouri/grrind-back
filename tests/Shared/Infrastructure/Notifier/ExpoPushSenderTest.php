@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Shared\Infrastructure\Notifier;
 
 use App\Shared\Application\PushNotification;
+use App\Shared\Application\PushRejection;
 use App\Shared\Application\PushTargets;
 use App\Shared\Infrastructure\Notifier\ExpoPushSender;
 use PHPUnit\Framework\TestCase;
@@ -67,23 +68,65 @@ final class ExpoPushSenderTest extends TestCase
 
     /**
      * Un jeton mort ne doit pas priver les autres appareils du joueur de la
-     * notification — la même tolérance que l'import face à un workout écarté. Et le
-     * ticket refusé garde de quoi être exploité par le #131, qui invalidera le jeton.
+     * notification — la même tolérance que l'import face à un workout écarté.
      */
-    public function testARejectedTokenDoesNotStopTheOthersAndKeepsItsReason(): void
+    public function testARejectedTokenDoesNotStopTheOthers(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(self::texterRejecting('dead-token', 'DeviceNotRegistered'), self::targetsOf($bob, ['dead-token', 'live-token']), new NullLogger());
+        $sender = new ExpoPushSender(self::texterRejecting('dead-token', self::bridgeMessage('DeviceNotRegistered')), self::targetsOf($bob, ['dead-token', 'live-token']), new NullLogger());
 
         [$dead, $live] = $sender->send($bob, self::notification());
 
         self::assertSame('dead-token', $dead->pushToken);
         self::assertFalse($dead->accepted);
         self::assertNull($dead->ticketId);
-        self::assertSame('DeviceNotRegistered', $dead->reason);
 
         self::assertSame('live-token', $live->pushToken);
         self::assertTrue($live->accepted);
+    }
+
+    /**
+     * L'extraction que {@see PushRejection} documente : le code n'est nulle part ailleurs
+     * que dans ce message formaté par `ExpoTransport::doSend()`, reconstitué ici tel
+     * quel — pas une approximation, le vrai format que le bundle produit.
+     */
+    public function testARealBridgeMessageResolvesToItsPushRejection(): void
+    {
+        $bob = Uuid::v7();
+        $bridgeMessage = self::bridgeMessage('DeviceNotRegistered');
+        $sender = new ExpoPushSender(self::texterRejecting('dead-token', $bridgeMessage), self::targetsOf($bob, ['dead-token']), new NullLogger());
+
+        [$ticket] = $sender->send($bob, self::notification());
+
+        self::assertSame(PushRejection::DeviceNotRegistered, $ticket->rejection);
+        self::assertSame($bridgeMessage, $ticket->rawReason);
+    }
+
+    /**
+     * Tout ce qui ne matche pas le format connu — panne réseau, réponse non-200 sans
+     * détail structuré, un futur format de bundle — rend `Unknown` plutôt que de lever :
+     * un format inattendu ne doit jamais faire tomber l'envoi aux autres jetons.
+     */
+    public function testAnUnrecognizedMessageResolvesToUnknown(): void
+    {
+        $bob = Uuid::v7();
+        $networkFailure = 'Could not reach the remote Expo server.';
+        $sender = new ExpoPushSender(self::texterRejecting('dead-token', $networkFailure), self::targetsOf($bob, ['dead-token']), new NullLogger());
+
+        [$ticket] = $sender->send($bob, self::notification());
+
+        self::assertSame(PushRejection::Unknown, $ticket->rejection);
+        self::assertSame($networkFailure, $ticket->rawReason);
+    }
+
+    /**
+     * Le format exact que lève `ExpoTransport::doSend()` (`symfony/expo-notifier`) sur
+     * un ticket refusé — voir le docblock de {@see PushRejection}. Le message côté Expo
+     * ($message) n'importe pas ici, seul le code entre parenthèses en fin de chaîne compte.
+     */
+    private static function bridgeMessage(string $expoCode): string
+    {
+        return \sprintf('Unable to post the Expo message: "%s" (%s)', 'the token is not a valid Expo push token', $expoCode);
     }
 
     private static function notification(): PushNotification

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Notifier;
 
 use App\Shared\Application\PushNotification;
+use App\Shared\Application\PushRejection;
 use App\Shared\Application\PushSender;
 use App\Shared\Application\PushTargets;
 use App\Shared\Application\PushTicket;
@@ -36,6 +37,13 @@ use Symfony\Component\Uid\Uuid;
  * jeton mort ne doit pas priver les autres appareils du joueur de la notification — même
  * logique que l'import qui écarte un workout sans annuler les neuf autres. L'échec est
  * donc consigné dans le {@see PushTicket} de ce jeton, jamais relancé.
+ *
+ * **C'est ici, et nulle part ailleurs, que le vocabulaire Expo s'arrête.** Le
+ * `TransportException` du bridge ne porte son code d'erreur (`DeviceNotRegistered`, …)
+ * que dans un message formaté — voir {@see PushRejection} pour le format exact et
+ * pourquoi ce n'est pas plus fiable. `rejectionFrom()` en fait la seule extraction du
+ * projet ; un consommateur du port (#131 compris) ne lit qu'un enum fermé, jamais une
+ * sous-chaîne d'un message tiers.
  */
 final readonly class ExpoPushSender implements PushSender
 {
@@ -86,12 +94,31 @@ final readonly class ExpoPushSender implements PushSender
 
             return PushTicket::accepted($pushToken, $sent?->getMessageId());
         } catch (TransportExceptionInterface $e) {
+            $rejection = self::rejectionFrom($e->getMessage());
+
             $this->logger->warning('Notification push refusée par Expo.', [
                 'category' => $notification->category,
+                'rejection' => $rejection->value,
                 'reason' => $e->getMessage(),
             ]);
 
-            return PushTicket::rejected($pushToken, $e->getMessage());
+            return PushTicket::rejected($pushToken, $rejection, $e->getMessage());
         }
+    }
+
+    /**
+     * Récupère le code Expo dans le message formaté par `ExpoTransport::doSend()` — voir
+     * le docblock de {@see PushRejection} pour le format exact. Un message qui ne s'y
+     * conforme pas (panne réseau, réponse non-200 sans détail structuré, un futur format
+     * de bundle) rend {@see PushRejection::Unknown} plutôt que de lever : un format
+     * inattendu ne doit jamais faire tomber l'envoi aux autres jetons du joueur.
+     */
+    private static function rejectionFrom(string $message): PushRejection
+    {
+        if (1 !== preg_match('/\(([^()]+)\)$/', $message, $matches)) {
+            return PushRejection::Unknown;
+        }
+
+        return PushRejection::tryFrom($matches[1]) ?? PushRejection::Unknown;
     }
 }
