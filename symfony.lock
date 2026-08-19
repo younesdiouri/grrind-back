@@ -123,6 +123,15 @@
             "bin/console"
         ]
     },
+    "symfony/expo-notifier": {
+        "version": "8.1",
+        "recipe": {
+            "repo": "github.com/symfony/recipes",
+            "branch": "main",
+            "version": "5.4",
+            "ref": "5648ba1ac04dff2dee601da75703b5b6034a791e"
+        }
+    },
     "symfony/flex": {
         "version": "2.11",
         "recipe": {
@@ -187,6 +196,18 @@
         },
         "files": [
             "config/packages/monolog.yaml"
+        ]
+    },
+    "symfony/notifier": {
+        "version": "8.1",
+        "recipe": {
+            "repo": "github.com/symfony/recipes",
+            "branch": "main",
+            "version": "5.0",
+            "ref": "178877daf79d2dbd62129dd03612cb1a2cb407cc"
+        },
+        "files": [
+            "config/packages/notifier.yaml"
         ]
     },
     "symfony/property-info": {

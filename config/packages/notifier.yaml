@@ -1,0 +1,18 @@
+# Un seul canal : Push, par TexterInterface. `NotifierInterface`/`Notification`/
+# `Recipient` — le multi-canal (email, chat, urgence) que la recette Flex propose par
+# défaut — ne correspond à aucun besoin du produit ; le garder aurait laissé deux façons
+# de faire la même chose dans le conteneur, dont une jamais appelée.
+framework:
+    notifier:
+        texter_transports:
+            expo: '%env(EXPO_DSN)%'
+
+when@test:
+    framework:
+        notifier:
+            texter_transports:
+                # Aucune suite de tests ne peut appeler Expo, quelle que soit la valeur
+                # de EXPO_DSN sur le poste qui l'exécute — même règle que
+                # StubSocialProfileResolver pour Google/Apple, appliquée ici par le
+                # transport nul que Symfony fournit plutôt que par un stub à nous.
+                expo: 'null://null'
