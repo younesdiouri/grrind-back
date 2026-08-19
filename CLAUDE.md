@@ -398,3 +398,29 @@ reproduisent.
 Le mapping Doctrine n'a **pas** d'`auto_mapping` : chaque module déclare le sien dans
 `config/packages/doctrine.yaml` au moment de son lot. Idem pour les layers Deptrac, déjà déclarés
 dans `deptrac.yaml` pour les sept modules.
+
+## Qui écrit quoi : l'architecte et le développeur
+
+Le travail se fait à deux, et la séparation n'est pas une répartition de charge — c'est **une
+relecture par quelqu'un qui n'a pas écrit le code**.
+
+```
+        Architecte  ──────────────►  developer-sonnet  ──────────────►  PR  ──────────────►  Architecte
+        (Opus)        délègue         (.claude/agents/)     ouvre                              revue finale
+                                                                                               et fusion
+   ticket rédigé,                 implémentation, tests,                              relit contre le ticket,
+   périmètre tranché              lint, typecheck, commits                            fusionne ou renvoie
+```
+
+**L'architecte** rédige le ticket avant qu'une ligne soit écrite : le *pourquoi*, le périmètre en
+cases à cocher, et surtout **ce qu'on ne fait pas**. Un ticket qui laisse le comment ouvert est
+normal ; un ticket qui laisse le pourquoi ouvert ne part pas.
+
+**`developer-sonnet`** implémente le ticket en entier et ouvre la PR. Il ne fusionne jamais, il
+ne réduit jamais le périmètre de lui-même, et il **remonte au lieu de contourner** quand un
+invariant du client lui barre la route. Sa fiche vit dans `.claude/agents/developer-sonnet.md`
+et porte les six interdits sous une forme opérationnelle.
+
+**La revue finale revient à l'architecte**, et elle se fait *contre le ticket* : ce qui est coché
+l'est-il vraiment, ce qui ne l'est pas est-il expliqué, et la PR a-t-elle tranché quelque chose
+qui aurait dû remonter. C'est là, et pas dans le CI, que les décisions de produit se tiennent.
