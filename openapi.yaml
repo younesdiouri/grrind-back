@@ -284,6 +284,28 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  /api/devices:
+    post:
+      tags:
+        - Appareils
+      operationId: post_identity_device_register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '200':
+          description: "L'appareil est enregistré — ou son propriétaire mis à jour si le jeton appartenait à un autre compte."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /api/auth/login:
     post:
       tags:
@@ -1013,6 +1035,39 @@ components:
         tokens:
           $ref: '#/components/schemas/TokenPair'
       type: object
+    Device:
+      description: "Un appareil enregistré pour la notification push. Rendu par `POST /api/devices`,\nque l'appel soit un premier enregistrement ou un réenregistrement — la route est\nun upsert par construction, et rien dans la réponse ne distingue les deux cas.\n\n**Le jeton n'y figure jamais.** Le client vient de l'envoyer ; le faire revenir\ndans une réponse HTTP en ferait une valeur qui finit dans des logs pour rien.\n"
+      required:
+        - id
+        - platform
+        - environment
+        - registeredAt
+        - lastSeenAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        platform:
+          description: "Le système de l'appareil. Deux valeurs aujourd'hui, comme `source` n'en avait que deux au premier jour — l'enum est prévue pour en accueillir d'autres sans que la forme bouge."
+          type: string
+          enum:
+            - IOS
+            - ANDROID
+        environment:
+          description: "Le canal de build qui a émis le jeton. Un même appareil produit un jeton différent selon qu'il tourne un client de dev Expo ou un build publié — sans ce champ, une campagne de production irait aussi aux téléphones des développeurs."
+          type: string
+          enum:
+            - DEVELOPMENT
+            - PRODUCTION
+        registeredAt:
+          description: "Le tout premier enregistrement de ce jeton. Ne bouge pas si le même jeton change de propriétaire — c'est `lastSeenAt` qui le signale."
+          type: string
+          format: date-time
+        lastSeenAt:
+          description: "Rafraîchi à chaque appel de la route, y compris quand rien d'autre ne change."
+          type: string
+          format: date-time
+      type: object
     Workout:
       description: "**La seule forme d'un workout dans toute l'API** — l'historique la sert, le `SyncSummary`\nl'embarque telle quelle. Un client décode un seul type.\n\nUne séance **déjà faite** : elle n'a pas d'état, et `endedAt` comme `durationSeconds` ne\nsont pas nullables. Un workout arrive terminé ou n'arrive pas.\n\n`durationSeconds` est calculée par le serveur à partir des deux bornes, jamais recopiée\nd'un champ envoyé par le client. C'est la durée **réellement mesurée** : au-delà du\nplafond, l'XP est calculée sur une durée écrêtée, mais l'historique dit ce qui s'est\npassé.\n\n**Les mesures sont nullables, et c'est structurel** : aucun appareil ne fournit tout.\n`null` veut dire « non mesuré », jamais zéro — un tour de piste plat a bien un dénivelé\nde zéro.\n"
       required:
@@ -1523,6 +1578,35 @@ components:
           maxLength: 8
           minLength: 8
       type: object
+    DevicePlatform:
+      type: string
+      enum:
+        - IOS
+        - ANDROID
+    DeviceEnvironment:
+      type: string
+      enum:
+        - DEVELOPMENT
+        - PRODUCTION
+    RegisterDeviceRequest:
+      properties:
+        pushToken:
+          type: string
+          default: ''
+          maxLength: 255
+        platform:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/DevicePlatform'
+          default: null
+        environment:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/DeviceEnvironment'
+          default: null
+      type: object
     RefreshTokenRequest:
       properties:
         refreshToken:
@@ -1767,6 +1851,8 @@ security:
 tags:
   -
     name: Guildes
+  -
+    name: Appareils
   -
     name: Authentification
   -

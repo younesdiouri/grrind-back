@@ -453,6 +453,35 @@ when@dev:
                             user: { $ref: '#/components/schemas/UserProfile' }
                             tokens: { $ref: '#/components/schemas/TokenPair' }
 
+                    Device:
+                        type: object
+                        description: |
+                            Un appareil enregistré pour la notification push. Rendu par `POST /api/devices`,
+                            que l'appel soit un premier enregistrement ou un réenregistrement — la route est
+                            un upsert par construction, et rien dans la réponse ne distingue les deux cas.
+
+                            **Le jeton n'y figure jamais.** Le client vient de l'envoyer ; le faire revenir
+                            dans une réponse HTTP en ferait une valeur qui finit dans des logs pour rien.
+                        required: [id, platform, environment, registeredAt, lastSeenAt]
+                        properties:
+                            id: { type: string, format: uuid }
+                            platform:
+                                type: string
+                                enum: [IOS, ANDROID]
+                                description: "Le système de l'appareil. Deux valeurs aujourd'hui, comme `source` n'en avait que deux au premier jour — l'enum est prévue pour en accueillir d'autres sans que la forme bouge."
+                            environment:
+                                type: string
+                                enum: [DEVELOPMENT, PRODUCTION]
+                                description: "Le canal de build qui a émis le jeton. Un même appareil produit un jeton différent selon qu'il tourne un client de dev Expo ou un build publié — sans ce champ, une campagne de production irait aussi aux téléphones des développeurs."
+                            registeredAt:
+                                type: string
+                                format: date-time
+                                description: "Le tout premier enregistrement de ce jeton. Ne bouge pas si le même jeton change de propriétaire — c'est `lastSeenAt` qui le signale."
+                            lastSeenAt:
+                                type: string
+                                format: date-time
+                                description: "Rafraîchi à chaque appel de la route, y compris quand rien d'autre ne change."
+
                     # ————— Entraînement ————————————————————————————————————————————————
                     Workout:
                         type: object
