@@ -106,6 +106,11 @@ services:
     # joueur sans jamais importer une entité `Identity`, comme les précédents.
     App\Shared\Application\PushTargets: '@App\Identity\Infrastructure\Doctrine\UserDeviceRepository'
 
+    # Le bridge Expo posé au #130 : contrairement aux autres ports, l'implémentation vit
+    # dans `Shared` lui-même — traduire vers Expo n'appartient à aucun module métier, et
+    # `ExpoPushSender` ne fait que consommer le port `PushTargets` juste au-dessus.
+    App\Shared\Application\PushSender: '@App\Shared\Infrastructure\Notifier\ExpoPushSender'
+
     # Providers league/oauth2-client câblés directement : KnpUOAuth2ClientBundle a été
     # écarté (décision Lot 1bis). Ils sont derrière un service locator dans le résolveur,
     # donc construits à la demande — le constructeur d'Apple refuse une configuration
@@ -150,6 +155,14 @@ when@test:
             public: true
 
         App\Progression\Application\GrantXpHandler:
+            public: true
+
+        # Public pour que le test de câblage l'appelle sans détour : sans autre
+        # consommateur que l'alias lui-même, le compilateur l'inlinerait sinon et
+        # `self::getContainer()->get(PushSender::class)` échouerait — même besoin que
+        # `DailyLoadProvider` et `GrantXpHandler` juste au-dessus.
+        App\Shared\Application\PushSender:
+            alias: App\Shared\Infrastructure\Notifier\ExpoPushSender
             public: true
 
         # Route protégée qui sert de sonde à l'idempotence.
