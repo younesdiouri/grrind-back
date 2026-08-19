@@ -970,6 +970,7 @@ components:
         - registeredAt
         - title
         - nextTitle
+        - notificationPreferences
       properties:
         id:
           type: string
@@ -998,6 +999,13 @@ components:
           allOf:
             -
               $ref: '#/components/schemas/PlayerTitle'
+        notificationPreferences:
+          description: "Toutes les catégories connues, jamais seulement celles coupées (#132) — le\nclient lit l'état exact de chacune plutôt que de connaître le défaut. Clé =\nvaleur de `NotificationCategory`, valeur = activée.\n"
+          type: object
+          example:
+            GUILD_ACTIVITY: true
+          additionalProperties:
+            type: boolean
       type: object
     TokenPair:
       description: "Deux jetons de nature différente. Le JWT porte l'identité et ne se révoque pas —\nd'où sa courte durée. Le refresh token est **à usage unique et rotatif**, groupé par\nfamille : une famille est un appareil connecté, s'en déconnecter la révoque\nentièrement. Rejouer un jeton déjà consommé révoque toute la famille.\n"
@@ -1613,6 +1621,23 @@ components:
           type: string
           default: ''
       type: object
+    NotificationCategory:
+      type: string
+      enum:
+        - GUILD_ACTIVITY
+    NotificationPreferenceRequest:
+      properties:
+        category:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/NotificationCategory'
+          default: null
+        enabled:
+          type: boolean
+          nullable: true
+          default: null
+      type: object
     UpdateProfileRequest:
       properties:
         displayName:
@@ -1624,6 +1649,11 @@ components:
           type: string
           nullable: true
           default: null
+        notificationPreferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationPreferenceRequest'
+          default: []
       type: object
     RegisterRequest:
       properties:
