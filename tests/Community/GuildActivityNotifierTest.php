@@ -6,6 +6,10 @@ namespace App\Tests\Community;
 
 use App\Community\Application\AnnounceGuildActivity;
 use App\Community\Application\AnnounceGuildActivityHandler;
+use App\Community\Domain\PendingGuildActivity;
+use App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository;
+use App\Shared\Domain\NotificationCategory;
+use App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\Messaging\WorkoutCreditedSpy;
@@ -18,6 +22,7 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\KernelInterface;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * `GuildActivityNotifier` (#133) : une séance créditée réveille la guilde, sans la noyer.
@@ -241,6 +246,107 @@ final class GuildActivityNotifierTest extends ApiTestCase
     }
 
     /**
+     * Le #134 : un rejeu du même message après un traitement déjà complet ne renvoie rien
+     * — la fenêtre a été refermée par la première exécution, `activityFor()` la trouve
+     * absente et le handler ressort sans y toucher. C'est le cas nominal du « au moins une
+     * fois » de l'outbox : l'accusé de réception se perd, le message revient, personne ne
+     * doit rien recevoir une seconde fois.
+     */
+    public function testAReplayedAnnouncementAfterFullSuccessSendsNothingAgain(): void
+    {
+        [$author, $recipients] = $this->guildOfFour();
+
+        $this->import($author, [self::freshCandidate()]);
+        $this->consumeTheOutbox();
+
+        $windowId = $this->flushPendingAnnouncement($author);
+        self::assertCount(\count($recipients), SpyingPushSender::$sent, 'La première exécution doit avoir notifié tout le monde pour que le rejeu démontre quelque chose.');
+
+        $this->announce($author, $windowId);
+
+        self::assertCount(\count($recipients), SpyingPushSender::$sent, 'Le rejeu du même message ne doit ajouter aucun envoi : la fenêtre est déjà refermée.');
+    }
+
+    /**
+     * Le cas que le #134 cible vraiment : une panne *au milieu* de la boucle d'envoi, pas
+     * après. Un destinataire porte déjà une trace de livraison — comme s'il avait reçu son
+     * push avant que le worker ne tombe — et le rejeu du même message ne doit renvoyer
+     * qu'aux deux autres, jamais à lui.
+     */
+    public function testARetriedAnnouncementSkipsAnAlreadyDeliveredRecipientAndReachesTheOthers(): void
+    {
+        [$author, $recipients] = $this->guildOfFour();
+
+        $this->import($author, [self::freshCandidate()]);
+        $this->consumeTheOutbox();
+
+        $windowId = $this->currentWindowId($author);
+        $alreadyNotified = $recipients[0];
+
+        $deliveries = self::getContainer()->get(NotificationDeliveryRepository::class);
+        self::assertInstanceOf(NotificationDeliveryRepository::class, $deliveries);
+        self::assertTrue($deliveries->claim($windowId, $alreadyNotified->id, NotificationCategory::GuildActivity, new DateTimeImmutable()), 'La réservation doit réussir la première fois — c\'est ce qui simule l\'envoi déjà parti avant la panne.');
+
+        $this->announce($author, $windowId);
+
+        $notifiedIds = array_map(static fn (array $sent): string => $sent['recipientId']->toRfc4122(), SpyingPushSender::$sent);
+
+        self::assertCount(2, SpyingPushSender::$sent, 'Le destinataire déjà tracé ne doit pas recevoir de second envoi, mais les deux autres doivent recevoir le leur malgré la panne simulée.');
+        self::assertNotContains($alreadyNotified->id->toRfc4122(), $notifiedIds, 'Ce destinataire a « déjà reçu » son push avant la panne simulée : le rejeu ne doit pas le renotifier.');
+    }
+
+    /**
+     * Le scénario que la revue du #134 a mis en évidence : un handler qui épuise ses trois
+     * tentatives (`messenger.yaml`) laisse la fenêtre ouverte pour de bon, puisque `close()`
+     * ne se déclenche plus qu'en sortie normale. Sans `stale_window_minutes`, plus aucune
+     * séance suivante de cet auteur ne redéclencherait d'annonce — la guilde deviendrait
+     * muette en silence. Une fenêtre vieillie au-delà du seuil doit donc repartir, sur le
+     * même `windowId`, et sans renotifier qui que ce soit déjà servi avant l'abandon.
+     */
+    public function testAnAbandonedWindowReopensWithoutDoublyNotifyingAlreadyServedRecipients(): void
+    {
+        [$author, $recipients] = $this->guildOfFour();
+
+        $this->import($author, [self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 90)]);
+        $this->consumeTheOutbox();
+
+        $windowId = $this->currentWindowId($author);
+        $alreadyNotified = $recipients[0];
+
+        // Comme si le worker était mort après avoir notifié ce seul destinataire, sur les
+        // trois tentatives permises — le message est parti sur le transport `failed`, plus
+        // personne ne le rejoue, et la fenêtre reste ouverte sans que `close()` n'ait jamais
+        // été appelée.
+        $deliveries = self::getContainer()->get(NotificationDeliveryRepository::class);
+        self::assertInstanceOf(NotificationDeliveryRepository::class, $deliveries);
+        self::assertTrue($deliveries->claim($windowId, $alreadyNotified->id, NotificationCategory::GuildActivity, new DateTimeImmutable()));
+
+        // `stale_window_minutes` (notifications.yaml) vaut quinze minutes : on recule
+        // `opened_at` bien au-delà pour que `recordSession()` traite la fenêtre comme
+        // abandonnée plutôt que comme une annonce encore en vol.
+        $this->connection()->executeStatement(
+            "UPDATE community_pending_guild_activity SET opened_at = NOW() - INTERVAL '20 minutes' WHERE author_id = :authorId",
+            ['authorId' => $author->id->toRfc4122()],
+        );
+
+        $this->import($author, [self::freshCandidate(externalId: 'HK-2', endedMinutesAgo: 5)], key: 'import-suivant');
+        $this->consumeTheOutbox();
+
+        self::assertSame(
+            $windowId->toRfc4122(),
+            $this->currentWindowId($author)->toRfc4122(),
+            'Une fenêtre abandonnée se réutilise, elle n\'en ouvre pas une seconde : c\'est ce qui garde la trace de livraison déjà écrite valide pour la suite.',
+        );
+
+        $this->flushPendingAnnouncement($author);
+
+        $notifiedIds = array_map(static fn (array $sent): string => $sent['recipientId']->toRfc4122(), SpyingPushSender::$sent);
+
+        self::assertCount(2, SpyingPushSender::$sent, 'La fenêtre abandonnée doit repartir vers les deux destinataires jamais servis.');
+        self::assertNotContains($alreadyNotified->id->toRfc4122(), $notifiedIds, 'Celui déjà notifié avant l\'abandon ne doit pas recevoir de second push.');
+    }
+
+    /**
      * @return array{0: Account, 1: list<Account>, 2: string}
      */
     private function guildOfFour(): array
@@ -343,13 +449,38 @@ final class GuildActivityNotifierTest extends ApiTestCase
      * Invoque `AnnounceGuildActivityHandler` directement, comme si le `DelayStamp` posé
      * par `GuildActivityNotifier` s'était déjà écoulé — l'outbox ne le sert jamais avant
      * ça, donc `consumeTheOutbox()` seule ne suffit pas à observer un envoi.
+     *
+     * Rend le `windowId` traité, pour les tests d'idempotence du #134 qui ont besoin de le
+     * rejouer explicitement — la fenêtre étant refermée en sortie de handler, on ne peut
+     * plus le relire depuis la base après coup.
      */
-    private function flushPendingAnnouncement(Account $author): void
+    private function flushPendingAnnouncement(Account $author): Uuid
+    {
+        $windowId = $this->currentWindowId($author);
+        $this->announce($author, $windowId);
+
+        return $windowId;
+    }
+
+    /** Le `windowId` de la fenêtre actuellement ouverte pour cet auteur. */
+    private function currentWindowId(Account $author): Uuid
+    {
+        $repository = self::getContainer()->get(PendingGuildActivityRepository::class);
+        self::assertInstanceOf(PendingGuildActivityRepository::class, $repository);
+
+        $pending = $repository->find($author->id);
+        self::assertInstanceOf(PendingGuildActivity::class, $pending, 'Aucune fenêtre ouverte pour cet auteur : le test qui appelle ceci a-t-il bien crédité une séance fraîche avant ?');
+
+        return $pending->windowId();
+    }
+
+    /** Rejoue `AnnounceGuildActivityHandler` pour un `(authorId, windowId)` précis, sans relire l'état courant — c'est le point du test de rejeu. */
+    private function announce(Account $author, Uuid $windowId): void
     {
         $handler = self::getContainer()->get(AnnounceGuildActivityHandler::class);
         self::assertInstanceOf(AnnounceGuildActivityHandler::class, $handler);
 
-        $handler(new AnnounceGuildActivity($author->id));
+        $handler(new AnnounceGuildActivity($author->id, $windowId));
     }
 
     /**

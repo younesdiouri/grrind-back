@@ -54,16 +54,22 @@ final readonly class GuildActivityNotifier
             return;
         }
 
-        $isFirstOfTheWindow = $this->pending->recordSession(
+        $windowId = $this->pending->recordSession(
             $event->userId,
             $event->discipline,
             $event->durationSeconds,
             $event->xpGranted,
+            $this->clock->now(),
         );
 
-        // Une annonce est déjà programmée pour cet auteur : elle lira cette séance-ci en
-        // plus des précédentes à son tour, inutile d'en programmer une seconde.
-        if (!$isFirstOfTheWindow) {
+        // `null` : une annonce fraîche est déjà programmée pour cet auteur, elle lira
+        // cette séance-ci en plus des précédentes à son tour — inutile d'en reprogrammer
+        // une seconde. Un `windowId` non nul, en revanche, ne veut pas toujours dire
+        // « fenêtre neuve » : voir le docblock de `PendingGuildActivityRepository::recordSession()`
+        // (#134) — une fenêtre abandonnée (handler qui a épuisé ses trois tentatives) en
+        // rend un aussi, pour qu'une annonce reparte. Cette méthode n'a pas à distinguer
+        // les deux cas : dans les deux, une annonce doit partir.
+        if (null === $windowId) {
             return;
         }
 
@@ -71,7 +77,7 @@ final readonly class GuildActivityNotifier
         // le docblock d'`AnnounceGuildActivity` : sans lui, deux messages publiés dans la
         // même seconde n'ont aucun ordre garanti entre eux, et cette annonce pourrait être
         // traitée *avant* une séance déjà en file pour le même lot.
-        $this->bus->dispatch(new AnnounceGuildActivity($event->userId), [new DelayStamp($this->announcementDelaySeconds * 1000)]);
+        $this->bus->dispatch(new AnnounceGuildActivity($event->userId, $windowId), [new DelayStamp($this->announcementDelaySeconds * 1000)]);
     }
 
     private function isFresh(DateTimeImmutable $endedAt): bool

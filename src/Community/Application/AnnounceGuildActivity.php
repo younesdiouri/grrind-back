@@ -41,10 +41,19 @@ use Symfony\Component\Uid\Uuid;
  * Voir `notifications.yaml` (`announcement_delay_seconds`) pour la valeur retenue et son
  * bénéfice accessoire — une seconde synchronisation qui arrive dans la minute rejoint la
  * même annonce au lieu d'en ouvrir une seconde.
+ *
+ * **`windowId`, pas seulement `authorId` (#134).** L'outbox livre au moins une fois : un
+ * rejeu de ce message doit retomber sur la même fenêtre, jamais sur une autre. Or l'auteur
+ * seul ne suffit pas à identifier *cette* fenêtre : le mode dégradé ci-dessus en ouvre
+ * légitimement une seconde pour le même auteur, et confondre les deux sous `authorId`
+ * ferait passer la trace de livraison du #134 pour un doublon de la première — rendant la
+ * seconde annonce muette pour toujours plutôt que dégradée. `windowId` est celui de
+ * {@see \App\Community\Domain\PendingGuildActivity::windowId()}, généré à l'ouverture de
+ * la fenêtre par {@see \App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository::recordSession()}.
  */
 final readonly class AnnounceGuildActivity
 {
-    public function __construct(public Uuid $authorId)
+    public function __construct(public Uuid $authorId, public Uuid $windowId)
     {
     }
 }

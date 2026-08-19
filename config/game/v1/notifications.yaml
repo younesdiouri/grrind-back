@@ -50,6 +50,27 @@ freshness_window_minutes: 120
 # deux fois au lieu d'une. Voir `GuildActivityNotifierTest::testAnAnnouncementFlushedBetweenTwoSessionsProducesTwoAnnouncements()`.
 announcement_delay_seconds: 60
 
+# ————— Fenêtre abandonnée ——————————————————————————————————————————————————————————
+#
+# **Un garde-fou du #134, pas de l'agrégation.** `AnnounceGuildActivityHandler` referme sa
+# fenêtre seulement après avoir essayé tous ses destinataires — voir le docblock de
+# `App\Community\Domain\PendingGuildActivity` — donc un handler qui épuise ses trois
+# tentatives (`messenger.yaml`) la laisse ouverte pour de bon : sans ce garde-fou, aucune
+# séance suivante de cet auteur ne redéclencherait jamais d'annonce, en silence.
+#
+# **Un multiple franc de `announcement_delay_seconds`, pas une valeur serrée.** Il ne
+# s'agit pas de rattraper une annonce en vol — soixante secondes plus le temps de trois
+# retries (`delay: 1000, multiplier: 3` dans `messenger.yaml`, quelques secondes en tout)
+# suffisent largement à un traitement normal. Quinze minutes laisse une marge très large
+# avant de conclure à un abandon, pour ne jamais confondre une fenêtre simplement lente
+# avec une fenêtre vraiment morte.
+#
+# Reprogrammer une fenêtre abandonnée ne peut pas renotifier ceux qui l'avaient déjà reçue
+# — c'est la trace de livraison du #134
+# (`App\Shared\Domain\Notification\NotificationDelivery`) qui le garantit, pas cette
+# valeur : elle ne fait que décider *quand* réessayer, jamais *qui* a déjà été notifié.
+stale_window_minutes: 15
+
 # ————— Heures calmes ———————————————————————————————————————————————————————————————
 #
 # Dans le fuseau du **destinataire**, jamais celui de l'auteur ni du serveur : une séance à
