@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Notifier;
 
+use App\Shared\Application\DeadPushTokens;
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRejection;
 use App\Shared\Application\PushSender;
@@ -44,12 +45,21 @@ use Symfony\Component\Uid\Uuid;
  * pourquoi ce n'est pas plus fiable. `rejectionFrom()` en fait la seule extraction du
  * projet ; un consommateur du port (#131 compris) ne lit qu'un enum fermé, jamais une
  * sous-chaîne d'un message tiers.
+ *
+ * **#131 : un refus immédiat invalide déjà le jeton.** Expo distingue un refus au ticket
+ * (connu tout de suite, ici) d'un refus au reçu de livraison (connu plus tard, interrogé
+ * en asynchrone) — mais les deux portent le même {@see PushRejection}, et
+ * {@see PushRejection::invalidatesDevice()} est le seul endroit qui décide. Le chemin du
+ * reçu n'est **pas** posé par ce ticket : `symfony/expo-notifier` (v8.1.0) n'expose que
+ * `doSend()` vers `/--/api/v2/push/send`, rien vers `/--/api/v2/push/getReceipts` — écrire
+ * l'appel nous-mêmes attend une décision plutôt qu'un client HTTP maison silencieux.
  */
 final readonly class ExpoPushSender implements PushSender
 {
     public function __construct(
         private TexterInterface $texter,
         private PushTargets $pushTargets,
+        private DeadPushTokens $deadPushTokens,
         private LoggerInterface $logger,
     ) {
     }
@@ -101,6 +111,13 @@ final readonly class ExpoPushSender implements PushSender
                 'rejection' => $rejection->value,
                 'reason' => $e->getMessage(),
             ]);
+
+            // #131 : le fournisseur est formel, pas approximatif — sur ce seul code, le
+            // jeton est effacé sèchement. Tout le reste (débit, credentials, réseau) se
+            // retente au prochain envoi, sans toucher à la table.
+            if ($rejection->invalidatesDevice()) {
+                $this->deadPushTokens->discard($pushToken);
+            }
 
             return PushTicket::rejected($pushToken, $rejection, $e->getMessage());
         }

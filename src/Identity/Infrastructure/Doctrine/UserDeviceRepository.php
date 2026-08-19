@@ -7,6 +7,7 @@ namespace App\Identity\Infrastructure\Doctrine;
 use App\Identity\Domain\DeviceEnvironment;
 use App\Identity\Domain\User;
 use App\Identity\Domain\UserDevice;
+use App\Shared\Application\DeadPushTokens;
 use App\Shared\Application\PushTargets;
 use App\Shared\Domain\NotificationCategory;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -17,7 +18,7 @@ use Symfony\Component\Uid\Uuid;
 /**
  * @extends ServiceEntityRepository<UserDevice>
  */
-class UserDeviceRepository extends ServiceEntityRepository implements PushTargets
+class UserDeviceRepository extends ServiceEntityRepository implements PushTargets, DeadPushTokens
 {
     private readonly DeviceEnvironment $currentEnvironment;
 
@@ -45,6 +46,26 @@ class UserDeviceRepository extends ServiceEntityRepository implements PushTarget
 
     public function commit(): void
     {
+        $this->getEntityManager()->flush();
+    }
+
+    /**
+     * L'implémentation du port {@see DeadPushTokens}. Sèche et immédiate — pas de flag,
+     * pas de compteur d'échecs à côté : Expo est formel sur `DeviceNotRegistered`, la
+     * ligne n'a plus de raison d'exister. `ofPushToken()` puis `remove()` plutôt qu'un
+     * DQL `DELETE` : le volume d'un refus par envoi ne justifie pas de contourner l'unit
+     * of work, et ça garde `claim()` (un appel concurrent qui viendrait de réclamer ce
+     * jeton pour un autre compte) visible au flush plutôt qu'écrasé silencieusement.
+     */
+    public function discard(string $pushToken): void
+    {
+        $device = $this->ofPushToken($pushToken);
+
+        if (null === $device) {
+            return;
+        }
+
+        $this->getEntityManager()->remove($device);
         $this->getEntityManager()->flush();
     }
 

@@ -33,4 +33,22 @@ enum PushRejection: string
     case MessageRateExceeded = 'MessageRateExceeded';
     case InvalidCredentials = 'InvalidCredentials';
     case Unknown = 'Unknown';
+
+    /**
+     * `DeviceNotRegistered` est le seul cas où le fournisseur affirme que l'appareil a
+     * disparu — désinstallation, restauration, permission révoquée. Les trois autres
+     * décrivent un incident de l'envoi (débit, credentials, format), pas de l'appareil :
+     * le retenter a un sens, effacer la ligne effacerait un appareil vivant un jour de
+     * panne. Voir le docblock de {@see DeadPushTokens}.
+     *
+     * Ce même code arrive par deux chemins — refusé tout de suite dans le
+     * {@see PushTicket} d'un envoi ({@see \App\Shared\Infrastructure\Notifier\ExpoPushSender}),
+     * ou constaté plus tard dans un reçu de livraison Expo — et cette méthode est ce qui
+     * fait qu'ils rendent la même décision au lieu de deux implémentations qui pourraient
+     * diverger.
+     */
+    public function invalidatesDevice(): bool
+    {
+        return self::DeviceNotRegistered === $this;
+    }
 }

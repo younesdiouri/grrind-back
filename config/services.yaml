@@ -106,6 +106,11 @@ services:
     # joueur sans jamais importer une entité `Identity`, comme les précédents.
     App\Shared\Application\PushTargets: '@App\Identity\Infrastructure\Doctrine\UserDeviceRepository'
 
+    # Le #131 : même repository, même frontière, un contrat séparé parce que lire les
+    # jetons et effacer un jeton mort ne sont pas la même intention — voir le docblock du
+    # port.
+    App\Shared\Application\DeadPushTokens: '@App\Identity\Infrastructure\Doctrine\UserDeviceRepository'
+
     # Le bridge Expo posé au #130 : contrairement aux autres ports, l'implémentation vit
     # dans `Shared` lui-même — traduire vers Expo n'appartient à aucun module métier, et
     # `ExpoPushSender` ne fait que consommer le port `PushTargets` juste au-dessus.
