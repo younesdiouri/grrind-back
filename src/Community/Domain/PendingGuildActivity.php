@@ -23,6 +23,16 @@ use Symfony\Component\Uid\Uuid;
  * lieu d'en reprogrammer une seconde — voir
  * {@see PendingGuildActivityRepository::recordSession()}
  * pour comment le conflit d'insertion tranche entre les deux cas.
+ *
+ * **`windowId` existe pour le #134, pas pour ce ticket-ci.** L'auteur est la clé de
+ * stockage, mais deux fenêtres successives du même auteur (mode dégradé, voir
+ * {@see \App\Community\Application\AnnounceGuildActivity}) partagent cet auteur sans être
+ * la même annonce : sans un identifiant propre à *cette* fenêtre, un
+ * {@see \App\Community\Application\AnnounceGuildActivityHandler} qui rejoue après qu'une
+ * seconde fenêtre a déjà pris la place de la première toucherait les données de la
+ * mauvaise fenêtre — ou, pire, la trace de livraison du #134 confondrait les deux et
+ * rendrait la seconde annonce muette. Généré une fois à l'ouverture, jamais réécrit par
+ * {@see self::addSession()}.
  */
 #[ORM\Entity(repositoryClass: PendingGuildActivityRepository::class)]
 #[ORM\Table(name: 'community_pending_guild_activity')]
@@ -32,6 +42,9 @@ class PendingGuildActivity
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $authorId;
+
+    #[ORM\Column(type: UuidType::NAME)]
+    private Uuid $windowId;
 
     #[ORM\Column]
     private int $sessionsCount;
@@ -52,9 +65,10 @@ class PendingGuildActivity
      * @internal ne se crée que par {@see PendingGuildActivityRepository::recordSession()},
      *           seul point qui sait distinguer une ligne neuve d'un conflit d'insertion
      */
-    public function __construct(Uuid $authorId, Discipline $discipline, int $durationSeconds, int $xpGranted)
+    public function __construct(Uuid $authorId, Uuid $windowId, Discipline $discipline, int $durationSeconds, int $xpGranted)
     {
         $this->authorId = $authorId;
+        $this->windowId = $windowId;
         $this->sessionsCount = 1;
         $this->totalXpGranted = $xpGranted;
         $this->lastDiscipline = $discipline;
@@ -64,6 +78,11 @@ class PendingGuildActivity
     public function authorId(): Uuid
     {
         return $this->authorId;
+    }
+
+    public function windowId(): Uuid
+    {
+        return $this->windowId;
     }
 
     /** @internal voir {@see self::__construct()} */

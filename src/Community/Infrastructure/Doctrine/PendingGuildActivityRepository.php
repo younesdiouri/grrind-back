@@ -22,10 +22,11 @@ class PendingGuildActivityRepository extends ServiceEntityRepository
     }
 
     /**
-     * Enregistre une séance créditée dans l'annonce en attente de son auteur, et dit si
-     * c'est **la première** de la fenêtre — c'est cette réponse qui décide, pour
-     * {@see \App\Community\Application\GuildActivityNotifier}, s'il faut programmer une
-     * annonce ou laisser celle déjà en vol s'en charger.
+     * Enregistre une séance créditée dans l'annonce en attente de son auteur, et rend
+     * l'identifiant de **la fenêtre** si c'est la première séance à l'ouvrir — c'est cette
+     * réponse qui décide, pour {@see \App\Community\Application\GuildActivityNotifier},
+     * s'il faut programmer une annonce (avec ce `windowId`) ou laisser celle déjà en vol
+     * s'en charger. `null` si la séance a rejoint une fenêtre déjà ouverte.
      *
      * `INSERT ... ON CONFLICT DO NOTHING`, même geste qu'{@see \App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository} :
      * le perdant d'une course entre deux séances créditées au même instant ne lève pas, il
@@ -33,18 +34,21 @@ class PendingGuildActivityRepository extends ServiceEntityRepository
      * son propre `flush` : contrairement à la transaction de complétion, aucun autre dépôt
      * n'a besoin d'y participer.
      */
-    public function recordSession(Uuid $authorId, Discipline $discipline, int $durationSeconds, int $xpGranted): bool
+    public function recordSession(Uuid $authorId, Discipline $discipline, int $durationSeconds, int $xpGranted): ?Uuid
     {
-        return $this->getEntityManager()->wrapInTransaction(function () use ($authorId, $discipline, $durationSeconds, $xpGranted): bool {
+        return $this->getEntityManager()->wrapInTransaction(function () use ($authorId, $discipline, $durationSeconds, $xpGranted): ?Uuid {
+            $windowId = Uuid::v7();
+
             $inserted = $this->getEntityManager()->getConnection()->executeStatement(
                 <<<'SQL'
                     INSERT INTO community_pending_guild_activity
-                        (author_id, sessions_count, total_xp_granted, last_discipline, last_duration_seconds)
-                    VALUES (:authorId, 1, :xpGranted, :discipline, :durationSeconds)
+                        (author_id, window_id, sessions_count, total_xp_granted, last_discipline, last_duration_seconds)
+                    VALUES (:authorId, :windowId, 1, :xpGranted, :discipline, :durationSeconds)
                     ON CONFLICT (author_id) DO NOTHING
                     SQL,
                 [
                     'authorId' => $authorId->toRfc4122(),
+                    'windowId' => $windowId->toRfc4122(),
                     'xpGranted' => $xpGranted,
                     'discipline' => $discipline->value,
                     'durationSeconds' => $durationSeconds,
@@ -52,7 +56,7 @@ class PendingGuildActivityRepository extends ServiceEntityRepository
             );
 
             if (1 === $inserted) {
-                return true;
+                return $windowId;
             }
 
             $pending = $this->find($authorId, LockMode::PESSIMISTIC_WRITE);
@@ -64,31 +68,53 @@ class PendingGuildActivityRepository extends ServiceEntityRepository
             $pending->addSession($discipline, $durationSeconds, $xpGranted);
             $this->getEntityManager()->flush();
 
-            return false;
+            return null;
         });
     }
 
     /**
-     * Referme l'annonce en attente d'un auteur et en rend l'état final — verrouillée puis
-     * supprimée dans la même transaction, pour qu'une séance créditée juste après ne se
-     * perde pas dans une ligne qu'un envoi concurrent est en train de lire.
+     * L'annonce en attente de cet auteur, si c'est encore **cette fenêtre-là** — `null`
+     * sinon, que la fenêtre ait déjà été refermée ({@see self::close()}) par une exécution
+     * précédente du même message, ou qu'une seconde fenêtre l'ait remplacée entre-temps
+     * (mode dégradé). Dans les deux cas, {@see \App\Community\Application\AnnounceGuildActivityHandler}
+     * n'a rien à faire : ni renvoyer ce qui l'a déjà été, ni toucher aux données d'une
+     * fenêtre qui n'est pas la sienne (#134).
      *
-     * `null` si aucune annonce n'est en attente : {@see \App\Community\Application\AnnounceGuildActivityHandler}
-     * n'a alors rien à envoyer.
+     * Volontairement sans verrou : contrairement à `recordSession()`, cette lecture sert à
+     * construire le contenu d'une annonce déjà décidée, pas à trancher un conflit d'écriture
+     * concurrent. Une séance qui s'ajoute pendant l'envoi reste le même risque déjà accepté
+     * et documenté — « dégradé, pas corrompu » — que celui qui existait quand `close()`
+     * verrouillait puis supprimait en un seul geste.
      */
-    public function close(Uuid $authorId): ?PendingGuildActivity
+    public function activityFor(Uuid $authorId, Uuid $windowId): ?PendingGuildActivity
     {
-        return $this->getEntityManager()->wrapInTransaction(function () use ($authorId): ?PendingGuildActivity {
-            $pending = $this->find($authorId, LockMode::PESSIMISTIC_WRITE);
+        $pending = $this->find($authorId);
 
-            if (null === $pending) {
-                return null;
-            }
+        if (null === $pending || !$pending->windowId()->equals($windowId)) {
+            return null;
+        }
 
-            $this->getEntityManager()->remove($pending);
-            $this->getEntityManager()->flush();
+        return $pending;
+    }
 
-            return $pending;
-        });
+    /**
+     * Referme la fenêtre — appelée une fois que
+     * {@see \App\Community\Application\AnnounceGuildActivityHandler} a fini d'essayer tous
+     * ses destinataires, jamais avant : voir le docblock de {@see PendingGuildActivity}
+     * pour pourquoi la lecture du contenu (`activityFor()`) et la fermeture sont deux
+     * gestes séparés depuis le #134.
+     *
+     * Filtrée sur `(authorId, windowId)`, comme `activityFor()` : un appel après qu'une
+     * seconde fenêtre a déjà pris la place de celle-ci ne supprime rien de la nouvelle.
+     * Une suppression conditionnelle directe suffit — pas de verrou-puis-suppression comme
+     * l'ancien `close()` : un second appel pour la même fenêtre (rejeu après succès) ne
+     * supprime simplement rien, sans qu'il y ait de course à trancher.
+     */
+    public function close(Uuid $authorId, Uuid $windowId): void
+    {
+        $this->getEntityManager()->getConnection()->executeStatement(
+            'DELETE FROM community_pending_guild_activity WHERE author_id = :authorId AND window_id = :windowId',
+            ['authorId' => $authorId->toRfc4122(), 'windowId' => $windowId->toRfc4122()],
+        );
     }
 }

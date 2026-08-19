@@ -204,6 +204,15 @@ when@test:
             arguments:
                 $pushSender: '@App\Tests\Support\SpyingPushSender'
 
+        # Publics pour que le test d'idempotence du #134 lise le `windowId` d'une fenêtre
+        # ouverte et pose une trace de livraison avant d'appeler le handler — simuler une
+        # panne au milieu de la boucle d'envoi sans en provoquer une vraie.
+        App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository:
+            public: true
+
+        App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository:
+            public: true
+
         # L'abonné qui prouve qu'un module tiers réagit à un workout importé sans être
         # nommé nulle part. Il n'est pas autoconfiguré par le `App\Tests\` du dessus — il
         # n'y en a pas — donc il se déclare ici, et son `#[AsMessageHandler]` fait le reste.

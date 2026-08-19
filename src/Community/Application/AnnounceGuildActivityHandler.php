@@ -15,21 +15,33 @@ use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushSender;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\NotificationCategory;
+use App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * L'envoi proprement dit (#133) — jamais avant que {@see PendingGuildActivity} soit
- * refermée, jamais deux fois pour la même annonce : voir le docblock d'
- * {@see AnnounceGuildActivity} pour pourquoi ce détour existe.
+ * L'envoi proprement dit (#133) — jamais avant que la fenêtre soit lue via
+ * {@see PendingGuildActivityRepository::activityFor()}, jamais deux fois pour le même
+ * destinataire : voir le docblock d'{@see AnnounceGuildActivity} pour pourquoi ce détour
+ * existe, et celui de {@see \App\Shared\Domain\Notification\NotificationDelivery} pour
+ * l'idempotence du #134.
  *
  * **Les trois refus se décident par destinataire, jamais par auteur.** Le fuseau des
  * heures calmes, comme le plafond, appartiennent à celui qui reçoit — un joueur peut être
  * notifié pendant qu'un autre, dans un fuseau ou avec un historique différents, ne l'est
  * pas pour la même annonce. Aucun des deux refus n'interrompt les autres destinataires,
  * même logique que `PushSender` sur un jeton mort.
+ *
+ * **La fenêtre ne se referme qu'après avoir essayé tous les destinataires — jamais en
+ * entrant dans le handler (#134).** L'outbox livre au moins une fois : si ce handler
+ * refermait la fenêtre avant d'envoyer, comme avant le #134, un rejeu après une panne au
+ * milieu de la boucle (le worker tué, un dixième destinataire sur trente) retomberait sur
+ * une fenêtre déjà vide et abandonnerait silencieusement les destinataires restants —
+ * l'inverse du problème que le #134 devait fermer, mais tout aussi silencieux. Chaque
+ * sortie de cette méthode referme donc explicitement la fenêtre elle-même, qu'il y ait eu
+ * un destinataire ou aucun.
  */
 final readonly class AnnounceGuildActivityHandler
 {
@@ -39,6 +51,7 @@ final readonly class AnnounceGuildActivityHandler
         private PlayerProfiles $profiles,
         private PlayerTimezones $timezones,
         private PushSender $pushSender,
+        private NotificationDeliveryRepository $deliveries,
         private ClockInterface $clock,
         private QuietHours $quietHours,
         /**
@@ -53,12 +66,13 @@ final readonly class AnnounceGuildActivityHandler
     #[AsMessageHandler]
     public function __invoke(AnnounceGuildActivity $message): void
     {
-        $activity = $this->pending->close($message->authorId);
+        $activity = $this->pending->activityFor($message->authorId, $message->windowId);
 
-        // Défensif : `GuildActivityNotifier` ne programme cette annonce que lorsqu'elle
-        // vient d'ouvrir la ligne, donc `close()` la trouve normalement toujours. Une
-        // absence ne signale rien de plus qu'un rejeu du même message — le #134 tranchera
-        // l'idempotence de l'outbox, ce n'est pas à cette classe de le faire en silence.
+        // `null` veut dire qu'il n'y a rien à faire pour *cette* fenêtre : soit un rejeu
+        // après un traitement déjà complet (elle a été refermée en sortie de méthode la
+        // fois précédente), soit une fenêtre plus récente a déjà pris sa place pour le même
+        // auteur (mode dégradé). Dans les deux cas, refermer quoi que ce soit ici serait une
+        // erreur — voir `PendingGuildActivityRepository::activityFor()`.
         if (null === $activity) {
             return;
         }
@@ -68,12 +82,16 @@ final readonly class AnnounceGuildActivityHandler
         // L'auteur a quitté sa guilde entre la séance et cette annonce : plus personne à
         // prévenir.
         if (null === $membership) {
+            $this->pending->close($message->authorId, $message->windowId);
+
             return;
         }
 
         $recipientIds = self::recipientsOf($membership->guild()->members(), $message->authorId);
 
         if ([] === $recipientIds) {
+            $this->pending->close($message->authorId, $message->windowId);
+
             return;
         }
 
@@ -84,6 +102,8 @@ final readonly class AnnounceGuildActivityHandler
         // ailleurs dans ce module, perdre une annonce vaut mieux qu'en publier une à
         // moitié écrite.
         if (null === $profile) {
+            $this->pending->close($message->authorId, $message->windowId);
+
             return;
         }
 
@@ -91,9 +111,10 @@ final readonly class AnnounceGuildActivityHandler
             'Activité de guilde',
             self::body($profile->displayName, $activity),
             NotificationCategory::GuildActivity,
-            // Stable par auteur, pas par annonce : la prochaine activité du même joueur
+            // Stable par auteur, pas par fenêtre : la prochaine activité du même joueur
             // remplace celle-ci sur l'appareil du destinataire plutôt que de s'empiler à
-            // côté.
+            // côté. Ne pas confondre avec `windowId`, qui sert à l'idempotence du #134 en
+            // dessous — l'un fusionne l'affichage, l'autre empêche un double envoi.
             'guild-activity:'.$message->authorId->toRfc4122(),
         );
 
@@ -108,8 +129,19 @@ final readonly class AnnounceGuildActivityHandler
                 continue;
             }
 
+            // Écrite avant l'appel réseau, en contrainte d'unicité (#134) : l'outbox livre
+            // au moins une fois, donc c'est cette réservation — pas un espoir que ce
+            // handler ne rejoue jamais — qui empêche un retry de renotifier un destinataire
+            // déjà servi. Une collision veut dire « déjà envoyé », pas une erreur : on
+            // passe au suivant sans y toucher.
+            if (!$this->deliveries->claim($message->windowId, $recipientId, $notification->category, $now)) {
+                continue;
+            }
+
             $this->pushSender->send($recipientId, $notification);
         }
+
+        $this->pending->close($message->authorId, $message->windowId);
     }
 
     /**
