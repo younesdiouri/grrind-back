@@ -9,6 +9,7 @@ use App\Shared\Application\PushRejection;
 use App\Shared\Application\PushTargets;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Infrastructure\Notifier\ExpoPushSender;
+use App\Tests\Support\SpyingDeadPushTokens;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -32,7 +33,7 @@ final class ExpoPushSenderTest extends TestCase
     public function testEachDeviceGetsItsOwnTicketInPushTargetsOrder(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, ['token-a', 'token-b']), new NullLogger());
+        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, ['token-a', 'token-b']), new SpyingDeadPushTokens(), new NullLogger());
 
         $tickets = $sender->send($bob, self::notification());
 
@@ -46,7 +47,7 @@ final class ExpoPushSenderTest extends TestCase
     public function testAPlayerWithNoDeviceGetsNoTicket(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, []), new NullLogger());
+        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, []), new SpyingDeadPushTokens(), new NullLogger());
 
         self::assertSame([], $sender->send($bob, self::notification()));
     }
@@ -59,7 +60,7 @@ final class ExpoPushSenderTest extends TestCase
     public function testTheNullTransportProducesAnAcceptedTicketWithoutAnId(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, ['token']), new NullLogger());
+        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, ['token']), new SpyingDeadPushTokens(), new NullLogger());
 
         [$ticket] = $sender->send($bob, self::notification());
 
@@ -74,7 +75,7 @@ final class ExpoPushSenderTest extends TestCase
     public function testARejectedTokenDoesNotStopTheOthers(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(self::texterRejecting('dead-token', self::bridgeMessage('DeviceNotRegistered')), self::targetsOf($bob, ['dead-token', 'live-token']), new NullLogger());
+        $sender = new ExpoPushSender(self::texterRejecting('dead-token', self::bridgeMessage('DeviceNotRegistered')), self::targetsOf($bob, ['dead-token', 'live-token']), new SpyingDeadPushTokens(), new NullLogger());
 
         [$dead, $live] = $sender->send($bob, self::notification());
 
@@ -95,7 +96,7 @@ final class ExpoPushSenderTest extends TestCase
     {
         $bob = Uuid::v7();
         $bridgeMessage = self::bridgeMessage('DeviceNotRegistered');
-        $sender = new ExpoPushSender(self::texterRejecting('dead-token', $bridgeMessage), self::targetsOf($bob, ['dead-token']), new NullLogger());
+        $sender = new ExpoPushSender(self::texterRejecting('dead-token', $bridgeMessage), self::targetsOf($bob, ['dead-token']), new SpyingDeadPushTokens(), new NullLogger());
 
         [$ticket] = $sender->send($bob, self::notification());
 
@@ -112,12 +113,64 @@ final class ExpoPushSenderTest extends TestCase
     {
         $bob = Uuid::v7();
         $networkFailure = 'Could not reach the remote Expo server.';
-        $sender = new ExpoPushSender(self::texterRejecting('dead-token', $networkFailure), self::targetsOf($bob, ['dead-token']), new NullLogger());
+        $sender = new ExpoPushSender(self::texterRejecting('dead-token', $networkFailure), self::targetsOf($bob, ['dead-token']), new SpyingDeadPushTokens(), new NullLogger());
 
         [$ticket] = $sender->send($bob, self::notification());
 
         self::assertSame(PushRejection::Unknown, $ticket->rejection);
         self::assertSame($networkFailure, $ticket->rawReason);
+    }
+
+    /**
+     * Le cœur du #131 : le fournisseur est formel sur `DeviceNotRegistered`, donc le
+     * jeton est effacé sèchement, sans attendre le reçu de livraison.
+     */
+    public function testADeviceNotRegisteredRejectionDiscardsTheDeadToken(): void
+    {
+        $bob = Uuid::v7();
+        $deadPushTokens = new SpyingDeadPushTokens();
+        $sender = new ExpoPushSender(self::texterRejecting('dead-token', self::bridgeMessage('DeviceNotRegistered')), self::targetsOf($bob, ['dead-token']), $deadPushTokens, new NullLogger());
+
+        $sender->send($bob, self::notification());
+
+        self::assertSame(['dead-token'], $deadPushTokens->discarded);
+    }
+
+    /**
+     * Le pendant obligatoire du test ci-dessus : `MessageRateExceeded` est un incident de
+     * l'envoi, pas de l'appareil — confondre les deux effacerait des appareils vivants un
+     * jour de panne. Même exigence pour `Unknown`, le refus qu'on ne sait pas qualifier.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function nonFatalRejections(): iterable
+    {
+        yield 'MessageRateExceeded' => ['MessageRateExceeded'];
+        yield 'MessageTooBig' => ['MessageTooBig'];
+        yield 'InvalidCredentials' => ['InvalidCredentials'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('nonFatalRejections')]
+    public function testANonFatalRejectionDoesNotDiscardTheToken(string $expoCode): void
+    {
+        $bob = Uuid::v7();
+        $deadPushTokens = new SpyingDeadPushTokens();
+        $sender = new ExpoPushSender(self::texterRejecting('token', self::bridgeMessage($expoCode)), self::targetsOf($bob, ['token']), $deadPushTokens, new NullLogger());
+
+        $sender->send($bob, self::notification());
+
+        self::assertSame([], $deadPushTokens->discarded);
+    }
+
+    public function testAnUnrecognizedRejectionDoesNotDiscardTheToken(): void
+    {
+        $bob = Uuid::v7();
+        $deadPushTokens = new SpyingDeadPushTokens();
+        $sender = new ExpoPushSender(self::texterRejecting('token', 'Could not reach the remote Expo server.'), self::targetsOf($bob, ['token']), $deadPushTokens, new NullLogger());
+
+        $sender->send($bob, self::notification());
+
+        self::assertSame([], $deadPushTokens->discarded);
     }
 
     /**
