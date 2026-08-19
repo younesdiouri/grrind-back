@@ -50,9 +50,11 @@ use Symfony\Component\Uid\Uuid;
  * (connu tout de suite, ici) d'un refus au reçu de livraison (connu plus tard, interrogé
  * en asynchrone) — mais les deux portent le même {@see PushRejection}, et
  * {@see PushRejection::invalidatesDevice()} est le seul endroit qui décide. Le chemin du
- * reçu n'est **pas** posé par ce ticket : `symfony/expo-notifier` (v8.1.0) n'expose que
- * `doSend()` vers `/--/api/v2/push/send`, rien vers `/--/api/v2/push/getReceipts` — écrire
- * l'appel nous-mêmes attend une décision plutôt qu'un client HTTP maison silencieux.
+ * reçu est posé par ce même ticket, mais **pas ici** : voir
+ * {@see ReceiptSchedulingPushSender}, qui décore ce sender plutôt que d'ajouter à sa
+ * construction une dépendance Doctrine et Messenger qu'il n'avait aucune raison de porter
+ * — cette classe reste ce que son docblock annonce, un traducteur vers Expo, testable
+ * sans conteneur ni réseau (voir `ExpoPushSenderTest`).
  */
 final readonly class ExpoPushSender implements PushSender
 {

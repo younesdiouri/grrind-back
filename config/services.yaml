@@ -135,7 +135,22 @@ services:
     # Le bridge Expo posé au #130 : contrairement aux autres ports, l'implémentation vit
     # dans `Shared` lui-même — traduire vers Expo n'appartient à aucun module métier, et
     # `ExpoPushSender` ne fait que consommer le port `PushTargets` juste au-dessus.
-    App\Shared\Application\PushSender: '@App\Shared\Infrastructure\Notifier\ExpoPushSender'
+    #
+    # Le #131 le décore plutôt que d'y ajouter des dépendances : voir le docblock de
+    # `ReceiptSchedulingPushSender`. `$sender` est câblé explicitement vers la classe
+    # concrète — l'autowiring par l'interface `PushSender` bouclerait sur cet alias-ci.
+    App\Shared\Infrastructure\Notifier\ReceiptSchedulingPushSender:
+        arguments:
+            $sender: '@App\Shared\Infrastructure\Notifier\ExpoPushSender'
+
+    App\Shared\Application\PushSender: '@App\Shared\Infrastructure\Notifier\ReceiptSchedulingPushSender'
+
+    # Le #131 : le même jeton que `ExpoTransport` envoie pour l'envoi (`Authorization:
+    # Bearer …`), extrait du même DSN — voir le docblock du handler pour pourquoi un
+    # second réglage aurait pu diverger du premier.
+    App\Shared\Infrastructure\Notifier\CheckExpoPushReceiptsHandler:
+        arguments:
+            $expoDsn: '%env(EXPO_DSN)%'
 
     # Providers league/oauth2-client câblés directement : KnpUOAuth2ClientBundle a été
     # écarté (décision Lot 1bis). Ils sont derrière un service locator dans le résolveur,
@@ -186,9 +201,11 @@ when@test:
         # Public pour que le test de câblage l'appelle sans détour : sans autre
         # consommateur que l'alias lui-même, le compilateur l'inlinerait sinon et
         # `self::getContainer()->get(PushSender::class)` échouerait — même besoin que
-        # `DailyLoadProvider` et `GrantXpHandler` juste au-dessus.
+        # `DailyLoadProvider` et `GrantXpHandler` juste au-dessus. Pointe vers le même
+        # service qu'en production (#131) : `PushSenderWiringTest` prouve la chaîne
+        # réellement câblée, décorateur compris, pas un raccourci propre aux tests.
         App\Shared\Application\PushSender:
-            alias: App\Shared\Infrastructure\Notifier\ExpoPushSender
+            alias: App\Shared\Infrastructure\Notifier\ReceiptSchedulingPushSender
             public: true
 
         # Route protégée qui sert de sonde à l'idempotence.
@@ -220,6 +237,32 @@ when@test:
 
         App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository:
             public: true
+
+        # Le #131 : aucune suite de tests ne peut appeler Expo pour les reçus non plus —
+        # même exigence que `notifier.yaml` pour l'envoi, appliquée ici par l'outil de test
+        # que `symfony/http-client` fournit plutôt qu'un drapeau maison. Sans réponse
+        # programmée, `MockHttpClient` rend une réponse vide qu'`ExceptionInterface` attrape
+        # côté handler — silencieux par défaut, un test qui a besoin d'un vrai reçu appelle
+        # `setResponseFactory()` sur le service ci-dessous plutôt que d'en écraser un autre.
+        Symfony\Component\HttpClient\MockHttpClient: ~
+
+        Symfony\Contracts\HttpClient\HttpClientInterface:
+            alias: Symfony\Component\HttpClient\MockHttpClient
+            public: true
+
+        # Publics pour que le test du #131 pose un ticket en attente et invoque le handler
+        # directement — même besoin que `AnnounceGuildActivityHandler` plus haut, sans
+        # attendre le `DelayStamp` posé par `ExpoPushSender`.
+        App\Shared\Infrastructure\Doctrine\PendingPushReceiptRepository:
+            public: true
+
+        # `$expoDsn` répété : la redéclaration d'un service déjà défini plus haut ne fusionne
+        # pas ses arguments, elle les remplace — même geste que `PendingGuildActivityRepository`
+        # juste au-dessus pour `$staleWindowMinutes`.
+        App\Shared\Infrastructure\Notifier\CheckExpoPushReceiptsHandler:
+            public: true
+            arguments:
+                $expoDsn: '%env(EXPO_DSN)%'
 
         # L'abonné qui prouve qu'un module tiers réagit à un workout importé sans être
         # nommé nulle part. Il n'est pas autoconfiguré par le `App\Tests\` du dessus — il
