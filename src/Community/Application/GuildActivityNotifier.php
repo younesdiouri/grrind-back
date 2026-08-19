@@ -11,6 +11,7 @@ use DateTimeImmutable;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 /**
  * La séance créditée réveille la guilde — le point d'entrée du #133, abonné à
@@ -23,7 +24,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * reste à {@see \App\Community\Domain\PendingGuildActivity}. L'envoi proprement dit attend
  * {@see AnnounceGuildActivityHandler} : voir le docblock d'{@see AnnounceGuildActivity}
  * pour pourquoi une séance créditée ne déclenche jamais un envoi immédiat — un push par
- * séance est exactement ce que le ticket met en garde contre.
+ * séance est exactement ce que le ticket met en garde contre — et pour ce que le
+ * `DelayStamp` posé ci-dessous garantit réellement.
  */
 final readonly class GuildActivityNotifier
 {
@@ -33,6 +35,7 @@ final readonly class GuildActivityNotifier
         private MessageBusInterface $bus,
         private ClockInterface $clock,
         private int $freshnessWindowMinutes,
+        private int $announcementDelaySeconds,
     ) {
     }
 
@@ -64,7 +67,11 @@ final readonly class GuildActivityNotifier
             return;
         }
 
-        $this->bus->dispatch(new AnnounceGuildActivity($event->userId));
+        // Le délai n'existe pas pour laisser le temps à d'autres séances d'arriver — voir
+        // le docblock d'`AnnounceGuildActivity` : sans lui, deux messages publiés dans la
+        // même seconde n'ont aucun ordre garanti entre eux, et cette annonce pourrait être
+        // traitée *avant* une séance déjà en file pour le même lot.
+        $this->bus->dispatch(new AnnounceGuildActivity($event->userId), [new DelayStamp($this->announcementDelaySeconds * 1000)]);
     }
 
     private function isFresh(DateTimeImmutable $endedAt): bool

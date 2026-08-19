@@ -66,10 +66,13 @@ services:
             $endHour: '%game.notifications.quiet_hours_end_hour%'
 
     # La fraîcheur d'une séance créditée : au-delà, c'est de l'historique, pas une raison
-    # de réveiller la guilde.
+    # de réveiller la guilde. Le délai, lui, n'est pas de l'équilibrage au sens des autres
+    # réglages — voir le docblock d'`AnnounceGuildActivity` pour ce qu'il garantit
+    # réellement.
     App\Community\Application\GuildActivityNotifier:
         arguments:
             $freshnessWindowMinutes: '%game.notifications.freshness_window_minutes%'
+            $announcementDelaySeconds: '%game.notifications.announcement_delay_seconds%'
 
     App\Progression\Domain\LevelCurve:
         arguments:
@@ -190,7 +193,14 @@ when@test:
         # que consomme `AnnounceGuildActivityHandler` (#133), pour observer ses envois
         # sans dépendre des logs du transport Expo nul.
         App\Tests\Support\SpyingPushSender: ~
+        # Public pour que les tests l'appellent directement plutôt que d'attendre le
+        # `DelayStamp` posé par `GuildActivityNotifier` — même besoin que
+        # `DailyLoadProvider` et `GrantXpHandler` plus haut, et c'est aussi ce qui permet
+        # de démontrer le mode dégradé documenté dans `AnnounceGuildActivity` : appeler ce
+        # handler *entre* deux séances créditées du même auteur simule un délai déjà
+        # écoulé, sans qu'un test attende une vraie minute.
         App\Community\Application\AnnounceGuildActivityHandler:
+            public: true
             arguments:
                 $pushSender: '@App\Tests\Support\SpyingPushSender'
 

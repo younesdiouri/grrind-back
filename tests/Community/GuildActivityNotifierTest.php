@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Community;
 
+use App\Community\Application\AnnounceGuildActivity;
+use App\Community\Application\AnnounceGuildActivityHandler;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\Messaging\WorkoutCreditedSpy;
@@ -22,8 +24,18 @@ use Symfony\Component\HttpKernel\KernelInterface;
  *
  * {@see self::testABatchImportedAtOnceProducesOnePushPerRecipient()} est le test qui dit si
  * le ticket est fait — c'est celui que la description du ticket met en avant. Les autres
- * couvrent chacune des règles qui l'y amènent : fraîcheur, agrégation, heures calmes, et
- * l'absence de destinataire quand l'auteur n'a pas de guilde.
+ * couvrent chacune des règles qui l'y amènent : fraîcheur, agrégation, heures calmes,
+ * l'absence de destinataire quand l'auteur n'a pas de guilde, et le mode dégradé
+ * documenté dans `AnnounceGuildActivity`.
+ *
+ * **`AnnounceGuildActivity` est toujours dispatchée avec un `DelayStamp`** (voir son
+ * docblock), donc `consumeTheOutbox()` ne l'atteint jamais : `messenger:consume` ne sert
+ * que les messages dont `available_at` est déjà passé. Chaque test qui a besoin de voir
+ * l'annonce partir appelle `flushPendingAnnouncement()`, qui invoque directement
+ * `AnnounceGuildActivityHandler` — public en environnement `test` pour ça, voir
+ * `config/services.yaml`. C'est aussi ce qui permet de simuler le mode dégradé : appeler
+ * ce handler *entre* deux séances créditées du même auteur revient à traiter l'annonce
+ * comme si le délai s'était déjà écoulé.
  */
 final class GuildActivityNotifierTest extends ApiTestCase
 {
@@ -90,6 +102,8 @@ final class GuildActivityNotifierTest extends ApiTestCase
         self::assertCount(3, WorkoutCreditedSpy::$received, 'Les trois séances doivent avoir été créditées pour que le test prouve quelque chose.');
         $totalXp = array_sum(array_map(static fn ($event) => $event->xpGranted, WorkoutCreditedSpy::$received));
 
+        $this->flushPendingAnnouncement($author);
+
         self::assertCount(\count($recipients), SpyingPushSender::$sent, 'Un push par destinataire, pas un par séance : trois séances créditées ne doivent produire ni zéro ni neuf envois.');
 
         $recipientIds = array_map(static fn (Account $account): string => $account->id->toRfc4122(), $recipients);
@@ -138,6 +152,8 @@ final class GuildActivityNotifierTest extends ApiTestCase
         self::assertCount(1, WorkoutCreditedSpy::$received);
         $xp = WorkoutCreditedSpy::$received[0]->xpGranted;
 
+        $this->flushPendingAnnouncement($author);
+
         self::assertNotCount(0, SpyingPushSender::$sent);
 
         foreach (SpyingPushSender::$sent as $sent) {
@@ -184,11 +200,44 @@ final class GuildActivityNotifierTest extends ApiTestCase
 
         $this->import($author, [self::freshCandidate()]);
         $this->consumeTheOutbox();
+        $this->flushPendingAnnouncement($author);
 
         $notifiedIds = array_map(static fn (array $sent): string => $sent['recipientId']->toRfc4122(), SpyingPushSender::$sent);
 
         self::assertContains($awake->id->toRfc4122(), $notifiedIds);
         self::assertNotContains($asleep->id->toRfc4122(), $notifiedIds);
+    }
+
+    /**
+     * Le mode dégradé documenté dans le docblock d'`AnnounceGuildActivity`, plutôt qu'un
+     * mode qu'on prétendrait ne jamais exister : si l'annonce est traitée *entre* deux
+     * séances créditées du même auteur — ici simulé en appelant
+     * `AnnounceGuildActivityHandler` directement, comme le ferait un worker dont le
+     * `DelayStamp` s'est déjà écoulé — la seconde séance rouvre une fenêtre et une
+     * seconde annonce part. Deux pushes, pas un — dégradé, pas corrompu : aucune séance
+     * n'est perdue, aucun destinataire n'est notifié à tort.
+     */
+    public function testAnAnnouncementFlushedBetweenTwoSessionsProducesTwoAnnouncements(): void
+    {
+        [$author, $recipients] = $this->guildOfFour();
+
+        // Décalées pour ne pas se chevaucher — Training écarterait sinon la seconde comme
+        // le même effort que la première, et le test ne démontrerait plus rien du #133.
+        $this->import($author, [self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 90)]);
+        $this->consumeTheOutbox();
+        $this->flushPendingAnnouncement($author);
+
+        self::assertCount(\count($recipients), SpyingPushSender::$sent, 'La première annonce doit partir avant que le test en démontre une seconde.');
+
+        $this->import($author, [self::freshCandidate(externalId: 'HK-2', endedMinutesAgo: 5)], key: 'import-suivant');
+        $this->consumeTheOutbox();
+        $this->flushPendingAnnouncement($author);
+
+        self::assertCount(
+            2 * \count($recipients),
+            SpyingPushSender::$sent,
+            'La seconde séance, créditée après que la première annonce est partie, rouvre une fenêtre : c\'est le mode dégradé, documenté et non silencieux.',
+        );
     }
 
     /**
@@ -291,9 +340,24 @@ final class GuildActivityNotifierTest extends ApiTestCase
     }
 
     /**
-     * Draine l'outbox entière, y compris ce qu'un message en cours de traitement y ajoute
-     * — `AnnounceGuildActivity` est dispatchée *pendant* le traitement de `WorkoutCredited`,
-     * donc un unique appel borné au nombre de messages présents au démarrage la manquerait.
+     * Invoque `AnnounceGuildActivityHandler` directement, comme si le `DelayStamp` posé
+     * par `GuildActivityNotifier` s'était déjà écoulé — l'outbox ne le sert jamais avant
+     * ça, donc `consumeTheOutbox()` seule ne suffit pas à observer un envoi.
+     */
+    private function flushPendingAnnouncement(Account $author): void
+    {
+        $handler = self::getContainer()->get(AnnounceGuildActivityHandler::class);
+        self::assertInstanceOf(AnnounceGuildActivityHandler::class, $handler);
+
+        $handler(new AnnounceGuildActivity($author->id));
+    }
+
+    /**
+     * Draine l'outbox de tout ce qui est déjà dû, y compris ce qu'un message en cours de
+     * traitement y ajoute d'immédiatement disponible — `WorkoutImported` et
+     * `WorkoutCredited` partagent la même file. `AnnounceGuildActivity`, elle, porte
+     * toujours un `DelayStamp` : cette boucle ne l'atteint jamais, voir
+     * `flushPendingAnnouncement()`.
      */
     private function consumeTheOutbox(): void
     {
@@ -320,9 +384,15 @@ final class GuildActivityNotifierTest extends ApiTestCase
         return $kernel;
     }
 
+    /**
+     * Seulement ce qui est **déjà dû** : un message retardé par un `DelayStamp` reste une
+     * ligne de la table sans être un travail que `messenger:consume` sait servir
+     * maintenant, et le compter ferait boucler `consumeTheOutbox()` jusqu'à son
+     * `--time-limit` pour rien.
+     */
     private function outboxSize(): int
     {
-        $pending = $this->connection()->fetchOne('SELECT COUNT(*) FROM messenger_messages');
+        $pending = $this->connection()->fetchOne('SELECT COUNT(*) FROM messenger_messages WHERE available_at <= NOW()');
         self::assertIsNumeric($pending);
 
         return (int) $pending;

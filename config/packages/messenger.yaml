@@ -25,8 +25,8 @@ framework:
             App\Shared\Domain\Event\DomainEvent: outbox
 
             # Pas un `DomainEvent` — un message interne à `Community` (#133), routé
-            # explicitement vers la même file. C'est cette async qui fait l'agrégation :
-            # écrit après toutes les séances créditées déjà en file pour le même lot,
-            # l'ordre du transport le fait toujours traiter après elles — voir le
-            # docblock d'`AnnounceGuildActivity`.
+            # explicitement vers la même file. Toujours dispatché avec un `DelayStamp` —
+            # voir le docblock d'`AnnounceGuildActivity` pour pourquoi ce délai, et non
+            # l'ordre du transport seul, est ce qui garantit qu'il est traité après les
+            # séances créditées du même lot.
             App\Community\Application\AnnounceGuildActivity: outbox
