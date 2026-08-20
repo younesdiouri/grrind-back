@@ -12,9 +12,11 @@ use App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerTimezones;
 use App\Shared\Application\PushNotification;
+use App\Shared\Application\PushRoute;
 use App\Shared\Application\PushSender;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\NotificationCategory;
+use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -116,6 +118,9 @@ final readonly class AnnounceGuildActivityHandler
             // côté. Ne pas confondre avec `windowId`, qui sert à l'idempotence du #134 en
             // dessous — l'un fusionne l'affichage, l'autre empêche un double envoi.
             'guild-activity:'.$message->authorId->toRfc4122(),
+            // #144 : la cible du tap est l'auteur de la séance, dont le profil se relit
+            // par `GET /api/players/{id}` — jamais l'XP ou la discipline transportées ici.
+            new PushRoute(PushRouteType::PlayerProfile, $message->authorId),
         );
 
         $now = $this->clock->now();

@@ -6,13 +6,17 @@ namespace App\Tests\Shared\Infrastructure\Notifier;
 
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRejection;
+use App\Shared\Application\PushRoute;
 use App\Shared\Application\PushTargets;
 use App\Shared\Domain\NotificationCategory;
+use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Notifier\ExpoPushSender;
 use App\Tests\Support\SpyingDeadPushTokens;
+use App\Tests\Support\SpyingTexter;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\Notifier\Bridge\Expo\ExpoOptions;
 use Symfony\Component\Notifier\Exception\TransportExceptionInterface;
 use Symfony\Component\Notifier\Message\MessageInterface;
 use Symfony\Component\Notifier\Message\PushMessage;
@@ -174,6 +178,39 @@ final class ExpoPushSenderTest extends TestCase
     }
 
     /**
+     * Le #144 : `groupingKey` et `route` voyagent tous les deux dans `data`, l'un à côté
+     * de l'autre, jamais l'un à la place de l'autre — ils répondent à deux questions
+     * différentes (voir le docblock de {@see PushRoute}).
+     */
+    public function testDataCarriesGroupingKeyAndRouteAlongsideEachOther(): void
+    {
+        $bob = Uuid::v7();
+        $targetId = Uuid::v7();
+        $texter = new SpyingTexter();
+        $sender = new ExpoPushSender($texter, self::targetsOf($bob, ['token']), new SpyingDeadPushTokens(), new NullLogger());
+
+        $notification = new PushNotification(
+            'Titre',
+            'Corps',
+            NotificationCategory::GuildActivity,
+            'guild-roster',
+            new PushRoute(PushRouteType::PlayerProfile, $targetId),
+        );
+
+        $sender->send($bob, $notification);
+
+        self::assertCount(1, $texter->sent);
+        $options = $texter->sent[0]->getOptions();
+        self::assertInstanceOf(ExpoOptions::class, $options);
+
+        $data = $options->toArray()['data'];
+        self::assertIsArray($data);
+        self::assertSame('guild-roster', $data['groupingKey']);
+        self::assertSame('PLAYER_PROFILE', $data['routeType']);
+        self::assertSame($targetId->toRfc4122(), $data['routeId']);
+    }
+
+    /**
      * Le format exact que lève `ExpoTransport::doSend()` (`symfony/expo-notifier`) sur
      * un ticket refusé — voir le docblock de {@see PushRejection}. Le message côté Expo
      * ($message) n'importe pas ici, seul le code entre parenthèses en fin de chaîne compte.
@@ -185,7 +222,7 @@ final class ExpoPushSenderTest extends TestCase
 
     private static function notification(): PushNotification
     {
-        return new PushNotification('Un coéquipier a rejoint', 'Dis bonjour à Bob.', NotificationCategory::GuildActivity, 'guild-roster');
+        return new PushNotification('Un coéquipier a rejoint', 'Dis bonjour à Bob.', NotificationCategory::GuildActivity, 'guild-roster', new PushRoute(PushRouteType::PlayerProfile, Uuid::v7()));
     }
 
     /**

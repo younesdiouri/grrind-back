@@ -6,9 +6,11 @@ namespace App\Tests\Shared\Infrastructure\Notifier;
 
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRejection;
+use App\Shared\Application\PushRoute;
 use App\Shared\Application\PushSender;
 use App\Shared\Application\PushTicket;
 use App\Shared\Domain\NotificationCategory;
+use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Doctrine\PendingPushReceiptRepository;
 use App\Shared\Infrastructure\Notifier\ReceiptSchedulingPushSender;
 use App\Tests\Support\ApiTestCase;
@@ -107,7 +109,7 @@ final class ReceiptSchedulingPushSenderTest extends ApiTestCase
 
     private static function notification(): PushNotification
     {
-        return new PushNotification('Titre', 'Corps', NotificationCategory::GuildActivity, 'grouping-key');
+        return new PushNotification('Titre', 'Corps', NotificationCategory::GuildActivity, 'grouping-key', new PushRoute(PushRouteType::PlayerProfile, Uuid::v7()));
     }
 
     private function decorate(PushSender $inner): ReceiptSchedulingPushSender
