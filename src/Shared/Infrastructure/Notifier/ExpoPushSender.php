@@ -10,6 +10,7 @@ use App\Shared\Application\PushRejection;
 use App\Shared\Application\PushSender;
 use App\Shared\Application\PushTargets;
 use App\Shared\Application\PushTicket;
+use App\Shared\UI\Push\PushNotificationData;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Notifier\Bridge\Expo\ExpoOptions;
 use Symfony\Component\Notifier\Exception\TransportExceptionInterface;
@@ -29,6 +30,11 @@ use Symfony\Component\Uid\Uuid;
  * vieilliraient dans une notification qui peut dormir des heures avant d'être touchée, là
  * où `title`/`body` assument déjà de l'être. Ce que le tap affiche ensuite se relit depuis
  * l'API, jamais transporté ici.
+ *
+ * **Sa forme n'est plus écrite ici (#147).** Les clés du `data` sont du contrat — le
+ * client les décode — et un contrat se génère : c'est {@see PushNotificationData} qui les
+ * nomme, et `openapi.yaml` qui les décrit depuis cette même classe. Cette traduction-ci
+ * reste une traduction vers Expo : elle sait seulement que le champ s'appelle `data`.
  *
  * **Toujours journalisée, quel que soit l'environnement.** C'est ce qui rend `dev` et
  * `test` sûrs sans code à part : `EXPO_DSN=null://null` par défaut (voir `.env` et
@@ -95,11 +101,7 @@ final readonly class ExpoPushSender implements PushSender
                     'categoryId' => $notification->category->value,
                     'channelId' => $notification->category->value,
                 ],
-                data: [
-                    'groupingKey' => $notification->groupingKey,
-                    'routeType' => $notification->route->type->value,
-                    'routeId' => $notification->route->targetId->toRfc4122(),
-                ],
+                data: PushNotificationData::of($notification)->toArray(),
             ),
         );
 

@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared;
 
+use App\Shared\Application\PushNotification;
+use App\Shared\Application\PushRoute;
+use App\Shared\Domain\NotificationCategory;
+use App\Shared\Domain\PushRouteType;
 use App\Shared\UI\Http\ProblemDetails;
+use App\Shared\UI\Push\PushNotificationData;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
@@ -12,6 +17,7 @@ use SplFileInfo;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -117,6 +123,52 @@ final class OpenApiContractTest extends KernelTestCase
                 \sprintf('Le schéma "%s" n\'est référencé nulle part. Si sa route a disparu, il doit disparaître avec elle.', $name),
             );
         }
+    }
+
+    /**
+     * **Le seul schéma du contrat qu'aucune route ne rend** — le `data` d'un push, qui
+     * arrive par APNs. Les deux tests ci-dessus ne peuvent rien pour lui : l'un cherche
+     * des routes non décrites, l'autre des schémas que plus rien ne référence, et celui-ci
+     * n'a jamais eu de route à perdre. Ce qui le tient est ailleurs — il est décrit depuis
+     * la classe que le sender utilise, et c'est ce que ce test vérifie (#147).
+     *
+     * La comparaison porte sur les clés **réellement envoyées** : décrire une charge utile
+     * que le code ne produit plus serait la panne silencieuse que ce contrat existe pour
+     * éviter, la même dans l'autre sens.
+     */
+    public function testTheContractDescribesThePushPayloadTheSenderSends(): void
+    {
+        $sent = PushNotificationData::of(new PushNotification(
+            'Titre',
+            'Corps',
+            NotificationCategory::GuildActivity,
+            'guild-roster',
+            new PushRoute(PushRouteType::PlayerProfile, Uuid::v7()),
+        ))->toArray();
+
+        $schema = $this->schema('PushNotificationData');
+
+        $properties = $schema['properties'];
+        self::assertIsArray($properties);
+
+        self::assertSame(
+            array_keys($sent),
+            array_keys($properties),
+            'Le contrat et le `data` envoyé ne portent plus les mêmes clés. Le sender fait foi ; '
+            .'recale `PushNotificationData`, puis `make openapi`.',
+        );
+
+        // Aucune n'est facultative : le client route dessus, une clé manquante le laisse
+        // sans recours au moment précis où il en a besoin.
+        self::assertSame(array_keys($sent), $schema['required']);
+
+        // L'énumération que le client branche est celle que le code émet. Le contrôle de
+        // dérive de la CI le dirait aussi, mais plus tard : un cas ajouté à `PushRouteType`
+        // sans `make openapi` doit tomber ici, avant la revue.
+        self::assertSame(
+            array_column(PushRouteType::cases(), 'value'),
+            $this->schema('PushRouteType')['enum'],
+        );
     }
 
     /**
@@ -259,29 +311,41 @@ final class OpenApiContractTest extends KernelTestCase
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function schema(string $name): array
+    {
+        $components = $this->spec['components'];
+        self::assertIsArray($components);
+
+        $schemas = $components['schemas'];
+        self::assertIsArray($schemas);
+        self::assertArrayHasKey($name, $schemas, \sprintf('Le schéma "%s" a disparu du contrat.', $name));
+
+        $schema = $schemas[$name];
+        self::assertIsArray($schema);
+
+        /** @var array<string, mixed> $schema */
+        return $schema;
+    }
+
+    /**
      * Ceux de `nelmio_api_doc.yaml`, et eux seuls. Le générateur en produit d'autres à
      * partir des DTO de requête — `XpHistoryQuery`, `RegisterRequest` — qu'il ne référence
      * nulle part parce qu'il déplie leurs champs en paramètres. Ceux-là ne peuvent pas
      * pourrir : ils naissent d'une classe qui existe.
      *
+     * **Un schéma déclaré sous `models.names` est de ceux-là**, même s'il apparaît aussi
+     * sous `components.schemas` : ce qu'on y écrit à la main n'est que sa prose, sa forme
+     * vient d'une classe (#147). Il est donc retiré de la liste — sans quoi le seul schéma
+     * du contrat qui n'appartient à aucune route ferait échouer un test qui cherche des
+     * schémas morts, pour la seule raison qu'il est vivant ailleurs.
+     *
      * @return list<string>
      */
     private static function handWrittenSchemas(): array
     {
-        $config = Yaml::parseFile(__DIR__.'/../../config/packages/nelmio_api_doc.yaml');
-        self::assertIsArray($config);
-
-        $node = $config;
-
-        foreach (['when@dev', 'nelmio_api_doc', 'documentation', 'components', 'schemas'] as $key) {
-            self::assertIsArray($node, 'Le fichier de configuration a changé de forme : ce test ne sait plus où chercher.');
-            self::assertArrayHasKey($key, $node);
-            $node = $node[$key];
-        }
-
-        $schemas = $node;
-        self::assertIsArray($schemas);
-
+        $schemas = self::configuredAt('documentation', 'components', 'schemas');
         $names = array_keys($schemas);
 
         foreach ($names as $name) {
@@ -289,7 +353,46 @@ final class OpenApiContractTest extends KernelTestCase
         }
 
         /** @var list<string> $names */
+        return array_values(array_diff($names, self::generatedFromAClass()));
+    }
+
+    /**
+     * Les alias de `models.names` — les modèles que le générateur décrit sans attendre
+     * qu'une route les référence.
+     *
+     * @return list<string>
+     */
+    private static function generatedFromAClass(): array
+    {
+        $names = [];
+
+        foreach (self::configuredAt('models', 'names') as $declaration) {
+            self::assertIsArray($declaration);
+            self::assertArrayHasKey('alias', $declaration);
+            self::assertIsString($declaration['alias']);
+
+            $names[] = $declaration['alias'];
+        }
+
         return $names;
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private static function configuredAt(string ...$path): array
+    {
+        $node = Yaml::parseFile(__DIR__.'/../../config/packages/nelmio_api_doc.yaml');
+
+        foreach (['when@dev', 'nelmio_api_doc', ...$path] as $key) {
+            self::assertIsArray($node, 'Le fichier de configuration a changé de forme : ce test ne sait plus où chercher.');
+            self::assertArrayHasKey($key, $node);
+            $node = $node[$key];
+        }
+
+        self::assertIsArray($node);
+
+        return $node;
     }
 
     /**

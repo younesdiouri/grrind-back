@@ -21,6 +21,21 @@ when@dev:
             path_patterns:
                 - ^/api
 
+        # **Un schéma que rien ne référence, et c'est voulu (#147).** Le `data` d'un push
+        # est du contrat — le client le décode et route dessus — mais il n'est le corps
+        # d'aucune réponse : le canal est APNs, pas HTTP. Déclaré ici, le générateur le
+        # décrit sans attendre qu'une route le référence, et `PushRouteType` sort avec lui,
+        # généré depuis l'enum PHP. C'est tout l'intérêt : un schéma écrit à la main aurait
+        # recopié `PLAYER_PROFILE`, exactement ce qu'on refuse au client.
+        #
+        # Inventer une route pour donner un point d'accroche au schéma aurait été le
+        # contraire d'une solution : une route de plus à documenter, à sécuriser et à
+        # faire vivre, pour satisfaire un générateur.
+        models:
+            names:
+                - alias: PushNotificationData
+                  type: App\Shared\UI\Push\PushNotificationData
+
         documentation:
             info:
                 title: GRRIND
@@ -489,6 +504,24 @@ when@dev:
                                 type: string
                                 format: date-time
                                 description: "Rafraîchi à chaque appel de la route, y compris quand rien d'autre ne change."
+
+                    # **Décrit ailleurs, complété ici (#147).** Ses propriétés sont générées
+                    # depuis `App\Shared\UI\Push\PushNotificationData` (voir `models.names`
+                    # plus haut) : les redéclarer ici les figerait à la main. Ne reste que ce
+                    # qu'aucune classe ne porte — la prose qui dit d'où vient cette charge
+                    # utile, puisque aucun `paths` ne mène à elle.
+                    PushNotificationData:
+                        description: |
+                            Le `data` d'une notification push, **le seul morceau qui se décode plutôt que
+                            s'affiche**. Il n'arrive par aucune route : le canal est APNs via Expo, pas HTTP.
+                            Il est décrit ici parce que c'est le même contrat — le client route dessus, il
+                            doit donc générer `routeType` plutôt que d'en recopier les valeurs.
+
+                            **Rien à afficher tel quel.** `routeId` est une clé de ressource à relire —
+                            pour `PLAYER_PROFILE`, l'identifiant que `GET /api/players/{id}` résout. Une
+                            notification peut dormir des heures dans le centre de notifications ; ce que le
+                            tap montre ensuite doit être exact, donc relu depuis l'API. `groupingKey`, lui,
+                            ne se lit pas : il dit seulement quelle notification une nouvelle remplace.
 
                     # ————— Entraînement ————————————————————————————————————————————————
                     Workout:
