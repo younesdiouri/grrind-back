@@ -23,22 +23,29 @@ use Symfony\Component\Uid\Uuid;
  * c'est la même opération qui rend la route idempotente pour le même compte et qui
  * transfère la propriété quand ce n'est pas le cas.
  *
- * **Ne suit pas la famille de refresh tokens.** Un jeton de push survit à la rotation des
- * refresh tokens (30 jours, ré-émis à chaque appel de `/api/auth/refresh`), donc l'accrocher
- * à une famille précise l'aurait fait expirer avec elle. La route qui l'enregistre
- * authentifie par jeton d'accès (`#[CurrentUser]`), qui ne porte pas l'identifiant de
- * famille — le coupler exigerait de le faire voyager jusque dans le claim JWT, ce qu'aucun
- * autre besoin ne justifie aujourd'hui. Conséquence assumée : se déconnecter (révoquer une
- * famille) ne retire **pas** le jeton de push de cet appareil en l'état ; un compte qui se
- * déconnecte puis se reconnecte avec un autre continue de recevoir les notifications tant
- * qu'un autre appel à `claim()` ne l'a pas repris. À trancher au ticket qui branchera un
- * vrai transport (Lot 4d) : soit le client se désenregistre explicitement à la
- * déconnexion, soit `LogOutHandler` apprend à révoquer le jeton associé.
+ * **Suit la famille de refresh tokens (#136, arbitrage B).** Une famille *est* un appareil —
+ * `CLAUDE.md` le disait déjà avant que ce ticket en tire la conséquence : porter le jeton de
+ * push par autre chose qu'elle aurait été une deuxième définition d'appareil dans le même
+ * projet. `familyId` vient du claim `fid` du jeton d'accès courant ({@see
+ * \App\Identity\UI\Http\CurrentDeviceFamily}) et `claim()` le réécrit à **chaque** appel, au
+ * même titre que le propriétaire — pas seulement à la création : un même téléphone qui se
+ * déconnecte puis se reconnecte sur le même compte ouvre une famille neuve à chaque login, et
+ * seule la dernière doit pouvoir couper ce jeton. `LogOutHandler` et le rejeu détecté par
+ * `RefreshSessionHandler` retirent la ligne dont ils révoquent la famille, dans la même
+ * transaction — c'est ce qui referme la fuite que ce docblock décrivait jusqu'ici.
+ *
+ * **Nullable.** Les lignes déjà en base au déploiement de ce ticket n'ont pas de famille, et
+ * un jeton d'accès signé juste avant le déploiement reste valable jusqu'à quinze minutes après
+ * sans porter le claim — dans les deux cas `claim()` reçoit `null` et l'écrit tel quel plutôt
+ * que d'échouer, la ligne se raccroche à une vraie famille au premier appel qui en porte une.
+ * Une famille qui pointe une lignée révoquée n'est pas nettoyée pour autant : elle se fait
+ * reprendre au prochain `claim()`, et #131 ramasse la ligne si l'appareil est vraiment parti.
  */
 #[ORM\Entity(repositoryClass: UserDeviceRepository::class)]
 #[ORM\Table(name: 'identity_user_device')]
 #[ORM\UniqueConstraint(name: 'uniq_identity_user_device_token', columns: ['push_token'])]
 #[ORM\Index(name: 'idx_identity_user_device_user', columns: ['user_id'])]
+#[ORM\Index(name: 'idx_identity_user_device_family', columns: ['family_id'])]
 class UserDevice
 {
     /**
@@ -54,6 +61,10 @@ class UserDevice
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private User $user;
+
+    /** La famille de refresh tokens dont vient le jeton d'accès qui a fait ce `claim()`. */
+    #[ORM\Column(type: UuidType::NAME, nullable: true)]
+    private ?Uuid $familyId;
 
     #[ORM\Column(length: self::PUSH_TOKEN_MAX_LENGTH)]
     private string $pushToken;
@@ -74,6 +85,7 @@ class UserDevice
     private function __construct(
         string $pushToken,
         User $user,
+        ?Uuid $familyId,
         DevicePlatform $platform,
         DeviceEnvironment $environment,
         DateTimeImmutable $now,
@@ -81,17 +93,18 @@ class UserDevice
         $this->id = Uuid::v7();
         $this->pushToken = $pushToken;
         $this->registeredAt = $now;
-        $this->claim($user, $platform, $environment, $now);
+        $this->claim($user, $familyId, $platform, $environment, $now);
     }
 
     public static function register(
         string $pushToken,
         User $user,
+        ?Uuid $familyId,
         DevicePlatform $platform,
         DeviceEnvironment $environment,
         DateTimeImmutable $now,
     ): self {
-        return new self($pushToken, $user, $platform, $environment, $now);
+        return new self($pushToken, $user, $familyId, $platform, $environment, $now);
     }
 
     public function id(): Uuid
@@ -129,14 +142,21 @@ class UserDevice
         return $this->lastSeenAt;
     }
 
+    public function familyId(): ?Uuid
+    {
+        return $this->familyId;
+    }
+
     /**
      * Reprend la ligne pour `$user` — sans condition sur le propriétaire actuel. Voir le
      * docblock de la classe : c'est délibérément la même opération pour un
-     * réenregistrement anodin et pour un changement de propriétaire.
+     * réenregistrement anodin et pour un changement de propriétaire, et `$familyId` suit
+     * exactement la même règle que `$user`.
      */
-    public function claim(User $user, DevicePlatform $platform, DeviceEnvironment $environment, DateTimeImmutable $now): void
+    public function claim(User $user, ?Uuid $familyId, DevicePlatform $platform, DeviceEnvironment $environment, DateTimeImmutable $now): void
     {
         $this->user = $user;
+        $this->familyId = $familyId;
         $this->platform = $platform;
         $this->environment = $environment;
         $this->lastSeenAt = $now;

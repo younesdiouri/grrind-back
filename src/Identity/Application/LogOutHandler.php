@@ -6,6 +6,7 @@ namespace App\Identity\Application;
 
 use App\Identity\Domain\RefreshTokenSecret;
 use App\Identity\Infrastructure\Doctrine\RefreshTokenRepository;
+use App\Identity\Infrastructure\Doctrine\UserDeviceRepository;
 use InvalidArgumentException;
 use Psr\Clock\ClockInterface;
 
@@ -14,11 +15,16 @@ use Psr\Clock\ClockInterface;
  *
  * Idempotent et silencieux : un jeton inconnu ne produit pas d'erreur. Répondre
  * autrement dirait à un inconnu si le jeton qu'il tient existe.
+ *
+ * **Retire aussi le jeton de push de cette famille (#136, arbitrage B).** Une famille est un
+ * appareil ; s'en déconnecter doit couper ses notifications sans que le client ait à s'en
+ * souvenir. Même transaction que la révocation — voir {@see RefreshTokenRepository::transactional()}.
  */
 final readonly class LogOutHandler
 {
     public function __construct(
         private RefreshTokenRepository $refreshTokens,
+        private UserDeviceRepository $devices,
         private ClockInterface $clock,
     ) {
     }
@@ -35,7 +41,12 @@ final readonly class LogOutHandler
             return;
         }
 
-        $this->refreshTokens->revokeFamily($token->familyId(), $this->clock->now());
-        $this->refreshTokens->commit();
+        $familyId = $token->familyId();
+        $now = $this->clock->now();
+
+        $this->refreshTokens->transactional(function () use ($familyId, $now): void {
+            $this->refreshTokens->revokeFamily($familyId, $now);
+            $this->devices->discardFamily($familyId);
+        });
     }
 }

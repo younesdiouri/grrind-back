@@ -50,6 +50,23 @@ class UserDeviceRepository extends ServiceEntityRepository implements PushTarget
     }
 
     /**
+     * Retire l'appareil de la famille qu'on révoque — `LogOutHandler` et le rejeu détecté par
+     * `RefreshSessionHandler` (#136). Au plus une ligne par famille en pratique (voir le
+     * docblock de {@see UserDevice} : `claim()` réécrit `familyId` à
+     * chaque appel), donc un `DELETE` en DQL plutôt qu'un aller-retour par l'unit of work —
+     * même idiome que {@see RefreshTokenRepository::revokeFamily()}, dont l'appelant doit
+     * l'exécuter dans la même transaction.
+     */
+    public function discardFamily(Uuid $familyId): void
+    {
+        $this->getEntityManager()->createQuery(
+            'DELETE FROM '.UserDevice::class.' d WHERE d.familyId = :family'
+        )
+            ->setParameter('family', $familyId, UuidType::NAME)
+            ->execute();
+    }
+
+    /**
      * L'implémentation du port {@see DeadPushTokens}. Sèche et immédiate — pas de flag,
      * pas de compteur d'échecs à côté : Expo est formel sur `DeviceNotRegistered`, la
      * ligne n'a plus de raison d'exister. `ofPushToken()` puis `remove()` plutôt qu'un

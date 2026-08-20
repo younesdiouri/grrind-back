@@ -14,11 +14,16 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Component\Uid\Uuid;
 
 /**
- * `#[CurrentUser]` et rien d'autre : enregistrer son propre téléphone est une donnée du
- * joueur courant, l'invariant de CLAUDE.md tient ici comme sur `/api/me` — aucun
+ * `#[CurrentUser]` et rien d'autre en entrée : enregistrer son propre téléphone est une
+ * donnée du joueur courant, l'invariant de CLAUDE.md tient ici comme sur `/api/me` — aucun
  * identifiant de compte dans l'URL ni dans le corps.
+ *
+ * `#[CurrentDeviceFamily]` accroche l'appareil à la famille de refresh tokens dont vient le
+ * jeton d'accès courant (#136), sans rien demander de plus au client : le claim `fid` voyage
+ * déjà dans le jeton qu'il envoie pour s'authentifier.
  *
  * `200` et non `201` : la route est un upsert par construction (le client réenregistre son
  * jeton à chaque démarrage, recommandation Apple comme Expo), donc rien ne distingue pour
@@ -40,13 +45,19 @@ final readonly class DeviceController
     )]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
-    public function __invoke(#[CurrentUser] User $user, #[MapRequestPayload] RegisterDeviceRequest $request): JsonResponse
-    {
+    public function __invoke(
+        #[CurrentUser]
+        User $user,
+        #[CurrentDeviceFamily]
+        ?Uuid $familyId,
+        #[MapRequestPayload]
+        RegisterDeviceRequest $request,
+    ): JsonResponse {
         // Les valeurs non nulles sont garanties par la validation, qui a déjà rendu un 422
         // sinon — même idiome que ImportWorkoutsController::candidate().
         \assert(null !== $request->platform && null !== $request->environment);
 
-        $device = ($this->register)($user, new RegisterDevice($request->pushToken, $request->platform, $request->environment));
+        $device = ($this->register)($user, new RegisterDevice($request->pushToken, $familyId, $request->platform, $request->environment));
 
         return new JsonResponse(DeviceResource::from($device)->toArray());
     }

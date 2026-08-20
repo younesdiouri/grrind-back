@@ -30,10 +30,10 @@ final readonly class RegisterDeviceHandler
         $device = $this->devices->ofPushToken($command->pushToken);
 
         if (null === $device) {
-            $device = UserDevice::register($command->pushToken, $user, $command->platform, $command->environment, $now);
+            $device = UserDevice::register($command->pushToken, $user, $command->familyId, $command->platform, $command->environment, $now);
             $this->devices->add($device);
         } else {
-            $device->claim($user, $command->platform, $command->environment, $now);
+            $device->claim($user, $command->familyId, $command->platform, $command->environment, $now);
         }
 
         $this->devices->commit();
