@@ -9,6 +9,7 @@ use App\Community\Application\AnnounceGuildActivityHandler;
 use App\Community\Domain\PendingGuildActivity;
 use App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository;
 use App\Shared\Domain\NotificationCategory;
+use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
@@ -118,6 +119,11 @@ final class GuildActivityNotifierTest extends ApiTestCase
             self::assertSame('GUILD_ACTIVITY', $sent['notification']->category->value);
             self::assertStringContainsString('3 séances', $sent['notification']->body);
             self::assertStringContainsString('+'.$totalXp.' XP', $sent['notification']->body);
+
+            // #144 : le tap doit mener au profil de l'auteur de la séance, pas à celui du
+            // destinataire — c'est GET /api/players/{id} qui le résout ensuite.
+            self::assertSame(PushRouteType::PlayerProfile, $sent['notification']->route->type);
+            self::assertTrue($sent['notification']->route->targetId->equals($author->id));
         }
 
         // Un seul destinataire par identifiant : la boucle ci-dessus n'a pas pu compter

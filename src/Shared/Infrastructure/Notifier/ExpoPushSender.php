@@ -19,9 +19,16 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * L'implémentation du port {@see PushSender} : traduit une {@see PushNotification} —
- * `category` et `groupingKey` — vers le vocabulaire qu'Expo attend (`categoryId`,
+ * `category`, `groupingKey` et `route` — vers le vocabulaire qu'Expo attend (`categoryId`,
  * `channelId`, `data`), et délègue l'appel au `TexterInterface` du framework. C'est tout
  * ce qu'elle fait : aucune règle de jeu, aucune décision de qui notifier.
+ *
+ * **`data` (#144) : `groupingKey` et `route`, jamais autre chose.** Les deux répondent à
+ * deux questions différentes — quelle notification celle-ci remplace-t-elle, où le tap
+ * doit-il mener — et aucune donnée de jeu ne s'y ajoute : XP, niveau ou discipline
+ * vieilliraient dans une notification qui peut dormir des heures avant d'être touchée, là
+ * où `title`/`body` assument déjà de l'être. Ce que le tap affiche ensuite se relit depuis
+ * l'API, jamais transporté ici.
  *
  * **Toujours journalisée, quel que soit l'environnement.** C'est ce qui rend `dev` et
  * `test` sûrs sans code à part : `EXPO_DSN=null://null` par défaut (voir `.env` et
@@ -88,7 +95,11 @@ final readonly class ExpoPushSender implements PushSender
                     'categoryId' => $notification->category->value,
                     'channelId' => $notification->category->value,
                 ],
-                data: ['groupingKey' => $notification->groupingKey],
+                data: [
+                    'groupingKey' => $notification->groupingKey,
+                    'routeType' => $notification->route->type->value,
+                    'routeId' => $notification->route->targetId->toRfc4122(),
+                ],
             ),
         );
 
