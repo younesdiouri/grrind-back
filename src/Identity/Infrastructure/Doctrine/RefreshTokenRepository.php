@@ -52,4 +52,15 @@ class RefreshTokenRepository extends ServiceEntityRepository
     {
         $this->getEntityManager()->flush();
     }
+
+    /**
+     * Révoquer une famille et retirer l'appareil qu'elle portait est un seul geste — voir
+     * `LogOutHandler` et le rejeu détecté par `RefreshSessionHandler` (#136). Les deux DQL
+     * `UPDATE`/`DELETE` qu'ils déclenchent s'exécutent hors du unit of work Doctrine ; sans
+     * cette transaction explicite, rien ne les lierait l'une à l'autre.
+     */
+    public function transactional(callable $work): mixed
+    {
+        return $this->getEntityManager()->wrapInTransaction(static fn (): mixed => $work());
+    }
 }

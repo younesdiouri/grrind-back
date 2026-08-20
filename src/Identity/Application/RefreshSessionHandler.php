@@ -8,6 +8,7 @@ use App\Identity\Domain\Exception\InvalidRefreshToken;
 use App\Identity\Domain\RefreshToken;
 use App\Identity\Domain\RefreshTokenSecret;
 use App\Identity\Infrastructure\Doctrine\RefreshTokenRepository;
+use App\Identity\Infrastructure\Doctrine\UserDeviceRepository;
 use InvalidArgumentException;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Psr\Clock\ClockInterface;
@@ -16,6 +17,7 @@ final readonly class RefreshSessionHandler
 {
     public function __construct(
         private RefreshTokenRepository $refreshTokens,
+        private UserDeviceRepository $devices,
         private JWTTokenManagerInterface $jwt,
         private ClockInterface $clock,
         private int $accessTokenTtl,
@@ -36,9 +38,14 @@ final readonly class RefreshSessionHandler
 
         if ($presented->isReplay()) {
             // Voir RefreshToken : impossible de distinguer le voleur du vrai client,
-            // donc on coupe la famille entière.
-            $this->refreshTokens->revokeFamily($presented->familyId(), $now);
-            $this->refreshTokens->commit();
+            // donc on coupe la famille entière — et l'appareil qu'elle portait, même
+            // transaction (#136, même geste que LogOutHandler).
+            $familyId = $presented->familyId();
+
+            $this->refreshTokens->transactional(function () use ($familyId, $now): void {
+                $this->refreshTokens->revokeFamily($familyId, $now);
+                $this->devices->discardFamily($familyId);
+            });
 
             throw new InvalidRefreshToken();
         }
@@ -57,7 +64,7 @@ final readonly class RefreshSessionHandler
         $user = $presented->user();
 
         return new AuthenticatedUser($user, new TokenPair(
-            $this->jwt->create($user),
+            $this->jwt->createFromPayload($user, ['fid' => $rotated->familyId()->toRfc4122()]),
             $this->accessTokenTtl,
             $secret->value,
             $rotated->expiresAt(),

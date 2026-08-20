@@ -37,13 +37,12 @@ final readonly class AuthenticationResponseListener
     }
 
     /**
-     * Login réussi. Lexik a signé le JWT et s'apprêtait à répondre `{"token": …}` ;
-     * on lui substitue le contrat GRRIND — profil et paire de jetons — pour que
-     * login, inscription et rafraîchissement rendent tous la même forme et que le
-     * client n'ait qu'un seul chemin de traitement.
-     *
-     * C'est aussi ici que naît la famille de refresh tokens : une par login, donc
-     * une par appareil.
+     * Login réussi. Lexik a signé un JWT et s'apprêtait à répondre `{"token": …}` ; ce
+     * jeton-là est jeté sans être lu, jamais renvoyé. `IssueTokens` en signe un second, une
+     * fois la famille de refresh tokens créée, pour qu'il porte le claim `fid` (#136, voir
+     * son docblock pour le compromis) — et on lui substitue au passage le contrat GRRIND,
+     * profil et paire de jetons, pour que login, inscription et rafraîchissement rendent
+     * tous la même forme.
      */
     #[AsEventListener(event: Events::AUTHENTICATION_SUCCESS)]
     public function onLoginSucceeded(AuthenticationSuccessEvent $event): void
@@ -54,10 +53,7 @@ final readonly class AuthenticationResponseListener
             return;
         }
 
-        $data = $event->getData();
-        $accessToken = \is_string($data['token'] ?? null) ? $data['token'] : '';
-
-        $tokens = $this->issueTokens->alongside($user, $accessToken);
+        $tokens = ($this->issueTokens)($user);
 
         $event->setData(AuthResource::from(new AuthenticatedUser($user, $tokens), $this->titles->of($user->id()))->toArray());
     }
