@@ -690,6 +690,25 @@ paths:
           $ref: '#/components/responses/Unauthorized'
 components:
   schemas:
+    PushRouteType:
+      type: string
+      enum:
+        - PLAYER_PROFILE
+    PushNotificationData:
+      description: "Le `data` d'une notification push, **le seul morceau qui se décode plutôt que\ns'affiche**. Il n'arrive par aucune route : le canal est APNs via Expo, pas HTTP.\nIl est décrit ici parce que c'est le même contrat — le client route dessus, il\ndoit donc générer `routeType` plutôt que d'en recopier les valeurs.\n\n**Rien à afficher tel quel.** `routeId` est une clé de ressource à relire —\npour `PLAYER_PROFILE`, l'identifiant que `GET /api/players/{id}` résout. Une\nnotification peut dormir des heures dans le centre de notifications ; ce que le\ntap montre ensuite doit être exact, donc relu depuis l'API. `groupingKey`, lui,\nne se lit pas : il dit seulement quelle notification une nouvelle remplace.\n"
+      required:
+        - groupingKey
+        - routeType
+        - routeId
+      properties:
+        groupingKey:
+          type: string
+        routeType:
+          $ref: '#/components/schemas/PushRouteType'
+        routeId:
+          type: string
+          format: uuid
+      type: object
     ProblemDetails:
       description: "Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et\n`detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une\nviolation de validation donne `violations` — pour que le client se recale au lieu\nd'afficher un refus sec.\n"
       required:

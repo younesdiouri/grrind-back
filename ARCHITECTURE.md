@@ -716,6 +716,12 @@ défaire. Le raisonnement complet est dans le docblock du fichier concerné.
   l'écran d'un joueur est pire que le problème qu'elle répare.
 - **Un compte sans ligne de progression n'est pas un écart** tant que son ledger est vide :
   c'est l'état normal d'une inscription, et c'est le premier crédit qui pose la ligne.
+- **`openapi.yaml` décrit un schéma qu'aucune route ne référence** : `PushNotificationData`, le
+  `data` d'un push. Le canal est APNs, pas HTTP, mais le contrat est le même — le client route
+  sur `routeType` et doit le générer, pas le recopier. Il est déclaré sous `models.names` et
+  décrit depuis la classe que le sender utilise ; lui inventer une route pour « le raccrocher »
+  serait une route de plus à documenter et à sécuriser, et le supprimer parce qu'il est orphelin
+  rendrait le client à sa chaîne recopiée.
 
 ---
 
