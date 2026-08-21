@@ -16,28 +16,37 @@ use App\Tests\Support\SpyingTexter;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Notifier\Bridge\Expo\ExpoOptions;
+use Symfony\Component\Notifier\Bridge\Expo\ExpoTransport;
 use Symfony\Component\Notifier\Exception\TransportExceptionInterface;
 use Symfony\Component\Notifier\Message\MessageInterface;
 use Symfony\Component\Notifier\Message\PushMessage;
 use Symfony\Component\Notifier\Message\SentMessage;
-use Symfony\Component\Notifier\Texter;
-use Symfony\Component\Notifier\TexterInterface;
 use Symfony\Component\Notifier\Transport\NullTransport;
+use Symfony\Component\Notifier\Transport\TransportInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Sans conteneur, sans réseau : ce que l'adapter garantit par construction. Le câblage
- * réel — `%env(EXPO_DSN)%`, forcé à `null://null` en environnement `test` — se prouve à
- * part, dans {@see PushSenderWiringTest}, comme `PushTargetsTest` le fait pour son
- * voisin.
+ * Sans conteneur, sans réseau réel : ce que l'adapter garantit par construction. Le
+ * câblage réel — `%env(EXPO_DSN)%`, forcé à `null://null` en environnement `test` — se
+ * prouve à part, dans {@see PushSenderWiringTest}, comme `PushTargetsTest` le fait pour
+ * son voisin.
+ *
+ * Depuis le #150, `ExpoPushSender` consomme un `TransportInterface`, pas un
+ * `TexterInterface` — voir son docblock pour pourquoi. La plupart des tests ci-dessous
+ * passent `NullTransport` ou un double directement, mais deux d'entre eux vont plus loin
+ * et traversent le **vrai** `ExpoTransport` du bridge, avec `MockHttpClient` : c'est ce
+ * qui prouve que le `ticketId` d'Expo ressort réellement, plutôt que de le supposer
+ * depuis un double qui ne reconstruit pas le format de réponse du bridge.
  */
 final class ExpoPushSenderTest extends TestCase
 {
     public function testEachDeviceGetsItsOwnTicketInPushTargetsOrder(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, ['token-a', 'token-b']), new SpyingDeadPushTokens(), new NullLogger());
+        $sender = new ExpoPushSender(new NullTransport(), self::targetsOf($bob, ['token-a', 'token-b']), new SpyingDeadPushTokens(), new NullLogger());
 
         $tickets = $sender->send($bob, self::notification());
 
@@ -51,7 +60,7 @@ final class ExpoPushSenderTest extends TestCase
     public function testAPlayerWithNoDeviceGetsNoTicket(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, []), new SpyingDeadPushTokens(), new NullLogger());
+        $sender = new ExpoPushSender(new NullTransport(), self::targetsOf($bob, []), new SpyingDeadPushTokens(), new NullLogger());
 
         self::assertSame([], $sender->send($bob, self::notification()));
     }
@@ -64,7 +73,7 @@ final class ExpoPushSenderTest extends TestCase
     public function testTheNullTransportProducesAnAcceptedTicketWithoutAnId(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(new Texter(new NullTransport()), self::targetsOf($bob, ['token']), new SpyingDeadPushTokens(), new NullLogger());
+        $sender = new ExpoPushSender(new NullTransport(), self::targetsOf($bob, ['token']), new SpyingDeadPushTokens(), new NullLogger());
 
         [$ticket] = $sender->send($bob, self::notification());
 
@@ -79,7 +88,7 @@ final class ExpoPushSenderTest extends TestCase
     public function testARejectedTokenDoesNotStopTheOthers(): void
     {
         $bob = Uuid::v7();
-        $sender = new ExpoPushSender(self::texterRejecting('dead-token', self::bridgeMessage('DeviceNotRegistered')), self::targetsOf($bob, ['dead-token', 'live-token']), new SpyingDeadPushTokens(), new NullLogger());
+        $sender = new ExpoPushSender(self::transportRejecting('dead-token', self::bridgeMessage('DeviceNotRegistered')), self::targetsOf($bob, ['dead-token', 'live-token']), new SpyingDeadPushTokens(), new NullLogger());
 
         [$dead, $live] = $sender->send($bob, self::notification());
 
@@ -100,7 +109,7 @@ final class ExpoPushSenderTest extends TestCase
     {
         $bob = Uuid::v7();
         $bridgeMessage = self::bridgeMessage('DeviceNotRegistered');
-        $sender = new ExpoPushSender(self::texterRejecting('dead-token', $bridgeMessage), self::targetsOf($bob, ['dead-token']), new SpyingDeadPushTokens(), new NullLogger());
+        $sender = new ExpoPushSender(self::transportRejecting('dead-token', $bridgeMessage), self::targetsOf($bob, ['dead-token']), new SpyingDeadPushTokens(), new NullLogger());
 
         [$ticket] = $sender->send($bob, self::notification());
 
@@ -117,7 +126,7 @@ final class ExpoPushSenderTest extends TestCase
     {
         $bob = Uuid::v7();
         $networkFailure = 'Could not reach the remote Expo server.';
-        $sender = new ExpoPushSender(self::texterRejecting('dead-token', $networkFailure), self::targetsOf($bob, ['dead-token']), new SpyingDeadPushTokens(), new NullLogger());
+        $sender = new ExpoPushSender(self::transportRejecting('dead-token', $networkFailure), self::targetsOf($bob, ['dead-token']), new SpyingDeadPushTokens(), new NullLogger());
 
         [$ticket] = $sender->send($bob, self::notification());
 
@@ -133,10 +142,43 @@ final class ExpoPushSenderTest extends TestCase
     {
         $bob = Uuid::v7();
         $deadPushTokens = new SpyingDeadPushTokens();
-        $sender = new ExpoPushSender(self::texterRejecting('dead-token', self::bridgeMessage('DeviceNotRegistered')), self::targetsOf($bob, ['dead-token']), $deadPushTokens, new NullLogger());
+        $sender = new ExpoPushSender(self::transportRejecting('dead-token', self::bridgeMessage('DeviceNotRegistered')), self::targetsOf($bob, ['dead-token']), $deadPushTokens, new NullLogger());
 
         $sender->send($bob, self::notification());
 
+        self::assertSame(['dead-token'], $deadPushTokens->discarded);
+    }
+
+    /**
+     * Le #150 : le même refus que le test ci-dessus, mais à travers le **vrai**
+     * `ExpoTransport` du bridge — `MockHttpClient` rendant la réponse d'erreur qu'Expo
+     * produit réellement. Rouge sur `main` avant #150 : `ExpoPushSender` n'y accepte
+     * qu'un `TexterInterface`, et un `ExpoTransport` ne l'implémente pas — le type ne
+     * compile même pas. C'est le chemin des refus que le ticket documente comme cassé :
+     * `Texter::send()` dispatchait sur le bus Messenger, et `HandleMessageMiddleware`
+     * enveloppait le `TransportException` du bridge dans un `HandlerFailedException` que
+     * le `catch` ci-dessus ne reconnaît pas — l'exception traversait `ExpoPushSender` au
+     * lieu d'être consignée dans un `PushTicket`. Passer par `TransportInterface`
+     * (`Transports::send()`, jamais `Texter::send()`) supprime ce détour : le
+     * `TransportException` natif du bridge remonte tel quel, et le `catch` se déclenche.
+     */
+    public function testARealBridgeRejectionDiscardsTheDeadTokenWithoutThrowing(): void
+    {
+        $bob = Uuid::v7();
+        $mockClient = new MockHttpClient(static fn (): MockResponse => new MockResponse(json_encode([
+            'data' => [
+                'status' => 'error',
+                'message' => 'The Expo push token is not a valid Expo push token.',
+                'details' => ['error' => 'DeviceNotRegistered'],
+            ],
+        ], \JSON_THROW_ON_ERROR)));
+        $deadPushTokens = new SpyingDeadPushTokens();
+        $sender = new ExpoPushSender(new ExpoTransport(null, $mockClient), self::targetsOf($bob, ['dead-token']), $deadPushTokens, new NullLogger());
+
+        [$ticket] = $sender->send($bob, self::notification());
+
+        self::assertFalse($ticket->accepted);
+        self::assertSame(PushRejection::DeviceNotRegistered, $ticket->rejection);
         self::assertSame(['dead-token'], $deadPushTokens->discarded);
     }
 
@@ -159,7 +201,7 @@ final class ExpoPushSenderTest extends TestCase
     {
         $bob = Uuid::v7();
         $deadPushTokens = new SpyingDeadPushTokens();
-        $sender = new ExpoPushSender(self::texterRejecting('token', self::bridgeMessage($expoCode)), self::targetsOf($bob, ['token']), $deadPushTokens, new NullLogger());
+        $sender = new ExpoPushSender(self::transportRejecting('token', self::bridgeMessage($expoCode)), self::targetsOf($bob, ['token']), $deadPushTokens, new NullLogger());
 
         $sender->send($bob, self::notification());
 
@@ -170,7 +212,7 @@ final class ExpoPushSenderTest extends TestCase
     {
         $bob = Uuid::v7();
         $deadPushTokens = new SpyingDeadPushTokens();
-        $sender = new ExpoPushSender(self::texterRejecting('token', 'Could not reach the remote Expo server.'), self::targetsOf($bob, ['token']), $deadPushTokens, new NullLogger());
+        $sender = new ExpoPushSender(self::transportRejecting('token', 'Could not reach the remote Expo server.'), self::targetsOf($bob, ['token']), $deadPushTokens, new NullLogger());
 
         $sender->send($bob, self::notification());
 
@@ -246,12 +288,12 @@ final class ExpoPushSenderTest extends TestCase
     }
 
     /**
-     * Un texter qui refuse un jeton précis et accepte tous les autres — assez pour
+     * Un transport qui refuse un jeton précis et accepte tous les autres — assez pour
      * prouver la tolérance de l'adapter, sans reconstruire tout `ExpoTransport`.
      */
-    private static function texterRejecting(string $rejectedToken, string $reason): TexterInterface
+    private static function transportRejecting(string $rejectedToken, string $reason): TransportInterface
     {
-        return new class($rejectedToken, $reason) implements TexterInterface {
+        return new class($rejectedToken, $reason) implements TransportInterface {
             public function __construct(
                 private readonly string $rejectedToken,
                 private readonly string $reason,

@@ -136,6 +136,14 @@ services:
     # dans `Shared` lui-même — traduire vers Expo n'appartient à aucun module métier, et
     # `ExpoPushSender` ne fait que consommer le port `PushTargets` juste au-dessus.
     #
+    # Le #150 : `$transport` vise `texter.transports` (le service `Transports` du
+    # framework), jamais `TexterInterface`/`texter` — voir le docblock de la classe pour
+    # pourquoi `Texter::send()` rend toujours `null` dès qu'un bus Messenger lui est
+    # injecté, ce que `FrameworkExtension` fait automatiquement.
+    App\Shared\Infrastructure\Notifier\ExpoPushSender:
+        arguments:
+            $transport: '@texter.transports'
+
     # Le #131 le décore plutôt que d'y ajouter des dépendances : voir le docblock de
     # `ReceiptSchedulingPushSender`. `$sender` est câblé explicitement vers la classe
     # concrète — l'autowiring par l'interface `PushSender` bouclerait sur cet alias-ci.

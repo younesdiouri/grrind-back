@@ -20,8 +20,8 @@ use Symfony\Component\Uid\Uuid;
  *
  * Il ne mocke rien : `self::getContainer()->get(PushSender::class)` est la chaîne réelle —
  * {@see \App\Shared\Infrastructure\Notifier\ReceiptSchedulingPushSender} (#131) décorant le
- * vrai `ExpoPushSender`, avec le vrai `TexterInterface` compilé du conteneur. S'il envoyait
- * réellement sur le réseau, ce test le ferait — c'est la garantie qu'aucune suite
+ * vrai `ExpoPushSender`, avec le vrai `texter.transports` (#150) compilé du conteneur. S'il
+ * envoyait réellement sur le réseau, ce test le ferait — c'est la garantie qu'aucune suite
  * PHPUnit ne peut appeler Expo, prouvée plutôt qu'affirmée. Le transport nul ne produit
  * jamais de `ticketId` (voir `ExpoPushSenderTest`), donc le décorateur n'a jamais rien à
  * programmer ici — c'est `ReceiptSchedulingPushSenderTest` qui le prouve, avec un sender
