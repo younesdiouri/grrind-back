@@ -40,6 +40,10 @@ final readonly class ReceiptSchedulingPushSender implements PushSender
     public function __construct(
         private PushSender $sender,
         private PendingPushReceiptRepository $pendingReceipts,
+        // Sans `#[Target]`, volontairement (#155) : `CheckExpoPushReceipts` n'est pas un
+        // `DomainEvent`, il reste sur le bus strict que `MessageBusInterface` résout par
+        // défaut. Symfony ne crée d'alias nommé que pour les bus non par défaut — voir le
+        // docblock de `messenger.yaml`.
         private MessageBusInterface $bus,
         private ClockInterface $clock,
     ) {
