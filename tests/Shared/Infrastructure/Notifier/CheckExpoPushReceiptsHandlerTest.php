@@ -197,7 +197,7 @@ final class CheckExpoPushReceiptsHandlerTest extends ApiTestCase
         $response = $this->post('/api/devices', [
             'pushToken' => $pushToken,
             'platform' => 'IOS',
-            'environment' => 'DEVELOPMENT',
+            'environment' => 'PRODUCTION',
         ], $account->headers);
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 

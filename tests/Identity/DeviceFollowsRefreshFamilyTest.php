@@ -23,7 +23,7 @@ final class DeviceFollowsRefreshFamilyTest extends ApiTestCase
     private const array DEVICE = [
         'pushToken' => 'ExponentPushToken[abc123]',
         'platform' => 'IOS',
-        'environment' => 'DEVELOPMENT',
+        'environment' => 'PRODUCTION',
     ];
 
     public function testTheAccessTokenCarriesTheFamilyIdInFid(): void

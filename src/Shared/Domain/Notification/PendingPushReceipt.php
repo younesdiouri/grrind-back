@@ -27,7 +27,7 @@ use Symfony\Component\Uid\Uuid;
  * et le docblock du handler pour la décision de retenter ou d'abandonner.
  *
  * **Grossit vite, ne vaut plus rien passé quelques jours, purge raccrochée au #43** — même
- * remarque que {@see NotificationDelivery} pour la même raison : les lignes normalement
+ * remarque que {@see NotificationAttempt} pour la même raison : les lignes normalement
  * résolues sont effacées au fil de l'eau par le handler, seules celles jamais résolues
  * (Expo n'a jamais répondu) attendent une tâche de rétention future.
  */

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Doctrine;
 
-use App\Shared\Domain\Notification\NotificationDelivery;
+use App\Shared\Domain\Notification\NotificationAttempt;
 use App\Shared\Domain\NotificationCategory;
 use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -18,37 +18,37 @@ use Symfony\Component\Uid\Uuid;
  * exprimer) et un échec ne doit pas emporter l'`EntityManager` du consommateur, qui a
  * souvent une boucle à continuer après une collision.
  *
- * @extends ServiceEntityRepository<NotificationDelivery>
+ * @extends ServiceEntityRepository<NotificationAttempt>
  */
-class NotificationDeliveryRepository extends ServiceEntityRepository
+class NotificationAttemptRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
-        parent::__construct($registry, NotificationDelivery::class);
+        parent::__construct($registry, NotificationAttempt::class);
     }
 
     /**
-     * Réserve la livraison de cet événement à ce destinataire, dans cette catégorie —
+     * Réserve l'envoi de cet événement à ce destinataire, dans cette catégorie —
      * `true` si c'est la première fois (au consommateur d'envoyer), `false` si une trace
      * existe déjà (au consommateur de passer au suivant sans y toucher, voir le docblock
-     * de {@see NotificationDelivery}).
+     * de {@see NotificationAttempt}).
      */
     public function claim(Uuid $eventId, Uuid $recipientId, NotificationCategory $category, DateTimeImmutable $now): bool
     {
-        $delivery = NotificationDelivery::record($eventId, $recipientId, $category, $now);
+        $attempt = NotificationAttempt::record($eventId, $recipientId, $category, $now);
 
         $inserted = $this->getEntityManager()->getConnection()->executeStatement(
             <<<'SQL'
-                INSERT INTO shared_notification_delivery (id, event_id, recipient_id, category, created_at)
+                INSERT INTO shared_notification_attempt (id, event_id, recipient_id, category, created_at)
                 VALUES (:id, :eventId, :recipientId, :category, :now)
                 ON CONFLICT (event_id, recipient_id, category) DO NOTHING
                 SQL,
             [
-                'id' => $delivery->id()->toRfc4122(),
-                'eventId' => $delivery->eventId()->toRfc4122(),
-                'recipientId' => $delivery->recipientId()->toRfc4122(),
-                'category' => $delivery->category()->value,
-                'now' => $delivery->createdAt(),
+                'id' => $attempt->id()->toRfc4122(),
+                'eventId' => $attempt->eventId()->toRfc4122(),
+                'recipientId' => $attempt->recipientId()->toRfc4122(),
+                'category' => $attempt->category()->value,
+                'now' => $attempt->createdAt(),
             ],
             ['now' => Types::DATETIMETZ_IMMUTABLE],
         );

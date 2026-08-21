@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Domain\Notification;
 
 use App\Shared\Domain\NotificationCategory;
-use App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository;
+use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -13,11 +13,16 @@ use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * La preuve qu'un push a déjà été envoyé pour cet événement, à ce destinataire, dans
- * cette catégorie (#134) — la trace qui rend un handler de notification idempotent
- * là où l'outbox ne l'est pas : le transport livre *au moins une fois*, donc c'est cette
- * ligne, et non un espoir que le handler ne rejoue jamais, qui empêche un retry de
- * renotifier quelqu'un qui l'a déjà été.
+ * Une réservation d'envoi pour cet événement, à ce destinataire, dans cette catégorie
+ * (#134) — pas une preuve de livraison (#149, le nom mentait). La ligne existe pour
+ * rendre un handler de notification idempotent là où l'outbox ne l'est pas : le
+ * transport livre *au moins une fois*, donc c'est cette réservation, et non un espoir
+ * que le handler ne rejoue jamais, qui empêche un retry de renotifier quelqu'un déjà
+ * servi. Elle ne dit rien de ce qui s'est passé après — ni si l'appel réseau est parti,
+ * ni s'il a réussi. Pas de colonne d'issue (`SENT`/`NO_TARGET`) à côté : elle rendrait
+ * la ligne mutable et demanderait une seconde écriture après l'appel réseau, celle qui
+ * manquera le jour où le worker meurt entre les deux. Ce que « livré » veut dire se
+ * regarde dans les logs du sender, pas ici.
  *
  * **L'unicité porte sur (event, recipient, category), pas sur `event` seul** — même
  * geste que {@see \App\Shared\Domain\Idempotency\IdempotencyRecord} sur (user, key) :
@@ -31,21 +36,24 @@ use Symfony\Component\Uid\Uuid;
  * motivé cette table : l'auteur seul confondrait deux fenêtres d'agrégation successives
  * du même joueur, et rendrait la seconde muette pour toujours.
  *
- * **Écrite avant l'appel réseau, jamais après.** Une collision au `claim()` de
- * {@see NotificationDeliveryRepository} veut dire « déjà envoyé », pas une erreur — le
- * consommateur passe au destinataire suivant sans y toucher. Écrire la trace après
- * l'envoi laisserait exactement la fenêtre que cette table existe pour fermer : un
- * handler qui envoie puis échoue avant l'accusé de réception rejouerait l'envoi.
+ * **Réservée avant l'appel réseau, jamais après — cet ordre ne bouge pas (#149).** Une
+ * collision au `claim()` de {@see NotificationAttemptRepository} veut dire « déjà
+ * réservé », pas une erreur — le consommateur passe au destinataire suivant sans y
+ * toucher. Réserver après l'envoi laisserait exactement la fenêtre que cette table
+ * existe pour fermer : un handler qui envoie puis échoue avant l'accusé de réception
+ * rejouerait l'envoi. C'est cet ordre qui rend `AnnounceGuildActivityHandler` idempotent
+ * sous une outbox at-least-once ; l'inverser rouvrirait le double envoi que le #134 a
+ * fermé.
  *
- * **Purgeable, et raccrochée au #43** : cette table grossit d'une ligne par push envoyé
+ * **Purgeable, et raccrochée au #43** : cette table grossit d'une ligne par tentative
  * et n'a plus de valeur passé quelques jours — `createdAt` est ce sur quoi une tâche de
  * rétention future filtrera. Elle sert aussi de matière au #41 (combien de notifications,
  * combien rejetées) tant qu'elle vit.
  */
-#[ORM\Entity(repositoryClass: NotificationDeliveryRepository::class)]
-#[ORM\Table(name: 'shared_notification_delivery')]
-#[ORM\UniqueConstraint(name: 'uniq_shared_notification_delivery', columns: ['event_id', 'recipient_id', 'category'])]
-class NotificationDelivery
+#[ORM\Entity(repositoryClass: NotificationAttemptRepository::class)]
+#[ORM\Table(name: 'shared_notification_attempt')]
+#[ORM\UniqueConstraint(name: 'uniq_shared_notification_attempt', columns: ['event_id', 'recipient_id', 'category'])]
+class NotificationAttempt
 {
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME)]
@@ -73,7 +81,7 @@ class NotificationDelivery
     }
 
     /**
-     * @internal ne se crée que par {@see NotificationDeliveryRepository::claim()}, seul
+     * @internal ne se crée que par {@see NotificationAttemptRepository::claim()}, seul
      *           point qui sait distinguer une trace neuve d'une collision d'unicité
      */
     public static function record(Uuid $eventId, Uuid $recipientId, NotificationCategory $category, DateTimeImmutable $now): self

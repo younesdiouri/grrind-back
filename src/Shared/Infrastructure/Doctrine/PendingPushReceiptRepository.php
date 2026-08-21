@@ -11,7 +11,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
- * Écrite en DBAL, jamais via l'ORM — même raison qu'{@see NotificationDeliveryRepository} :
+ * Écrite en DBAL, jamais via l'ORM — même raison qu'{@see NotificationAttemptRepository} :
  * {@see \App\Shared\Infrastructure\Notifier\ExpoPushSender::send()} appelle {@see record()}
  * dans une boucle sur les appareils d'un joueur, et un `flush()` déclenché là fuiterait sur
  * l'`EntityManager` du consommateur plutôt que de rester une écriture isolée.

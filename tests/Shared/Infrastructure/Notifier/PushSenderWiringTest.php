@@ -36,7 +36,7 @@ final class PushSenderWiringTest extends ApiTestCase
         $this->post('/api/devices', [
             'pushToken' => 'wiring-token',
             'platform' => 'IOS',
-            'environment' => 'DEVELOPMENT',
+            'environment' => 'PRODUCTION',
         ], $bob->headers);
 
         $sender = self::getContainer()->get(PushSender::class);

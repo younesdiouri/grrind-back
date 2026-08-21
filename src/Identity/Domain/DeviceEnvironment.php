@@ -9,34 +9,24 @@ namespace App\Identity\Domain;
  * produit un jeton `DEVELOPMENT` en client de dev Expo et un jeton `PRODUCTION` une fois
  * publié sur le store, et ce sont deux jetons Expo différents pour le même appareil.
  *
- * Expo Push Service ne distingue pas sandbox et production comme le faisait APNs brut — le
- * ruleset de routage vit côté Expo — mais **le serveur, lui, doit savoir lesquels sont des
- * builds de test** : notifier tous les jetons sans distinction enverrait les campagnes de
- * production aux appareils des développeurs.
+ * **Ce que ce champ dit, et ce qu'il ne dit plus (#149).** Il décrit uniquement quel canal
+ * APNs a émis *ce jeton précis* — rien sur le déploiement qui l'a produit. Il a longtemps
+ * porté une seconde intention, fausse : distinguer un build de développeur d'un build de
+ * store. Elle ne tient pas — **tout build EAS produit un jeton `PRODUCTION`**, y compris le
+ * client de dev en `distribution: internal`, la preview, TestFlight et l'App Store ; seul un
+ * `expo run:ios` local signé par un profil de développement produit `DEVELOPMENT`. Le champ
+ * ne peut donc plus servir à protéger qui que ce soit d'une campagne : un jeton `PRODUCTION`
+ * n'est pas plus « un vrai joueur » qu'un jeton `DEVELOPMENT` n'est « un développeur ».
  *
- * **Le filtrage vit ici, pas chez l'appelant.** {@see \App\Identity\Infrastructure\Doctrine\UserDeviceRepository::of()}
- * — l'implémentation de {@see \App\Shared\Application\PushTargets} — ne rend que les jetons
- * de l'environnement courant, via {@see self::ofRuntimeEnvironment()}. Un notifier qui devrait
- * se souvenir de filtrer l'oubliera un jour ; c'est une règle de plateforme, pas une décision
- * du consommateur.
+ * **Quel canal ce déploiement adresse est une question différente**, tranchée par le réglage
+ * `PUSH_TARGET_ENVIRONMENT` ({@see \App\Identity\Infrastructure\Doctrine\UserDeviceRepository})
+ * — jamais déduite de `%kernel.environment%`, qui décrit le serveur, pas le jeton. Les deux
+ * axes ne se confondent plus : un serveur de dev peut viser `PRODUCTION` (le cas normal,
+ * puisque c'est ce que tout build EAS produit) sans que ça dise quoi que ce soit sur son
+ * propre environnement d'exécution.
  */
 enum DeviceEnvironment: string
 {
     case Development = 'DEVELOPMENT';
     case Production = 'PRODUCTION';
-
-    /**
-     * Traduit `%kernel.environment%` (`dev`, `test`, `prod`) en `DeviceEnvironment`. Une
-     * chaîne brute en entrée, pas un type Symfony : le domaine reste sans dépendance au
-     * framework, et c'est l'appelant (le câblage de `UserDeviceRepository` dans
-     * `services.yaml`) qui fait le pont.
-     *
-     * `test` tombe du côté `DEVELOPMENT` avec `dev` : la suite de tests n'est pas plus
-     * proche de la production qu'un poste de développeur, et un jeton `PRODUCTION` ne doit
-     * jamais être notifié pendant qu'elle tourne.
-     */
-    public static function ofRuntimeEnvironment(string $kernelEnvironment): self
-    {
-        return 'prod' === $kernelEnvironment ? self::Production : self::Development;
-    }
 }

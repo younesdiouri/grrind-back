@@ -17,7 +17,7 @@ use App\Shared\Application\PushSender;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
-use App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository;
+use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -27,7 +27,7 @@ use Symfony\Component\Uid\Uuid;
  * L'envoi proprement dit (#133) — jamais avant que la fenêtre soit lue via
  * {@see PendingGuildActivityRepository::activityFor()}, jamais deux fois pour le même
  * destinataire : voir le docblock d'{@see AnnounceGuildActivity} pour pourquoi ce détour
- * existe, et celui de {@see \App\Shared\Domain\Notification\NotificationDelivery} pour
+ * existe, et celui de {@see \App\Shared\Domain\Notification\NotificationAttempt} pour
  * l'idempotence du #134.
  *
  * **Les trois refus se décident par destinataire, jamais par auteur.** Le fuseau des
@@ -53,7 +53,7 @@ final readonly class AnnounceGuildActivityHandler
         private PlayerProfiles $profiles,
         private PlayerTimezones $timezones,
         private PushSender $pushSender,
-        private NotificationDeliveryRepository $deliveries,
+        private NotificationAttemptRepository $attempts,
         private ClockInterface $clock,
         private QuietHours $quietHours,
         /**
@@ -139,7 +139,7 @@ final readonly class AnnounceGuildActivityHandler
             // handler ne rejoue jamais — qui empêche un retry de renotifier un destinataire
             // déjà servi. Une collision veut dire « déjà envoyé », pas une erreur : on
             // passe au suivant sans y toucher.
-            if (!$this->deliveries->claim($message->windowId, $recipientId, $notification->category, $now)) {
+            if (!$this->attempts->claim($message->windowId, $recipientId, $notification->category, $now)) {
                 continue;
             }
 

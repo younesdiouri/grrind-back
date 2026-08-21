@@ -24,7 +24,7 @@ final class DeadPushTokensTest extends ApiTestCase
         $this->post('/api/devices', [
             'pushToken' => 'dead-token',
             'platform' => 'IOS',
-            'environment' => 'DEVELOPMENT',
+            'environment' => 'PRODUCTION',
         ], $bob->headers);
 
         $deadPushTokens = self::getContainer()->get(DeadPushTokens::class);
@@ -47,13 +47,13 @@ final class DeadPushTokensTest extends ApiTestCase
         $this->post('/api/devices', [
             'pushToken' => 'dead-token',
             'platform' => 'IOS',
-            'environment' => 'DEVELOPMENT',
+            'environment' => 'PRODUCTION',
         ], $bob->headers);
 
         $this->post('/api/devices', [
             'pushToken' => 'live-token',
             'platform' => 'ANDROID',
-            'environment' => 'DEVELOPMENT',
+            'environment' => 'PRODUCTION',
         ], $bob->headers);
 
         $deadPushTokens = self::getContainer()->get(DeadPushTokens::class);
