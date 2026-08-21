@@ -116,12 +116,14 @@ services:
     # complétion — sans lui, une séance se fermerait sans rapporter un point.
     App\Shared\Application\SessionRewards: '@App\Progression\Infrastructure\Reward\LedgerSessionRewards'
 
-    # Le registre des appareils : l'entrée du kernel n'est pas un `DeviceEnvironment`, la
-    # conversion vit dans l'enum — voir son docblock. `%kernel.environment%` reste
-    # `dev`/`test`/`prod` jusqu'ici, jamais un concept du domaine.
+    # Le registre des appareils (#149) : `$targetEnvironment` vient du réglage
+    # `PUSH_TARGET_ENVIRONMENT` (voir `.env`), résolu par le processeur `enum:` de
+    # Symfony — jamais de `%kernel.environment%`, qui décrit le serveur et non le canal
+    # APNs visé. Voir le docblock de `DeviceEnvironment` pour pourquoi les deux axes ne
+    # se confondent pas.
     App\Identity\Infrastructure\Doctrine\UserDeviceRepository:
         arguments:
-            $kernelEnvironment: '%kernel.environment%'
+            $targetEnvironment: '%env(enum:App\Identity\Domain\DeviceEnvironment:PUSH_TARGET_ENVIRONMENT)%'
 
     # Le port posé au #129 en préalable du jalon Notifications : `Community` notifiera un
     # joueur sans jamais importer une entité `Identity`, comme les précédents.

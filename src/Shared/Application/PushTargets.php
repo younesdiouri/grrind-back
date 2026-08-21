@@ -29,14 +29,16 @@ use Symfony\Component\Uid\Uuid;
  * Le jeton est une chaîne Expo (`ExponentPushToken[…]`), pas un device token APNs brut :
  * c'est symfony/expo-notifier qui portera l'appel HTTP, posé aux tickets suivants (#130+).
  *
- * **Déjà filtré sur l'environnement d'exécution.** `UserDevice` porte un `DeviceEnvironment`
+ * **Déjà filtré sur l'environnement visé (#149).** `UserDevice` porte un `DeviceEnvironment`
  * (`DEVELOPMENT`/`PRODUCTION`) parce qu'un même joueur peut avoir un jeton de chaque —
  * client de dev Expo et build publié. Rendre les deux ici obligerait chaque consommateur à
- * connaître cette distinction et à se souvenir de filtrer ; un notifier qui l'oublie envoie
- * une campagne de production aux téléphones des développeurs. Le filtrage est donc une
- * règle de plateforme tranchée dans l'implémentation
- * ({@see \App\Identity\Infrastructure\Doctrine\UserDeviceRepository::of()}), pas ici dans
- * le contrat ni chez l'appelant.
+ * connaître cette distinction et à se souvenir de filtrer. Ce que ce filtre garde toujours :
+ * une règle de plateforme tranchée une fois dans l'implémentation
+ * ({@see \App\Identity\Infrastructure\Doctrine\UserDeviceRepository::of()}), pas ici dans le
+ * contrat ni chez l'appelant. Ce qu'il ne garde plus : « environnement du jeton » et
+ * « environnement du serveur » ne sont pas le même axe — voir le docblock de
+ * {@see \App\Identity\Domain\DeviceEnvironment} pour ce que le champ décrit réellement, et
+ * celui de `UserDeviceRepository::of()` pour ce sur quoi le filtre est indexé aujourd'hui.
  *
  * **Depuis le #132, filtré aussi sur la préférence du compte.** Une catégorie coupée dans
  * les préférences du joueur ({@see \App\Identity\Domain\User::notifiesOn()}) rend une
