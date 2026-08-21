@@ -24,7 +24,11 @@ use Symfony\Component\Uid\Uuid;
  * — `ExpoPushSender` n'est plus consommé qu'à travers lui.
  *
  * **Un ticket sans `ticketId`** (le transport nul de dev/test, voir `notifier.yaml`) n'a
- * rien à interroger plus tard : rien n'est enregistré, rien n'est dispatché.
+ * rien à interroger plus tard : rien n'est enregistré, rien n'est dispatché. C'était vrai
+ * avant le #150, faux le temps que `ExpoPushSender` dépende de `TexterInterface` — qui
+ * rendait un `ticketId` nul même avec le vrai bridge Expo, voir son docblock — et c'est
+ * redevenu vrai depuis : seul le transport nul ne fabrique jamais d'identifiant, un envoi
+ * réel en fabrique toujours un.
  *
  * **Un seul message différé par appel à `send()`, jamais un par ticket.** Voir le docblock
  * de {@see CheckExpoPushReceiptsHandler} pour comment il retrouve, lui, tout ce qui est mûr à
