@@ -15,14 +15,44 @@ primary_region = 'cdg'
   # attend du HTTP en clair sur `internal_port`.
   SERVER_NAME = ':80'
 
+# `app` : la commande par défaut de l'image (FrankenPHP en mode worker, cf.
+# FRANKENPHP_CONFIG dans le Dockerfile — sans rapport avec le groupe `worker` ci-dessous)
+# — chaîne vide pour ne pas la remplacer.
+# `worker` : le consommateur de l'outbox Messenger (transport `outbox`, cf. messenger.yaml).
+# Sans lui, `messenger_messages` s'accumule sans jamais être vidée — c'est le #153 : trente
+# `WorkoutImported` en attente, aucune annonce de guilde jamais partie.
+[processes]
+  app = ""
+  worker = "php bin/console messenger:consume outbox --time-limit=3600 --memory-limit=128M"
+
 [http_service]
   internal_port = 80
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
+  # Ne vaut que pour le groupe `app` (cf. `processes` juste en dessous) : `worker` n'a pas
+  # de `[http_service]`, donc `auto_stop_machines` ne s'y applique jamais — il tourne en
+  # permanence, voir `[[restart]]` plus bas. Ce n'est pas une incohérence à corriger : le
+  # web reste élastique sur le trafic HTTP, le worker ne l'est délibérément pas.
   min_machines_running = 0
   processes = ['app']
 
+# `messenger:consume` sort avec le code 0 quand `--time-limit`/`--memory-limit` est atteint
+# (cf. doc Symfony : c'est voulu, pour éviter les fuites mémoire d'un process PHP éternel) —
+# la politique par défaut de Fly, `on-failure`, ne relance donc jamais un `worker` qui vient
+# de sortir proprement. Sans cette section, le worker s'arrêterait au bout d'une heure et on
+# reconstruirait la panne du #153 en plus discret. `app` garde le défaut `on-failure` : un
+# `http_service` qui meurt sans trafic n'a pas besoin d'être relancé à tout prix.
+[[restart]]
+  policy = 'always'
+  processes = ['worker']
+
+# Décision du #153 : le worker `messenger:consume` tourne en continu (pas de consommation
+# périodique par cron). `stale_window_minutes: 15` et `announcement_delay_seconds: 60`
+# (cf. AnnounceGuildActivity) sont calibrés pour un consommateur vivant — une consommation
+# une fois par heure transformerait le mode dégradé (fenêtre dépassée reprise par une plus
+# récente) en mode nominal, et le délai d'annonce perdrait son sens. Le surcoût d'une
+# machine allumée 24h/24 pour ce groupe est accepté en connaissance de cause.
 [[vm]]
   memory = '512mb'
   cpu_kind = 'shared'
