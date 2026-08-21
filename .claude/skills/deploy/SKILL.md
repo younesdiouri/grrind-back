@@ -40,14 +40,35 @@ Les clés JWT sont des **secrets portant le PEM brut**, pas des fichiers montés
 `lexik_jwt_authentication` accepte l'un comme l'autre. `.dockerignore` exclut
 `config/jwt/` de l'image, et c'est voulu.
 
-## Les quatre pièges
+## Deux groupes de processus depuis le #153
 
-**1. Les machines sont arrêtées la plupart du temps.** `min_machines_running = 0` et
-`auto_stop_machines = 'stop'` : `flyctl ssh console` échoue alors avec *app grrind-back
-has no started VMs*. Ce n'est **pas** un déploiement raté. Démarrer une machine avant :
+`flyctl machine list -a grrind-back` rend **deux machines**, pas une : `app` (FrankenPHP,
+sert le trafic HTTP) et `worker` (`messenger:consume outbox`, consomme l'outbox Messenger).
+`flyctl ssh console` sans `-C` ou une commande visant explicitement une machine peut tomber
+sur l'une ou l'autre — préciser l'ID quand la distinction compte.
+
+Le groupe `worker` **tourne en permanence** (`[[restart]] policy = 'always'` scopé à
+`processes = ['worker']` dans `fly.toml`) : `min_machines_running = 0` du `[http_service]`
+ne s'applique qu'à `app`, `worker` n'a pas de `[http_service]` du tout. Ce n'est pas une
+incohérence — `stale_window_minutes` et `announcement_delay_seconds` d'`AnnounceGuildActivity`
+sont calibrés pour un consommateur vivant, pas pour une consommation périodique. Voir le
+commentaire de `fly.toml` et le #153 pour l'arbitrage complet.
+
+`messenger:consume` sort avec le code 0 quand `--time-limit`/`--memory-limit` est atteint
+(comportement documenté par Symfony, pas un bug) : sans la section `[[restart]]`, la
+politique par défaut de Fly (`on-failure`) ne l'aurait jamais relancé, et le worker se
+serait arrêté pour de bon au bout d'une heure.
+
+## Les cinq pièges
+
+**1. Les machines `app` sont arrêtées la plupart du temps ; `worker`, jamais.**
+`min_machines_running = 0` et `auto_stop_machines = 'stop'` ne visent que le groupe `app` :
+`flyctl ssh console` échoue avec *app grrind-back has no started VMs* si aucune machine
+`app` n'est démarrée — le `worker`, lui, est censé toujours l'être. Ce n'est **pas** un
+déploiement raté. Démarrer une machine `app` avant :
 
 ```bash
-flyctl machine list -a grrind-back          # relever un ID
+flyctl machine list -a grrind-back          # relever l'ID du groupe app
 flyctl machine start <ID> -a grrind-back
 ```
 
@@ -110,6 +131,18 @@ fonctionnels de `tests/Community/`.
 **Vérifier aussi un refus, pas seulement un succès.** Les décisions les plus coûteuses du
 projet sont des 404 là où on attendrait un 403 : un déploiement qui rendrait 403 sur
 `GET /api/players/{uuid-inconnu}` serait cassé sans qu'aucun chemin nominal ne le montre.
+
+**Vérifier que le worker consomme, pas seulement qu'il est démarré.** C'est le symptôme qui
+a produit le #153 : un `outbox` qui gonfle sans jamais se vider passe inaperçu tant que
+personne ne le regarde.
+
+```bash
+flyctl ssh console -a grrind-back -C "php bin/console messenger:stats"
+```
+
+`outbox` doit revenir à `0` après un import réel (ou rester bas et stable) — s'il grossit
+d'un déploiement à l'autre, le groupe `worker` n'est pas en train de consommer, qu'il soit
+démarré ou non.
 
 ## Nettoyage
 
