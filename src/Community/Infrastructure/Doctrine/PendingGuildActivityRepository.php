@@ -55,7 +55,7 @@ class PendingGuildActivityRepository extends ServiceEntityRepository
      * `$staleWindowMinutes` est donc traitée comme abandonnée : la séance rejoint quand
      * même son agrégat (rien n'est perdu), mais son `windowId` est rendu pour qu'une
      * nouvelle annonce reparte. **C'est la trace du #134 qui rend ça sûr** :
-     * {@see \App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository::claim()}
+     * {@see \App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository::claim()}
      * écarte tout destinataire déjà servi par une tentative précédente sur ce même
      * `windowId`, donc reprogrammer une fenêtre abandonnée ne peut pas le renotifier.
      */

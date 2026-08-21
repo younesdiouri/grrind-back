@@ -67,7 +67,7 @@ announcement_delay_seconds: 60
 #
 # Reprogrammer une fenêtre abandonnée ne peut pas renotifier ceux qui l'avaient déjà reçue
 # — c'est la trace de livraison du #134
-# (`App\Shared\Domain\Notification\NotificationDelivery`) qui le garantit, pas cette
+# (`App\Shared\Domain\Notification\NotificationAttempt`) qui le garantit, pas cette
 # valeur : elle ne fait que décider *quand* réessayer, jamais *qui* a déjà été notifié.
 stale_window_minutes: 15
 

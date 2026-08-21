@@ -230,14 +230,14 @@ when@test:
                 $pushSender: '@App\Tests\Support\SpyingPushSender'
 
         # Publics pour que le test d'idempotence du #134 lise le `windowId` d'une fenêtre
-        # ouverte et pose une trace de livraison avant d'appeler le handler — simuler une
+        # ouverte et pose une réservation d'envoi avant d'appeler le handler — simuler une
         # panne au milieu de la boucle d'envoi sans en provoquer une vraie.
         App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository:
             public: true
             arguments:
                 $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
 
-        App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository:
+        App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository:
             public: true
 
         # Le #131 : aucune suite de tests ne peut appeler Expo pour les reçus non plus —

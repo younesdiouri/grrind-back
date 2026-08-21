@@ -10,7 +10,7 @@ use App\Community\Domain\PendingGuildActivity;
 use App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
-use App\Shared\Infrastructure\Doctrine\NotificationDeliveryRepository;
+use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\Messaging\WorkoutCreditedSpy;
@@ -275,7 +275,7 @@ final class GuildActivityNotifierTest extends ApiTestCase
 
     /**
      * Le cas que le #134 cible vraiment : une panne *au milieu* de la boucle d'envoi, pas
-     * après. Un destinataire porte déjà une trace de livraison — comme s'il avait reçu son
+     * après. Un destinataire porte déjà une réservation d'envoi — comme s'il avait reçu son
      * push avant que le worker ne tombe — et le rejeu du même message ne doit renvoyer
      * qu'aux deux autres, jamais à lui.
      */
@@ -289,9 +289,9 @@ final class GuildActivityNotifierTest extends ApiTestCase
         $windowId = $this->currentWindowId($author);
         $alreadyNotified = $recipients[0];
 
-        $deliveries = self::getContainer()->get(NotificationDeliveryRepository::class);
-        self::assertInstanceOf(NotificationDeliveryRepository::class, $deliveries);
-        self::assertTrue($deliveries->claim($windowId, $alreadyNotified->id, NotificationCategory::GuildActivity, new DateTimeImmutable()), 'La réservation doit réussir la première fois — c\'est ce qui simule l\'envoi déjà parti avant la panne.');
+        $attempts = self::getContainer()->get(NotificationAttemptRepository::class);
+        self::assertInstanceOf(NotificationAttemptRepository::class, $attempts);
+        self::assertTrue($attempts->claim($windowId, $alreadyNotified->id, NotificationCategory::GuildActivity, new DateTimeImmutable()), 'La réservation doit réussir la première fois — c\'est ce qui simule l\'envoi déjà parti avant la panne.');
 
         $this->announce($author, $windowId);
 
@@ -323,9 +323,9 @@ final class GuildActivityNotifierTest extends ApiTestCase
         // trois tentatives permises — le message est parti sur le transport `failed`, plus
         // personne ne le rejoue, et la fenêtre reste ouverte sans que `close()` n'ait jamais
         // été appelée.
-        $deliveries = self::getContainer()->get(NotificationDeliveryRepository::class);
-        self::assertInstanceOf(NotificationDeliveryRepository::class, $deliveries);
-        self::assertTrue($deliveries->claim($windowId, $alreadyNotified->id, NotificationCategory::GuildActivity, new DateTimeImmutable()));
+        $attempts = self::getContainer()->get(NotificationAttemptRepository::class);
+        self::assertInstanceOf(NotificationAttemptRepository::class, $attempts);
+        self::assertTrue($attempts->claim($windowId, $alreadyNotified->id, NotificationCategory::GuildActivity, new DateTimeImmutable()));
 
         // `stale_window_minutes` (notifications.yaml) vaut quinze minutes : on recule
         // `opened_at` bien au-delà pour que `recordSession()` traite la fenêtre comme
