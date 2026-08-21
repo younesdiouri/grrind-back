@@ -15,32 +15,36 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Notifier\Bridge\Expo\ExpoOptions;
 use Symfony\Component\Notifier\Exception\TransportExceptionInterface;
 use Symfony\Component\Notifier\Message\PushMessage;
-use Symfony\Component\Notifier\Message\SentMessage;
-use Symfony\Component\Notifier\Transport\TransportInterface;
+use Symfony\Component\Notifier\Transport\Transports;
 use Symfony\Component\Uid\Uuid;
 
 /**
  * L'implémentation du port {@see PushSender} : traduit une {@see PushNotification} —
  * `category`, `groupingKey` et `route` — vers le vocabulaire qu'Expo attend (`categoryId`,
- * `channelId`, `data`), et délègue l'appel au `TransportInterface` du framework. C'est
- * tout ce qu'elle fait : aucune règle de jeu, aucune décision de qui notifier.
+ * `channelId`, `data`), et délègue l'appel au `Transports` du framework. C'est tout ce
+ * qu'elle fait : aucune règle de jeu, aucune décision de qui notifier.
  *
- * **Pourquoi `TransportInterface` (`texter.transports`) et pas `TexterInterface` (#150).**
- * `Texter::send()` rend toujours `null` dès qu'un bus Messenger lui est injecté — ce que
- * `FrameworkExtension` fait automatiquement puisque Messenger est activé sur ce projet,
- * qu'on lui ait demandé ou non. Le push part quand même (traité en synchrone, aucune route
- * Messenger ne vise les messages du Notifier), mais `Texter::send()` jette le
- * `SentMessage` que le bridge a pourtant construit avec le `ticketId` d'Expo — d'où un
- * push livré et un `PushTicket` sans identifiant, qui éteignait toute la chaîne de reçus
- * du #131. `Transports::send()` (le service `texter.transports`, câblé dans
- * `config/services.yaml`) appelle le transport directement, sans détour par le bus, et
- * rend un `SentMessage` **non nullable** — un contrat plus fort que `?SentMessage` de
- * `TransportInterface`, qu'on aurait pu contourner par mégarde. C'est aussi ce qui répare
- * le chemin des refus : un `TransportException` du bridge n'est plus enveloppé dans un
+ * **Pourquoi `Transports` (`texter.transports`), pas `TexterInterface` ni même
+ * `TransportInterface` (#150).** `TexterInterface extends TransportInterface` : un
+ * `Texter` est donc un `TransportInterface` valide, et `Texter::send()` rend toujours
+ * `null` dès qu'un bus Messenger lui est injecté — ce que `FrameworkExtension` fait
+ * automatiquement puisque Messenger est activé sur ce projet, qu'on lui ait demandé ou
+ * non. Le push part quand même (traité en synchrone, aucune route Messenger ne vise les
+ * messages du Notifier), mais `Texter::send()` jette le `SentMessage` que le bridge a
+ * pourtant construit avec le `ticketId` d'Expo — d'où un push livré et un `PushTicket`
+ * sans identifiant, qui éteignait toute la chaîne de reçus du #131. Typer ce
+ * constructeur en `TransportInterface` aurait laissé `'@texter'` câblable à sa place :
+ * le conteneur aurait compilé, et la panne serait revenue sans qu'aucun test ne rougisse.
+ * `Transports` (la classe concrète du service `texter.transports`, câblé dans
+ * `config/services.yaml`) est `final` et redéclare `send(): SentMessage`, **non
+ * nullable** — un type qui exclut `Texter` par construction, pas seulement par
+ * convention, et qui dispense PHPStan de nous croire sur parole : la garantie est une
+ * propriété du type, pas d'une annotation. C'est aussi ce qui répare le chemin des
+ * refus : un `TransportException` du bridge n'est plus enveloppé dans un
  * `HandlerFailedException` par `HandleMessageMiddleware`, donc le `catch` ci-dessous se
  * déclenche de nouveau en conditions réelles. Rien d'observable n'est perdu :
- * `AbstractTransport::send()` dispatche lui-même le `MessageEvent`, donc le profiler et le
- * listener de log du Notifier continuent de voir les envois.
+ * `AbstractTransport::send()` dispatche lui-même le `MessageEvent`, donc le profiler et
+ * le listener de log du Notifier continuent de voir les envois.
  *
  * **`data` (#144) : `groupingKey` et `route`, jamais autre chose.** Les deux répondent à
  * deux questions différentes — quelle notification celle-ci remplace-t-elle, où le tap
@@ -90,7 +94,7 @@ use Symfony\Component\Uid\Uuid;
 final readonly class ExpoPushSender implements PushSender
 {
     public function __construct(
-        private TransportInterface $transport,
+        private Transports $transport,
         private PushTargets $pushTargets,
         private DeadPushTokens $deadPushTokens,
         private LoggerInterface $logger,
@@ -124,14 +128,6 @@ final readonly class ExpoPushSender implements PushSender
         );
 
         try {
-            // `TransportInterface::send()` déclare `?SentMessage` — un contrat assez large
-            // pour couvrir un transport asynchrone qui rendrait la main avant la réponse.
-            // Aucune implémentation embarquée par symfony/notifier (`Transports`,
-            // `AbstractTransport` — dont `ExpoTransport` — et `NullTransport`) n'est dans
-            // ce cas : les trois redéclarent `send(): SentMessage`, non nullable, et lèvent
-            // plutôt que de rendre `null`. PHPStan ne voit que le contrat de l'interface ;
-            // cette annotation encode la garantie réelle des implémentations qu'on câble.
-            /** @var SentMessage $sent */
             $sent = $this->transport->send($message);
 
             $this->logger->info('Notification push envoyée.', [

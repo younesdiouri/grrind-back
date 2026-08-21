@@ -139,7 +139,12 @@ services:
     # Le #150 : `$transport` vise `texter.transports` (le service `Transports` du
     # framework), jamais `TexterInterface`/`texter` — voir le docblock de la classe pour
     # pourquoi `Texter::send()` rend toujours `null` dès qu'un bus Messenger lui est
-    # injecté, ce que `FrameworkExtension` fait automatiquement.
+    # injecté, ce que `FrameworkExtension` fait automatiquement. `Transports` est `final`,
+    # donc `'@texter'` (un `Texter`, pas un `Transports`) n'est plus câblable ici — le
+    # conteneur refuserait de compiler plutôt que de rejouer la panne en silence.
+    # L'autowiring seul ne suffirait pas non plus : `chatter.transports` partage la même
+    # classe `Transports`, donc deux candidats existent pour ce type, d'où l'argument
+    # explicite.
     App\Shared\Infrastructure\Notifier\ExpoPushSender:
         arguments:
             $transport: '@texter.transports'

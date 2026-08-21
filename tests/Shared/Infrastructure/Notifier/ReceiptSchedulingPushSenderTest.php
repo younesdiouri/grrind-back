@@ -24,6 +24,7 @@ use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Notifier\Bridge\Expo\ExpoTransport;
+use Symfony\Component\Notifier\Transport\Transports;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -37,8 +38,12 @@ use Symfony\Component\Uid\Uuid;
  * ressort du vrai bridge Expo ne sert à rien s'il ne traverse pas jusqu'à
  * `PendingPushReceiptRepository` — c'est ici, avec le vrai conteneur, que ça se vérifie :
  * {@see self::testARealBridgeTicketIsRecordedForItsReceipt()} construit un {@see ExpoPushSender}
- * avec un vrai `ExpoTransport` (`MockHttpClient`, jamais un double de `TexterInterface`), le
- * décore comme la production le fait, et prouve que la ligne existe.
+ * avec un vrai `ExpoTransport` enveloppé dans un `Transports` (`MockHttpClient`, jamais un
+ * double de `TexterInterface`), le décore comme la production le fait, et prouve que la
+ * ligne existe. Ce test prouve que le `ticketId` traverse le vrai bridge — pas que le
+ * câblage est protégé contre un retour en arrière vers `TexterInterface`/`Texter` : c'est
+ * le type `Transports` du constructeur d'`ExpoPushSender` qui tient cette garantie, à la
+ * compilation du conteneur.
  */
 final class ReceiptSchedulingPushSenderTest extends ApiTestCase
 {
@@ -109,7 +114,9 @@ final class ReceiptSchedulingPushSenderTest extends ApiTestCase
      * que `Texter::send()` cassait, en rendant toujours `null` dès qu'un bus Messenger lui
      * est injecté (voir le docblock d'`ExpoPushSender`). Rouge sur `main` avant #150 :
      * `ExpoPushSender` n'y accepte qu'un `TexterInterface`, et un `ExpoTransport` ne
-     * l'implémente pas.
+     * l'implémente pas — un `TypeError`, pas une assertion qui échoue. Ce test prouve
+     * que le `ticketId` traverse, pas que le câblage reste protégé : voir le docblock de
+     * la classe.
      */
     public function testARealBridgeTicketIsRecordedForItsReceipt(): void
     {
@@ -117,7 +124,7 @@ final class ReceiptSchedulingPushSenderTest extends ApiTestCase
         $mockClient = new MockHttpClient(static fn (): MockResponse => new MockResponse(json_encode([
             'data' => ['status' => 'ok', 'id' => '01a02101-1fe1-719d-8525-f3774d798bd1'],
         ], \JSON_THROW_ON_ERROR)));
-        $expoSender = new ExpoPushSender(new ExpoTransport(null, $mockClient), self::targetsOf($bob, ['token-a']), new SpyingDeadPushTokens(), new NullLogger());
+        $expoSender = new ExpoPushSender(new Transports(['expo' => new ExpoTransport(null, $mockClient)]), self::targetsOf($bob, ['token-a']), new SpyingDeadPushTokens(), new NullLogger());
         $decorator = $this->decorate($expoSender);
 
         $tickets = $decorator->send($bob, self::notification());
