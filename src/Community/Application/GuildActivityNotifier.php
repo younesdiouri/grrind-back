@@ -32,6 +32,11 @@ final readonly class GuildActivityNotifier
     public function __construct(
         private GuildMembershipRepository $memberships,
         private PendingGuildActivityRepository $pending,
+        // Sans `#[Target]`, volontairement (#155) : `AnnounceGuildActivity` n'est pas un
+        // `DomainEvent`, il doit rester sur le bus strict — celui que `MessageBusInterface`
+        // résout par défaut. Symfony ne crée d'alias nommé que pour les bus non par
+        // défaut ; en poser un ici pour `command.bus` ne compile pas, voir le docblock de
+        // `messenger.yaml`.
         private MessageBusInterface $bus,
         private ClockInterface $clock,
         private int $freshnessWindowMinutes,

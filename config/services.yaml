@@ -25,6 +25,19 @@ services:
 
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
 
+    # Sonde du #155 : `event.bus` n'est référencé nulle part par son id de service —
+    # seulement par le type `MessageBusInterface` avec `#[Target]` — donc le compilateur
+    # l'inlinerait sans cet alias public, et un test qui voudrait y dispatcher
+    # directement ne pourrait pas le récupérer. `command.bus` n'a pas besoin de son
+    # pendant : c'est le `default_bus`, déjà exposé publiquement par le framework sous
+    # `messenger.default_bus`. Déclaré ici plutôt que sous `when@test` : le service
+    # `event.bus` existe dans tous les environnements, et PHPStan résout les services
+    # contre le conteneur `dev` (`phpstan.dist.neon`) — un alias test-conditionnel n'y
+    # serait pas trouvé.
+    messenger.test.event_bus:
+        alias: event.bus
+        public: true
+
     # L'objet typé que le domaine consomme, construit depuis les paramètres tirés de
     # `game/v1/training.yaml`. Un paramètre absent casse la compilation du conteneur en
     # nommant ce service : l'équilibrage se valide au démarrage, pas à la première

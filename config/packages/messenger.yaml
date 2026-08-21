@@ -2,9 +2,71 @@
 # ce qui rend la publication atomique. L'INSERT dans messenger_messages participe au
 # COMMIT de la séance, là où un broker externe force à choisir entre perdre l'événement
 # et annoncer un fait encore annulable.
+#
+# ————— Deux bus, pas un (#155) ——————————————————————————————————————————————————————————
+#
+# Un `DomainEvent` sans abonné est un état légitime — voir son docblock : « un fait publié
+# que personne n'écoute encore n'est pas une erreur ». Symfony, lui, traite par défaut
+# l'absence de handler comme une faute, sur tous les messages sans distinction. Le worker
+# du #153 a révélé ça en production : `WorkoutImported` sortait vers `failed` à chaque
+# import, alors que rien n'a jamais mal tourné.
+#
+# Trois chemins existaient : abaisser la sévérité de tout le bus, cesser de publier
+# l'événement tant que rien ne l'écoute, ou séparer les deux natures de message. Les deux
+# premiers défont un contrat pour ne réparer qu'un symptôme — le premier ferait taire
+# aussi une commande dont le handler a disparu, ce que `NoHandlerForMessageException`
+# existe pour attraper ; le second inverserait le sens de `DomainEvent`, qui publie un
+# fait *pour que les autres puissent* l'apprendre, pas seulement quand quelqu'un écoute
+# déjà. Le troisième est retenu : la distinction existe déjà dans le code sans avoir été
+# nommée — les points d'injection de `MessageBusInterface` se répartissent d'eux-mêmes
+# entre les faits qu'on publie (`$events`) et les déclencheurs internes qu'on dispatche
+# (`$bus`).
+#
+# `command.bus` reste le `default_bus`, délibérément : c'est celui qui garde la sévérité,
+# et un `MessageBusInterface` injecté sans `#[Target]` doit tomber du côté strict, jamais
+# du côté permissif. Seul `event.bus` — où partent les `DomainEvent`, et eux seuls —
+# autorise l'absence de handler.
+#
+# `#[Target('event.bus')]` est obligatoire sur les deux points qui publient un
+# `DomainEvent` (`ImportWorkoutsHandler::$events`, `LedgerSessionRewards::$events`) :
+# l'autowiring par nom de paramètre est déprécié depuis Symfony 8.1 (constaté en
+# production sur ce dépôt), et un `$events` qui retomberait sur le bus par défaut par
+# accident republierait le bug strictement à l'identique — silencieusement, puisque
+# l'erreur ne se voit qu'à la consommation, pas au dispatch. Les trois autres points
+# (`$bus` dans `GuildActivityNotifier`, `ReceiptSchedulingPushSender`,
+# `CheckExpoPushReceiptsHandler`) restent un `MessageBusInterface` **sans** `#[Target]` :
+# Symfony ne crée un alias nommé que pour les bus qui ne sont pas le `default_bus` — le
+# viser explicitement par `#[Target('command.bus')]` ne compile pas — et l'absence
+# d'attribut suffit à les garder sur le bus strict.
+#
+# Le routage ne bouge pas : `routing` s'applique par **message**, pas par bus — la règle
+# sur `DomainEvent` reste ce qui route un événement du seul fait qu'il implémente
+# l'interface, quel que soit le bus qui l'a dispatché.
+#
+# Le worker non plus : dès qu'il y a plusieurs bus, Messenger pose un `BusNameStamp` sur
+# l'enveloppe au moment du dispatch, et `messenger:consume outbox` renvoie chaque message
+# vers son bus d'origine tout seul — `fly.toml` est inchangé.
+#
+# Piège pour une migration à chaud : ce `BusNameStamp` n'existe que sur ce qui est
+# dispatché *après* ce changement. Un message déjà écrit dans `messenger_messages` avant
+# le déploiement n'en porte pas, et retomberait sur `default_bus` (`command.bus`, strict)
+# à la consommation. Sans conséquence ici — l'outbox est vide et les lignes `failed` du
+# #155 sont purgées côté prod, pas par cette PR.
 framework:
     messenger:
         failure_transport: failed
+
+        # Le bus injecté par un `MessageBusInterface` sans `#[Target]` — voir plus haut.
+        default_bus: command.bus
+
+        buses:
+            command.bus: ~
+
+            # `allow_no_handlers` vit sous `default_middleware` — ce n'est pas une clé
+            # du bus lui-même, `config:dump-reference framework messenger` fait foi.
+            event.bus:
+                default_middleware:
+                    allow_no_handlers: true
 
         transports:
             outbox:

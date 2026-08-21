@@ -16,6 +16,7 @@ use App\Shared\Application\SessionRewards;
 use App\Shared\Application\XpLine;
 use App\Shared\Domain\Event\WorkoutCredited;
 use App\Shared\Domain\Event\WorkoutImported;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -44,6 +45,10 @@ final readonly class LedgerSessionRewards implements SessionRewards
     public function __construct(
         private GrantXpHandler $grantXp,
         private TitleTranslator $titles,
+        // `event.bus` explicitement (#155) : `WorkoutCredited` est un `DomainEvent`, voir
+        // le docblock de `messenger.yaml` pour pourquoi ce bus-là tolère l'absence
+        // d'abonné et pourquoi `#[Target]` n'est pas optionnel ici.
+        #[Target('event.bus')]
         private MessageBusInterface $events,
     ) {
     }

@@ -14,6 +14,7 @@ use App\Training\Domain\WorkoutRules;
 use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use DateTimeImmutable;
 use Psr\Clock\ClockInterface;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -69,6 +70,11 @@ final readonly class ImportWorkoutsHandler
         private ActivityTypeMap $activityTypes,
         private WorkoutRules $rules,
         private SessionRewards $rewards,
+        // `event.bus` explicitement (#155) : `WorkoutImported` est un `DomainEvent`, il
+        // part sur le bus qui tolère l'absence d'abonné. Sans `#[Target]`, l'autowiring
+        // par nom de paramètre est déprécié en 8.1 et retomberait de toute façon sur
+        // `default_bus` — le bus strict, celui qu'on cherche justement à éviter ici.
+        #[Target('event.bus')]
         private MessageBusInterface $events,
         private ClockInterface $clock,
     ) {

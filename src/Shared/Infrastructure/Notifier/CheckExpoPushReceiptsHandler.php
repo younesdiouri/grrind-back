@@ -73,6 +73,10 @@ final readonly class CheckExpoPushReceiptsHandler
         private HttpClientInterface $httpClient,
         private PendingPushReceiptRepository $receipts,
         private DeadPushTokens $deadPushTokens,
+        // Sans `#[Target]`, volontairement (#155) : `CheckExpoPushReceipts` n'est pas un
+        // `DomainEvent`, il reste sur le bus strict que `MessageBusInterface` résout par
+        // défaut. Symfony ne crée d'alias nommé que pour les bus non par défaut — voir le
+        // docblock de `messenger.yaml`.
         private MessageBusInterface $bus,
         private ClockInterface $clock,
         private LoggerInterface $logger,
