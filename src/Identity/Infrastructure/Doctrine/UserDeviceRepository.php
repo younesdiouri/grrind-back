@@ -138,16 +138,19 @@ class UserDeviceRepository extends ServiceEntityRepository implements PushTarget
             return [];
         }
 
-        // Tous les appareils du joueur, pas seulement ceux de l'environnement visé :
-        // distinguer « aucun appareil » de « des appareils, mais aucun dans
-        // l'environnement visé » demande de voir les deux ensembles. Le volume est d'une
-        // poignée de lignes par joueur, ça ne justifie pas une seconde requête.
-        /** @var list<UserDevice> $devices */
+        // Toujours une projection scalaire, seulement élargie d'une colonne (#149) : pas
+        // une hydratation d'entités — `getArrayResult()` sur ce `select()` partiel reste
+        // un tableau de scalaires, `environment` inclus pour distinguer « aucun appareil »
+        // de « des appareils, mais aucun dans l'environnement visé », ce que demande de
+        // voir les deux ensembles à la fois. Le volume est d'une poignée de lignes par
+        // joueur, ça ne justifie pas une seconde requête.
+        /** @var list<array{pushToken: string, environment: DeviceEnvironment}> $devices */
         $devices = $this->createQueryBuilder('d')
+            ->select('d.pushToken', 'd.environment')
             ->where('d.user = :userId')
             ->setParameter('userId', $userId, UuidType::NAME)
             ->getQuery()
-            ->getResult();
+            ->getArrayResult();
 
         if ([] === $devices) {
             $this->logger->info('Aucune cible de push : aucun appareil enregistré.', [
@@ -164,10 +167,10 @@ class UserDeviceRepository extends ServiceEntityRepository implements PushTarget
         $foundEnvironments = [];
 
         foreach ($devices as $device) {
-            $foundEnvironments[] = $device->environment()->value;
+            $foundEnvironments[] = $device['environment']->value;
 
-            if ($this->targetEnvironment === $device->environment()) {
-                $tokens[] = $device->pushToken();
+            if ($this->targetEnvironment === $device['environment']) {
+                $tokens[] = $device['pushToken'];
             }
         }
 
