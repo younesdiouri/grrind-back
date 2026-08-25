@@ -353,6 +353,36 @@ final class GuildActivityNotifierTest extends ApiTestCase
     }
 
     /**
+     * `ApiTestCase::openAccount()` fixe `Europe/Paris` pour tout le monde : réaliste pour
+     * les autres modules, mais ce fichier est le seul de la suite dont une règle — les
+     * heures calmes — dépend de l'heure locale du compte. Contre l'horloge réelle (#169
+     * exclut `MockClock` sur la suite fonctionnelle), `Europe/Paris` en dur place chaque
+     * destinataire endormi une partie de la journée, et la suite passe ou non selon
+     * l'heure à laquelle elle tourne.
+     *
+     * On ne corrige donc pas la base commune — un fuseau neutralisé pour toute la suite
+     * serait un piège qui se retendrait au premier autre test sensible à l'heure locale,
+     * pour un problème que seul ce fichier a. La neutralisation reste ici, à la création
+     * des comptes, une fois pour toutes : chaque compte de ce fichier est placé à 15h
+     * locale au moment où le test tourne — loin des deux bornes des heures calmes,
+     * quelle que soit l'heure UTC réelle — plutôt que de compter sur `Europe/Paris` pour
+     * l'être par chance.
+     *
+     * {@see self::testQuietHoursAreEvaluatedPerRecipient()} reste le seul test qui doit
+     * encore placer un destinataire endormi : il écrase ce défaut avec ses propres appels
+     * à `PATCH /api/me`, après l'ouverture du compte.
+     */
+    protected function openAccount(string $email = 'bob@grrind.app', string $displayName = 'Bob'): Account
+    {
+        $account = parent::openAccount($email, $displayName);
+
+        $response = $this->send('PATCH', '/api/me', ['timezone' => self::timezoneShiftingUtcHourTo(15)], $account->headers);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+
+        return $account;
+    }
+
+    /**
      * @return array{0: Account, 1: list<Account>, 2: string}
      */
     private function guildOfFour(): array
