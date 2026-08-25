@@ -109,6 +109,14 @@ services:
             $brackets: '%game.xp.diminishing_returns%'
             $beyondWeightPercent: '%game.xp.diminishing_returns_beyond_percent%'
 
+    # La table de répartition de l'XP entre les quatre caractéristiques (#158), tirée de
+    # `game/v1/attributes.yaml`. Une liste, comme `disciplines` de `XpRates` juste
+    # au-dessus : ouvrir une discipline ou corriger un pourcentage se fait dans le YAML,
+    # sans revenir ici.
+    App\Shared\Domain\Activity\AttributeSplit:
+        arguments:
+            $splits: '%game.attributes.splits%'
+
     # Le fuseau du joueur traverse la frontière des modules par ce seul point : `Identity`
     # implémente le port, `Progression` et `Engagement` ne connaissent que l'interface.
     App\Shared\Application\PlayerTimezones: '@App\Identity\Infrastructure\Doctrine\UserRepository'

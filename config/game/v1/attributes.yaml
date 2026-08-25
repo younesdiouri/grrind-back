@@ -1,0 +1,44 @@
+# Où va l'XP d'une séance, une fois calculé. `XpCalculator` rend un montant ; cette table
+# le répartit entre les quatre caractéristiques du personnage — Strength, Endurance,
+# Mobility, Dexterity — selon la discipline pratiquée. La quantité vient de l'effort ; la
+# destination vient du sport.
+#
+# ————— Ce que cette table dit ——————————————————————————————————————————————————————————
+#
+# Un pourcentage par couple (discipline, caractéristique), qui doit sommer à exactement
+# 100 sur chaque ligne — validé au démarrage par `AttributeSplit`, qui refuse aussi une
+# discipline absente ou en double. `Vitality`, la cinquième caractéristique du game
+# design, n'apparaît pas ici : elle est dérivée des quatre autres et ne reçoit jamais d'XP
+# directement.
+#
+# La répartition se pose sur le total final d'`XpCalculator`, pas sur le socle : les
+# garde-fous — rendements décroissants, plafond quotidien — restent inchangés, calculés
+# avant cette table et sans jamais la consulter.
+#
+# ————— Ce que cette table ne prétend pas dire ———————————————————————————————————————————
+#
+# Ces valeurs sont reprises du document de game design tel quel, avec trois écarts
+# assumés et confirmés en revue — de l'équilibrage, qui se patche ici sans migration :
+#
+#   - `STRENGTH` : le document écrit 75/15/5/0, qui somme à 95 — une coquille, seule
+#     ligne dans ce cas. Le point manquant va en Dexterity.
+#   - `WALKING` et `HIIT` n'ont pas de ligne au document. `HIIT` reprend la famille
+#     « Fitness / gymnastique » ; `WALKING` s'aligne sur `RUNNING` en déplaçant sa
+#     Dexterity vers Mobility — on ne pivote pas sur ses appuis en marchant comme en
+#     courant.
+#   - `CLIMBING` reprend l'exemple d'escalade donné au fil du texte du document.
+#
+# Aucune formule ne relie une ligne à la charge réelle du sport : ce n'est pas mesuré,
+# c'est choisi. Le jour où un Effort Score par famille de sport existera, il changera peut-
+# être `base_xp_per_hour` d'`xp.yaml` ; il ne changera pas cette table, qui répond à une
+# question différente — pas combien, mais vers où.
+splits:
+    - { discipline: STRENGTH, strength: 75, endurance: 15, mobility: 5, dexterity: 5 }
+    - { discipline: RUNNING, strength: 5, endurance: 75, mobility: 5, dexterity: 15 }
+    - { discipline: WALKING, strength: 5, endurance: 80, mobility: 10, dexterity: 5 }
+    - { discipline: CYCLING, strength: 15, endurance: 60, mobility: 10, dexterity: 15 }
+    - { discipline: SWIMMING, strength: 15, endurance: 55, mobility: 20, dexterity: 10 }
+    - { discipline: HIKING, strength: 10, endurance: 55, mobility: 20, dexterity: 15 }
+    - { discipline: HIIT, strength: 20, endurance: 25, mobility: 25, dexterity: 30 }
+    - { discipline: MOBILITY, strength: 5, endurance: 10, mobility: 70, dexterity: 15 }
+    - { discipline: CLIMBING, strength: 40, endurance: 20, mobility: 20, dexterity: 20 }
