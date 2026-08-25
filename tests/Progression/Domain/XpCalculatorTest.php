@@ -10,6 +10,8 @@ use App\Progression\Domain\XpBreakdownLine;
 use App\Progression\Domain\XpBreakdownSource;
 use App\Progression\Domain\XpCalculator;
 use App\Progression\Domain\XpRates;
+use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\AttributeSplit;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierSource;
@@ -425,34 +427,112 @@ final class XpCalculatorTest extends TestCase
         self::assertSame('v1-abcdef012345', self::calculator()->calculate(Discipline::Running, 3600, [], DailyLoad::untouched())->rulesetVersion);
     }
 
+    /**
+     * L'invariant du #159 : `attributeGains.total() === amount()`, y compris quand le
+     * plafond quotidien a écrêté le montant.
+     *
+     * La table de test somme 33/33/17/17 — aucun pourcentage rond, pour qu'une répartition
+     * calculée sur le mauvais montant ne puisse pas retomber par hasard sur le bon total.
+     * Si `distribute()` était appelé sur le montant gagné avant écrêtage (45, ici) plutôt
+     * que sur le total final (30), le vecteur rendu sommerait à 45 et non à 30 — c'est
+     * précisément ce que ce test refuserait de laisser passer.
+     */
+    public function testAttributesAreDistributedOnTheAmountAfterTheDailyCapNotBeforeIt(): void
+    {
+        $calculator = new XpCalculator(self::rates(), self::diminishing(), self::splitOf(33, 33, 17, 17), 'v1-abcdef012345');
+
+        // 150 déjà gagnés sur un plafond de 180 : la séance de 30 min gagnerait 45, mais il
+        // ne reste que 30 sous le plafond — le même cas que « le plafond quotidien écrête »
+        // ci-dessus.
+        $award = $calculator->calculate(Discipline::Running, 30 * 60, [], new DailyLoad(0, 150));
+
+        self::assertSame(30, $award->amount());
+        self::assertSame($award->amount(), $award->attributeGains->total());
+        self::assertEquals(new AttributeGains(10, 10, 5, 5), $award->attributeGains);
+    }
+
+    /**
+     * Même preuve à l'autre bout de l'échelle : un socle entièrement rogné par les
+     * rendements décroissants doit distribuer zéro sur les quatre, pas le socle plein.
+     */
+    public function testAttributesAreDistributedOnTheAmountAfterDiminishingReturnsHaveEmptiedIt(): void
+    {
+        $calculator = new XpCalculator(self::rates(), self::diminishing(), self::splitOf(33, 33, 17, 17), 'v1-abcdef012345');
+
+        $award = $calculator->calculate(Discipline::Running, 30 * 60, [], new DailyLoad(130 * 60, 0));
+
+        self::assertSame(0, $award->amount());
+        self::assertEquals(new AttributeGains(0, 0, 0, 0), $award->attributeGains);
+    }
+
+    private static function splitOf(int $strength, int $endurance, int $mobility, int $dexterity): AttributeSplit
+    {
+        return new AttributeSplit(array_map(
+            static fn (Discipline $discipline): array => [
+                'discipline' => $discipline->value,
+                'strength' => $strength,
+                'endurance' => $endurance,
+                'mobility' => $mobility,
+                'dexterity' => $dexterity,
+            ],
+            Discipline::cases(),
+        ));
+    }
+
     private static function calculator(): XpCalculator
     {
-        return new XpCalculator(
-            // 90 XP l'heure plutôt que les 60 livrés : le socle d'une heure vaut alors 90,
-            // ce qui donne au breakdown les chiffres de l'exemple du produit — « 90 base,
-            // +18 streak, +13 bottes ». Le barème de test n'a aucune raison de suivre
-            // l'équilibrage, et en le suivant il rendrait ces tests illisibles à chaque
-            // recalibrage.
-            new XpRates(90, [
-                ['discipline' => 'RUNNING', 'daily_cap_xp' => 180, 'xp_per_km' => 10],
-                ['discipline' => 'WALKING', 'daily_cap_xp' => 180, 'xp_per_km' => 5],
-                ['discipline' => 'CYCLING', 'daily_cap_xp' => 180, 'xp_per_km' => 3],
-                ['discipline' => 'SWIMMING', 'daily_cap_xp' => 200, 'xp_per_km' => 50],
-                ['discipline' => 'HIKING', 'daily_cap_xp' => 500, 'xp_per_km' => 8, 'xp_per_100m_elevation' => 20],
-                // Les quatre sans seconde dimension : aucune montre ne leur en donne une
-                // fiable, et c'est ce que ces lignes-là servent à vérifier.
-                ['discipline' => 'STRENGTH', 'daily_cap_xp' => 160],
-                ['discipline' => 'HIIT', 'daily_cap_xp' => 220],
-                ['discipline' => 'MOBILITY', 'daily_cap_xp' => 100],
-                ['discipline' => 'CLIMBING', 'daily_cap_xp' => 170],
-            ]),
-            new DiminishingReturns([
-                ['up_to_minutes' => 60, 'weight_percent' => 100],
-                ['up_to_minutes' => 90, 'weight_percent' => 60],
-                ['up_to_minutes' => 120, 'weight_percent' => 30],
-            ], 0),
-            'v1-abcdef012345',
-        );
+        return new XpCalculator(self::rates(), self::diminishing(), self::uniformSplit(), 'v1-abcdef012345');
+    }
+
+    private static function rates(): XpRates
+    {
+        // 90 XP l'heure plutôt que les 60 livrés : le socle d'une heure vaut alors 90, ce
+        // qui donne au breakdown les chiffres de l'exemple du produit — « 90 base, +18
+        // streak, +13 bottes ». Le barème de test n'a aucune raison de suivre
+        // l'équilibrage, et en le suivant il rendrait ces tests illisibles à chaque
+        // recalibrage.
+        return new XpRates(90, [
+            ['discipline' => 'RUNNING', 'daily_cap_xp' => 180, 'xp_per_km' => 10],
+            ['discipline' => 'WALKING', 'daily_cap_xp' => 180, 'xp_per_km' => 5],
+            ['discipline' => 'CYCLING', 'daily_cap_xp' => 180, 'xp_per_km' => 3],
+            ['discipline' => 'SWIMMING', 'daily_cap_xp' => 200, 'xp_per_km' => 50],
+            ['discipline' => 'HIKING', 'daily_cap_xp' => 500, 'xp_per_km' => 8, 'xp_per_100m_elevation' => 20],
+            // Les quatre sans seconde dimension : aucune montre ne leur en donne une
+            // fiable, et c'est ce que ces lignes-là servent à vérifier.
+            ['discipline' => 'STRENGTH', 'daily_cap_xp' => 160],
+            ['discipline' => 'HIIT', 'daily_cap_xp' => 220],
+            ['discipline' => 'MOBILITY', 'daily_cap_xp' => 100],
+            ['discipline' => 'CLIMBING', 'daily_cap_xp' => 170],
+        ]);
+    }
+
+    private static function diminishing(): DiminishingReturns
+    {
+        return new DiminishingReturns([
+            ['up_to_minutes' => 60, 'weight_percent' => 100],
+            ['up_to_minutes' => 90, 'weight_percent' => 60],
+            ['up_to_minutes' => 120, 'weight_percent' => 30],
+        ], 0);
+    }
+
+    /**
+     * Une répartition égale partout : ces tests ne portent pas sur les caractéristiques,
+     * l'important est qu'elle ne casse jamais le calcul. {@see testAttributesAreDistributedOnTheAmountAfterTheDailyCapNotBeforeIt}
+     * porte une table dédiée, choisie pour distinguer les deux positions possibles de
+     * l'appel.
+     */
+    private static function uniformSplit(): AttributeSplit
+    {
+        return new AttributeSplit(array_map(
+            static fn (Discipline $discipline): array => [
+                'discipline' => $discipline->value,
+                'strength' => 25,
+                'endurance' => 25,
+                'mobility' => 25,
+                'dexterity' => 25,
+            ],
+            Discipline::cases(),
+        ));
     }
 
     private static function bonus(ModifierSource $source, int $percentage): Modifier

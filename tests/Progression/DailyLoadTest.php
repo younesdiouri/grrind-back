@@ -11,6 +11,7 @@ use App\Progression\Domain\XpBreakdownLine;
 use App\Progression\Domain\XpBreakdownSource;
 use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\ApiTestCase;
 use DateTimeImmutable;
@@ -109,7 +110,10 @@ final class DailyLoadTest extends ApiTestCase
             Uuid::v7(),
             $discipline,
             $durationSeconds,
-            new XpAward(new XpBreakdown(new XpBreakdownLine(XpBreakdownSource::Base, $amount)), 'v1-000000000000'),
+            // La répartition n'a rien à voir avec la journée du joueur ; tout sur Strength
+            // suffit à tenir l'invariant `total() === amount` sans faire intervenir
+            // `AttributeSplit`, hors sujet ici.
+            new XpAward(new XpBreakdown(new XpBreakdownLine(XpBreakdownSource::Base, $amount)), new AttributeGains($amount, 0, 0, 0), 'v1-000000000000'),
             new DateTimeImmutable($at),
         );
 

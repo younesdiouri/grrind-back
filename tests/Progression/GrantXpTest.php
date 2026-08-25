@@ -16,6 +16,7 @@ use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierSource;
@@ -269,7 +270,9 @@ final class GrantXpTest extends ApiTestCase
             Uuid::v7(),
             Discipline::Running,
             0,
-            new XpAward(new XpBreakdown(new XpBreakdownLine(XpBreakdownSource::Base, $amount)), 'v1-000000000000'),
+            // Seedé hors du handler, donc hors du calculateur réel : tout sur Strength
+            // suffit à tenir l'invariant sans reconstruire une table de répartition ici.
+            new XpAward(new XpBreakdown(new XpBreakdownLine(XpBreakdownSource::Base, $amount)), new AttributeGains($amount, 0, 0, 0), 'v1-000000000000'),
             $at,
         ));
         $this->ledger->commit();

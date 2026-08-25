@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Domain;
 
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -99,6 +100,29 @@ class XpTransaction
     private string $rulesetVersion;
 
     /**
+     * La répartition du montant sur les quatre caractéristiques (#159), **signée** comme
+     * `amount` et `durationSeconds` — l'annulation porte l'exact opposé de chacune, voir
+     * {@see reversalOf()}. Quatre colonnes plutôt qu'une table fille comme pour le
+     * breakdown : ce n'est pas un détail de calcul mais une distribution d'un total déjà
+     * connu, à quatre destinations fixes qui ne varieront jamais en nombre.
+     *
+     * L'invariant `strength + endurance + mobility + dexterity == amount` est porté par
+     * `AttributeSplit`, pas relu ici : ce type ne fait que transporter ce qu'elle a rendu,
+     * exactement comme `amount` transporte `breakdown->total()`.
+     */
+    #[ORM\Column]
+    private int $strength;
+
+    #[ORM\Column]
+    private int $endurance;
+
+    #[ORM\Column]
+    private int $mobility;
+
+    #[ORM\Column]
+    private int $dexterity;
+
+    /**
      * @var Collection<int, XpTransactionLine>
      */
     #[ORM\OneToMany(targetEntity: XpTransactionLine::class, mappedBy: 'transaction', cascade: ['persist'])]
@@ -129,6 +153,7 @@ class XpTransaction
         Discipline $discipline,
         int $durationSeconds,
         XpBreakdown $breakdown,
+        AttributeGains $attributeGains,
         string $rulesetVersion,
         DateTimeImmutable $occurredAt,
     ) {
@@ -140,6 +165,10 @@ class XpTransaction
         $this->durationSeconds = $durationSeconds;
         $this->rulesetVersion = $rulesetVersion;
         $this->amount = $breakdown->total();
+        $this->strength = $attributeGains->strength;
+        $this->endurance = $attributeGains->endurance;
+        $this->mobility = $attributeGains->mobility;
+        $this->dexterity = $attributeGains->dexterity;
         $this->occurredAt = $occurredAt;
         $this->lines = new ArrayCollection();
 
@@ -171,6 +200,7 @@ class XpTransaction
             $discipline,
             $durationSeconds,
             $award->breakdown,
+            $award->attributeGains,
             $award->rulesetVersion,
             $occurredAt,
         );
@@ -187,6 +217,17 @@ class XpTransaction
      * se solde plus. Une séance de mardi invalidée jeudi rendrait l'XP de mardi tout en
      * creusant le compteur de jeudi — deux jours faux au lieu d'aucun. L'instant de
      * l'annulation reste lisible dans l'UUID v7 de la ligne.
+     *
+     * La répartition suit la même règle que `durationSeconds` (#159) : l'exact opposé de
+     * chacune des quatre composantes, jamais un nouvel appel à `AttributeSplit::distribute()`
+     * sur `-amount` — pas parce que l'arrondi diffèrerait (`distribute()` répartit
+     * `abs($amount)` puis négate le vecteur, il est déjà symétrique par construction), mais
+     * parce qu'une annulation n'a pas à consulter la table courante. La transaction annulée
+     * peut avoir été écrite sous un `rulesetVersion` antérieur, dont les pourcentages ont
+     * changé depuis : rejouer `distribute()` aujourd'hui rendrait un vecteur qui ne solde
+     * pas celui d'origine, et le ledger cesserait de se compenser. Inverser un fait déjà
+     * stocké ne dépend d'aucune règle courante — exactement pourquoi `durationSeconds` fait
+     * pareil.
      */
     public static function reversalOf(self $credit): self
     {
@@ -200,6 +241,7 @@ class XpTransaction
             // en XP, et la somme du jour s'en charge sans cas particulier.
             -$credit->durationSeconds,
             $credit->breakdown()->negated(),
+            new AttributeGains(-$credit->strength, -$credit->endurance, -$credit->mobility, -$credit->dexterity),
             $credit->rulesetVersion,
             $credit->occurredAt,
         );
@@ -243,6 +285,12 @@ class XpTransaction
     public function rulesetVersion(): string
     {
         return $this->rulesetVersion;
+    }
+
+    /** Les quatre colonnes redeviennent la valeur pure qu'`AttributeSplit` avait rendue. */
+    public function attributeGains(): AttributeGains
+    {
+        return new AttributeGains($this->strength, $this->endurance, $this->mobility, $this->dexterity);
     }
 
     /** Les lignes persistées redeviennent la valeur pure que le calcul avait produite. */

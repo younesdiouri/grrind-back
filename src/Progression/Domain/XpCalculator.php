@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Progression\Domain;
 
+use App\Shared\Domain\Activity\AttributeSplit;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierSource;
@@ -53,7 +54,9 @@ use App\Shared\Domain\Modifier\ModifierType;
  *    incluant le terrain, sans quoi un même streak vaudrait trois fois plus sur un trail
  *    que sur une séance de fonte, pour une raison que personne ne pourrait raconter ;
  * 5. **le plafond quotidien** de la discipline, qui écrête le total et borne le seul côté
- *    que les rendements décroissants ne bornent pas.
+ *    que les rendements décroissants ne bornent pas ;
+ * 6. **la répartition en caractéristiques** (#159), qui se pose en tout dernier, sur le
+ *    montant final déjà écrêté.
  *
  * Placer les rendements décroissants avant les bonus plutôt qu'après donne exactement le
  * même montant — les deux opérations sont linéaires — mais une arithmétique entière plus
@@ -63,12 +66,37 @@ use App\Shared\Domain\Modifier\ModifierType;
  *
  * Le breakdown **montre ce qui a été rogné** au lieu de livrer un total amaigri sans
  * explication : c'est ce qui fait la différence entre une mécanique et une punition.
+ *
+ * ## Pourquoi la répartition se pose en dernier, et pourquoi ça ne change rien
+ *
+ * `AttributeSplit::distribute()` reçoit `$breakdown->total()` — le montant **après**
+ * rendements décroissants et plafond quotidien, jamais le socle. C'est un choix de
+ * position, pas seulement de commodité, et il ne bouge pas malgré la tentation de
+ * répartir chaque ligne du détail avant de les sommer :
+ *
+ * - **la composition est additive** (voir plus haut : socle, terrain et bonus s'ajoutent,
+ *   ils ne se multiplient jamais) ;
+ * - **la distribution est linéaire** — `AttributeSplit` applique un même pourcentage par
+ *   caractéristique quel que soit le montant, à l'arrondi de plus fort reste près.
+ *
+ * La composition d'une somme et d'une fonction linéaire ne dépend pas de l'ordre :
+ * répartir chaque ligne puis les sommer donnerait le même vecteur `(S, E, M, D)` que
+ * répartir la somme une seule fois — à l'arrondi près, et c'est justement pour *garder*
+ * un seul arrondi (plus fort reste, une fois, sur le total) plutôt que d'en cumuler un
+ * par ligne que la répartition se pose ici et pas plus tôt. Le plafond quotidien, lui,
+ * n'a pas de linéarité à préserver : il **écrête**, donc le répartir avant l'écrêtage
+ * distribuerait un montant que le joueur n'a jamais reçu. La position n'est donc pas
+ * neutre pour le plafond — c'est précisément pourquoi elle se pose après lui, jamais
+ * avant : déplacer cet appel plus haut « pour bien faire » romprait l'invariant
+ * `S+E+M+D == amount` sur toute séance écrêtée, sans qu'aucun garde-fou de type ne le
+ * voie passer.
  */
 final readonly class XpCalculator
 {
     public function __construct(
         private XpRates $rates,
         private DiminishingReturns $diminishing,
+        private AttributeSplit $attributes,
         private string $rulesetVersion,
     ) {
     }
@@ -132,7 +160,12 @@ final readonly class XpCalculator
             $breakdown = new XpBreakdown(...$lines);
         }
 
-        return new XpAward($breakdown, $this->rulesetVersion);
+        // En tout dernier, sur le total déjà écrêté par le plafond quotidien — voir le
+        // docblock de la classe pour pourquoi cette position ne change rien au vecteur
+        // rendu, et pourquoi elle ne peut pas se déplacer avant l'écrêtage.
+        $gains = $this->attributes->distribute($discipline, $breakdown->total());
+
+        return new XpAward($breakdown, $gains, $this->rulesetVersion);
     }
 
     /**

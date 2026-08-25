@@ -10,6 +10,7 @@ use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\PlayerRecord;
 use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\LocalDay;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -51,6 +52,40 @@ class XpTransactionRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         return (int) $total;
+    }
+
+    /**
+     * Le total d'un joueur, par caractéristique — même geste que {@see totalOf()}, sur les
+     * quatre colonnes de répartition (#159) plutôt que sur `amount`. La somme des quatre
+     * vaut `totalOf($userId)` par construction : chaque ligne écrite au ledger porte déjà
+     * cet invariant, une simple addition ne peut pas le rompre.
+     */
+    public function attributeTotalsOf(Uuid $userId): AttributeGains
+    {
+        $row = $this->createQueryBuilder('t')
+            ->select('COALESCE(SUM(t.strength), 0) AS strength')
+            ->addSelect('COALESCE(SUM(t.endurance), 0) AS endurance')
+            ->addSelect('COALESCE(SUM(t.mobility), 0) AS mobility')
+            ->addSelect('COALESCE(SUM(t.dexterity), 0) AS dexterity')
+            ->where('t.userId = :userId')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->getQuery()
+            ->getSingleResult();
+
+        \assert(
+            \is_array($row)
+            && is_numeric($row['strength'])
+            && is_numeric($row['endurance'])
+            && is_numeric($row['mobility'])
+            && is_numeric($row['dexterity']),
+        );
+
+        return new AttributeGains(
+            (int) $row['strength'],
+            (int) $row['endurance'],
+            (int) $row['mobility'],
+            (int) $row['dexterity'],
+        );
     }
 
     /**

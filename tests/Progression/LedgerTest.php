@@ -12,6 +12,7 @@ use App\Progression\Domain\XpBreakdownSource;
 use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
@@ -180,7 +181,10 @@ final class LedgerTest extends KernelTestCase
             $sourceId,
             Discipline::Running,
             2700,
-            new XpAward($breakdown, 'v1-000000000000'),
+            // Tout sur Strength : la répartition exacte n'est pas le sujet de ce test, seul
+            // l'invariant `total() === amount` doit tenir, et `LedgerRepartitionTest` porte
+            // la preuve de la répartition elle-même.
+            new XpAward($breakdown, new AttributeGains($breakdown->total(), 0, 0, 0), 'v1-000000000000'),
             $this->now,
         );
 
