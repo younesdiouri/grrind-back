@@ -219,10 +219,15 @@ class XpTransaction
      * l'annulation reste lisible dans l'UUID v7 de la ligne.
      *
      * La répartition suit la même règle que `durationSeconds` (#159) : l'exact opposé de
-     * chacune des quatre composantes, pas un nouveau tirage sur `-amount` — sinon un
-     * arrondi de plus fort reste pourrait choisir une autre caractéristique à l'annulation
-     * qu'au crédit, et la journée annulée ne se solderait plus caractéristique par
-     * caractéristique.
+     * chacune des quatre composantes, jamais un nouvel appel à `AttributeSplit::distribute()`
+     * sur `-amount` — pas parce que l'arrondi diffèrerait (`distribute()` répartit
+     * `abs($amount)` puis négate le vecteur, il est déjà symétrique par construction), mais
+     * parce qu'une annulation n'a pas à consulter la table courante. La transaction annulée
+     * peut avoir été écrite sous un `rulesetVersion` antérieur, dont les pourcentages ont
+     * changé depuis : rejouer `distribute()` aujourd'hui rendrait un vecteur qui ne solde
+     * pas celui d'origine, et le ledger cesserait de se compenser. Inverser un fait déjà
+     * stocké ne dépend d'aucune règle courante — exactement pourquoi `durationSeconds` fait
+     * pareil.
      */
     public static function reversalOf(self $credit): self
     {
