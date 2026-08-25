@@ -770,6 +770,19 @@ when@dev:
                                     contributeurs de modificateurs ; les deux dernières, les garde-fous.
                             amount: { type: integer, example: -55 }
 
+                    AttributeGauge:
+                        type: object
+                        description: |
+                            Une caractéristique du personnage — Strength, Endurance, Mobility ou Dexterity —
+                            avec ce que la séance lui a rapporté et sa jauge avant/après. `gained` est le
+                            détail par caractéristique d'`xp.awarded` : leur somme sur les quatre vaut
+                            exactement ce total.
+                        required: [gained, before, after]
+                        properties:
+                            gained: { type: integer, example: 108, description: "Peut valoir zéro : cette séance n'a rien rapporté à cette caractéristique." }
+                            before: { type: integer, example: 5000 }
+                            after: { type: integer, example: 5108 }
+
                     RewardSummary:
                         type: object
                         description: |
@@ -777,18 +790,23 @@ when@dev:
                             autant qu'il y a eu de séances, dans l'ordre chronologique.
 
                             **L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en
-                            bas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau
-                            bascule, le titre tombe, puis le loot et la série. Un champ déplacé change la mise
-                            en scène.
+                            bas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq
+                            jauges de caractéristiques montent**, le niveau bascule, le titre tombe, puis le
+                            loot et la série. Un champ déplacé change la mise en scène.
+
+                            `attributes` se place entre `xp` et `level`, et nulle part ailleurs : les
+                            caractéristiques sont la conséquence directe de l'XP qui vient de tomber, le
+                            niveau celui du **total** qu'elles composent — il vient donc après la
+                            répartition qui l'alimente.
 
                             **Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de
                             jouer l'animation — d'où le palier donné avant *et* après, et les titres déjà
-                            traduits.
+                            traduits. `attributes` suit la même règle, Vitality comprise.
 
                             `loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5
                             et 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la
                             rendre optionnelle pour toujours.
-                        required: [session, xp, level, titlesUnlocked, loot, streak, unlockableNodes, rulesetVersion]
+                        required: [session, xp, attributes, level, titlesUnlocked, loot, streak, unlockableNodes, rulesetVersion]
                         properties:
                             session: { $ref: '#/components/schemas/Workout' }
                             xp:
@@ -800,6 +818,31 @@ when@dev:
                                         type: array
                                         description: "Dans l'ordre d'affichage. Le client ne le trie pas, il le joue."
                                         items: { $ref: '#/components/schemas/XpLine' }
+                            attributes:
+                                type: object
+                                description: |
+                                    Les cinq caractéristiques du personnage, chacune avec son avant et son
+                                    après — même raison que le palier de niveau : une jauge qui repartirait de
+                                    zéro mentirait à tout joueur qui n'y était pas.
+
+                                    **Vitality n'a pas de `gained`.** Elle ne reçoit jamais d'XP directement —
+                                    c'est une caractéristique dérivée des quatre autres, qui mesure l'équilibre
+                                    de la pratique. Elle peut donc bouger sans que **cette** séance lui ait
+                                    rien crédité : un joueur qui varie ses sports la voit sauter même le jour
+                                    où la répartition de sa séance n'y touche pas directement.
+                                required: [strength, endurance, mobility, dexterity, vitality]
+                                properties:
+                                    strength: { $ref: '#/components/schemas/AttributeGauge' }
+                                    endurance: { $ref: '#/components/schemas/AttributeGauge' }
+                                    mobility: { $ref: '#/components/schemas/AttributeGauge' }
+                                    dexterity: { $ref: '#/components/schemas/AttributeGauge' }
+                                    vitality:
+                                        type: object
+                                        description: "Dérivée, jamais créditée : pas de `gained` ici."
+                                        required: [before, after]
+                                        properties:
+                                            before: { type: integer, example: 300 }
+                                            after: { type: integer, example: 310 }
                             level:
                                 type: object
                                 required: [before, xpIntoLevelBefore, xpToNextLevelBefore, after, reached, totalXp, xpIntoLevel, xpToNextLevel, skillPointsGranted]

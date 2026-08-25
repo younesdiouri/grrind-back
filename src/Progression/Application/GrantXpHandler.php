@@ -90,10 +90,13 @@ final readonly class GrantXpHandler
             ));
             $this->ledger->commit();
 
-            // Lu avant la reprojection, donc c'est bien le palier d'où le joueur part —
-            // et il est cohérent avec `levelsReached` par construction, puisque `retotal`
-            // compare au même état. Le client anime la barre depuis là (#79).
+            // Lus avant la reprojection, donc c'est bien l'état d'où le joueur part — et
+            // ils sont cohérents avec `levelsReached` par construction, puisque `retotal`
+            // compare au même état. Le client anime la barre et les cinq jauges depuis là
+            // (#79, #162).
             $standingBefore = $snapshot->standing();
+            $attributesBefore = $snapshot->attributes();
+            $vitalityBefore = $snapshot->vitality();
             $levelsReached = $snapshot->retotal(
                 $this->ledger->totalOf($command->userId),
                 $this->ledger->attributeTotalsOf($command->userId),
@@ -107,6 +110,8 @@ final readonly class GrantXpHandler
                 $award,
                 $snapshot,
                 $standingBefore,
+                $attributesBefore,
+                $vitalityBefore,
                 $levelsReached,
                 $snapshot->earnedSkillPoints() - $standingBefore->earnedSkillPoints,
                 // En dernier, et dans la transaction : les conditions se lisent au ledger,

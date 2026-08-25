@@ -121,6 +121,17 @@ final readonly class LedgerSessionRewards implements SessionRewards
                 ),
                 $granted->titlesUnlocked,
             ),
+            // Le détail de cette séance, déjà porté par `XpAward` (#159) — aucun nouveau
+            // calcul, juste le même vecteur réexporté vers `Shared`.
+            $granted->award->attributeGains,
+            // Même geste qu'au palier de niveau : `attributesBefore` vient du handler, lu
+            // avant `retotal()` ; l'arrivée se relit directement sur le snapshot reprojeté.
+            $granted->attributesBefore,
+            $snapshot->attributes(),
+            // Vitality peut bouger sans que cette séance lui ait rien crédité — c'est tout
+            // l'intérêt de la lire avant/après plutôt que de la dériver du gain (#162).
+            $granted->vitalityBefore,
+            $snapshot->vitality(),
             $granted->award->rulesetVersion,
         );
     }

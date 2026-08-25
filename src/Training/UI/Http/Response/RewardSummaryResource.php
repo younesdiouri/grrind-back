@@ -19,15 +19,28 @@ use App\Training\Application\SessionCompletion;
  * `RewardSummaryPayloadTest` fige l'ordre des clés en attendant.
  *
  * **L'ordre des champs est l'ordre de l'animation.** Le client le joue de haut en bas : la
- * séance se referme, la barre d'XP se remplit ligne à ligne, le niveau bascule, le titre
- * tombe, puis le loot et la série. Ce n'est pas une convention d'écriture, c'est le contrat :
- * un champ déplacé change la mise en scène, et c'est le schéma le plus coûteux à casser du
- * produit.
+ * séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq jauges de
+ * caractéristiques montent**, le niveau bascule, le titre tombe, puis le loot et la série.
+ * Ce n'est pas une convention d'écriture, c'est le contrat : un champ déplacé change la
+ * mise en scène, et c'est le schéma le plus coûteux à casser du produit.
+ *
+ * **`attributes` (#162) se place entre `xp` et `level`, et nulle part ailleurs.** Les
+ * caractéristiques sont la conséquence directe de l'XP qui vient de tomber — les faire
+ * monter après le niveau les couperait de leur cause, et le joueur verrait des jauges
+ * bouger sans savoir pourquoi. Le niveau, lui, est la conséquence du **total**, donc il
+ * vient après la répartition qui l'alimente : `xp` → `attributes` → `level`, dans cet
+ * ordre et pas un autre.
  *
  * **Un seul aller-retour.** Rien ici ne demande au client de recharger quoi que ce soit
  * avant de jouer l'animation — c'est pourquoi le palier est donné avant *et* après, et
  * pourquoi les titres arrivent déjà traduits, dans la forme unique de {@see PlayerTitle}
- * que servent déjà `GET /api/me` et `GET /api/titles`.
+ * que servent déjà `GET /api/me` et `GET /api/titles`. `attributes` suit la même règle :
+ * chacune des cinq caractéristiques porte son avant et son après, Vitality comprise —
+ * une jauge qui repartirait de zéro mentirait à tout joueur qui n'y était pas, exactement
+ * comme le palier de niveau (#79). **Vitality n'a pas de `gained`** : elle ne reçoit
+ * jamais d'XP directement, elle se lit avant/après sur l'état du joueur — voir le
+ * docblock d'`App\Shared\Domain\Activity\Vitality` pour pourquoi elle peut bouger sans que
+ * cette séance lui ait rien crédité.
  *
  * **`loot`, `streak` et `unlockableNodes` sont présents et vides.** Le loot arrive au Lot 6,
  * la série au Lot 5, les arbres au Lot 7. Les ajouter plus tard obligerait le client déjà
@@ -66,6 +79,35 @@ final readonly class RewardSummaryResource
                     $this->reward->breakdown,
                 ),
             ],
+            // Entre `xp` et `level`, jamais ailleurs — voir le docblock de la classe.
+            'attributes' => [
+                'strength' => self::gauge(
+                    $this->reward->attributeGains->strength,
+                    $this->reward->attributesBefore->strength,
+                    $this->reward->attributesAfter->strength,
+                ),
+                'endurance' => self::gauge(
+                    $this->reward->attributeGains->endurance,
+                    $this->reward->attributesBefore->endurance,
+                    $this->reward->attributesAfter->endurance,
+                ),
+                'mobility' => self::gauge(
+                    $this->reward->attributeGains->mobility,
+                    $this->reward->attributesBefore->mobility,
+                    $this->reward->attributesAfter->mobility,
+                ),
+                'dexterity' => self::gauge(
+                    $this->reward->attributeGains->dexterity,
+                    $this->reward->attributesBefore->dexterity,
+                    $this->reward->attributesAfter->dexterity,
+                ),
+                // Pas de `gained` : Vitality ne reçoit jamais d'XP directement, elle se lit
+                // avant/après sur l'état du joueur — voir le docblock de la classe.
+                'vitality' => [
+                    'before' => $this->reward->vitalityBefore,
+                    'after' => $this->reward->vitalityAfter,
+                ],
+            ],
             'level' => [
                 // Le palier de départ vient avant la bascule parce que l'animation est
                 // dans cet ordre : la barre se pose là où le joueur en était, puis elle
@@ -96,5 +138,16 @@ final readonly class RewardSummaryResource
             // un rapport de bug ; c'est ce qui rend une capture d'écran exploitable.
             'rulesetVersion' => $this->reward->rulesetVersion,
         ];
+    }
+
+    /**
+     * Une jauge de caractéristique : ce que la séance lui a rapporté, et son avant/après —
+     * même geste qu'au palier de niveau, à l'échelle d'une seule caractéristique.
+     *
+     * @return array{gained: int, before: int, after: int}
+     */
+    private static function gauge(int $gained, int $before, int $after): array
+    {
+        return ['gained' => $gained, 'before' => $before, 'after' => $after];
     }
 }

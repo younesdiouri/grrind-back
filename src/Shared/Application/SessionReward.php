@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Application;
 
+use App\Shared\Domain\Activity\AttributeGains;
+
 /**
  * Ce qu'une séance a rapporté, tel que `Training` le reçoit de `Progression` pour en faire
  * le `RewardSummary` (#22).
@@ -24,13 +26,26 @@ namespace App\Shared\Application;
  * il ne sait pas où la placer, et un franchissement multiple la fait démarrer à zéro pour
  * un joueur qui n'y était pas (#79). Lui faire reconstituer tout ça à partir d'une liste
  * éventuellement vide est exactement le genre de calcul qu'on refait de travers.
+ *
+ * **Les cinq caractéristiques (#162) portent le même avant/après que le niveau, et pour la
+ * même raison.** `attributesBefore`/`attributesAfter` et `vitalityBefore`/`vitalityAfter`
+ * sont lues sur le snapshot, jamais dérivées de `attributeGains` : Vitality en particulier
+ * **peut bouger sans que la séance lui ait rien crédité**, parce qu'elle mesure l'équilibre
+ * de la pratique entière et pas ce qu'un seul workout a rapporté — un joueur qui varie ses
+ * sports doit la voir sauter même le jour où il n'a touché ni fonte ni mobilité pour la
+ * première fois depuis longtemps. `attributeGains`, lui, est le détail par caractéristique
+ * de `xpAwarded` — la même donnée que porte déjà `XpAward`, réexportée en `AttributeGains`
+ * puisque c'est déjà un type de `Shared`.
  */
 final readonly class SessionReward
 {
     /**
-     * @param list<XpLine>      $breakdown      dans l'ordre d'affichage : le client ne le trie pas, il le joue
-     * @param list<int>         $levelsReached  vide si aucun niveau n'a été franchi ; plusieurs est un cas normal
-     * @param list<PlayerTitle> $titlesUnlocked vide le plus souvent : un titre est un événement rare, c'est ce qui en fait un
+     * @param list<XpLine>      $breakdown        dans l'ordre d'affichage : le client ne le trie pas, il le joue
+     * @param AttributeGains    $attributeGains   ce que **cette séance** a rapporté à chaque caractéristique ; `total() === xpAwarded`
+     * @param AttributeGains    $attributesBefore les quatre caractéristiques avant la séance
+     * @param AttributeGains    $attributesAfter  les quatre caractéristiques après — jamais recalculées côté client
+     * @param list<int>         $levelsReached    vide si aucun niveau n'a été franchi ; plusieurs est un cas normal
+     * @param list<PlayerTitle> $titlesUnlocked   vide le plus souvent : un titre est un événement rare, c'est ce qui en fait un
      */
     public function __construct(
         public int $xpAwarded,
@@ -49,6 +64,13 @@ final readonly class SessionReward
         /** Les points de compétence que ces niveaux ont accordés. */
         public int $skillPointsGranted,
         public array $titlesUnlocked,
+        public AttributeGains $attributeGains,
+        public AttributeGains $attributesBefore,
+        public AttributeGains $attributesAfter,
+        /** Dérivée des quatre ci-dessus, avant la séance — voir le docblock de la classe. */
+        public int $vitalityBefore,
+        /** Dérivée des quatre ci-dessus, après — voir le docblock de la classe. */
+        public int $vitalityAfter,
         /** L'équilibrage sous lequel ce montant a été accordé, tel qu'il est écrit au ledger. */
         public string $rulesetVersion,
     ) {
