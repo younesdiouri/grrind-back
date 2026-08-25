@@ -31,10 +31,11 @@ final readonly class AttributeGains
 
     /**
      * Les quatre totaux nommés, dans l'ordre de {@see Attribute}. Ce qui s'en sert —
-     * {@see \App\Progression\Domain\SnapshotDivergence} au premier chef — compare ou
-     * transporte les quatre d'un coup plutôt que de les récrire un à un : le jour où une
-     * cinquième caractéristique rejoint ce type, elle rejoint cette comparaison sans qu'un
-     * appelant ait à s'en souvenir.
+     * {@see \App\Progression\Domain\SnapshotDivergence} au premier chef — évite de récrire
+     * les quatre noms à chaque comparaison, et toute caractéristique qui recevrait un jour de
+     * l'XP au ledger en profiterait de la même façon : ce n'est **pas** le cas de Vitality,
+     * dérivée des quatre autres (#158), qui rejoindra `$expected`/`$actual` directement plutôt
+     * que par ce vecteur.
      *
      * @return array{strength: int, endurance: int, mobility: int, dexterity: int}
      */

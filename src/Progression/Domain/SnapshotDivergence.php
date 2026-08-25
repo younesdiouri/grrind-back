@@ -15,9 +15,11 @@ use Symfony\Component\Uid\Uuid;
  * même le cas le plus vicieux, parce que le joueur voit le bon nombre d'XP et le mauvais
  * nombre de points à dépenser. Ne comparer que le total ferait passer ce bug-là pour une
  * base saine. Les quatre caractéristiques (#160) rejoignent `$expected`/`$actual` par
- * {@see AttributeGains::toArray()} plutôt que d'être récrites champ à champ ici : une
- * cinquième caractéristique qui rejoindrait ce type un jour rejoindrait la comparaison
- * sans toucher ce fichier.
+ * {@see AttributeGains::toArray()}, qui évite de récrire leurs quatre noms ici : une
+ * caractéristique qui recevrait un jour de l'XP au ledger en profiterait de la même façon.
+ * Vitality (#161), elle, est dérivée des quatre autres et ne passera jamais par
+ * `AttributeGains` — le jour où elle rejoint le snapshot, elle rejoint `$expected`/`$actual`
+ * directement, ici même.
  *
  * Fonction pure : deux entrées, une sortie, aucune base. C'est ce qui permet de la tester
  * par table de cas plutôt qu'en abîmant une ligne pour voir.
