@@ -31,9 +31,10 @@ use InvalidArgumentException;
  * d'une seule restée à zéro.
  *
  * **Jamais sur le produit direct des quatre totaux.** Quatre totaux à sept chiffres donnent
- * un produit à vingt-huit chiffres — `PHP_INT_MAX` en fait dix-neuf — et déborderait
- * silencieusement en un nombre négatif. La forme retenue ne calcule jamais plus de deux
- * facteurs à la fois :
+ * un produit à vingt-huit chiffres — `PHP_INT_MAX` en fait dix-neuf. PHP ne boucle pas comme
+ * en C sur ce dépassement : il promeut silencieusement le résultat en flottant, dont on ne
+ * contrôle plus l'erreur sur une valeur de jeu persistée. La forme retenue ne calcule jamais
+ * plus de deux facteurs à la fois :
  *
  *     (S·E·M·D)^(1/4) == sqrt(sqrt(S·E) · sqrt(M·D))
  *
