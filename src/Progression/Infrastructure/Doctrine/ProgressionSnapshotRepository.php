@@ -155,15 +155,21 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
     {
         $fresh = ProgressionSnapshot::untouched($userId, $curve, $this->clock->now());
 
+        $attributes = $fresh->attributes();
+
         $this->getEntityManager()->getConnection()->executeStatement(
             <<<'SQL'
-                INSERT INTO progression_snapshot (user_id, total_xp, level, xp_into_level, xp_to_next_level, earned_skill_points, updated_at)
-                VALUES (:userId, :totalXp, :level, :xpIntoLevel, :xpToNextLevel, :earnedSkillPoints, :updatedAt)
+                INSERT INTO progression_snapshot (user_id, total_xp, strength, endurance, mobility, dexterity, level, xp_into_level, xp_to_next_level, earned_skill_points, updated_at)
+                VALUES (:userId, :totalXp, :strength, :endurance, :mobility, :dexterity, :level, :xpIntoLevel, :xpToNextLevel, :earnedSkillPoints, :updatedAt)
                 ON CONFLICT (user_id) DO NOTHING
                 SQL,
             [
                 'userId' => $userId->toRfc4122(),
                 'totalXp' => $fresh->totalXp(),
+                'strength' => $attributes->strength,
+                'endurance' => $attributes->endurance,
+                'mobility' => $attributes->mobility,
+                'dexterity' => $attributes->dexterity,
                 'level' => $fresh->level(),
                 'xpIntoLevel' => $fresh->xpIntoLevel(),
                 'xpToNextLevel' => $fresh->xpToNextLevel(),

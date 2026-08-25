@@ -12,6 +12,7 @@ use App\Progression\Domain\TitleProgress;
 use App\Progression\Infrastructure\Doctrine\ActiveTitleRepository;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\UnlockedTitleRepository;
+use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
 
@@ -49,6 +50,10 @@ final readonly class ProgressionStateProvider
         return new ProgressionState(
             $snapshot?->totalXp() ?? 0,
             $standing,
+            // Le joueur sans ligne n'a rien gagné sur aucune caractéristique — même raison
+            // que pour `standingOf()` : c'est l'état neutre d'un compte qui vient de
+            // s'inscrire, pas une base manquante.
+            $snapshot?->attributes() ?? new AttributeGains(0, 0, 0, 0),
             // Accordés moins dépensés — et rien ne se dépense avant les arbres de
             // compétences (#32). Le calcul vit ici plutôt que dans la réponse pour qu'il
             // n'y ait qu'un endroit à ouvrir au Lot 7.

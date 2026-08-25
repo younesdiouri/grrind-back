@@ -6,6 +6,7 @@ namespace App\Progression\Application;
 
 use App\Progression\Domain\LevelStanding;
 use App\Progression\Domain\TitleProgress;
+use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeImmutable;
 
 /**
@@ -19,11 +20,16 @@ use DateTimeImmutable;
  * Ce n'est pas le mur des titres. {@see TitleBoard} montre le catalogue **entier**, situé
  * sur un relevé du ledger, parce qu'un écran de sélection doit donner à viser ; ici on ne
  * montre que l'acquis, et c'est précisément ce qui permet de se passer du ledger.
+ *
+ * `attributes` porte les quatre caractéristiques (#160), lues du snapshot comme le reste —
+ * aucune route ne les sert encore (#162), mais l'état du joueur les porte déjà, pour la
+ * même raison que la courbe : c'est ici qu'on assemble, pas dans la réponse HTTP.
  */
 final readonly class ProgressionState
 {
     /**
      * @param LevelStanding                    $standing          projeté par la courbe, relu tel quel du snapshot
+     * @param AttributeGains                   $attributes        les quatre caractéristiques, relues telles quelles du snapshot
      * @param list<TitleProgress>              $unlockedTitles    les seuls acquis, dans l'ordre du catalogue
      * @param array<string, DateTimeImmutable> $unlockedAt        identifiant de titre → date de déblocage
      * @param string|null                      $activeTitleId     le titre affiché, s'il y en a un
@@ -32,6 +38,7 @@ final readonly class ProgressionState
     public function __construct(
         public int $totalXp,
         public LevelStanding $standing,
+        public AttributeGains $attributes,
         public int $availableSkillPoints,
         public array $unlockedTitles,
         public array $unlockedAt,

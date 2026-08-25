@@ -77,6 +77,29 @@ final class RebuildProgressionTest extends ApiTestCase
         self::assertSame(4242, $this->snapshotOf($account->id)['total_xp'], '`--dry-run` a écrit.');
     }
 
+    /**
+     * Le même rapport, une colonne plus bas dans la fiche du personnage (#160) : une
+     * caractéristique qui a dérivé se nomme exactement comme le reste, sans code
+     * particulier — {@see \App\Progression\Domain\SnapshotDivergence} la traite comme
+     * n'importe quel autre champ.
+     */
+    public function testDryRunNamesADriftedAttributeColumnTooWithoutRepairingIt(): void
+    {
+        $account = $this->openAccount();
+        $this->earnXp($account);
+        $this->corrupt($account->id, 'strength', 4242);
+
+        $rebuild = $this->rebuild(['--dry-run' => true]);
+
+        self::assertSame(Command::FAILURE, $rebuild->getStatusCode());
+
+        $display = self::flatten($rebuild);
+        self::assertStringContainsString('strength', $display);
+        self::assertStringContainsString('4242', $display);
+
+        self::assertSame(4242, $this->snapshotOf($account->id)['strength'], '`--dry-run` a écrit.');
+    }
+
     public function testRepairsASnapshotThatWasAlteredByHand(): void
     {
         $account = $this->openAccount();
@@ -84,9 +107,12 @@ final class RebuildProgressionTest extends ApiTestCase
         $sane = $this->snapshotOf($account->id);
 
         // Un total juste et des colonnes projetées fausses : le cas le plus vicieux, celui
-        // où le joueur lit la bonne XP et le mauvais nombre de points à dépenser.
+        // où le joueur lit la bonne XP et le mauvais nombre de points à dépenser. La
+        // caractéristique (#160) est du même acabit : une colonne que rien d'autre ne
+        // recoupe.
         $this->corrupt($account->id, 'level', 99);
         $this->corrupt($account->id, 'earned_skill_points', 99);
+        $this->corrupt($account->id, 'strength', 4242);
 
         $rebuild = $this->rebuild();
 

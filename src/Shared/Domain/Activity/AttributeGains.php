@@ -28,4 +28,24 @@ final readonly class AttributeGains
     {
         return $this->strength + $this->endurance + $this->mobility + $this->dexterity;
     }
+
+    /**
+     * Les quatre totaux nommés, dans l'ordre de {@see Attribute}. Ce qui s'en sert —
+     * {@see \App\Progression\Domain\SnapshotDivergence} au premier chef — évite de récrire
+     * les quatre noms à chaque comparaison, et toute caractéristique qui recevrait un jour de
+     * l'XP au ledger en profiterait de la même façon : ce n'est **pas** le cas de Vitality,
+     * dérivée des quatre autres (#158), qui rejoindra `$expected`/`$actual` directement plutôt
+     * que par ce vecteur.
+     *
+     * @return array{strength: int, endurance: int, mobility: int, dexterity: int}
+     */
+    public function toArray(): array
+    {
+        return [
+            'strength' => $this->strength,
+            'endurance' => $this->endurance,
+            'mobility' => $this->mobility,
+            'dexterity' => $this->dexterity,
+        ];
+    }
 }
