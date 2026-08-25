@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace App\Tests\Training;
 
+use App\Progression\Application\GrantXp;
+use App\Progression\Application\GrantXpHandler;
+use App\Progression\Domain\ProgressionSnapshot;
+use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
+use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\Workouts;
 use DateTimeImmutable;
 use DateTimeInterface;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * La timeline contre la vraie API : ce que le client reçoit et joue.
@@ -21,6 +28,27 @@ use Symfony\Component\HttpFoundation\Response;
 final class ImportSyncSummaryTest extends ApiTestCase
 {
     use Workouts;
+
+    private GrantXpHandler $grantXp;
+    private ProgressionSnapshotRepository $snapshots;
+    private EntityManagerInterface $entityManager;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $grantXp = self::getContainer()->get(GrantXpHandler::class);
+        self::assertInstanceOf(GrantXpHandler::class, $grantXp);
+        $this->grantXp = $grantXp;
+
+        $snapshots = self::getContainer()->get(ProgressionSnapshotRepository::class);
+        self::assertInstanceOf(ProgressionSnapshotRepository::class, $snapshots);
+        $this->snapshots = $snapshots;
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        self::assertInstanceOf(EntityManagerInterface::class, $entityManager);
+        $this->entityManager = $entityManager;
+    }
 
     /**
      * **Le test qui porte le ticket.** Un joueur revient après dix jours d'absence : il
@@ -61,6 +89,119 @@ final class ImportSyncSummaryTest extends ApiTestCase
         }
 
         self::assertSame(90, $arrival);
+    }
+
+    /**
+     * **Le garde-fou du #162.** Les cinq caractéristiques annoncées dans le payload ne sont
+     * pas de la mise en forme : elles doivent égaler exactement ce que le vrai snapshot a
+     * gagné, sur chacune des cinq valeurs — Vitality comprise, qui n'a pourtant pas de
+     * `gained` puisqu'elle n'en reçoit jamais.
+     *
+     * Le joueur part d'un état non trivial (un premier crédit direct au ledger) plutôt que
+     * de zéro partout : sans quoi l'invariant se vérifierait sur un cas particulier — un
+     * compte tout neuf où « avant » et « gagné » se confondent.
+     */
+    public function testTheAttributeGainsInThePayloadEqualTheDifferenceOfTheRealSnapshots(): void
+    {
+        $bob = $this->openAccount();
+
+        ($this->grantXp)(new GrantXp($bob->id, Uuid::v7(), Discipline::Strength, 3600, new DateTimeImmutable('-10 days')));
+
+        $before = $this->snapshots->ofPlayer($bob->id);
+        self::assertInstanceOf(ProgressionSnapshot::class, $before);
+        $attributesBefore = $before->attributes();
+        $vitalityBefore = $before->vitality();
+
+        $body = self::decode($this->import($bob, [self::candidate(daysAgo: 3)]));
+        self::assertIsArray($body['imported']);
+        self::assertCount(1, $body['imported']);
+
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+        $attributes = $reward['attributes'];
+        self::assertIsArray($attributes);
+
+        // Sans ce `clear()`, `ofPlayer()` rendrait l'entité déjà chargée par `$before` —
+        // le même objet PHP, pas une relecture de ce que l'import vient d'écrire.
+        $this->entityManager->clear();
+        $after = $this->snapshots->ofPlayer($bob->id);
+        self::assertInstanceOf(ProgressionSnapshot::class, $after);
+        $attributesAfter = $after->attributes();
+
+        $expected = [
+            'strength' => [$attributesBefore->strength, $attributesAfter->strength],
+            'endurance' => [$attributesBefore->endurance, $attributesAfter->endurance],
+            'mobility' => [$attributesBefore->mobility, $attributesAfter->mobility],
+            'dexterity' => [$attributesBefore->dexterity, $attributesAfter->dexterity],
+        ];
+
+        foreach ($expected as $key => [$expectedBefore, $expectedAfter]) {
+            $gauge = $attributes[$key];
+            self::assertIsArray($gauge);
+            self::assertIsInt($gauge['gained']);
+            self::assertIsInt($gauge['before']);
+            self::assertIsInt($gauge['after']);
+
+            self::assertSame($expectedBefore, $gauge['before'], "$key : le payload doit repartir d'où le snapshot en était.");
+            self::assertSame($expectedAfter, $gauge['after'], "$key : le palier d'arrivée annoncé doit être celui que le snapshot porte réellement.");
+            self::assertSame($gauge['after'] - $gauge['before'], $gauge['gained'], "$key : le gain annoncé doit égaler la différence des deux snapshots.");
+        }
+
+        $vitality = $attributes['vitality'];
+        self::assertIsArray($vitality);
+        self::assertSame($vitalityBefore, $vitality['before']);
+        self::assertSame($after->vitality(), $vitality['after']);
+    }
+
+    /**
+     * **Le deuxième garde-fou du #162.** Comme la barre de niveau, les cinq jauges
+     * s'enchaînent sans trou : l'arrivée de l'une est le départ de la suivante, sur toute la
+     * timeline — c'est ce qui permet au client d'animer trois workouts d'affilée sans un
+     * seul recalcul.
+     */
+    public function testTheAttributeAndVitalityGaugesChainFromOneWorkoutToTheNext(): void
+    {
+        $bob = $this->openAccount();
+
+        $body = self::decode($this->import($bob, [
+            self::candidate(externalId: 'HK-1', daysAgo: 9),
+            self::candidate(externalId: 'HK-2', daysAgo: 6),
+            self::candidate(externalId: 'HK-3', daysAgo: 3),
+        ]));
+
+        self::assertIsArray($body['imported']);
+        self::assertCount(3, $body['imported']);
+
+        $previousAttributes = null;
+        $previousLevelAfter = null;
+
+        foreach ($body['imported'] as $reward) {
+            self::assertIsArray($reward);
+            $attributes = $reward['attributes'];
+            $level = $reward['level'];
+            self::assertIsArray($attributes);
+            self::assertIsArray($level);
+
+            if (null !== $previousAttributes) {
+                self::assertSame($previousLevelAfter, $level['before'], 'Le niveau doit lui aussi s\'enchaîner sans trou.');
+
+                foreach (['strength', 'endurance', 'mobility', 'dexterity', 'vitality'] as $key) {
+                    $gauge = $attributes[$key];
+                    $previousGauge = $previousAttributes[$key];
+                    self::assertIsArray($gauge);
+                    self::assertIsArray($previousGauge);
+
+                    self::assertSame(
+                        $previousGauge['after'],
+                        $gauge['before'],
+                        "$key : l'après de l'un doit être l'avant du suivant.",
+                    );
+                }
+            }
+
+            $previousAttributes = $attributes;
+            $previousLevelAfter = $level['after'];
+        }
     }
 
     /**
