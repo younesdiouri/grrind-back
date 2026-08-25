@@ -6,6 +6,7 @@ namespace App\Tests\Training;
 
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\XpLine;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\WorkoutSource;
 use App\Training\Application\SessionCompletion;
@@ -49,7 +50,7 @@ final class SyncSummaryPayloadTest extends TestCase
         self::assertIsArray($payload['imported']);
         self::assertIsArray($payload['imported'][0]);
         self::assertSame(
-            ['session', 'xp', 'level', 'titlesUnlocked', 'loot', 'streak', 'unlockableNodes', 'rulesetVersion'],
+            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'streak', 'unlockableNodes', 'rulesetVersion'],
             array_keys($payload['imported'][0]),
         );
     }
@@ -165,6 +166,11 @@ final class SyncSummaryPayloadTest extends TestCase
             levelsReached: [],
             skillPointsGranted: 0,
             titlesUnlocked: [],
+            attributeGains: new AttributeGains($awarded, 0, 0, 0),
+            attributesBefore: new AttributeGains($totalXpBefore, 0, 0, 0),
+            attributesAfter: new AttributeGains($totalXpBefore + $awarded, 0, 0, 0),
+            vitalityBefore: 0,
+            vitalityAfter: 0,
             rulesetVersion: 'v1-abcdef',
         ));
     }

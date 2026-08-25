@@ -21,9 +21,11 @@ use DateTimeImmutable;
  * sur un relevé du ledger, parce qu'un écran de sélection doit donner à viser ; ici on ne
  * montre que l'acquis, et c'est précisément ce qui permet de se passer du ledger.
  *
- * `attributes` porte les quatre caractéristiques (#160), lues du snapshot comme le reste —
- * aucune route ne les sert encore (#162), mais l'état du joueur les porte déjà, pour la
- * même raison que la courbe : c'est ici qu'on assemble, pas dans la réponse HTTP.
+ * `attributes` porte les quatre caractéristiques (#160), lues du snapshot comme le reste.
+ * **`/api/progression` ne les rend toujours pas** : le #162 les a servies par le
+ * `RewardSummary`, où l'avant/après anime les cinq jauges — ce n'est pas cette route, qui
+ * ne rend qu'un instant, qui en avait besoin. L'état du joueur les porte déjà pour autant,
+ * pour la même raison que la courbe : c'est ici qu'on assemble, pas dans la réponse HTTP.
  */
 final readonly class ProgressionState
 {

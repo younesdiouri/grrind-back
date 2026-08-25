@@ -1352,11 +1352,30 @@ components:
           type: integer
           example: -55
       type: object
+    AttributeGauge:
+      description: "Une caractéristique du personnage — Strength, Endurance, Mobility ou Dexterity —\navec ce que la séance lui a rapporté et sa jauge avant/après. `gained` est le\ndétail par caractéristique d'`xp.awarded` : leur somme sur les quatre vaut\nexactement ce total.\n"
+      required:
+        - gained
+        - before
+        - after
+      properties:
+        gained:
+          description: "Peut valoir zéro : cette séance n'a rien rapporté à cette caractéristique."
+          type: integer
+          example: 108
+        before:
+          type: integer
+          example: 5000
+        after:
+          type: integer
+          example: 5108
+      type: object
     RewardSummary:
-      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, le niveau\nbascule, le titre tombe, puis le loot et la série. Un champ déplacé change la mise\nen scène.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, et les titres déjà\ntraduits.\n\n`loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5\net 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
+      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq\njauges de caractéristiques montent**, le niveau bascule, le titre tombe, puis le\nloot et la série. Un champ déplacé change la mise en scène.\n\n`attributes` se place entre `xp` et `level`, et nulle part ailleurs : les\ncaractéristiques sont la conséquence directe de l'XP qui vient de tomber, le\nniveau celui du **total** qu'elles composent — il vient donc après la\nrépartition qui l'alimente.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, et les titres déjà\ntraduits. `attributes` suit la même règle, Vitality comprise.\n\n`loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5\net 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
       required:
         - session
         - xp
+        - attributes
         - level
         - titlesUnlocked
         - loot
@@ -1380,6 +1399,37 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/XpLine'
+          type: object
+        attributes:
+          description: "Les cinq caractéristiques du personnage, chacune avec son avant et son\naprès — même raison que le palier de niveau : une jauge qui repartirait de\nzéro mentirait à tout joueur qui n'y était pas.\n\n**Vitality n'a pas de `gained`.** Elle ne reçoit jamais d'XP directement —\nc'est une caractéristique dérivée des quatre autres, qui mesure l'équilibre\nde la pratique. Elle peut donc bouger sans que **cette** séance lui ait\nrien crédité : un joueur qui varie ses sports la voit sauter même le jour\noù la répartition de sa séance n'y touche pas directement.\n"
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+            - vitality
+          properties:
+            strength:
+              $ref: '#/components/schemas/AttributeGauge'
+            endurance:
+              $ref: '#/components/schemas/AttributeGauge'
+            mobility:
+              $ref: '#/components/schemas/AttributeGauge'
+            dexterity:
+              $ref: '#/components/schemas/AttributeGauge'
+            vitality:
+              description: 'Dérivée, jamais créditée : pas de `gained` ici.'
+              required:
+                - before
+                - after
+              properties:
+                before:
+                  type: integer
+                  example: 300
+                after:
+                  type: integer
+                  example: 310
+              type: object
           type: object
         level:
           required:

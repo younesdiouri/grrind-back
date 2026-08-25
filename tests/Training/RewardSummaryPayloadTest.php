@@ -7,6 +7,7 @@ namespace App\Tests\Training;
 use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\XpLine;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\WorkoutSource;
 use App\Training\Application\SessionCompletion;
@@ -32,10 +33,28 @@ final class RewardSummaryPayloadTest extends TestCase
         $payload = self::summary()->toArray();
 
         self::assertSame(
-            ['session', 'xp', 'level', 'titlesUnlocked', 'loot', 'streak', 'unlockableNodes', 'rulesetVersion'],
+            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'streak', 'unlockableNodes', 'rulesetVersion'],
             array_keys($payload),
             'Un champ déplacé change la mise en scène. Si c\'est voulu, le client doit être prévenu avant.',
         );
+
+        // `attributes` entre `xp` et `level`, jamais ailleurs (#162) : les caractéristiques
+        // sont la conséquence directe de l'XP qui vient de tomber, le niveau celle du total
+        // qu'elles composent.
+        $attributes = $payload['attributes'];
+        self::assertIsArray($attributes);
+        self::assertSame(['strength', 'endurance', 'mobility', 'dexterity', 'vitality'], array_keys($attributes));
+
+        $strength = $attributes['strength'];
+        self::assertIsArray($strength);
+        // Comme `xp.awarded` précède `xp.breakdown` : ce que la séance a rapporté d'abord,
+        // puis la jauge qu'elle anime.
+        self::assertSame(['gained', 'before', 'after'], array_keys($strength));
+
+        $vitality = $attributes['vitality'];
+        self::assertIsArray($vitality);
+        // Pas de `gained` ici : Vitality ne reçoit jamais d'XP directement.
+        self::assertSame(['before', 'after'], array_keys($vitality));
 
         $level = $payload['level'];
         self::assertIsArray($level);
@@ -47,6 +66,30 @@ final class RewardSummaryPayloadTest extends TestCase
             ['before', 'xpIntoLevelBefore', 'xpToNextLevelBefore', 'after', 'reached', 'totalXp', 'xpIntoLevel', 'xpToNextLevel', 'skillPointsGranted'],
             array_keys($level),
         );
+    }
+
+    /**
+     * Le champ le plus intéressant du lot (#162) : Vitality bouge **sans avoir reçu la
+     * moindre XP** de cette séance, parce que la répartition du jour a rééquilibré la
+     * pratique. Ici, Mobility n'a rien reçu de cette séance — `gained` vaut zéro, `before`
+     * égale `after` — et Vitality bouge quand même : la preuve, au niveau du payload, que
+     * `RewardSummaryResource` ne la dérive jamais de `attributeGains`.
+     */
+    public function testVitalityCanMoveWithoutHavingReceivedAnyXp(): void
+    {
+        $payload = self::summary()->toArray();
+
+        $attributes = $payload['attributes'];
+        self::assertIsArray($attributes);
+
+        $mobility = $attributes['mobility'];
+        self::assertIsArray($mobility);
+        self::assertSame(0, $mobility['gained']);
+        self::assertSame($mobility['before'], $mobility['after']);
+
+        $vitality = $attributes['vitality'];
+        self::assertIsArray($vitality);
+        self::assertNotSame($vitality['before'], $vitality['after']);
     }
 
     /**
@@ -110,6 +153,14 @@ final class RewardSummaryPayloadTest extends TestCase
                 1,
                 'SESSIONS',
             )],
+            // Cette séance ne rapporte rien à Mobility (`0`) : c'est le cas que
+            // {@see testVitalityCanMoveWithoutHavingReceivedAnyXp} exploite — Mobility
+            // reste immobile pendant que Vitality bouge quand même.
+            attributeGains: new AttributeGains(135, 10, 0, 0),
+            attributesBefore: new AttributeGains(5_000, 1_000, 0, 200),
+            attributesAfter: new AttributeGains(5_135, 1_010, 0, 200),
+            vitalityBefore: 300,
+            vitalityAfter: 310,
             rulesetVersion: 'v1-abcdef',
         );
 
