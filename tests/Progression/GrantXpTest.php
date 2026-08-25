@@ -18,6 +18,7 @@ use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Activity\Vitality;
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierSource;
 use App\Shared\Domain\Modifier\ModifierType;
@@ -306,7 +307,7 @@ final class GrantXpTest extends ApiTestCase
         // `wrapInTransaction`.
         $this->expectException(TransactionRequiredException::class);
 
-        $this->snapshots->lockFor(Uuid::v7(), self::curve());
+        $this->snapshots->lockFor(Uuid::v7(), self::curve(), self::vitality());
     }
 
     private static function assertSnapshotMatchesTheCurve(ProgressionSnapshot $snapshot, int $total, AttributeGains $attributes): void
@@ -321,6 +322,9 @@ final class GrantXpTest extends ApiTestCase
         // Les quatre caractéristiques (#160) ne sont pas projetées par la courbe : elles se
         // recopient telles quelles du ledger, voir le docblock de `ProgressionSnapshot`.
         self::assertEquals($attributes, $snapshot->attributes());
+        // Vitality (#161), elle, est projetée — mais depuis `$attributes` juste au-dessus,
+        // jamais depuis le ledger : voir le même docblock.
+        self::assertSame(self::vitality()->of($attributes), $snapshot->vitality());
     }
 
     /** Une écriture au ledger qui ne passe pas par le handler, donc que le snapshot ignore. */
@@ -350,5 +354,17 @@ final class GrantXpTest extends ApiTestCase
 
         /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
         return new LevelCurve($levels);
+    }
+
+    /**
+     * Le plancher livré, construit depuis son paramètre — même geste et même raison qu'à
+     * {@see curve()} : le conteneur n'expose pas `Vitality` en dehors du handler.
+     */
+    private static function vitality(): Vitality
+    {
+        $floorPermille = self::getContainer()->getParameter('game.attributes.vitality.floor_permille');
+        self::assertIsInt($floorPermille);
+
+        return new Vitality($floorPermille);
     }
 }

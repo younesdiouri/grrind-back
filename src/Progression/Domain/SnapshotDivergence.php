@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Domain;
 
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\Vitality;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -17,9 +18,9 @@ use Symfony\Component\Uid\Uuid;
  * base saine. Les quatre caractéristiques (#160) rejoignent `$expected`/`$actual` par
  * {@see AttributeGains::toArray()}, qui évite de récrire leurs quatre noms ici : une
  * caractéristique qui recevrait un jour de l'XP au ledger en profiterait de la même façon.
- * Vitality (#161), elle, est dérivée des quatre autres et ne passera jamais par
- * `AttributeGains` — le jour où elle rejoint le snapshot, elle rejoint `$expected`/`$actual`
- * directement, ici même.
+ * **Vitality (#161) rejoint `$expected`/`$actual` directement, ici même** : elle est
+ * dérivée des quatre autres et ne passe jamais par `AttributeGains::toArray()`, sans quoi
+ * `AttributeGains::total()` mentirait sur ce qu'une séance a réellement rapporté.
  *
  * Fonction pure : deux entrées, une sortie, aucune base. C'est ce qui permet de la tester
  * par table de cas plutôt qu'en abîmant une ligne pour voir.
@@ -47,6 +48,7 @@ final readonly class SnapshotDivergence
      * @param ProgressionSnapshot|null $stored           la ligne telle qu'elle est en base
      * @param int                      $ledgerTotal      la somme du ledger, qui fait autorité
      * @param AttributeGains           $ledgerAttributes la répartition du même ledger, par caractéristique (#160)
+     * @param Vitality                 $vitality         le calculateur (#161), pour dériver la Vitality attendue de `$ledgerAttributes`
      */
     public static function between(
         Uuid $userId,
@@ -54,6 +56,7 @@ final readonly class SnapshotDivergence
         int $ledgerTotal,
         AttributeGains $ledgerAttributes,
         LevelCurve $curve,
+        Vitality $vitality,
     ): ?self {
         // L'état normal d'un compte qui vient de s'inscrire : c'est le premier crédit qui
         // pose la ligne, sous verrou. Le signaler ferait crier la sonde à chaque
@@ -72,6 +75,7 @@ final readonly class SnapshotDivergence
             'xpToNextLevel' => $standing->xpToNextLevel,
             'earnedSkillPoints' => $standing->earnedSkillPoints,
             ...$ledgerAttributes->toArray(),
+            'vitality' => $vitality->of($ledgerAttributes),
         ];
 
         $actual = null === $stored ? array_fill_keys(array_keys($expected), null) : [
@@ -81,6 +85,7 @@ final readonly class SnapshotDivergence
             'xpToNextLevel' => $stored->xpToNextLevel(),
             'earnedSkillPoints' => $stored->earnedSkillPoints(),
             ...$stored->attributes()->toArray(),
+            'vitality' => $stored->vitality(),
         ];
 
         $fields = [];

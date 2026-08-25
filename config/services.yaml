@@ -117,6 +117,12 @@ services:
         arguments:
             $splits: '%game.attributes.splits%'
 
+    # Vitality (#161), dérivée des quatre caractéristiques ci-dessus — même fichier, même
+    # geste : le domaine reçoit un objet validé, pas un entier venu tel quel du YAML.
+    App\Shared\Domain\Activity\Vitality:
+        arguments:
+            $floorPermille: '%game.attributes.vitality.floor_permille%'
+
     # Le fuseau du joueur traverse la frontière des modules par ce seul point : `Identity`
     # implémente le port, `Progression` et `Engagement` ne connaissent que l'interface.
     App\Shared\Application\PlayerTimezones: '@App\Identity\Infrastructure\Doctrine\UserRepository'

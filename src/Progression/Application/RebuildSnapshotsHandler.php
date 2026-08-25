@@ -8,6 +8,7 @@ use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\SnapshotDivergence;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Domain\Activity\Vitality;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Uid\Uuid;
@@ -37,6 +38,7 @@ final readonly class RebuildSnapshotsHandler
         private ProgressionSnapshotRepository $snapshots,
         private XpTransactionRepository $ledger,
         private LevelCurve $curve,
+        private Vitality $vitality,
         private ClockInterface $clock,
         private EntityManagerInterface $entityManager,
     ) {
@@ -58,6 +60,7 @@ final readonly class RebuildSnapshotsHandler
                 $this->ledger->totalOf($userId),
                 $this->ledger->attributeTotalsOf($userId),
                 $this->curve,
+                $this->vitality,
             );
 
             if (null !== $divergence) {
@@ -93,11 +96,12 @@ final readonly class RebuildSnapshotsHandler
     private function repair(Uuid $userId): void
     {
         $this->entityManager->wrapInTransaction(function () use ($userId): void {
-            $snapshot = $this->snapshots->lockFor($userId, $this->curve);
+            $snapshot = $this->snapshots->lockFor($userId, $this->curve, $this->vitality);
             $snapshot->retotal(
                 $this->ledger->totalOf($userId),
                 $this->ledger->attributeTotalsOf($userId),
                 $this->curve,
+                $this->vitality,
                 $this->clock->now(),
             );
             $this->snapshots->commit();

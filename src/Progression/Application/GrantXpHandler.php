@@ -10,6 +10,7 @@ use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
 use App\Shared\Application\ModifierResolver;
+use App\Shared\Domain\Activity\Vitality;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 
@@ -54,6 +55,7 @@ final readonly class GrantXpHandler
         private XpCalculator $calculator,
         private TitleUnlocker $titles,
         private LevelCurve $curve,
+        private Vitality $vitality,
         private ClockInterface $clock,
         private EntityManagerInterface $entityManager,
     ) {
@@ -64,7 +66,7 @@ final readonly class GrantXpHandler
         $now = $this->clock->now();
 
         return $this->entityManager->wrapInTransaction(function () use ($command, $now): XpGranted {
-            $snapshot = $this->snapshots->lockFor($command->userId, $this->curve);
+            $snapshot = $this->snapshots->lockFor($command->userId, $this->curve, $this->vitality);
 
             $award = $this->calculator->calculate(
                 $command->discipline,
@@ -96,6 +98,7 @@ final readonly class GrantXpHandler
                 $this->ledger->totalOf($command->userId),
                 $this->ledger->attributeTotalsOf($command->userId),
                 $this->curve,
+                $this->vitality,
                 $now,
             );
             $this->snapshots->commit();
