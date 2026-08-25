@@ -6,6 +6,7 @@ namespace App;
 
 use App\Community\Infrastructure\Config\CommunitySection;
 use App\Community\Infrastructure\Config\NotificationsSection;
+use App\Progression\Infrastructure\Config\AttributeSplitSection;
 use App\Progression\Infrastructure\Config\LevelsSection;
 use App\Progression\Infrastructure\Config\TitlesSection;
 use App\Progression\Infrastructure\Config\XpSection;
@@ -36,6 +37,7 @@ class Kernel extends BaseKernel
             new TrainingSection(),
             new ActivityTypesSection(),
             new XpSection(),
+            new AttributeSplitSection(),
             new LevelsSection(),
             new TitlesSection(),
             new CommunitySection(),
