@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Domain;
 
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
+use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -24,6 +25,14 @@ use Symfony\Component\Uid\Uuid;
  * Contrairement au ledger, il se met à jour — c'est même sa raison d'être. Ce qui ne doit
  * jamais arriver, c'est qu'on le corrige *à la main* : une divergence se répare en
  * reconstruisant, sinon on entérine le bug qui l'a produite.
+ *
+ * **Les quatre caractéristiques (#160) ne sont pas projetées par la courbe, contrairement
+ * au palier.** Elles sont la simple somme du ledger —
+ * {@see \App\Progression\Infrastructure\Doctrine\XpTransactionRepository::attributeTotalsOf()}
+ * — recopiée telle quelle : rien à en déduire, `AttributeSplit` a déjà fait le calcul à
+ * l'écriture.
+ * Elles n'en sont pas moins un cache pour autant, et pas une cinquième vérité : c'est
+ * toujours le ledger qui fait autorité, `retotal()` se contente de rejouer la même somme.
  */
 #[ORM\Entity(repositoryClass: ProgressionSnapshotRepository::class)]
 #[ORM\Table(name: 'progression_snapshot')]
@@ -37,6 +46,23 @@ class ProgressionSnapshot
     /** La somme du ledger à la dernière projection. Signé : une annulation peut le faire baisser. */
     #[ORM\Column]
     private int $totalXp;
+
+    /**
+     * Les quatre caractéristiques (#160), recopiées telles quelles du ledger — voir le
+     * docblock de la classe. Signées comme `totalXp`, pour la même raison : une annulation
+     * les fait redescendre, pas seulement le total.
+     */
+    #[ORM\Column]
+    private int $strength;
+
+    #[ORM\Column]
+    private int $endurance;
+
+    #[ORM\Column]
+    private int $mobility;
+
+    #[ORM\Column]
+    private int $dexterity;
 
     #[ORM\Column]
     private int $level;
@@ -60,10 +86,14 @@ class ProgressionSnapshot
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $updatedAt;
 
-    private function __construct(Uuid $userId, int $totalXp, LevelCurve $curve, DateTimeImmutable $now)
+    private function __construct(Uuid $userId, int $totalXp, AttributeGains $attributes, LevelCurve $curve, DateTimeImmutable $now)
     {
         $this->userId = $userId;
         $this->totalXp = $totalXp;
+        $this->strength = $attributes->strength;
+        $this->endurance = $attributes->endurance;
+        $this->mobility = $attributes->mobility;
+        $this->dexterity = $attributes->dexterity;
         $this->level = 0;
         $this->xpIntoLevel = 0;
         $this->xpToNextLevel = null;
@@ -73,28 +103,38 @@ class ProgressionSnapshot
         $this->project($curve);
     }
 
-    /** Le joueur qui n'a encore rien fait : niveau 1, zéro XP. */
+    /** Le joueur qui n'a encore rien fait : niveau 1, zéro XP, zéro partout. */
     public static function untouched(Uuid $userId, LevelCurve $curve, DateTimeImmutable $now): self
     {
-        return new self($userId, 0, $curve, $now);
+        return new self($userId, 0, new AttributeGains(0, 0, 0, 0), $curve, $now);
     }
 
     /**
-     * Reprojette le snapshot sur un nouveau total, et rend **les niveaux franchis**.
+     * Reprojette le snapshot sur un nouveau total et une nouvelle répartition, et rend
+     * **les niveaux franchis**.
      *
-     * Plusieurs d'un coup est le cas normal, pas l'exception : une longue séance après une
-     * pause peut en faire gagner deux ou trois, et le client a besoin de tous les animer.
-     * La liste est vide quand rien ne bouge — et quand le total *baisse* : une annulation
-     * ramène le joueur à son niveau réel, mais elle ne « fait pas descendre » un niveau au
-     * sens du jeu, il n'y a rien à annoncer.
+     * **Les deux ensemble, dans le même appel.** Le total et les quatre caractéristiques
+     * décrivent le même instant du ledger — les recevoir en deux méthodes laisserait un
+     * appelant reprojeter l'un sans l'autre, et le snapshot mentirait sur ses propres
+     * colonnes sans qu'aucun type ne s'en aperçoive (#160).
+     *
+     * Plusieurs niveaux d'un coup est le cas normal, pas l'exception : une longue séance
+     * après une pause peut en faire gagner deux ou trois, et le client a besoin de tous les
+     * animer. La liste est vide quand rien ne bouge — et quand le total *baisse* : une
+     * annulation ramène le joueur à son niveau réel, mais elle ne « fait pas descendre » un
+     * niveau au sens du jeu, il n'y a rien à annoncer.
      *
      * @return list<int> les niveaux atteints, dans l'ordre
      */
-    public function retotal(int $totalXp, LevelCurve $curve, DateTimeImmutable $now): array
+    public function retotal(int $totalXp, AttributeGains $attributes, LevelCurve $curve, DateTimeImmutable $now): array
     {
         $previous = $this->level;
 
         $this->totalXp = $totalXp;
+        $this->strength = $attributes->strength;
+        $this->endurance = $attributes->endurance;
+        $this->mobility = $attributes->mobility;
+        $this->dexterity = $attributes->dexterity;
         $this->updatedAt = $now;
         $this->project($curve);
 
@@ -117,6 +157,16 @@ class ProgressionSnapshot
     public function standing(): LevelStanding
     {
         return new LevelStanding($this->level, $this->xpIntoLevel, $this->xpToNextLevel, $this->earnedSkillPoints);
+    }
+
+    /**
+     * Les quatre caractéristiques, **d'un seul geste** — même raison qu'à {@see standing()} :
+     * lues séparément autour d'un {@see retotal}, elles pourraient mélanger un instant
+     * d'avant et un instant d'après.
+     */
+    public function attributes(): AttributeGains
+    {
+        return new AttributeGains($this->strength, $this->endurance, $this->mobility, $this->dexterity);
     }
 
     public function totalXp(): int

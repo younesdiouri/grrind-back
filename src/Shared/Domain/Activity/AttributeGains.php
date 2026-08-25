@@ -28,4 +28,23 @@ final readonly class AttributeGains
     {
         return $this->strength + $this->endurance + $this->mobility + $this->dexterity;
     }
+
+    /**
+     * Les quatre totaux nommés, dans l'ordre de {@see Attribute}. Ce qui s'en sert —
+     * {@see \App\Progression\Domain\SnapshotDivergence} au premier chef — compare ou
+     * transporte les quatre d'un coup plutôt que de les récrire un à un : le jour où une
+     * cinquième caractéristique rejoint ce type, elle rejoint cette comparaison sans qu'un
+     * appelant ait à s'en souvenir.
+     *
+     * @return array{strength: int, endurance: int, mobility: int, dexterity: int}
+     */
+    public function toArray(): array
+    {
+        return [
+            'strength' => $this->strength,
+            'endurance' => $this->endurance,
+            'mobility' => $this->mobility,
+            'dexterity' => $this->dexterity,
+        ];
+    }
 }

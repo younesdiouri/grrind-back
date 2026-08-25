@@ -35,13 +35,14 @@ use Psr\Clock\ClockInterface;
  *    streak et les objets équipés changent à l'intérieur de cette transaction-là, et un
  *    ensemble lu avant elle créditerait des bonus déjà périmés ;
  * 4. **calculer**, purement, et écrire l'XpTransaction ;
- * 5. **reprojeter** le snapshot sur le nouveau total ;
+ * 5. **reprojeter** le snapshot sur le nouveau total et la nouvelle répartition par
+ *    caractéristique (#160) ;
  * 6. **évaluer les titres**, une fois l'écriture faite, pour que la séance qui vient d'être
  *    créditée compte dans la condition qu'elle satisfait.
  *
- * Le total reprojeté est **relu au ledger** plutôt qu'additionné au snapshot : c'est ce
- * qui garde le snapshot réellement dérivé, et ce qui fait qu'une divergence se corrige
- * toute seule à la complétion suivante au lieu de s'accumuler.
+ * Le total **et** les quatre caractéristiques sont **relus au ledger** plutôt qu'ajoutés au
+ * snapshot : c'est ce qui garde le snapshot réellement dérivé, et ce qui fait qu'une
+ * divergence se corrige toute seule à la complétion suivante au lieu de s'accumuler.
  */
 final readonly class GrantXpHandler
 {
@@ -91,7 +92,12 @@ final readonly class GrantXpHandler
             // et il est cohérent avec `levelsReached` par construction, puisque `retotal`
             // compare au même état. Le client anime la barre depuis là (#79).
             $standingBefore = $snapshot->standing();
-            $levelsReached = $snapshot->retotal($this->ledger->totalOf($command->userId), $this->curve, $now);
+            $levelsReached = $snapshot->retotal(
+                $this->ledger->totalOf($command->userId),
+                $this->ledger->attributeTotalsOf($command->userId),
+                $this->curve,
+                $now,
+            );
             $this->snapshots->commit();
 
             return new XpGranted(

@@ -56,6 +56,7 @@ final readonly class RebuildSnapshotsHandler
                 $userId,
                 $this->snapshots->ofPlayer($userId),
                 $this->ledger->totalOf($userId),
+                $this->ledger->attributeTotalsOf($userId),
                 $this->curve,
             );
 
@@ -93,7 +94,12 @@ final readonly class RebuildSnapshotsHandler
     {
         $this->entityManager->wrapInTransaction(function () use ($userId): void {
             $snapshot = $this->snapshots->lockFor($userId, $this->curve);
-            $snapshot->retotal($this->ledger->totalOf($userId), $this->curve, $this->clock->now());
+            $snapshot->retotal(
+                $this->ledger->totalOf($userId),
+                $this->ledger->attributeTotalsOf($userId),
+                $this->curve,
+                $this->clock->now(),
+            );
             $this->snapshots->commit();
         });
     }

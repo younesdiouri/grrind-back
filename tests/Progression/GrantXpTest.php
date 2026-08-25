@@ -90,7 +90,7 @@ final class GrantXpTest extends ApiTestCase
         // ses colonnes n'est une information de plus : elles se redéduisent toutes.
         $total = $this->ledger->totalOf($player);
         self::assertSame($granted->award->amount(), $total);
-        self::assertSnapshotMatchesTheCurve($granted->snapshot, $total);
+        self::assertSnapshotMatchesTheCurve($granted->snapshot, $total, $this->ledger->attributeTotalsOf($player));
 
         // La ligne a survécu au commit, pas seulement à l'unité de travail.
         $this->entityManager->clear();
@@ -128,7 +128,65 @@ final class GrantXpTest extends ApiTestCase
         // Le handler relit la somme au lieu d'ajouter au compteur : l'écart se résorbe tout
         // seul au crédit suivant, là où un `+=` l'aurait entériné pour toujours.
         self::assertSame(1_000 + $granted->award->amount(), $granted->snapshot->totalXp());
-        self::assertSnapshotMatchesTheCurve($granted->snapshot, $this->ledger->totalOf($player));
+        self::assertSnapshotMatchesTheCurve($granted->snapshot, $this->ledger->totalOf($player), $this->ledger->attributeTotalsOf($player));
+    }
+
+    /**
+     * Le test que le #160 décrit : un ledger connu, annulation comprise, se reprojette à
+     * l'identique sur les cinq totaux — et l'annulation fait redescendre **les quatre
+     * caractéristiques**, pas seulement l'XP. C'est exactement le bug qu'une comparaison au
+     * seul total laisserait passer.
+     */
+    public function testASessionInvalidationLowersAllFourAttributesNotJustTheTotal(): void
+    {
+        $player = $this->openAccount()->id;
+
+        // Un crédit connu, daté d'avant-hier pour ne peser ni sur les rendements
+        // décroissants ni sur le plafond du jour — même geste que `seedLedger()`.
+        $gains = new AttributeGains(700, 200, 100, 0);
+        $credit = XpTransaction::creditFor(
+            $player,
+            Uuid::v7(),
+            Discipline::Running,
+            0,
+            new XpAward(new XpBreakdown(new XpBreakdownLine(XpBreakdownSource::Base, 1_000)), $gains, 'v1-000000000000'),
+            new DateTimeImmutable('-2 days'),
+        );
+        $this->ledger->add($credit);
+        $this->ledger->commit();
+
+        // Une première complétion reprojette le snapshot sur ce crédit : rien de neuf, la
+        // même mécanique que `testTheSnapshotIsRecomputedFromTheLedgerRatherThanIncremented`.
+        //
+        // Lue **tout de suite**, dans une variable à elle : `$afterCredit->snapshot` est
+        // l'entité que Doctrine réutilise d'un appel à l'autre pour ce joueur, donc la
+        // relire après le troisième crédit ne montrerait plus le palier de départ mais
+        // l'arrivée — même piège que celui documenté à `testTheStandingBeforeIsWhereTheSessionStartedFrom`.
+        $afterCredit = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
+        $attributesAfterCredit = $afterCredit->snapshot->attributes();
+        self::assertSnapshotMatchesTheCurve($afterCredit->snapshot, $this->ledger->totalOf($player), $this->ledger->attributeTotalsOf($player));
+        self::assertGreaterThanOrEqual(700, $attributesAfterCredit->strength);
+
+        // L'invalidation, écrite directement au ledger comme le ferait la transaction
+        // d'import de `Training` (#21) : une transaction négative, l'exact opposé du crédit.
+        $this->ledger->add(XpTransaction::reversalOf($credit));
+        $this->ledger->commit();
+
+        // Rien ne reprojette tout seul : c'est la complétion suivante — ou la
+        // reconstruction (#20) — qui rejoue le ledger. Une troisième petite séance suffit
+        // à le déclencher ici ; sa propre répartition (`$afterReversal->award->attributeGains`)
+        // sert à isoler, dans l'assertion, ce que le crédit annulé a vraiment retiré.
+        $afterReversal = ($this->grantXp)(new GrantXp($player, Uuid::v7(), Discipline::Cycling, 900, new DateTimeImmutable()));
+        $attributesAfterReversal = $afterReversal->snapshot->attributes();
+        $thirdSession = $afterReversal->award->attributeGains;
+
+        // Les quatre caractéristiques ont baissé exactement du montant que le crédit leur
+        // avait donné, une fois la troisième séance rajoutée — pas seulement l'XP total.
+        self::assertSame($attributesAfterCredit->strength - 700 + $thirdSession->strength, $attributesAfterReversal->strength);
+        self::assertSame($attributesAfterCredit->endurance - 200 + $thirdSession->endurance, $attributesAfterReversal->endurance);
+        self::assertSame($attributesAfterCredit->mobility - 100 + $thirdSession->mobility, $attributesAfterReversal->mobility);
+        self::assertSame($attributesAfterCredit->dexterity + $thirdSession->dexterity, $attributesAfterReversal->dexterity);
+        self::assertSnapshotMatchesTheCurve($afterReversal->snapshot, $this->ledger->totalOf($player), $this->ledger->attributeTotalsOf($player));
     }
 
     public function testAnnouncesEveryLevelCrossedAndTheSkillPointsTheyGrant(): void
@@ -251,7 +309,7 @@ final class GrantXpTest extends ApiTestCase
         $this->snapshots->lockFor(Uuid::v7(), self::curve());
     }
 
-    private static function assertSnapshotMatchesTheCurve(ProgressionSnapshot $snapshot, int $total): void
+    private static function assertSnapshotMatchesTheCurve(ProgressionSnapshot $snapshot, int $total, AttributeGains $attributes): void
     {
         $standing = self::curve()->standingAt($total);
 
@@ -260,6 +318,9 @@ final class GrantXpTest extends ApiTestCase
         self::assertSame($standing->xpIntoLevel, $snapshot->xpIntoLevel());
         self::assertSame($standing->xpToNextLevel, $snapshot->xpToNextLevel());
         self::assertSame($standing->earnedSkillPoints, $snapshot->earnedSkillPoints());
+        // Les quatre caractéristiques (#160) ne sont pas projetées par la courbe : elles se
+        // recopient telles quelles du ledger, voir le docblock de `ProgressionSnapshot`.
+        self::assertEquals($attributes, $snapshot->attributes());
     }
 
     /** Une écriture au ledger qui ne passe pas par le handler, donc que le snapshot ignore. */
