@@ -6,6 +6,7 @@ namespace App\Progression\Domain;
 
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\Vitality;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -33,6 +34,12 @@ use Symfony\Component\Uid\Uuid;
  * l'écriture.
  * Elles n'en sont pas moins un cache pour autant, et pas une cinquième vérité : c'est
  * toujours le ledger qui fait autorité, `retotal()` se contente de rejouer la même somme.
+ *
+ * **Vitality (#161), elle, *est* projetée — mais depuis les quatre caractéristiques
+ * ci-dessus, jamais depuis le ledger.** Elle n'a pas de colonne à y relire : aucune
+ * transaction ne lui est adressée, voir le docblock d'`App\Shared\Domain\Activity\Vitality`.
+ * `project()` la calcule dans le même geste que le niveau, à partir de ce que `retotal()`
+ * vient d'écrire dans `$this`.
  */
 #[ORM\Entity(repositoryClass: ProgressionSnapshotRepository::class)]
 #[ORM\Table(name: 'progression_snapshot')]
@@ -64,6 +71,14 @@ class ProgressionSnapshot
     #[ORM\Column]
     private int $dexterity;
 
+    /**
+     * La cinquième caractéristique (#161), reprojetée comme le niveau l'est déjà — mais
+     * depuis les quatre colonnes juste au-dessus, jamais depuis le ledger : `Vitality` ne
+     * reçoit jamais d'écriture, il n'y a rien à y relire. Voir le docblock de la classe.
+     */
+    #[ORM\Column]
+    private int $vitality;
+
     #[ORM\Column]
     private int $level;
 
@@ -86,7 +101,7 @@ class ProgressionSnapshot
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $updatedAt;
 
-    private function __construct(Uuid $userId, int $totalXp, AttributeGains $attributes, LevelCurve $curve, DateTimeImmutable $now)
+    private function __construct(Uuid $userId, int $totalXp, AttributeGains $attributes, LevelCurve $curve, Vitality $vitality, DateTimeImmutable $now)
     {
         $this->userId = $userId;
         $this->totalXp = $totalXp;
@@ -100,23 +115,23 @@ class ProgressionSnapshot
         $this->earnedSkillPoints = 0;
         $this->updatedAt = $now;
 
-        $this->project($curve);
+        $this->project($curve, $vitality);
     }
 
-    /** Le joueur qui n'a encore rien fait : niveau 1, zéro XP, zéro partout. */
-    public static function untouched(Uuid $userId, LevelCurve $curve, DateTimeImmutable $now): self
+    /** Le joueur qui n'a encore rien fait : niveau 1, zéro XP, zéro partout — Vitality compris. */
+    public static function untouched(Uuid $userId, LevelCurve $curve, Vitality $vitality, DateTimeImmutable $now): self
     {
-        return new self($userId, 0, new AttributeGains(0, 0, 0, 0), $curve, $now);
+        return new self($userId, 0, new AttributeGains(0, 0, 0, 0), $curve, $vitality, $now);
     }
 
     /**
      * Reprojette le snapshot sur un nouveau total et une nouvelle répartition, et rend
      * **les niveaux franchis**.
      *
-     * **Les deux ensemble, dans le même appel.** Le total et les quatre caractéristiques
-     * décrivent le même instant du ledger — les recevoir en deux méthodes laisserait un
-     * appelant reprojeter l'un sans l'autre, et le snapshot mentirait sur ses propres
-     * colonnes sans qu'aucun type ne s'en aperçoive (#160).
+     * **Les trois ensemble, dans le même appel.** Le total, les quatre caractéristiques et
+     * la Vitality qu'on en dérive décrivent le même instant du ledger — les recevoir
+     * séparément laisserait un appelant reprojeter l'un sans l'autre, et le snapshot
+     * mentirait sur ses propres colonnes sans qu'aucun type ne s'en aperçoive (#160, #161).
      *
      * Plusieurs niveaux d'un coup est le cas normal, pas l'exception : une longue séance
      * après une pause peut en faire gagner deux ou trois, et le client a besoin de tous les
@@ -126,7 +141,7 @@ class ProgressionSnapshot
      *
      * @return list<int> les niveaux atteints, dans l'ordre
      */
-    public function retotal(int $totalXp, AttributeGains $attributes, LevelCurve $curve, DateTimeImmutable $now): array
+    public function retotal(int $totalXp, AttributeGains $attributes, LevelCurve $curve, Vitality $vitality, DateTimeImmutable $now): array
     {
         $previous = $this->level;
 
@@ -136,7 +151,7 @@ class ProgressionSnapshot
         $this->mobility = $attributes->mobility;
         $this->dexterity = $attributes->dexterity;
         $this->updatedAt = $now;
-        $this->project($curve);
+        $this->project($curve, $vitality);
 
         return $this->level > $previous ? range($previous + 1, $this->level) : [];
     }
@@ -169,6 +184,11 @@ class ProgressionSnapshot
         return new AttributeGains($this->strength, $this->endurance, $this->mobility, $this->dexterity);
     }
 
+    public function vitality(): int
+    {
+        return $this->vitality;
+    }
+
     public function totalXp(): int
     {
         return $this->totalXp;
@@ -199,8 +219,12 @@ class ProgressionSnapshot
         return $this->updatedAt;
     }
 
-    /** Tout ce qui n'est pas le total se déduit de lui. Un seul endroit le fait. */
-    private function project(LevelCurve $curve): void
+    /**
+     * Tout ce qui n'est pas le total ou les quatre caractéristiques se déduit d'eux. Un
+     * seul endroit le fait — Vitality y compris : elle se dérive des colonnes juste
+     * écrites ci-dessus, jamais du ledger directement, voir le docblock de la classe.
+     */
+    private function project(LevelCurve $curve, Vitality $vitality): void
     {
         $standing = $curve->standingAt($this->totalXp);
 
@@ -208,5 +232,6 @@ class ProgressionSnapshot
         $this->xpIntoLevel = $standing->xpIntoLevel;
         $this->xpToNextLevel = $standing->xpToNextLevel;
         $this->earnedSkillPoints = $standing->earnedSkillPoints;
+        $this->vitality = $vitality->of($this->attributes());
     }
 }

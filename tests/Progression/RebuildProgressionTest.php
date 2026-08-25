@@ -100,6 +100,28 @@ final class RebuildProgressionTest extends ApiTestCase
         self::assertSame(4242, $this->snapshotOf($account->id)['strength'], '`--dry-run` a écrit.');
     }
 
+    /**
+     * Le même rapport, une caractéristique plus loin (#161) : Vitality est dérivée, pas
+     * recopiée du ledger — {@see \App\Progression\Domain\SnapshotDivergence} la traite comme
+     * n'importe quel autre champ, sans code particulier.
+     */
+    public function testDryRunNamesADriftedVitalityColumnTooWithoutRepairingIt(): void
+    {
+        $account = $this->openAccount();
+        $this->earnXp($account);
+        $this->corrupt($account->id, 'vitality', 4242);
+
+        $rebuild = $this->rebuild(['--dry-run' => true]);
+
+        self::assertSame(Command::FAILURE, $rebuild->getStatusCode());
+
+        $display = self::flatten($rebuild);
+        self::assertStringContainsString('vitality', $display);
+        self::assertStringContainsString('4242', $display);
+
+        self::assertSame(4242, $this->snapshotOf($account->id)['vitality'], '`--dry-run` a écrit.');
+    }
+
     public function testRepairsASnapshotThatWasAlteredByHand(): void
     {
         $account = $this->openAccount();

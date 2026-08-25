@@ -7,6 +7,7 @@ namespace App\Progression\Infrastructure\Doctrine;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\LevelStanding;
 use App\Progression\Domain\ProgressionSnapshot;
+use App\Shared\Domain\Activity\Vitality;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\DBAL\ParameterType;
@@ -93,9 +94,9 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
      *
      * @throws TransactionRequiredException hors transaction : un verrou qui se relâche aussitôt ne verrouille rien
      */
-    public function lockFor(Uuid $userId, LevelCurve $curve): ProgressionSnapshot
+    public function lockFor(Uuid $userId, LevelCurve $curve, Vitality $vitality): ProgressionSnapshot
     {
-        $this->insertIfMissing($userId, $curve);
+        $this->insertIfMissing($userId, $curve, $vitality);
 
         $snapshot = $this->find($userId, LockMode::PESSIMISTIC_WRITE);
         \assert($snapshot instanceof ProgressionSnapshot);
@@ -151,16 +152,16 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
      * ligne existe. Les valeurs écrites sont celles d'un joueur qui n'a rien fait — c'est
      * la reprojection qui suit, dans la même transaction, qui leur donnera leur contenu.
      */
-    private function insertIfMissing(Uuid $userId, LevelCurve $curve): void
+    private function insertIfMissing(Uuid $userId, LevelCurve $curve, Vitality $vitality): void
     {
-        $fresh = ProgressionSnapshot::untouched($userId, $curve, $this->clock->now());
+        $fresh = ProgressionSnapshot::untouched($userId, $curve, $vitality, $this->clock->now());
 
         $attributes = $fresh->attributes();
 
         $this->getEntityManager()->getConnection()->executeStatement(
             <<<'SQL'
-                INSERT INTO progression_snapshot (user_id, total_xp, strength, endurance, mobility, dexterity, level, xp_into_level, xp_to_next_level, earned_skill_points, updated_at)
-                VALUES (:userId, :totalXp, :strength, :endurance, :mobility, :dexterity, :level, :xpIntoLevel, :xpToNextLevel, :earnedSkillPoints, :updatedAt)
+                INSERT INTO progression_snapshot (user_id, total_xp, strength, endurance, mobility, dexterity, vitality, level, xp_into_level, xp_to_next_level, earned_skill_points, updated_at)
+                VALUES (:userId, :totalXp, :strength, :endurance, :mobility, :dexterity, :vitality, :level, :xpIntoLevel, :xpToNextLevel, :earnedSkillPoints, :updatedAt)
                 ON CONFLICT (user_id) DO NOTHING
                 SQL,
             [
@@ -170,6 +171,7 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
                 'endurance' => $attributes->endurance,
                 'mobility' => $attributes->mobility,
                 'dexterity' => $attributes->dexterity,
+                'vitality' => $fresh->vitality(),
                 'level' => $fresh->level(),
                 'xpIntoLevel' => $fresh->xpIntoLevel(),
                 'xpToNextLevel' => $fresh->xpToNextLevel(),

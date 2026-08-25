@@ -7,6 +7,7 @@ namespace App\Tests\Progression\Domain;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\ProgressionSnapshot;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\Vitality;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
@@ -33,13 +34,29 @@ final class ProgressionSnapshotTest extends TestCase
         self::assertSame(100, $snapshot->xpToNextLevel());
         self::assertSame(0, $snapshot->earnedSkillPoints());
         self::assertEquals(new AttributeGains(0, 0, 0, 0), $snapshot->attributes());
+        // Zéro partout, donc zéro Vitality : c'est l'état normal d'un compte qui vient de
+        // s'inscrire, pas le cas que le plancher existe pour protéger (#161).
+        self::assertSame(0, $snapshot->vitality());
+    }
+
+    /**
+     * Vitality (#161) se reprojette avec le reste, depuis les quatre colonnes que
+     * `retotal()` vient d'écrire — jamais depuis le ledger, qui ne lui adresse rien.
+     */
+    public function testVitalityIsReprojectedFromTheFourAttributesJustWritten(): void
+    {
+        $snapshot = self::untouched();
+
+        $snapshot->retotal(400, new AttributeGains(100, 100, 100, 100), self::curve(), self::vitality(), self::now());
+
+        self::assertSame(400, $snapshot->vitality(), 'Quatre caractéristiques égales : le coefficient vaut 1, la Vitality vaut le total.');
     }
 
     public function testRetotalDerivesEverythingFromTheTotal(): void
     {
         $snapshot = self::untouched();
 
-        $snapshot->retotal(220, self::onStrength(220), self::curve(), new DateTimeImmutable('2026-08-11T12:00:00+00:00'));
+        $snapshot->retotal(220, self::onStrength(220), self::curve(), self::vitality(), new DateTimeImmutable('2026-08-11T12:00:00+00:00'));
 
         self::assertSame(220, $snapshot->totalXp());
         self::assertSame(2, $snapshot->level());
@@ -59,7 +76,7 @@ final class ProgressionSnapshotTest extends TestCase
     {
         $snapshot = self::untouched();
 
-        $snapshot->retotal(121, new AttributeGains(50, 40, 20, 11), self::curve(), self::now());
+        $snapshot->retotal(121, new AttributeGains(50, 40, 20, 11), self::curve(), self::vitality(), self::now());
 
         self::assertEquals(new AttributeGains(50, 40, 20, 11), $snapshot->attributes());
     }
@@ -74,7 +91,7 @@ final class ProgressionSnapshotTest extends TestCase
     {
         $snapshot = self::untouched();
 
-        $snapshot->retotal(121, new AttributeGains(50, 40, 20, 11), self::curve(), self::now());
+        $snapshot->retotal(121, new AttributeGains(50, 40, 20, 11), self::curve(), self::vitality(), self::now());
         self::assertEquals(new AttributeGains(50, 40, 20, 11), $snapshot->attributes());
 
         // `retotal()` reçoit toujours la somme **totale** du ledger, jamais un delta — même
@@ -82,7 +99,7 @@ final class ProgressionSnapshotTest extends TestCase
         // ledger retombe à zéro sur les quatre colonnes, et c'est cette somme-là qu'on lui
         // repasse : `GrantXpHandler` et `RebuildSnapshotsHandler` la relisent au ledger à
         // chaque appel, ils ne la déduisent jamais de l'état précédent.
-        self::assertSame([], $snapshot->retotal(0, new AttributeGains(0, 0, 0, 0), self::curve(), self::now()));
+        self::assertSame([], $snapshot->retotal(0, new AttributeGains(0, 0, 0, 0), self::curve(), self::vitality(), self::now()));
 
         self::assertSame(0, $snapshot->totalXp());
         self::assertEquals(new AttributeGains(0, 0, 0, 0), $snapshot->attributes());
@@ -92,7 +109,7 @@ final class ProgressionSnapshotTest extends TestCase
     {
         $snapshot = self::untouched();
 
-        self::assertSame([2], $snapshot->retotal(150, self::onStrength(150), self::curve(), self::now()));
+        self::assertSame([2], $snapshot->retotal(150, self::onStrength(150), self::curve(), self::vitality(), self::now()));
     }
 
     public function testAnnouncesEveryLevelWhenSeveralAreCrossedAtOnce(): void
@@ -101,27 +118,27 @@ final class ProgressionSnapshotTest extends TestCase
         // un booléen « a monté de niveau » lui ferait en avaler deux en silence.
         $snapshot = self::untouched();
 
-        self::assertSame([2, 3, 4], $snapshot->retotal(600, self::onStrength(600), self::curve(), self::now()));
+        self::assertSame([2, 3, 4], $snapshot->retotal(600, self::onStrength(600), self::curve(), self::vitality(), self::now()));
         self::assertSame(4, $snapshot->earnedSkillPoints());
     }
 
     public function testAnnouncesNothingWhenTheLevelDoesNotMove(): void
     {
         $snapshot = self::untouched();
-        $snapshot->retotal(150, self::onStrength(150), self::curve(), self::now());
+        $snapshot->retotal(150, self::onStrength(150), self::curve(), self::vitality(), self::now());
 
-        self::assertSame([], $snapshot->retotal(180, self::onStrength(180), self::curve(), self::now()));
+        self::assertSame([], $snapshot->retotal(180, self::onStrength(180), self::curve(), self::vitality(), self::now()));
     }
 
     public function testAReversalLowersTheLevelWithoutAnnouncingAnything(): void
     {
         $snapshot = self::untouched();
-        $snapshot->retotal(350, self::onStrength(350), self::curve(), self::now());
+        $snapshot->retotal(350, self::onStrength(350), self::curve(), self::vitality(), self::now());
         self::assertSame(3, $snapshot->level());
 
         // Une annulation ramène le joueur à son niveau réel — mais elle ne « fait pas
         // descendre » un niveau au sens du jeu, il n'y a rien à animer.
-        self::assertSame([], $snapshot->retotal(120, self::onStrength(120), self::curve(), self::now()));
+        self::assertSame([], $snapshot->retotal(120, self::onStrength(120), self::curve(), self::vitality(), self::now()));
 
         self::assertSame(2, $snapshot->level());
         self::assertSame(1, $snapshot->earnedSkillPoints());
@@ -132,9 +149,9 @@ final class ProgressionSnapshotTest extends TestCase
         // Deux fois le même total ne double rien : c'est ce qui fait qu'une reconstruction
         // (#20) peut rejouer autant de fois qu'elle veut.
         $snapshot = self::untouched();
-        $snapshot->retotal(350, self::onStrength(350), self::curve(), self::now());
+        $snapshot->retotal(350, self::onStrength(350), self::curve(), self::vitality(), self::now());
 
-        self::assertSame([], $snapshot->retotal(350, self::onStrength(350), self::curve(), self::now()));
+        self::assertSame([], $snapshot->retotal(350, self::onStrength(350), self::curve(), self::vitality(), self::now()));
         self::assertSame(3, $snapshot->level());
         self::assertSame(2, $snapshot->earnedSkillPoints());
     }
@@ -142,7 +159,7 @@ final class ProgressionSnapshotTest extends TestCase
     public function testTheTopOfTheCurveHasNoNextLevel(): void
     {
         $snapshot = self::untouched();
-        $snapshot->retotal(5_000, self::onStrength(5_000), self::curve(), self::now());
+        $snapshot->retotal(5_000, self::onStrength(5_000), self::curve(), self::vitality(), self::now());
 
         self::assertSame(4, $snapshot->level());
         self::assertNull($snapshot->xpToNextLevel());
@@ -154,7 +171,7 @@ final class ProgressionSnapshotTest extends TestCase
 
     private static function untouched(): ProgressionSnapshot
     {
-        return ProgressionSnapshot::untouched(Uuid::v7(), self::curve(), self::now());
+        return ProgressionSnapshot::untouched(Uuid::v7(), self::curve(), self::vitality(), self::now());
     }
 
     /** Tout sur `strength`, pour les tests qui portent sur le niveau et non la répartition. */
@@ -166,6 +183,12 @@ final class ProgressionSnapshotTest extends TestCase
     private static function curve(): LevelCurve
     {
         return new LevelCurve(LevelCurveTest::fixture());
+    }
+
+    /** Un plancher arbitraire mais documenté, indépendant de celui livré — la table de cas complète vit dans `VitalityTest`. */
+    private static function vitality(): Vitality
+    {
+        return new Vitality(250);
     }
 
     private static function now(): DateTimeImmutable

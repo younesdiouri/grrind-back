@@ -8,6 +8,7 @@ use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\ProgressionSnapshot;
 use App\Progression\Domain\SnapshotDivergence;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\Vitality;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
@@ -74,11 +75,30 @@ final class SnapshotDivergenceTest extends TestCase
 
         self::assertNotNull($divergence);
         self::assertSame(
-            ['totalXp', 'level', 'xpIntoLevel', 'earnedSkillPoints', 'strength', 'endurance', 'mobility', 'dexterity'],
+            ['totalXp', 'level', 'xpIntoLevel', 'earnedSkillPoints', 'strength', 'endurance', 'mobility', 'dexterity', 'vitality'],
             array_keys($divergence->fields),
         );
         self::assertSame(['stored' => null, 'expected' => 400], $divergence->fields['totalXp']);
         self::assertSame(['stored' => null, 'expected' => 400], $divergence->fields['strength']);
+        // Tout sur Strength : le coefficient d'équilibre s'effondre, seul le plancher paie.
+        self::assertSame(['stored' => null, 'expected' => 100], $divergence->fields['vitality']);
+    }
+
+    /**
+     * Le même bug qu'à {@see testCatchesAnAttributeThatDriftedWhileEverythingElseStayedRight()},
+     * une caractéristique plus bas : Vitality (#161) est dérivée, pas recopiée du ledger — une
+     * comparaison qui l'oublierait laisserait un joueur lire une valeur que rien ne recoupe.
+     */
+    public function testCatchesAVitalityThatDriftedWhileEverythingElseStayedRight(): void
+    {
+        $snapshot = self::snapshotAt(400, new AttributeGains(100, 100, 100, 100));
+        self::corrupt($snapshot, 'vitality', 999);
+
+        $divergence = self::compare($snapshot, 400, new AttributeGains(100, 100, 100, 100));
+
+        self::assertNotNull($divergence);
+        self::assertSame(['vitality'], array_keys($divergence->fields));
+        self::assertSame(['stored' => 999, 'expected' => 400], $divergence->fields['vitality']);
     }
 
     public function testAMissingLineFacingAnEmptyLedgerIsTheNormalStateOfANewAccount(): void
@@ -97,13 +117,13 @@ final class SnapshotDivergenceTest extends TestCase
 
     private static function compare(?ProgressionSnapshot $stored, int $ledgerTotal, AttributeGains $ledgerAttributes): ?SnapshotDivergence
     {
-        return SnapshotDivergence::between(Uuid::v7(), $stored, $ledgerTotal, $ledgerAttributes, self::curve());
+        return SnapshotDivergence::between(Uuid::v7(), $stored, $ledgerTotal, $ledgerAttributes, self::curve(), self::vitality());
     }
 
     private static function snapshotAt(int $totalXp, AttributeGains $attributes): ProgressionSnapshot
     {
-        $snapshot = ProgressionSnapshot::untouched(Uuid::v7(), self::curve(), new DateTimeImmutable());
-        $snapshot->retotal($totalXp, $attributes, self::curve(), new DateTimeImmutable());
+        $snapshot = ProgressionSnapshot::untouched(Uuid::v7(), self::curve(), self::vitality(), new DateTimeImmutable());
+        $snapshot->retotal($totalXp, $attributes, self::curve(), self::vitality(), new DateTimeImmutable());
 
         return $snapshot;
     }
@@ -132,5 +152,11 @@ final class SnapshotDivergenceTest extends TestCase
             ['level' => 2, 'total_xp' => 100, 'skill_points' => 1],
             ['level' => 3, 'total_xp' => 300, 'skill_points' => 1],
         ]);
+    }
+
+    /** Un plancher arbitraire mais documenté, indépendant de celui livré — voir `VitalityTest` pour la table complète. */
+    private static function vitality(): Vitality
+    {
+        return new Vitality(250);
     }
 }
