@@ -42,3 +42,37 @@ splits:
     - { discipline: HIIT, strength: 20, endurance: 25, mobility: 25, dexterity: 30 }
     - { discipline: MOBILITY, strength: 5, endurance: 10, mobility: 70, dexterity: 15 }
     - { discipline: CLIMBING, strength: 40, endurance: 20, mobility: 20, dexterity: 20 }
+
+# Vitality (#161), la cinquième caractéristique du game design : entièrement dérivée des
+# quatre ci-dessus, jamais créditée directement — voir le docblock d'`App\Shared\Domain\
+# Activity\Vitality`. Le même sujet que la table plus haut — les caractéristiques du
+# personnage — d'où le même fichier plutôt qu'un huitième pour deux nombres.
+#
+# ————— Le coefficient d'équilibre —————————————————————————————————————————————————————
+#
+# Maximal quand les quatre totaux sont égaux, minimal dès qu'un seul porte tout :
+#
+#     coefficient = (S × E × M × D)^(1/4) / ((S + E + M + D) / 4)
+#
+# le rapport de la moyenne géométrique à la moyenne arithmétique des quatre totaux. Tranché
+# en revue contre un `min/max`, écarté pour être trop brutal — une seule caractéristique à
+# zéro l'aurait écrasée même avec les trois autres parfaitement équilibrées. La formule
+# elle-même n'a pas de paramètre libre ; ce fichier ne porte donc que ce que l'équilibrage
+# a réellement à trancher : le plancher ci-dessous.
+#
+# ————— Le plancher ——————————————————————————————————————————————————————————————————————
+#
+# Une part du total, pas une valeur absolue :
+#
+#     vitality = max(total × coefficient, total × floor_permille / 1000)
+#
+# Un plancher absolu figerait un joueur monospécialisé à 100 000 XP au même niveau qu'un
+# débutant. `floor_permille` dit la bonne chose : celui qui ne fait qu'un sport progresse
+# quand même, mille millièmes divisé par ce nombre fois plus lentement que celui qui varie.
+# **Non négociable à zéro** : un débutant qui n'a pratiqué qu'un sport doit avoir une
+# Vitality basse, jamais nulle — ce sera les HP du personnage au PvP, et zéro HP à
+# l'inscription serait une punition pour avoir commencé. `total = 0` fait exception :
+# c'est l'état d'un compte qui vient de s'inscrire, pas celui d'une pratique déséquilibrée,
+# et le plancher ne s'y applique pas — voir `Vitality::of()`.
+vitality:
+    floor_permille: 250

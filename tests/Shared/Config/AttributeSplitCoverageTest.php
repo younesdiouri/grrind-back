@@ -15,10 +15,23 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  *
  * `AttributeSplitTest` prouve que l'objet tient ses règles sur des données écrites pour
  * lui ; celui-ci prouve que **la table qu'on livre** couvre bien les neuf disciplines et
- * que les trois écarts assumés en revue (#158) sont ceux qui sont réellement livrés.
+ * que les trois écarts assumés en revue (#158) sont ceux qui sont réellement livrés. Le
+ * plancher de Vitality (#161), livré dans le même fichier, s'y vérifie aussi : la table de
+ * cas complète, elle, vit dans `VitalityTest`.
  */
 final class AttributeSplitCoverageTest extends KernelTestCase
 {
+    public function testTheShippedVitalityFloorIsTheOneDecidedInReview(): void
+    {
+        self::bootKernel();
+
+        $floorPermille = self::getContainer()->getParameter('game.attributes.vitality.floor_permille');
+
+        // Un quart du taux plein — tranché en revue, voir le docblock de `Vitality` : ni un
+        // socle absolu, ni zéro.
+        self::assertSame(250, $floorPermille);
+    }
+
     /**
      * Les trois écarts confirmés en revue, écrits en toutes lettres dans `attributes.yaml`.
      *

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Infrastructure\Config;
 
 use App\Shared\Domain\Activity\AttributeSplit;
+use App\Shared\Domain\Activity\Vitality;
 use App\Shared\Infrastructure\Config\GameBalanceSection;
 use InvalidArgumentException;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
@@ -12,20 +13,22 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
 /**
  * Le schéma de `config/game/v1/attributes.yaml` — la table de répartition de l'XP entre
- * les quatre caractéristiques.
+ * les quatre caractéristiques, et le plancher de Vitality (#161), leur dérivée.
  *
  * Il vit dans `Progression`, comme `XpSection` : c'est le module qui calcule l'XP qui
- * répartit ce qu'il calcule, même si `AttributeSplit` et les valeurs d'`Attribute` qu'elle
- * consomme appartiennent à `Shared` — même geste qu'`ActivityTypesSection` dans `Training`
- * pour `ActivityTypeMap`.
+ * répartit ce qu'il calcule, même si `AttributeSplit`, `Vitality` et les valeurs
+ * d'`Attribute` qu'elles consomment appartiennent à `Shared` — même geste
+ * qu'`ActivityTypesSection` dans `Training` pour `ActivityTypeMap`.
  *
- * Une **liste** et non une table indexée par discipline, pour la même raison qu'à
- * `XpSection` : le chargeur ne descend pas dans les listes, donc `game.attributes.splits`
- * reste un paramètre unique qu'`AttributeSplit` consomme d'un bloc.
+ * `splits` est une **liste** et non une table indexée par discipline, pour la même raison
+ * qu'à `XpSection` : le chargeur ne descend pas dans les listes, donc `game.attributes.splits`
+ * reste un paramètre unique qu'`AttributeSplit` consomme d'un bloc. `vitality`, lui, n'a
+ * qu'un seul réglage : le coefficient d'équilibre n'a pas de paramètre libre, tranché en
+ * revue — voir le docblock de `Vitality` — seul le plancher se patche.
  *
  * La couverture des disciplines, l'absence de doublon et la somme à 100 par ligne sont
- * dites par `AttributeSplit` : une règle de cohérence entre plusieurs clés ne s'écrit pas
- * deux fois.
+ * dites par `AttributeSplit` ; les bornes du plancher par `Vitality` : une règle de
+ * cohérence entre plusieurs clés ne s'écrit pas deux fois.
  */
 final class AttributeSplitSection implements GameBalanceSection
 {
@@ -53,12 +56,21 @@ final class AttributeSplitSection implements GameBalanceSection
                         ->end()
                     ->end()
                 ->end()
+                ->arrayNode('vitality')
+                    ->isRequired()
+                    ->children()
+                        // En millièmes : `Vitality::of()` ne laisse jamais un flottant en
+                        // sortir, et ce réglage ne fait pas exception dès l'entrée.
+                        ->integerNode('floor_permille')->isRequired()->min(0)->max(1000)->end()
+                    ->end()
+                ->end()
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
-                    /** @var array{splits: list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}>} $values */
+                    /** @var array{splits: list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}>, vitality: array{floor_permille: int}} $values */
                     try {
                         new AttributeSplit($values['splits']);
+                        new Vitality($values['vitality']['floor_permille']);
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);
                     }
