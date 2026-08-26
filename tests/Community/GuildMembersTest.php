@@ -73,7 +73,8 @@ final class GuildMembersTest extends ApiTestCase
 
     /**
      * Un joueur qui vient de s'inscrire n'a pas de ligne de progression — c'est le premier
-     * crédit qui la pose. Il doit s'afficher quand même, à l'état neutre.
+     * crédit qui la pose. Il doit s'afficher quand même, à l'état neutre, cinq zéros compris
+     * (#176) — et surtout sans faire disparaître la liste entière à cause de lui.
      */
     public function testAMemberWithoutProgressionShowsANeutralState(): void
     {
@@ -85,6 +86,10 @@ final class GuildMembersTest extends ApiTestCase
         self::assertSame(1, $member['level']);
         self::assertSame(0, $member['xpIntoLevel']);
         self::assertNull($member['title']);
+        self::assertSame(
+            ['strength' => 0, 'endurance' => 0, 'mobility' => 0, 'dexterity' => 0, 'vitality' => 0],
+            $member['attributes'],
+        );
     }
 
     /** Ce que la liste ne dit pas : rien du compte, seulement du profil public. */

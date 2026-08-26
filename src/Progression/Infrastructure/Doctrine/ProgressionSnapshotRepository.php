@@ -6,7 +6,10 @@ namespace App\Progression\Infrastructure\Doctrine;
 
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\LevelStanding;
+use App\Progression\Domain\PlayerCharacteristics;
+use App\Progression\Domain\PlayerStanding;
 use App\Progression\Domain\ProgressionSnapshot;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Vitality;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
@@ -32,12 +35,23 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
     }
 
     /**
-     * Les paliers de plusieurs joueurs, **en une requête**, indexés par UUID en RFC 4122.
+     * Le palier et les cinq caractéristiques de plusieurs joueurs, **en une seule requête**,
+     * indexés par UUID en RFC 4122.
+     *
+     * **Une seule lecture, et c'est le point.** Palier et caractéristiques viennent de la
+     * même ligne de `progression_snapshot` ; les séparer en deux requêtes ouvrirait une
+     * fenêtre où une complétion concurrente s'intercale entre les deux et fait cohabiter,
+     * dans la même réponse, un palier d'avant avec des caractéristiques d'après — voir le
+     * docblock de {@see PlayerStanding} pour pourquoi ce risque n'existe pas sur l'entité,
+     * qui sépare ces mêmes données pour la raison inverse.
      *
      * Les colonnes sont reprises telles quelles et non reprojetées depuis le total, pour la
      * même raison qu'à {@see \App\Progression\Application\ProgressionStateProvider} :
      * reprojeter masquerait la divergence que la commande de reconstruction (#20) existe
-     * pour détecter.
+     * pour détecter. Vitality en particulier est **relue telle quelle**, jamais recalculée
+     * ici : la colonne porte déjà la projection écrite par {@see ProgressionSnapshot::project()},
+     * et la refaire à ce niveau dupliquerait une règle de jeu dans une couche qui n'a pas à
+     * la connaître.
      *
      * Un joueur sans ligne est **absent** de la table de retour : il n'a rien fait, et
      * lire son état n'a pas à lui en créer une. C'est l'appelant qui décide de l'état
@@ -49,17 +63,17 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
      *
      * @param list<Uuid> $userIds
      *
-     * @return array<string, LevelStanding>
+     * @return array<string, PlayerStanding>
      */
-    public function standingsOf(array $userIds): array
+    public function progressionsOf(array $userIds): array
     {
         if ([] === $userIds) {
             return [];
         }
 
-        /** @var list<array{userId: Uuid, level: int, xpIntoLevel: int, xpToNextLevel: int|null, earnedSkillPoints: int}> $rows */
+        /** @var list<array{userId: Uuid, level: int, xpIntoLevel: int, xpToNextLevel: int|null, earnedSkillPoints: int, strength: int, endurance: int, mobility: int, dexterity: int, vitality: int}> $rows */
         $rows = $this->createQueryBuilder('s')
-            ->select('s.userId', 's.level', 's.xpIntoLevel', 's.xpToNextLevel', 's.earnedSkillPoints')
+            ->select('s.userId', 's.level', 's.xpIntoLevel', 's.xpToNextLevel', 's.earnedSkillPoints', 's.strength', 's.endurance', 's.mobility', 's.dexterity', 's.vitality')
             ->where('s.userId IN (:ids)')
             ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $userIds))
             ->getQuery()
@@ -68,11 +82,17 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
         $standings = [];
 
         foreach ($rows as $row) {
-            $standings[$row['userId']->toRfc4122()] = new LevelStanding(
-                $row['level'],
-                $row['xpIntoLevel'],
-                $row['xpToNextLevel'],
-                $row['earnedSkillPoints'],
+            $standings[$row['userId']->toRfc4122()] = new PlayerStanding(
+                new LevelStanding(
+                    $row['level'],
+                    $row['xpIntoLevel'],
+                    $row['xpToNextLevel'],
+                    $row['earnedSkillPoints'],
+                ),
+                new PlayerCharacteristics(
+                    new AttributeGains($row['strength'], $row['endurance'], $row['mobility'], $row['dexterity']),
+                    $row['vitality'],
+                ),
             );
         }
 

@@ -899,7 +899,7 @@ components:
           minLength: 8
       type: object
     Player:
-      description: "Un joueur **tel que les autres joueurs le voient** — la seule forme sous\nlaquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par\n`GET /api/players/{id}`, et étalée dans chaque membre d'une guilde.\n\n**Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni\nrôle applicatif. Ce sont des données de compte, pas de profil public — et les\nports qui alimentent cette ressource ne les rendent tout simplement pas.\n"
+      description: "Un joueur **tel que les autres joueurs le voient** — la seule forme sous\nlaquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par\n`GET /api/players/{id}`, et étalée dans chaque membre d'une guilde.\n\n**Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni\nrôle applicatif. Ce sont des données de compte, pas de profil public — et les\nports qui alimentent cette ressource ne les rendent tout simplement pas.\n\n**Les cinq caractéristiques (#176) y figurent par décision de produit** : la\nrépartition d'une pratique a été tranchée sociale, c'est une des raisons\nd'avoir des guildes. Ce que la phrase ci-dessus exclut ne bouge pas pour\nautant — un champ de compte n'entre pas ici parce qu'un champ de jeu vient d'y\nentrer.\n"
       required:
         - id
         - displayName
@@ -908,6 +908,7 @@ components:
         - xpIntoLevel
         - xpToNextLevel
         - title
+        - attributes
       properties:
         id:
           type: string
@@ -934,6 +935,32 @@ components:
           allOf:
             -
               $ref: '#/components/schemas/PlayerTitle'
+        attributes:
+          description: "Les cinq caractéristiques de ce joueur, à l'instant présent — même\nvocabulaire et même forme qu'à `GET /api/progression`\n(`Progression.attributes`) : un état, jamais un passage, donc ni\n`gained` ni avant/après.\n"
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+            - vitality
+          properties:
+            strength:
+              type: integer
+              example: 5108
+            endurance:
+              type: integer
+              example: 3200
+            mobility:
+              type: integer
+              example: 900
+            dexterity:
+              type: integer
+              example: 1500
+            vitality:
+              description: 'Dérivée des quatre autres, jamais créditée directement — voir `Progression.attributes.vitality`.'
+              type: integer
+              example: 310
+          type: object
       type: object
     GuildMember:
       description: "Un membre : le joueur public, plus ce que la guilde sait de lui. Les champs de\n`Player` sont **étalés** et non imbriqués — le client dessine une ligne, pas\ndeux objets, et `GET /api/players/{id}` sert exactement le même bloc.\n"
