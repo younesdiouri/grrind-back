@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Community;
 
+use App\Progression\Application\GrantXp;
+use App\Progression\Application\GrantXpHandler;
+use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
@@ -58,6 +62,34 @@ final class PlayerProfileTest extends ApiTestCase
         $seenByMember = $this->get('/api/players/'.$founder->id->toRfc4122(), $member->headers);
         self::assertSame(Response::HTTP_OK, $seenByMember->getStatusCode());
         self::assertSame('Bob', self::decode($seenByMember)['displayName']);
+    }
+
+    /**
+     * La répartition d'une pratique est une donnée sociale (#176) : ce que le ledger d'un
+     * co-équipier a accumulé doit se lire sur son profil public, pas seulement sur le sien.
+     */
+    public function testATeammatesCharacteristicsAreVisible(): void
+    {
+        [$founder, $member] = $this->guildOfTwo();
+
+        $grantXp = self::getContainer()->get(GrantXpHandler::class);
+        self::assertInstanceOf(GrantXpHandler::class, $grantXp);
+
+        $granted = ($grantXp)(new GrantXp($member->id, Uuid::v7(), Discipline::Running, 1800, new DateTimeImmutable()));
+        $attributes = $granted->snapshot->attributes();
+
+        $body = self::decode($this->get('/api/players/'.$member->id->toRfc4122(), $founder->headers));
+
+        self::assertSame(
+            [
+                'strength' => $attributes->strength,
+                'endurance' => $attributes->endurance,
+                'mobility' => $attributes->mobility,
+                'dexterity' => $attributes->dexterity,
+                'vitality' => $granted->snapshot->vitality(),
+            ],
+            $body['attributes'],
+        );
     }
 
     public function testAStrangerIsNotVisible(): void

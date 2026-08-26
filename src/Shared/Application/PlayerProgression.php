@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Shared\Application;
 
+use App\Shared\Domain\Activity\AttributeGains;
+
 /**
- * Où en est un joueur, tel qu'un autre module l'affiche : un niveau, une barre, un titre.
+ * Où en est un joueur, tel qu'un autre module l'affiche : un niveau, une barre, un titre —
+ * et, depuis #176, les cinq caractéristiques.
  *
  * Le titre est un {@see PlayerTitle}, **la forme unique qu'a déjà toute l'API**. Servir un
  * titre allégé ici donnerait au client un second type à décoder et un second composant à
@@ -14,6 +17,18 @@ namespace App\Shared\Application;
  * Le *prochain* titre n'y est pas : il n'a de sens que sur son propre profil, et c'est
  * pour ça que {@see PlayerTitles} reste un port distinct plutôt qu'une extension de
  * celui-ci. Deux besoins différents, deux contrats.
+ *
+ * **`attributes` et `vitality` y entrent par décision de produit, pas parce qu'ils ont fui
+ * (#176).** La répartition d'une pratique a été tranchée sociale — c'est une des raisons
+ * d'avoir des guildes — et ce port est la seule façon dont `Community` peut la voir, donc
+ * l'élargir ici est le geste qui la rend visible partout où ce port est déjà consommé :
+ * `GET /api/players/{id}` et la liste des membres, sans code en plus.
+ *
+ * **Ce que ce port n'a toujours pas le droit de porter ne change pas d'un mot** : ni
+ * adresse, ni fuseau, ni rôle applicatif, ni rien qui identifie un compte plutôt qu'un
+ * profil de jeu. Le prochain champ qui tenterait d'y entrer doit répondre à la même
+ * question que celui-ci — « est-ce une donnée de jeu qu'on a décidé de partager » — et pas
+ * se contenter d'être disponible.
  */
 final readonly class PlayerProgression
 {
@@ -25,11 +40,16 @@ final readonly class PlayerProgression
         public ?int $xpToNextLevel,
         /** `null` si le joueur n'en porte aucun — un cas normal, pas une anomalie. */
         public ?PlayerTitle $title,
+        /** Les quatre caractéristiques, à l'instant présent — un état, jamais un passage. */
+        public AttributeGains $attributes,
+        /** La cinquième, dérivée des quatre autres — voir {@see AttributeGains}. */
+        public int $vitality,
     ) {
     }
 
     /**
-     * Le joueur qui n'a encore rien fait : niveau 1, barre à zéro, aucun titre.
+     * Le joueur qui n'a encore rien fait : niveau 1, barre à zéro, aucun titre, zéro sur les
+     * cinq caractéristiques.
      *
      * **Il existe pour qu'aucun profil incomplet ne fasse rater un écran.** Un compte
      * inscrit il y a une minute n'a pas de ligne de progression — c'est le premier crédit
@@ -41,6 +61,6 @@ final readonly class PlayerProgression
      */
     public static function untouched(): self
     {
-        return new self(1, 0, null, null);
+        return new self(1, 0, null, null, new AttributeGains(0, 0, 0, 0), 0);
     }
 }

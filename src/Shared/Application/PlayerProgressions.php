@@ -7,8 +7,8 @@ namespace App\Shared\Application;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le niveau et le titre porté de plusieurs joueurs, pour les modules qui les affichent sans
- * posséder le ledger.
+ * Le niveau, le titre porté et les cinq caractéristiques de plusieurs joueurs, pour les
+ * modules qui les affichent sans posséder le ledger.
  *
  * Le pendant exact de {@see PlayerProfiles}, dans l'autre module et pour la même raison :
  * `Progression` possède la courbe, les snapshots et les titres ; `Community` dessine une

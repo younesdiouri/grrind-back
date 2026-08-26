@@ -343,7 +343,7 @@ when@dev:
 
                     Player:
                         type: object
-                        required: [id, displayName, registeredAt, level, xpIntoLevel, xpToNextLevel, title]
+                        required: [id, displayName, registeredAt, level, xpIntoLevel, xpToNextLevel, title, attributes]
                         description: |
                             Un joueur **tel que les autres joueurs le voient** — la seule forme sous
                             laquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par
@@ -352,6 +352,12 @@ when@dev:
                             **Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni
                             rôle applicatif. Ce sont des données de compte, pas de profil public — et les
                             ports qui alimentent cette ressource ne les rendent tout simplement pas.
+
+                            **Les cinq caractéristiques (#176) y figurent par décision de produit** : la
+                            répartition d'une pratique a été tranchée sociale, c'est une des raisons
+                            d'avoir des guildes. Ce que la phrase ci-dessus exclut ne bouge pas pour
+                            autant — un champ de compte n'entre pas ici parce qu'un champ de jeu vient d'y
+                            entrer.
                         properties:
                             id: { type: string, format: uuid }
                             displayName:
@@ -375,6 +381,23 @@ when@dev:
                                     *prochain* titre visé n'y est pas : il n'a de sens que sur son propre
                                     profil, et personne n'a à savoir ce qu'un co-équipier est en train de
                                     viser. C'est `GET /api/me` qui le sert.
+                            attributes:
+                                type: object
+                                description: |
+                                    Les cinq caractéristiques de ce joueur, à l'instant présent — même
+                                    vocabulaire et même forme qu'à `GET /api/progression`
+                                    (`Progression.attributes`) : un état, jamais un passage, donc ni
+                                    `gained` ni avant/après.
+                                required: [strength, endurance, mobility, dexterity, vitality]
+                                properties:
+                                    strength: { type: integer, example: 5108 }
+                                    endurance: { type: integer, example: 3200 }
+                                    mobility: { type: integer, example: 900 }
+                                    dexterity: { type: integer, example: 1500 }
+                                    vitality:
+                                        type: integer
+                                        example: 310
+                                        description: "Dérivée des quatre autres, jamais créditée directement — voir `Progression.attributes.vitality`."
 
                     GuildMember:
                         description: |

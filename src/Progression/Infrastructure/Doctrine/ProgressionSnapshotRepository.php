@@ -6,7 +6,9 @@ namespace App\Progression\Infrastructure\Doctrine;
 
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\LevelStanding;
+use App\Progression\Domain\PlayerCharacteristics;
 use App\Progression\Domain\ProgressionSnapshot;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Vitality;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
@@ -77,6 +79,52 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
         }
 
         return $standings;
+    }
+
+    /**
+     * Les cinq caractéristiques de plusieurs joueurs, **en une requête**, indexées par UUID
+     * en RFC 4122 — le pendant batch d'{@see ProgressionSnapshot::attributes()} et
+     * {@see ProgressionSnapshot::vitality()}, une requête distincte de {@see standingsOf()}
+     * pour la même raison que ces deux méthodes sont séparées sur l'entité : deux lectures
+     * du même snapshot, deux questions différentes. Le coût est constant comme celui de
+     * `standingsOf()` — une requête de plus par appel de {@see \App\Progression\Infrastructure\Translation\TranslatedPlayerProgressions::of()},
+     * jamais une par joueur.
+     *
+     * Vitality est **relue telle quelle**, jamais recalculée ici : la colonne porte déjà la
+     * projection écrite par {@see ProgressionSnapshot::project()}, et la refaire à ce niveau
+     * dupliquerait une règle de jeu dans une couche qui n'a pas à la connaître.
+     *
+     * Un joueur sans ligne est **absent** de la table de retour, comme à `standingsOf()` :
+     * c'est l'appelant qui décide de l'état neutre, voir {@see PlayerCharacteristics::untouched()}.
+     *
+     * @param list<Uuid> $userIds
+     *
+     * @return array<string, PlayerCharacteristics>
+     */
+    public function characteristicsOf(array $userIds): array
+    {
+        if ([] === $userIds) {
+            return [];
+        }
+
+        /** @var list<array{userId: Uuid, strength: int, endurance: int, mobility: int, dexterity: int, vitality: int}> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->select('s.userId', 's.strength', 's.endurance', 's.mobility', 's.dexterity', 's.vitality')
+            ->where('s.userId IN (:ids)')
+            ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $userIds))
+            ->getQuery()
+            ->getResult();
+
+        $characteristics = [];
+
+        foreach ($rows as $row) {
+            $characteristics[$row['userId']->toRfc4122()] = new PlayerCharacteristics(
+                new AttributeGains($row['strength'], $row['endurance'], $row['mobility'], $row['dexterity']),
+                $row['vitality'],
+            );
+        }
+
+        return $characteristics;
     }
 
     /**

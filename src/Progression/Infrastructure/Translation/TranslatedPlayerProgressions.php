@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Infrastructure\Translation;
 
 use App\Progression\Domain\LevelCurve;
+use App\Progression\Domain\PlayerCharacteristics;
 use App\Progression\Domain\TitleCatalog;
 use App\Progression\Domain\TitleProgress;
 use App\Progression\Infrastructure\Doctrine\ActiveTitleRepository;
@@ -25,10 +26,12 @@ use Symfony\Component\Uid\Uuid;
  * déjà situé**, pour que `Community` n'ait ni catalogue à consulter ni condition à
  * interpréter.
  *
- * **Trois requêtes, quel que soit le nombre de joueurs.** C'est la propriété que le port
- * existe pour garantir, et elle est vérifiée par un test qui compte les requêtes d'une
- * guilde de deux membres puis d'une guilde de dix. Sans lui, la première refonte qui
- * transformerait une de ces lectures en boucle passerait la revue sans un mot.
+ * **Un nombre constant de requêtes, quel que soit le nombre de joueurs** — quatre depuis
+ * #176, qui ajoute la lecture batchée des cinq caractéristiques à côté des trois d'origine.
+ * C'est la propriété que le port existe pour garantir, et elle est vérifiée par un test qui
+ * compte les requêtes d'une guilde de deux membres puis d'une guilde de dix. Sans lui, la
+ * première refonte qui transformerait une de ces lectures en boucle passerait la revue sans
+ * un mot.
  */
 final readonly class TranslatedPlayerProgressions implements PlayerProgressions
 {
@@ -54,6 +57,7 @@ final readonly class TranslatedPlayerProgressions implements PlayerProgressions
         }
 
         $standings = $this->snapshots->standingsOf($playerIds);
+        $characteristics = $this->snapshots->characteristicsOf($playerIds);
         $worn = $this->activeTitles->titleIdsOf($playerIds);
         $unlockedAt = $this->unlockedTitles->unlockedAtOf($playerIds, array_values(array_unique($worn)));
 
@@ -70,11 +74,18 @@ final readonly class TranslatedPlayerProgressions implements PlayerProgressions
             // main et qu'un niveau de départ est de l'équilibrage comme le reste.
             $standing ??= $this->curve->standingAt(0);
 
+            // Même repli pour les cinq caractéristiques, cette fois par la constante :
+            // contrairement au niveau, zéro partout n'a rien d'un choix d'équilibrage, c'est
+            // simplement l'absence de tout ledger.
+            $playerCharacteristics = $characteristics[$key] ?? PlayerCharacteristics::untouched();
+
             $progressions[$key] = new PlayerProgression(
                 $standing->level,
                 $standing->xpIntoLevel,
                 $standing->xpToNextLevel,
                 $this->wornTitleOf($playerId, $worn[$key] ?? null, $unlockedAt),
+                $playerCharacteristics->attributes,
+                $playerCharacteristics->vitality,
             );
         }
 
