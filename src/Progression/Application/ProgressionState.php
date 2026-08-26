@@ -22,16 +22,19 @@ use DateTimeImmutable;
  * montre que l'acquis, et c'est précisément ce qui permet de se passer du ledger.
  *
  * `attributes` porte les quatre caractéristiques (#160), lues du snapshot comme le reste.
- * **`/api/progression` ne les rend toujours pas** : le #162 les a servies par le
- * `RewardSummary`, où l'avant/après anime les cinq jauges — ce n'est pas cette route, qui
- * ne rend qu'un instant, qui en avait besoin. L'état du joueur les porte déjà pour autant,
- * pour la même raison que la courbe : c'est ici qu'on assemble, pas dans la réponse HTTP.
+ * `vitality` s'y ajoute (#163) — **lue du snapshot elle aussi**, jamais recalculée ici :
+ * `ProgressionSnapshot::project()` l'a déjà dérivée des quatre autres, une seconde version
+ * du calcul divergerait au premier changement de coefficient. `/api/progression` les rend
+ * désormais toutes les cinq (#163) ; le #162 les avait servies en premier par le
+ * `RewardSummary`, où l'avant/après anime les cinq jauges — cette route-ci ne rend qu'un
+ * instant, donc l'état courant seul, sans `gained` ni avant/après.
  */
 final readonly class ProgressionState
 {
     /**
      * @param LevelStanding                    $standing          projeté par la courbe, relu tel quel du snapshot
      * @param AttributeGains                   $attributes        les quatre caractéristiques, relues telles quelles du snapshot
+     * @param int                              $vitality          la cinquième, relue elle aussi du snapshot — jamais rederivée ici
      * @param list<TitleProgress>              $unlockedTitles    les seuls acquis, dans l'ordre du catalogue
      * @param array<string, DateTimeImmutable> $unlockedAt        identifiant de titre → date de déblocage
      * @param string|null                      $activeTitleId     le titre affiché, s'il y en a un
@@ -41,6 +44,7 @@ final readonly class ProgressionState
         public int $totalXp,
         public LevelStanding $standing,
         public AttributeGains $attributes,
+        public int $vitality,
         public int $availableSkillPoints,
         public array $unlockedTitles,
         public array $unlockedAt,

@@ -1505,6 +1505,7 @@ components:
         - xpIntoLevel
         - xpToNextLevel
         - skillPoints
+        - attributes
         - activeTitle
         - unlockedTitles
         - rulesetVersion
@@ -1530,6 +1531,32 @@ components:
               type: integer
             available:
               type: integer
+          type: object
+        attributes:
+          description: "Les cinq caractéristiques du personnage, à l'instant présent — même\nvocabulaire que dans `RewardSummary.attributes`, mais sous une forme\ndifférente : pas de `gained` ni d'avant/après ici, cette route ne rend\nqu'un instant. C'est cet état qui doit rester affiché après une\nsynchronisation, pas seulement le temps de l'animation.\n"
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+            - vitality
+          properties:
+            strength:
+              type: integer
+              example: 5108
+            endurance:
+              type: integer
+              example: 3200
+            mobility:
+              type: integer
+              example: 900
+            dexterity:
+              type: integer
+              example: 1500
+            vitality:
+              description: 'Dérivée des quatre autres, jamais créditée directement — voir `RewardSummary.attributes.vitality`.'
+              type: integer
+              example: 310
           type: object
         activeTitle:
           nullable: true
@@ -1573,6 +1600,7 @@ components:
         - amount
         - durationSeconds
         - breakdown
+        - attributes
         - rulesetVersion
         - occurredAt
       properties:
@@ -1610,6 +1638,27 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/XpLine'
+        attributes:
+          description: "La répartition de `amount` sur les quatre caractéristiques (#159) — ce qui\nrépond à « pourquoi ma Mobility stagne » sans avoir à recouper l'historique\nà la main. Signée comme `amount` : une annulation y montre des valeurs\nnégatives, la même contrepartie exacte qui explique la baisse.\n\n**Pas de `vitality` ici**, à la différence du vocabulaire de `RewardSummary` :\nelle ne reçoit jamais d'écriture, aucune transaction ne lui est adressée.\nSon état courant se lit sur `GET /api/progression`.\n"
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+          properties:
+            strength:
+              type: integer
+              example: 108
+            endurance:
+              type: integer
+              example: 0
+            mobility:
+              type: integer
+              example: 0
+            dexterity:
+              type: integer
+              example: 0
+          type: object
         rulesetVersion:
           description: "Celui du calcul, pas celui d'aujourd'hui. C'est ce qui permet de rééquilibrer sans corrompre l'historique."
           type: string

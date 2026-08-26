@@ -47,6 +47,10 @@ final class ProgressionStateTest extends ApiTestCase
         self::assertSame(0, $state['xpIntoLevel']);
         self::assertIsInt($state['xpToNextLevel']);
         self::assertSame(['earned' => 0, 'available' => 0], $state['skillPoints']);
+        self::assertSame(
+            ['strength' => 0, 'endurance' => 0, 'mobility' => 0, 'dexterity' => 0, 'vitality' => 0],
+            $state['attributes'],
+        );
         self::assertNull($state['activeTitle']);
         self::assertSame([], $state['unlockedTitles']);
         self::assertNull($state['lastProgressionAt']);
@@ -83,6 +87,19 @@ final class ProgressionStateTest extends ApiTestCase
         self::assertSame(
             ['earned' => $granted->snapshot->earnedSkillPoints(), 'available' => $granted->snapshot->earnedSkillPoints()],
             $state['skillPoints'],
+        );
+        // Les cinq caractéristiques (#163), lues du même snapshot que le reste de l'état —
+        // même vocabulaire que le `RewardSummary` (#162), sans `gained` ni avant/après.
+        $attributes = $granted->snapshot->attributes();
+        self::assertSame(
+            [
+                'strength' => $attributes->strength,
+                'endurance' => $attributes->endurance,
+                'mobility' => $attributes->mobility,
+                'dexterity' => $attributes->dexterity,
+                'vitality' => $granted->snapshot->vitality(),
+            ],
+            $state['attributes'],
         );
         self::assertIsString($state['lastProgressionAt']);
     }

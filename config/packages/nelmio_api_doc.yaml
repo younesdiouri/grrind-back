@@ -883,7 +883,7 @@ when@dev:
                     Progression:
                         type: object
                         description: "L'état du joueur — l'écran d'accueil de l'app en une requête, servi du seul snapshot."
-                        required: [level, totalXp, xpIntoLevel, xpToNextLevel, skillPoints, activeTitle, unlockedTitles, rulesetVersion, lastProgressionAt]
+                        required: [level, totalXp, xpIntoLevel, xpToNextLevel, skillPoints, attributes, activeTitle, unlockedTitles, rulesetVersion, lastProgressionAt]
                         properties:
                             level: { type: integer }
                             totalXp: { type: integer }
@@ -900,6 +900,24 @@ when@dev:
                                 properties:
                                     earned: { type: integer }
                                     available: { type: integer }
+                            attributes:
+                                type: object
+                                description: |
+                                    Les cinq caractéristiques du personnage, à l'instant présent — même
+                                    vocabulaire que dans `RewardSummary.attributes`, mais sous une forme
+                                    différente : pas de `gained` ni d'avant/après ici, cette route ne rend
+                                    qu'un instant. C'est cet état qui doit rester affiché après une
+                                    synchronisation, pas seulement le temps de l'animation.
+                                required: [strength, endurance, mobility, dexterity, vitality]
+                                properties:
+                                    strength: { type: integer, example: 5108 }
+                                    endurance: { type: integer, example: 3200 }
+                                    mobility: { type: integer, example: 900 }
+                                    dexterity: { type: integer, example: 1500 }
+                                    vitality:
+                                        type: integer
+                                        example: 310
+                                        description: "Dérivée des quatre autres, jamais créditée directement — voir `RewardSummary.attributes.vitality`."
                             activeTitle:
                                 nullable: true
                                 allOf: [{ $ref: '#/components/schemas/PlayerTitle' }]
@@ -930,7 +948,7 @@ when@dev:
                             Une écriture au ledger. **Le ledger est la vérité** ; le niveau et le total en sont
                             des projections. Rien ne s'efface : une séance invalidée produit une écriture
                             négative, et les deux restent.
-                        required: [id, sourceId, reason, discipline, amount, durationSeconds, breakdown, rulesetVersion, occurredAt]
+                        required: [id, sourceId, reason, discipline, amount, durationSeconds, breakdown, attributes, rulesetVersion, occurredAt]
                         properties:
                             id: { type: string, format: uuid }
                             sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant du workout." }
@@ -941,6 +959,23 @@ when@dev:
                             breakdown:
                                 type: array
                                 items: { $ref: '#/components/schemas/XpLine' }
+                            attributes:
+                                type: object
+                                description: |
+                                    La répartition de `amount` sur les quatre caractéristiques (#159) — ce qui
+                                    répond à « pourquoi ma Mobility stagne » sans avoir à recouper l'historique
+                                    à la main. Signée comme `amount` : une annulation y montre des valeurs
+                                    négatives, la même contrepartie exacte qui explique la baisse.
+
+                                    **Pas de `vitality` ici**, à la différence du vocabulaire de `RewardSummary` :
+                                    elle ne reçoit jamais d'écriture, aucune transaction ne lui est adressée.
+                                    Son état courant se lit sur `GET /api/progression`.
+                                required: [strength, endurance, mobility, dexterity]
+                                properties:
+                                    strength: { type: integer, example: 108 }
+                                    endurance: { type: integer, example: 0 }
+                                    mobility: { type: integer, example: 0 }
+                                    dexterity: { type: integer, example: 0 }
                             rulesetVersion: { type: string, description: "Celui du calcul, pas celui d'aujourd'hui. C'est ce qui permet de rééquilibrer sans corrompre l'historique." }
                             occurredAt:
                                 type: string

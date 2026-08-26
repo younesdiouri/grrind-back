@@ -8,6 +8,7 @@ use App\Progression\Application\ProgressionState;
 use App\Progression\Domain\TitleProgress;
 use App\Progression\Infrastructure\Translation\TitleTranslator;
 use App\Shared\Application\PlayerTitle;
+use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeImmutable;
 use DateTimeInterface;
 
@@ -26,6 +27,15 @@ use DateTimeInterface;
  *
  * `rulesetVersion` dit sous quel équilibrage cet état a été projeté. Le client n'en fait
  * rien aujourd'hui ; un rapport de bug, si.
+ *
+ * **`attributes` (#163) porte les cinq caractéristiques, Vitality comprise, mais sous une
+ * forme différente de celle du `RewardSummary` (#162).** Le `RewardSummary` anime un
+ * *passage* — chaque caractéristique y porte `gained`, `before` et `after`. Cette route ne
+ * rend qu'un instant : il n'y a ni gain ni avant/après à en tirer, seulement la valeur
+ * courante. Les cinq clés sont les mêmes (`strength`, `endurance`, `mobility`, `dexterity`,
+ * `vitality`) parce qu'un client qui les lirait sous deux orthographes écrirait deux
+ * mappings pour le même concept ; c'est la forme, pas le vocabulaire, qui diffère
+ * légitimement.
  */
 final readonly class ProgressionResource
 {
@@ -39,6 +49,8 @@ final readonly class ProgressionResource
         public ?int $xpToNextLevel,
         public int $earnedSkillPoints,
         public int $availableSkillPoints,
+        public AttributeGains $attributes,
+        public int $vitality,
         public ?PlayerTitle $activeTitle,
         public array $unlockedTitles,
         public string $rulesetVersion,
@@ -63,6 +75,8 @@ final readonly class ProgressionResource
             $state->standing->xpToNextLevel,
             $state->standing->earnedSkillPoints,
             $state->availableSkillPoints,
+            $state->attributes,
+            $state->vitality,
             // Cherché parmi les acquis et non lu du champ brut : un titre retiré du
             // catalogue laisse sa ligne en base, et il n'a rien à faire dans une réponse
             // qui ne le liste plus.
@@ -86,6 +100,16 @@ final readonly class ProgressionResource
             'skillPoints' => [
                 'earned' => $this->earnedSkillPoints,
                 'available' => $this->availableSkillPoints,
+            ],
+            // L'état courant des cinq caractéristiques — voir le docblock de la classe pour
+            // pourquoi la forme diffère de celle du `RewardSummary` alors que le vocabulaire
+            // ne bouge pas.
+            'attributes' => [
+                'strength' => $this->attributes->strength,
+                'endurance' => $this->attributes->endurance,
+                'mobility' => $this->attributes->mobility,
+                'dexterity' => $this->attributes->dexterity,
+                'vitality' => $this->vitality,
             ],
             // La même forme qu'à `GET /api/me` et `GET /api/titles` : un seul type à
             // décoder et un seul composant à dessiner côté client.
