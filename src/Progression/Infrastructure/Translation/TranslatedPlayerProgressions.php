@@ -6,6 +6,7 @@ namespace App\Progression\Infrastructure\Translation;
 
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\PlayerCharacteristics;
+use App\Progression\Domain\PlayerStanding;
 use App\Progression\Domain\TitleCatalog;
 use App\Progression\Domain\TitleProgress;
 use App\Progression\Infrastructure\Doctrine\ActiveTitleRepository;
@@ -26,12 +27,13 @@ use Symfony\Component\Uid\Uuid;
  * déjà situé**, pour que `Community` n'ait ni catalogue à consulter ni condition à
  * interpréter.
  *
- * **Un nombre constant de requêtes, quel que soit le nombre de joueurs** — quatre depuis
- * #176, qui ajoute la lecture batchée des cinq caractéristiques à côté des trois d'origine.
- * C'est la propriété que le port existe pour garantir, et elle est vérifiée par un test qui
- * compte les requêtes d'une guilde de deux membres puis d'une guilde de dix. Sans lui, la
- * première refonte qui transformerait une de ces lectures en boucle passerait la revue sans
- * un mot.
+ * **Un nombre constant de requêtes, quel que soit le nombre de joueurs.** C'est la propriété
+ * que le port existe pour garantir, et elle est vérifiée par un test qui compte les requêtes
+ * d'une guilde de deux membres puis d'une guilde de dix. Sans lui, la première refonte qui
+ * transformerait une de ces lectures en boucle passerait la revue sans un mot. Le palier et
+ * les cinq caractéristiques (#176) voyagent dans **une seule** de ces requêtes — voir le
+ * docblock de {@see ProgressionSnapshotRepository::progressionsOf()}
+ * pour pourquoi les séparer romprait la cohérence entre les deux.
  */
 final readonly class TranslatedPlayerProgressions implements PlayerProgressions
 {
@@ -56,8 +58,7 @@ final readonly class TranslatedPlayerProgressions implements PlayerProgressions
             return [];
         }
 
-        $standings = $this->snapshots->standingsOf($playerIds);
-        $characteristics = $this->snapshots->characteristicsOf($playerIds);
+        $rows = $this->snapshots->progressionsOf($playerIds);
         $worn = $this->activeTitles->titleIdsOf($playerIds);
         $unlockedAt = $this->unlockedTitles->unlockedAtOf($playerIds, array_values(array_unique($worn)));
 
@@ -65,27 +66,23 @@ final readonly class TranslatedPlayerProgressions implements PlayerProgressions
 
         foreach ($playerIds as $playerId) {
             $key = $playerId->toRfc4122();
-            $standing = $standings[$key] ?? null;
 
             // Le joueur qui n'a pas encore de ligne n'est pas une anomalie : il vient de
-            // s'inscrire, c'est le premier crédit qui la pose, et il peut avoir rejoint
-            // une guilde entre-temps. Le repli passe par la courbe plutôt que par la
-            // constante de `PlayerProgression::untouched()`, parce qu'ici on l'a sous la
-            // main et qu'un niveau de départ est de l'équilibrage comme le reste.
-            $standing ??= $this->curve->standingAt(0);
-
-            // Même repli pour les cinq caractéristiques, cette fois par la constante :
-            // contrairement au niveau, zéro partout n'a rien d'un choix d'équilibrage, c'est
-            // simplement l'absence de tout ledger.
-            $playerCharacteristics = $characteristics[$key] ?? PlayerCharacteristics::untouched();
+            // s'inscrire, c'est le premier crédit qui la pose, et il peut avoir rejoint une
+            // guilde entre-temps. Le repli sur le niveau passe par la courbe plutôt que par
+            // la constante de `PlayerProgression::untouched()`, parce qu'ici on l'a sous la
+            // main et qu'un niveau de départ est de l'équilibrage comme le reste ; les cinq
+            // caractéristiques, elles, replient sur la constante, zéro partout n'ayant rien
+            // d'un choix d'équilibrage.
+            $row = $rows[$key] ?? new PlayerStanding($this->curve->standingAt(0), PlayerCharacteristics::untouched());
 
             $progressions[$key] = new PlayerProgression(
-                $standing->level,
-                $standing->xpIntoLevel,
-                $standing->xpToNextLevel,
+                $row->standing->level,
+                $row->standing->xpIntoLevel,
+                $row->standing->xpToNextLevel,
                 $this->wornTitleOf($playerId, $worn[$key] ?? null, $unlockedAt),
-                $playerCharacteristics->attributes,
-                $playerCharacteristics->vitality,
+                $row->characteristics->attributes,
+                $row->characteristics->vitality,
             );
         }
 
