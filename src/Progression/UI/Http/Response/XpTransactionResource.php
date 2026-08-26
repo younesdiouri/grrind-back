@@ -6,6 +6,7 @@ namespace App\Progression\UI\Http\Response;
 
 use App\Progression\Domain\XpBreakdownLine;
 use App\Progression\Domain\XpTransaction;
+use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeInterface;
 
 /**
@@ -23,6 +24,15 @@ use DateTimeInterface;
  *
  * `amount` est signé, `durationSeconds` aussi : une séance invalidée écrit sa contrepartie
  * négative, et le joueur doit pouvoir la lire pour comprendre pourquoi son total a baissé.
+ *
+ * **`attributes` (#163) répond à « pourquoi ma Mobility stagne ».** C'est la répartition de
+ * `amount` sur les quatre caractéristiques (#159), signée comme le reste : une annulation y
+ * montre des valeurs négatives, et elles ne sont pas masquées — c'est la même contrepartie
+ * exacte qui explique la baisse. **Pas de `vitality` ici**, contrairement au vocabulaire du
+ * `RewardSummary` : Vitality ne reçoit jamais d'écriture, aucune transaction ne lui est
+ * adressée — voir le docblock d'`App\Shared\Domain\Activity\Vitality`. La lire ici
+ * demanderait de la rederiver à chaque ligne d'une page, sur des totaux qu'elle n'a pas :
+ * c'est `GET /api/progression` qui porte son état courant.
  */
 final readonly class XpTransactionResource
 {
@@ -37,6 +47,7 @@ final readonly class XpTransactionResource
         public int $amount,
         public int $durationSeconds,
         public array $breakdown,
+        public AttributeGains $attributes,
         public string $rulesetVersion,
         public string $occurredAt,
     ) {
@@ -57,6 +68,7 @@ final readonly class XpTransactionResource
                 static fn (XpBreakdownLine $line): array => ['source' => $line->source->value, 'amount' => $line->amount],
                 $transaction->breakdown()->lines,
             ),
+            $transaction->attributeGains(),
             $transaction->rulesetVersion(),
             $transaction->occurredAt()->format(DateTimeInterface::ATOM),
         );
@@ -75,6 +87,14 @@ final readonly class XpTransactionResource
             'amount' => $this->amount,
             'durationSeconds' => $this->durationSeconds,
             'breakdown' => $this->breakdown,
+            // La répartition du même `amount`, par caractéristique plutôt que par source —
+            // voir le docblock de la classe.
+            'attributes' => [
+                'strength' => $this->attributes->strength,
+                'endurance' => $this->attributes->endurance,
+                'mobility' => $this->attributes->mobility,
+                'dexterity' => $this->attributes->dexterity,
+            ],
             'rulesetVersion' => $this->rulesetVersion,
             'occurredAt' => $this->occurredAt,
         ];

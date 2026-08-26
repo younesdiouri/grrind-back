@@ -7,6 +7,9 @@ namespace App\Tests\Progression;
 use App\Progression\Application\GrantXp;
 use App\Progression\Application\GrantXpHandler;
 use App\Progression\Domain\XpBreakdownSource;
+use App\Progression\Domain\XpReason;
+use App\Progression\Domain\XpTransaction;
+use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
 use App\Progression\UI\Http\Request\XpHistoryQuery;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\Modifier;
@@ -30,6 +33,7 @@ use Symfony\Component\Uid\Uuid;
 final class XpHistoryTest extends ApiTestCase
 {
     private GrantXpHandler $grantXp;
+    private XpTransactionRepository $ledger;
 
     protected function setUp(): void
     {
@@ -38,6 +42,10 @@ final class XpHistoryTest extends ApiTestCase
         $grantXp = self::getContainer()->get(GrantXpHandler::class);
         self::assertInstanceOf(GrantXpHandler::class, $grantXp);
         $this->grantXp = $grantXp;
+
+        $ledger = self::getContainer()->get(XpTransactionRepository::class);
+        self::assertInstanceOf(XpTransactionRepository::class, $ledger);
+        $this->ledger = $ledger;
     }
 
     public function testAnAccountWithoutAnyCreditSeesAnEmptyPage(): void
@@ -78,6 +86,56 @@ final class XpHistoryTest extends ApiTestCase
                 ['source' => XpBreakdownSource::Streak->value, 'amount' => intdiv($base * 20, 100)],
             ],
             $transaction['breakdown'],
+        );
+
+        // Le même montant, réparti par caractéristique (#159, #163) plutôt que par source :
+        // c'est ce qui répond à « pourquoi ma Mobility stagne » sans recouper le breakdown à
+        // la main. Pas de `vitality` : voir le docblock de `XpTransactionResource`.
+        $attributeGains = $granted->award->attributeGains;
+        self::assertSame(
+            [
+                'strength' => $attributeGains->strength,
+                'endurance' => $attributeGains->endurance,
+                'mobility' => $attributeGains->mobility,
+                'dexterity' => $attributeGains->dexterity,
+            ],
+            $transaction['attributes'],
+        );
+        self::assertArrayNotHasKey('vitality', $transaction['attributes']);
+    }
+
+    public function testAnInvalidationCarriesTheOppositeAttributeSplitRatherThanHidingIt(): void
+    {
+        $account = $this->openAccount();
+        $sessionId = Uuid::v7();
+        $granted = ($this->grantXp)(new GrantXp($account->id, $sessionId, Discipline::Running, 3600, new DateTimeImmutable()));
+
+        // Aucun handler d'invalidation n'existe encore côté application (#91 pas fait) : le
+        // ledger est écrit directement, comme le fait déjà `LedgerTest` pour la même raison.
+        $credit = $this->ledger->recordedFor($sessionId, XpReason::SessionCompleted);
+        self::assertInstanceOf(XpTransaction::class, $credit);
+        $this->ledger->add(XpTransaction::reversalOf($credit));
+        $this->ledger->commit();
+
+        $page = self::decode($this->get('/api/progression/history', $account->headers));
+        self::assertIsArray($page['transactions']);
+        self::assertCount(2, $page['transactions']);
+
+        // La plus récente d'abord : l'annulation, dont la répartition solde exactement
+        // celle du crédit — des valeurs négatives, lisibles et non masquées.
+        $reversal = $page['transactions'][0];
+        self::assertIsArray($reversal);
+        self::assertSame('SESSION_INVALIDATED', $reversal['reason']);
+
+        $attributeGains = $granted->award->attributeGains;
+        self::assertSame(
+            [
+                'strength' => -$attributeGains->strength,
+                'endurance' => -$attributeGains->endurance,
+                'mobility' => -$attributeGains->mobility,
+                'dexterity' => -$attributeGains->dexterity,
+            ],
+            $reversal['attributes'],
         );
     }
 

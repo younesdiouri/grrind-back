@@ -54,6 +54,11 @@ final readonly class ProgressionStateProvider
             // que pour `standingOf()` : c'est l'état neutre d'un compte qui vient de
             // s'inscrire, pas une base manquante.
             $snapshot?->attributes() ?? new AttributeGains(0, 0, 0, 0),
+            // Vitality suit la même règle (#163) : lue du snapshot, jamais rederivée ici. Un
+            // compte sans ligne vaut 0 sur les quatre caractéristiques, donc 0 ici aussi —
+            // `Vitality::of()` rendrait exactement ce zéro pour un total nul, quel que soit
+            // le plancher configuré.
+            $snapshot?->vitality() ?? 0,
             // Accordés moins dépensés — et rien ne se dépense avant les arbres de
             // compétences (#32). Le calcul vit ici plutôt que dans la réponse pour qu'il
             // n'y ait qu'un endroit à ouvrir au Lot 7.
