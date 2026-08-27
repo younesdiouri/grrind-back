@@ -73,6 +73,38 @@ final class XpRatesTest extends TestCase
         self::assertSame(100, $rates->dailyCapOf(Discipline::Mobility));
     }
 
+    /**
+     * Le cas du #167 : une discipline qui porte `credits_xp: false` répond `false` à
+     * `credits()`, et n'a pas de plafond à consulter.
+     */
+    public function testADisciplineMarkedCreditsXpFalseDoesNotCredit(): void
+    {
+        $rates = new XpRates(90, [
+            ...self::everyDisciplineExceptRunning(),
+            ['discipline' => 'RUNNING', 'credits_xp' => false],
+        ]);
+
+        self::assertFalse($rates->credits(Discipline::Running));
+        self::assertTrue($rates->credits(Discipline::Walking));
+    }
+
+    /**
+     * `dailyCapOf()` n'a pas de sens pour une discipline qui ne crédite pas : c'est un bug
+     * d'appelant de le lui demander sans avoir vérifié `credits()` d'abord.
+     */
+    public function testDailyCapOfRefusesADisciplineThatDoesNotCredit(): void
+    {
+        $rates = new XpRates(90, [
+            ...self::everyDisciplineExceptRunning(),
+            ['discipline' => 'RUNNING', 'credits_xp' => false],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/RUNNING/');
+
+        $rates->dailyCapOf(Discipline::Running);
+    }
+
     #[DataProvider('distanceCases')]
     public function testConvertsMetresIntoPoints(Discipline $discipline, ?int $distanceMeters, int $expected): void
     {
@@ -132,7 +164,7 @@ final class XpRatesTest extends TestCase
     }
 
     /**
-     * @param list<array{discipline: string, daily_cap_xp: int, xp_per_km?: int, xp_per_100m_elevation?: int}> $disciplines
+     * @param list<array{discipline: string, daily_cap_xp?: int, xp_per_km?: int, xp_per_100m_elevation?: int, credits_xp?: bool}> $disciplines
      */
     #[DataProvider('unusableRates')]
     public function testRefusesAnUnusableBalance(int $baseXpPerHour, array $disciplines, string $expectedMessage): void
@@ -144,7 +176,7 @@ final class XpRatesTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{int, list<array{discipline: string, daily_cap_xp: int, xp_per_km?: int, xp_per_100m_elevation?: int}>, string}>
+     * @return iterable<string, array{int, list<array{discipline: string, daily_cap_xp?: int, xp_per_km?: int, xp_per_100m_elevation?: int, credits_xp?: bool}>, string}>
      */
     public static function unusableRates(): iterable
     {
@@ -181,6 +213,30 @@ final class XpRatesTest extends TestCase
             90,
             [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'daily_cap_xp' => 60]],
             '/sous ce qu\'une heure de socle rapporte/',
+        ];
+
+        // Ni l'un ni l'autre (#167) : une discipline doit trancher explicitement entre un
+        // plafond et « credits_xp: false », jamais rester dans le flou.
+        yield 'ni plafond ni marque de non-crédit' => [
+            90,
+            [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING']],
+            '/ni plafond quotidien ni "credits_xp: false"/',
+        ];
+
+        // Les deux à la fois seraient contradictoires : un plafond qu'on ne peut jamais
+        // atteindre puisque la discipline ne crédite rien.
+        yield 'plafond et marque de non-crédit ensemble' => [
+            90,
+            [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'daily_cap_xp' => 180, 'credits_xp' => false]],
+            '/ne peuvent pas coexister/',
+        ];
+
+        // `credits_xp: true` ne dit rien de plus que son absence — la seule valeur qui a
+        // un sens à écrire est `false`.
+        yield 'credits_xp à true, redondant' => [
+            90,
+            [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'daily_cap_xp' => 180, 'credits_xp' => true]],
+            '/ne dit rien de plus que son absence/',
         ];
     }
 

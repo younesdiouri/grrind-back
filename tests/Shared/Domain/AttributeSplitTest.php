@@ -112,7 +112,7 @@ final class AttributeSplitTest extends TestCase
             static fn (array $split): bool => 'CLIMBING' !== $split['discipline'],
         ));
 
-        new AttributeSplit($incomplete);
+        new AttributeSplit($incomplete, self::everyDisciplineCredits());
     }
 
     public function testRefusesADisciplineDeclaredTwice(): void
@@ -120,10 +120,13 @@ final class AttributeSplitTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/double/');
 
-        new AttributeSplit([
-            ...self::everyDiscipline(),
-            ['discipline' => 'RUNNING', 'strength' => 25, 'endurance' => 25, 'mobility' => 25, 'dexterity' => 25],
-        ]);
+        new AttributeSplit(
+            [
+                ...self::everyDiscipline(),
+                ['discipline' => 'RUNNING', 'strength' => 25, 'endurance' => 25, 'mobility' => 25, 'dexterity' => 25],
+            ],
+            self::everyDisciplineCredits(),
+        );
     }
 
     public function testRefusesADisciplineThatDoesNotExist(): void
@@ -131,10 +134,13 @@ final class AttributeSplitTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/QUIDDITCH/');
 
-        new AttributeSplit([
-            ...self::everyDiscipline(),
-            ['discipline' => 'QUIDDITCH', 'strength' => 25, 'endurance' => 25, 'mobility' => 25, 'dexterity' => 25],
-        ]);
+        new AttributeSplit(
+            [
+                ...self::everyDiscipline(),
+                ['discipline' => 'QUIDDITCH', 'strength' => 25, 'endurance' => 25, 'mobility' => 25, 'dexterity' => 25],
+            ],
+            self::everyDisciplineCredits(),
+        );
     }
 
     /**
@@ -151,10 +157,44 @@ final class AttributeSplitTest extends TestCase
             static fn (array $split): bool => 'RUNNING' !== $split['discipline'],
         ));
 
-        new AttributeSplit([
-            ...$withoutRunning,
-            ['discipline' => 'RUNNING', 'strength' => 75, 'endurance' => 15, 'mobility' => 5, 'dexterity' => 0],
-        ]);
+        new AttributeSplit(
+            [
+                ...$withoutRunning,
+                ['discipline' => 'RUNNING', 'strength' => 75, 'endurance' => 15, 'mobility' => 5, 'dexterity' => 0],
+            ],
+            self::everyDisciplineCredits(),
+        );
+    }
+
+    /**
+     * L'invariant du #167 : une discipline qui ne crédite pas n'a rien à exiger — sa
+     * ligne peut manquer sans que la construction échoue.
+     */
+    public function testADisciplineThatDoesNotCreditIsNotRequiredToHaveALine(): void
+    {
+        $withoutWalking = array_values(array_filter(
+            self::everyDiscipline(),
+            static fn (array $split): bool => 'WALKING' !== $split['discipline'],
+        ));
+
+        $split = new AttributeSplit($withoutWalking, self::everyDisciplineExcept('WALKING'));
+
+        // La construction n'a pas échoué : c'est la preuve. `distribute()` sur `WALKING`
+        // n'a de toute façon aucun sens — `XpCalculator` ne l'atteint jamais (#167).
+        self::assertInstanceOf(AttributeSplit::class, $split);
+    }
+
+    /**
+     * L'autre moitié de l'invariant : une ligne conservée pour une discipline qui ne
+     * crédite pas serait de la config morte, refusée au même titre qu'une ligne
+     * manquante.
+     */
+    public function testADisciplineThatDoesNotCreditRefusesALineAnyway(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/WALKING/');
+
+        new AttributeSplit(self::everyDiscipline(), self::everyDisciplineExcept('WALKING'));
     }
 
     /**
@@ -167,10 +207,13 @@ final class AttributeSplitTest extends TestCase
             static fn (array $split): bool => 'STRENGTH' !== $split['discipline'],
         ));
 
-        return new AttributeSplit([
-            ['discipline' => 'STRENGTH', ...$strengthSplit],
-            ...$withoutStrength,
-        ]);
+        return new AttributeSplit(
+            [
+                ['discipline' => 'STRENGTH', ...$strengthSplit],
+                ...$withoutStrength,
+            ],
+            self::everyDisciplineCredits(),
+        );
     }
 
     /**
@@ -190,6 +233,35 @@ final class AttributeSplitTest extends TestCase
                 'mobility' => 25,
                 'dexterity' => 25,
             ],
+            Discipline::cases(),
+        );
+    }
+
+    /**
+     * La liste brute de `xp.yaml` que ce test simule : toutes les disciplines créditent.
+     *
+     * @return list<array{discipline: string}>
+     */
+    private static function everyDisciplineCredits(): array
+    {
+        return array_map(
+            static fn (Discipline $discipline): array => ['discipline' => $discipline->value],
+            Discipline::cases(),
+        );
+    }
+
+    /**
+     * La même liste, avec une discipline explicitement marquée `credits_xp: false` —
+     * le pendant de `WALKING` dans `xp.yaml`.
+     *
+     * @return list<array{discipline: string, credits_xp?: bool}>
+     */
+    private static function everyDisciplineExcept(string $nonCredited): array
+    {
+        return array_map(
+            static fn (Discipline $discipline): array => $discipline->value === $nonCredited
+                ? ['discipline' => $discipline->value, 'credits_xp' => false]
+                : ['discipline' => $discipline->value],
             Discipline::cases(),
         );
     }
