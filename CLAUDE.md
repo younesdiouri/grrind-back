@@ -41,7 +41,8 @@ Ce que cette phase autorise, sans avoir à le demander ni à s'en excuser :
 
 - une migration destructive, un renommage sans reprise de données, un `db-reset` ;
 - couper une mécanique avant que son remplacement existe ;
-- changer une valeur du contrat client, tant que le ticket côté app suit.
+- changer une valeur du contrat client, tant que le ticket côté app suit ;
+- **fusionner soi-même sur `main`** une PR qu'on vient de relire, sans redemander.
 
 Ce qu'elle n'autorise pas, et qui reste à signaler avec la même exigence qu'après le lancement :
 une **logique fausse**, un **contrat qui ment**, un **invariant cassé**. Ceux-là survivent à la
@@ -452,3 +453,27 @@ et porte les six interdits sous une forme opérationnelle.
 **La revue finale revient à l'architecte**, et elle se fait *contre le ticket* : ce qui est coché
 l'est-il vraiment, ce qui ne l'est pas est-il expliqué, et la PR a-t-elle tranché quelque chose
 qui aurait dû remonter. C'est là, et pas dans le CI, que les décisions de produit se tiennent.
+
+**Et l'architecte fusionne lui-même sur `main`**, dans la foulée de sa revue, sans demander la
+permission de le faire. La revue *est* l'autorisation ; redemander après l'avoir donnée n'ajoute
+aucune sécurité, ça ajoute un aller-retour. Ce qui reste à remonter avant de fusionner est la
+seule chose qui compte : une PR qui a tranché quelque chose que le ticket ne tranchait pas.
+
+## Il n'y a pas de CI, et les barrières tournent avant le push
+
+Le workflow GitHub Actions a été supprimé (#178) : il rejouait, sur une image reconstruite à
+chaque fois, exactement ce que `make qa` et `make test` font en local en une fraction du temps.
+Le développeur les lance **avant de pousser**, et c'est la version qui fait foi — pas une seconde
+exécution plus lente sur une machine qu'on ne regarde qu'après coup.
+
+```bash
+make qa          # phpstan + cs-fixer + deptrac
+make test        # phpunit
+make openapi     # puis vérifier que `git diff openapi.yaml` est vide
+```
+
+**La troisième ligne est celle qu'on oublie, et c'est la seule que la CI attrapait vraiment.**
+`openapi.yaml` est du contrat versionné : le dépôt front en génère son client TypeScript. Un
+fichier en retard d'une route, c'est une intégration qui casse là-bas pour une raison qui vient
+d'ici, et personne ne pense spontanément à `make openapi` en ajoutant un endpoint. Toute PR qui
+touche à une route la relance et committe le résultat.

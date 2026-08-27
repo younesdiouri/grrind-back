@@ -19,7 +19,7 @@ Les schémas sont en Mermaid : GitHub les rend nativement dans cette page.
 ## 1. La carte
 
 Un seul déploiement, sept modules à frontières dures. **Un module ne connaît que `Shared`** —
-Deptrac le vérifie en CI, et le build casse sur une flèche interdite.
+`make qa` le vérifie, et casse sur une flèche interdite.
 
 ```mermaid
 flowchart TB

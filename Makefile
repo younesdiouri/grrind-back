@@ -109,7 +109,8 @@ migrate-prod: ## Applique les migrations depuis l'image de prod (étape de dépl
 ## —— Contrat d'API —————————————————————————————————————————————————————————
 # Le contrat client est un **fichier versionné**, pas une route de documentation : le
 # dépôt front en génère son client TypeScript, et un contrat qu'on ne peut pas differ est
-# un contrat qui dérive. La CI rejoue cette cible et refuse un openapi.yaml pas à jour.
+# un contrat qui dérive. Il n'y a plus de CI pour rejouer cette cible (#178) : toute PR qui
+# touche à une route la lance et committe le résultat, `git diff openapi.yaml` doit être vide.
 #
 # Le bundle n'est chargé qu'en dev, d'où `$(RUN)` : l'image de prod est bâtie `--no-dev` et
 # n'expose aucune documentation.
