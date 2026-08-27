@@ -1419,6 +1419,7 @@ components:
           required:
             - awarded
             - breakdown
+            - reason
           properties:
             awarded:
               description: 'La somme du `breakdown`, jamais autre chose.'
@@ -1429,6 +1430,12 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/XpLine'
+            reason:
+              description: "`null` pour toute séance créditée normalement — y compris une séance\nentièrement écrêtée par le plafond quotidien, dont `breakdown` porte déjà\nsa ligne `DAILY_CAP` pour l'expliquer.\n\nNon nul uniquement pour une discipline qui ne rapporte pas d'XP par\nconception : `breakdown` reste vide dans ce cas, puisqu'il n'y a rien eu\nà calculer, et `reason` porte l'explication à sa place plutôt qu'un\nbreakdown vide ou une ligne « base : 0 » qui mentirait sur un calcul qui\nn'a jamais eu lieu.\n\n`NO_XP_FEEDS_VITALITY` : la marche. Elle reste une séance à part entière\n— écrite, visible dans l'historique, animée ici — mais n'alimente que\nVitality, jamais l'XP.\n"
+              type: string
+              nullable: true
+              enum:
+                - NO_XP_FEEDS_VITALITY
           type: object
         attributes:
           description: "Les cinq caractéristiques du personnage, chacune avec son avant et son\naprès — même raison que le palier de niveau : une jauge qui repartirait de\nzéro mentirait à tout joueur qui n'y était pas.\n\n**Vitality n'a pas de `gained`.** Elle ne reçoit jamais d'XP directement —\nc'est une caractéristique dérivée des quatre autres, qui mesure l'équilibre\nde la pratique. Elle peut donc bouger sans que **cette** séance lui ait\nrien crédité : un joueur qui varie ses sports la voit sauter même le jour\noù la répartition de sa séance n'y touche pas directement.\n"

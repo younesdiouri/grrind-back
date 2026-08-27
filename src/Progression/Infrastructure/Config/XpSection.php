@@ -42,13 +42,22 @@ final class XpSection implements GameBalanceSection
                     ->arrayPrototype()
                         ->children()
                             ->scalarNode('discipline')->isRequired()->cannotBeEmpty()->end()
-                            ->integerNode('daily_cap_xp')->isRequired()->min(1)->end()
+                            // Facultatif : une discipline qui ne crédite pas (#167) n'a
+                            // pas de plafond, elle porte `credits_xp: false` à la place.
+                            // `XpRates` exige l'un des deux, jamais ni l'un ni l'autre,
+                            // jamais les deux — la cohérence se dit une fois, pas ici.
+                            ->integerNode('daily_cap_xp')->min(1)->end()
                             // Facultatifs, et `min(1)` : une clé absente vaut « pas de
                             // bonus », une clé à zéro voudrait dire « bonus mesuré et nul »
                             // et afficherait une ligne vide au joueur. Le schéma rend le
                             // second cas inatteignable plutôt que de laisser choisir.
                             ->integerNode('xp_per_km')->min(1)->end()
                             ->integerNode('xp_per_100m_elevation')->min(1)->end()
+                            // N'existe que pour porter `false` : une discipline qui
+                            // crédite ne le déclare pas, l'absence de la clé le dit déjà.
+                            // Voir `XpRates` pour le refus d'un `credits_xp: true` — une
+                            // affirmation qui ne dirait rien de plus que son absence.
+                            ->booleanNode('credits_xp')->end()
                         ->end()
                     ->end()
                 ->end()
@@ -66,7 +75,7 @@ final class XpSection implements GameBalanceSection
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
-                    /** @var array{base_xp_per_hour: int, disciplines: list<array{discipline: string, daily_cap_xp: int, xp_per_km?: int, xp_per_100m_elevation?: int}>, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $values */
+                    /** @var array{base_xp_per_hour: int, disciplines: list<array{discipline: string, daily_cap_xp?: int, xp_per_km?: int, xp_per_100m_elevation?: int, credits_xp?: bool}>, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $values */
                     try {
                         new XpRates($values['base_xp_per_hour'], $values['disciplines']);
                         new DiminishingReturns($values['diminishing_returns'], $values['diminishing_returns_beyond_percent']);

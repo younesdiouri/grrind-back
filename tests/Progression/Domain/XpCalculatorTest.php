@@ -467,16 +467,34 @@ final class XpCalculatorTest extends TestCase
 
     private static function splitOf(int $strength, int $endurance, int $mobility, int $dexterity): AttributeSplit
     {
-        return new AttributeSplit(array_map(
-            static fn (Discipline $discipline): array => [
-                'discipline' => $discipline->value,
-                'strength' => $strength,
-                'endurance' => $endurance,
-                'mobility' => $mobility,
-                'dexterity' => $dexterity,
-            ],
+        return new AttributeSplit(
+            array_map(
+                static fn (Discipline $discipline): array => [
+                    'discipline' => $discipline->value,
+                    'strength' => $strength,
+                    'endurance' => $endurance,
+                    'mobility' => $mobility,
+                    'dexterity' => $dexterity,
+                ],
+                Discipline::cases(),
+            ),
+            self::everyDisciplineCredits(),
+        );
+    }
+
+    /**
+     * Toutes les disciplines créditent, dans le barème de test — même `WALKING` : ces
+     * tests portent sur l'arithmétique de `XpCalculator`, jamais atteinte pour une
+     * discipline réelle qui ne crédite pas (#167), donc rien ici n'a à s'en préoccuper.
+     *
+     * @return list<array{discipline: string}>
+     */
+    private static function everyDisciplineCredits(): array
+    {
+        return array_map(
+            static fn (Discipline $discipline): array => ['discipline' => $discipline->value],
             Discipline::cases(),
-        ));
+        );
     }
 
     private static function calculator(): XpCalculator
@@ -526,16 +544,19 @@ final class XpCalculatorTest extends TestCase
      */
     private static function uniformSplit(): AttributeSplit
     {
-        return new AttributeSplit(array_map(
-            static fn (Discipline $discipline): array => [
-                'discipline' => $discipline->value,
-                'strength' => 25,
-                'endurance' => 25,
-                'mobility' => 25,
-                'dexterity' => 25,
-            ],
-            Discipline::cases(),
-        ));
+        return new AttributeSplit(
+            array_map(
+                static fn (Discipline $discipline): array => [
+                    'discipline' => $discipline->value,
+                    'strength' => 25,
+                    'endurance' => 25,
+                    'mobility' => 25,
+                    'dexterity' => 25,
+                ],
+                Discipline::cases(),
+            ),
+            self::everyDisciplineCredits(),
+        );
     }
 
     private static function bonus(ModifierSource $source, int $percentage): Modifier

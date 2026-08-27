@@ -6,14 +6,20 @@ namespace App\Progression\Infrastructure\Reward;
 
 use App\Progression\Application\GrantXp;
 use App\Progression\Application\GrantXpHandler;
+use App\Progression\Domain\LevelCurve;
+use App\Progression\Domain\LevelStanding;
 use App\Progression\Domain\Title;
 use App\Progression\Domain\TitleProgress;
+use App\Progression\Domain\XpAwardReason;
 use App\Progression\Domain\XpBreakdownLine;
+use App\Progression\Domain\XpRates;
+use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Translation\TitleTranslator;
 use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\SessionRewards;
 use App\Shared\Application\XpLine;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Event\WorkoutCredited;
 use App\Shared\Domain\Event\WorkoutImported;
 use Symfony\Component\DependencyInjection\Attribute\Target;
@@ -39,12 +45,30 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * donc dans la transaction que `Training` tient ouverte — un rollback en aval défait le
  * crédit et l'annonce ensemble. Elle n'a lieu que si `creditFor` est appelée : un workout
  * hors fenêtre n'atteint jamais cette classe, donc rien ne se publie pour lui.
+ *
+ * **Une discipline qui ne crédite pas s'arrête avant tout ça (#167).** `credits()` est la
+ * première question posée, avant `GrantXpHandler` : pour `WALKING`, aucun verrou, aucune
+ * lecture de la charge du jour, aucune `XpTransaction`, aucun `WorkoutCredited`. C'est ce
+ * qui garantit qu'une marche ne consomme ni les rendements décroissants ni le plafond
+ * quotidien d'une autre discipline pratiquée le même jour — la contaminer y punirait la
+ * vraie séance, ce qui serait pire que neutre. {@see uncredited()} rend malgré tout un
+ * `SessionReward` complet : la séance est créditée pour `Training` au sens où elle entre
+ * dans `imported`, pas dans `skipped` — elle est écrite, visible, animée — simplement à
+ * zéro XP et avec une raison.
  */
 final readonly class LedgerSessionRewards implements SessionRewards
 {
     public function __construct(
         private GrantXpHandler $grantXp,
         private TitleTranslator $titles,
+        private XpRates $rates,
+        // Lu **sans verrou** : `uncredited()` ne modifie rien, donc rien à sérialiser
+        // contre une complétion concurrente. Une lecture qui verrouille pour ne rien
+        // écrire prendrait un verrou pour rien, exactement ce que `ProgressionStateProvider`
+        // refuse déjà pour la même raison.
+        private ProgressionSnapshotRepository $snapshots,
+        private LevelCurve $curve,
+        private string $rulesetVersion,
         // `event.bus` explicitement (#155) : `WorkoutCredited` est un `DomainEvent`, voir
         // le docblock de `messenger.yaml` pour pourquoi ce bus-là tolère l'absence
         // d'abonné et pourquoi `#[Target]` n'est pas optionnel ici.
@@ -55,6 +79,10 @@ final readonly class LedgerSessionRewards implements SessionRewards
 
     public function creditFor(WorkoutImported $workout): SessionReward
     {
+        if (!$this->rates->credits($workout->discipline)) {
+            return $this->uncredited($workout);
+        }
+
         $granted = ($this->grantXp)(new GrantXp(
             $workout->userId,
             $workout->workoutId,
@@ -133,6 +161,52 @@ final readonly class LedgerSessionRewards implements SessionRewards
             $granted->vitalityBefore,
             $snapshot->vitality(),
             $granted->award->rulesetVersion,
+        );
+    }
+
+    /**
+     * Le `SessionReward` d'une discipline qui ne crédite pas d'XP : zéro partout, une
+     * raison, et un avant/après identique puisque rien n'a bougé.
+     *
+     * **Aucune écriture.** Le snapshot est lu, jamais verrouillé ni créé : un joueur qui
+     * n'a jamais rien fait n'a pas de ligne, et une marche ne doit pas lui en poser une —
+     * même raison que {@see \App\Progression\Application\ProgressionStateProvider}, qui
+     * refuse la même écriture pour la même raison. `LevelStanding` et les caractéristiques
+     * neutres reprennent donc le geste de cette classe-là plutôt que d'en inventer un.
+     */
+    private function uncredited(WorkoutImported $workout): SessionReward
+    {
+        $snapshot = $this->snapshots->ofPlayer($workout->userId);
+
+        $standing = null !== $snapshot
+            ? new LevelStanding($snapshot->level(), $snapshot->xpIntoLevel(), $snapshot->xpToNextLevel(), $snapshot->earnedSkillPoints())
+            : $this->curve->standingAt(0);
+
+        $attributes = $snapshot?->attributes() ?? new AttributeGains(0, 0, 0, 0);
+        $vitality = $snapshot?->vitality() ?? 0;
+
+        return new SessionReward(
+            xpAwarded: 0,
+            // Vide, et non une ligne « base : 0 » qui prétendrait avoir calculé quelque
+            // chose : `reason`, plus bas, porte l'explication à sa place.
+            breakdown: [],
+            levelBefore: $standing->level,
+            xpIntoLevelBefore: $standing->xpIntoLevel,
+            xpToNextLevelBefore: $standing->xpToNextLevel,
+            level: $standing->level,
+            totalXp: $snapshot?->totalXp() ?? 0,
+            xpIntoLevel: $standing->xpIntoLevel,
+            xpToNextLevel: $standing->xpToNextLevel,
+            levelsReached: [],
+            skillPointsGranted: 0,
+            titlesUnlocked: [],
+            attributeGains: new AttributeGains(0, 0, 0, 0),
+            attributesBefore: $attributes,
+            attributesAfter: $attributes,
+            vitalityBefore: $vitality,
+            vitalityAfter: $vitality,
+            rulesetVersion: $this->rulesetVersion,
+            reason: XpAwardReason::NoXpFeedsVitality->value,
         );
     }
 }

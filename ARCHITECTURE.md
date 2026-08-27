@@ -290,6 +290,15 @@ flowchart LR
 Le `wrapInTransaction` de `GrantXpHandler` n'en rouvre pas une seconde : DBAL en fait un
 point de sauvegarde, le verrou de ligne court jusqu'au COMMIT extérieur.
 
+**Une discipline peut ne rien créditer du tout (#167).** `WALKING` — la marche, qui n'alimente
+que Vitality selon le document de game design — s'arrête avant ce schéma en entier :
+`LedgerSessionRewards` pose la question `XpRates::credits()` en premier, et pour une réponse
+négative, aucun verrou, aucune lecture de charge du jour, aucune `XpTransaction`. La séance est
+quand même écrite par `Training` et animée dans `imported` — c'est un `RewardSummary` à part
+entière, à 0 XP et avec une `reason` — mais sans jamais toucher `GrantXpHandler`. C'est ce qui
+garantit qu'une marche ne consomme ni les rendements décroissants ni le plafond quotidien d'une
+autre discipline pratiquée le même jour.
+
 **Ce qui sort du COMMIT : le `SyncSummary`.** C'est le contrat le plus coûteux à casser du
 produit, et **l'ordre de ses clés est l'ordre de l'animation**, maintenant à deux niveaux : entre
 les workouts d'abord — `imported` est chronologique — puis à l'intérieur de chacun. Le client le
@@ -319,7 +328,8 @@ niveaux à franchir, ce qui est un cas normal (#79).
       "xp":       { "awarded": 145,
                     "breakdown": [ { "source": "BASE",        "amount":  60 },
                                    { "source": "DISTANCE",    "amount": 100 },
-                                   { "source": "DIMINISHING", "amount": -15 } ] },
+                                   { "source": "DIMINISHING", "amount": -15 } ],
+                    "reason": null },   // non nul, breakdown vide : une marche (#167)
       "level":    { "before": 1, "xpIntoLevelBefore": 0, "xpToNextLevelBefore": 100,
                     "after": 2, "reached": [2],
                     "totalXp": 145, "xpIntoLevel": 45, "xpToNextLevel": 115,

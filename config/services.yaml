@@ -113,9 +113,15 @@ services:
     # `game/v1/attributes.yaml`. Une liste, comme `disciplines` de `XpRates` juste
     # au-dessus : ouvrir une discipline ou corriger un pourcentage se fait dans le YAML,
     # sans revenir ici.
+    #
+    # `$disciplines` est la **même** liste que celle de `XpRates` juste au-dessus (#167) :
+    # c'est elle qui dit quelles disciplines créditent, donc quelles disciplines doivent
+    # avoir une ligne ici. Les deux tables ne peuvent pas diverger sur « qui crédite »
+    # sans qu'un seul fichier — `xp.yaml` — bouge.
     App\Shared\Domain\Activity\AttributeSplit:
         arguments:
             $splits: '%game.attributes.splits%'
+            $disciplines: '%game.xp.disciplines%'
 
     # Vitality (#161), dérivée des quatre caractéristiques ci-dessus — même fichier, même
     # geste : le domaine reçoit un objet validé, pas un entier venu tel quel du YAML.

@@ -72,12 +72,20 @@ final class GameBalancePassTest extends KernelTestCase
         self::assertIsInt($baseXpPerHour);
         self::assertIsArray($disciplines);
 
-        /** @var list<array{discipline: string, daily_cap_xp: int, xp_per_km?: int, xp_per_100m_elevation?: int}> $disciplines */
+        /** @var list<array{discipline: string, daily_cap_xp?: int, xp_per_km?: int, xp_per_100m_elevation?: int, credits_xp?: bool}> $disciplines */
         $rates = new XpRates($baseXpPerHour, $disciplines);
 
         // Le socle ne dépend plus de la discipline (#90) ; c'est le plafond quotidien qui
-        // reste par discipline, et c'est lui dont l'absence ferait échouer la construction.
+        // reste par discipline, et c'est lui dont l'absence ferait échouer la construction —
+        // sauf pour `WALKING` (#167), qui ne crédite pas et n'a donc pas de plafond du tout.
         foreach (Discipline::cases() as $discipline) {
+            if (Discipline::Walking === $discipline) {
+                self::assertFalse($rates->credits($discipline));
+
+                continue;
+            }
+
+            self::assertTrue($rates->credits($discipline));
             self::assertGreaterThan(0, $rates->dailyCapOf($discipline));
         }
     }

@@ -385,6 +385,177 @@ final class ImportSyncSummaryTest extends ApiTestCase
     }
 
     /**
+     * **Le test qui porte le #167.** Une marche ne doit consommer ni les rendements
+     * décroissants ni le plafond quotidien : sinon une heure de marche le matin brûlerait
+     * la tranche à 100 % et réduirait l'XP de la vraie séance du soir — la marche
+     * deviendrait pire que neutre.
+     *
+     * La preuve se fait par comparaison : Bob marche une heure puis court une demi-heure
+     * le même jour, Alice ne fait que courir, à la même heure du même jour relatif. Si la
+     * marche pesait sur la journée, la course de Bob démarrerait déjà à la 55ᵉ minute du
+     * jour — en plein dans la tranche à 60 % des rendements décroissants — et rapporterait
+     * moins que celle d'Alice.
+     */
+    public function testWalkingDoesNotConsumeTheDayForACreditedSessionAfterwards(): void
+    {
+        $bob = $this->openAccount('bob@grrind.app', 'Bob');
+        $withWalk = self::decode($this->import($bob, [
+            self::walkCandidate(daysAgo: 3),
+            self::candidate(externalId: 'HK-run', daysAgo: 3),
+        ]));
+
+        $alice = $this->openAccount('alice@grrind.app', 'Alice');
+        $withoutWalk = self::decode($this->import($alice, [
+            self::candidate(externalId: 'HK-run', daysAgo: 3),
+        ]));
+
+        self::assertIsArray($withWalk['imported']);
+        self::assertIsArray($withoutWalk['imported']);
+        self::assertCount(2, $withWalk['imported']);
+        self::assertCount(1, $withoutWalk['imported']);
+
+        $runWithWalk = $withWalk['imported'][1];
+        $runAlone = $withoutWalk['imported'][0];
+        self::assertIsArray($runWithWalk);
+        self::assertIsArray($runAlone);
+
+        $runWithWalkXp = $runWithWalk['xp'];
+        $runAloneXp = $runAlone['xp'];
+        self::assertIsArray($runWithWalkXp);
+        self::assertIsArray($runAloneXp);
+
+        self::assertSame(
+            $runAloneXp['awarded'],
+            $runWithWalkXp['awarded'],
+            'La marche du matin ne doit pas réduire l\'XP de la course du même jour.',
+        );
+        self::assertSame($runAloneXp['breakdown'], $runWithWalkXp['breakdown']);
+    }
+
+    /**
+     * Le `RewardSummary` d'une marche : zéro XP, une raison lisible plutôt qu'un
+     * breakdown vide, aucune caractéristique bougée, et rien écrit au ledger — le
+     * périmètre du #167 pris dans son entier.
+     */
+    public function testWalkingRendersZeroXpWithAReasonAndWritesNoLedgerLine(): void
+    {
+        $bob = $this->openAccount();
+
+        $body = self::decode($this->import($bob, [self::walkCandidate()]));
+
+        self::assertIsArray($body['imported']);
+        self::assertCount(1, $body['imported']);
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+
+        $session = $reward['session'];
+        self::assertIsArray($session);
+        self::assertSame('WALKING', $session['discipline']);
+        self::assertIsString($session['id']);
+
+        $xp = $reward['xp'];
+        self::assertIsArray($xp);
+        self::assertSame(0, $xp['awarded']);
+        self::assertSame([], $xp['breakdown']);
+        self::assertSame('NO_XP_FEEDS_VITALITY', $xp['reason']);
+
+        $level = $reward['level'];
+        self::assertIsArray($level);
+        self::assertSame($level['before'], $level['after']);
+        self::assertSame([], $level['reached']);
+        self::assertSame(0, $level['skillPointsGranted']);
+
+        $attributes = $reward['attributes'];
+        self::assertIsArray($attributes);
+        foreach (['strength', 'endurance', 'mobility', 'dexterity'] as $key) {
+            $gauge = $attributes[$key];
+            self::assertIsArray($gauge);
+            self::assertSame(0, $gauge['gained']);
+            self::assertSame($gauge['before'], $gauge['after']);
+        }
+        $vitality = $attributes['vitality'];
+        self::assertIsArray($vitality);
+        self::assertSame($vitality['before'], $vitality['after']);
+
+        self::assertSame([], $reward['titlesUnlocked']);
+
+        // Rien au ledger : une marche ne doit pas laisser de trace dans `xp_transaction`,
+        // même une trace nulle.
+        $count = $this->connection()->fetchOne(
+            'SELECT COUNT(*) FROM xp_transaction WHERE source_id = :sessionId',
+            ['sessionId' => $session['id']],
+        );
+        \assert(is_numeric($count));
+        self::assertSame(0, (int) $count);
+    }
+
+    /**
+     * **La mauvaise lecture qu'un joueur en fauteuil ne doit pas subir sans l'avoir aussi
+     * (#167).** `wheelchairWalkPace` reste sur `WALKING` et tombe à l'identique — aucune
+     * branche d'accessibilité, aucune discipline de repli. `wheelchairRunPace`, lui, reste
+     * sur `RUNNING` et crédite normalement : la coupure ne tient qu'à la discipline, jamais
+     * au type d'activité brut.
+     */
+    public function testWheelchairWalkPaceIsCutTheSameWayAsWalking(): void
+    {
+        $bob = $this->openAccount();
+
+        $body = self::decode($this->import($bob, [
+            self::candidate(externalId: 'HK-wheelchair-walk', activityType: 'wheelchairWalkPace'),
+        ]));
+
+        self::assertIsArray($body['imported']);
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+        self::assertIsArray($reward['session']);
+        self::assertSame('WALKING', $reward['session']['discipline']);
+        $xp = $reward['xp'];
+        self::assertIsArray($xp);
+        self::assertSame(0, $xp['awarded']);
+        self::assertSame('NO_XP_FEEDS_VITALITY', $xp['reason']);
+    }
+
+    public function testWheelchairRunPaceCreditsNormally(): void
+    {
+        $bob = $this->openAccount();
+
+        $body = self::decode($this->import($bob, [
+            self::candidate(externalId: 'HK-wheelchair-run', activityType: 'wheelchairRunPace'),
+        ]));
+
+        self::assertIsArray($body['imported']);
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+        self::assertIsArray($reward['session']);
+        self::assertSame('RUNNING', $reward['session']['discipline']);
+        $xp = $reward['xp'];
+        self::assertIsArray($xp);
+        self::assertGreaterThan(0, $xp['awarded']);
+        self::assertNull($xp['reason']);
+    }
+
+    /**
+     * **La mauvaise lecture évidente du ticket : `HIKING` n'est pas `WALKING`.** La
+     * randonnée reste une vraie séance créditée, distance et dénivelé compris.
+     */
+    public function testHikingIsNotConcernedByTheWalkingCut(): void
+    {
+        $bob = $this->openAccount();
+
+        $body = self::decode($this->import($bob, [self::candidate(activityType: 'hiking')]));
+
+        self::assertIsArray($body['imported']);
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+        self::assertIsArray($reward['session']);
+        self::assertSame('HIKING', $reward['session']['discipline']);
+        $xp = $reward['xp'];
+        self::assertIsArray($xp);
+        self::assertGreaterThan(0, $xp['awarded']);
+        self::assertNull($xp['reason']);
+    }
+
+    /**
      * @param list<array<string, mixed>> $workouts
      */
     private function import(Account $account, array $workouts, string $key = 'import-du-jour'): Response
@@ -412,6 +583,26 @@ final class ImportSyncSummaryTest extends ApiTestCase
             'activityType' => $activityType,
             'startedAt' => $startedAt->format(DateTimeInterface::ATOM),
             'endedAt' => $startedAt->modify('+1800 seconds')->format(DateTimeInterface::ATOM),
+        ];
+    }
+
+    /**
+     * Une marche d'une heure, finie cinq minutes avant que {@see candidate()} ne démarre
+     * sa course — assez proche pour peser sur la même journée du joueur si le garde-fou du
+     * #167 était manqué, assez loin pour ne jamais chevaucher.
+     *
+     * @return array<string, mixed>
+     */
+    private static function walkCandidate(string $externalId = 'HK-walk', int $daysAgo = 3): array
+    {
+        $startedAt = new DateTimeImmutable(\sprintf('-%d days', $daysAgo))->setTime(6, 0);
+
+        return [
+            'externalId' => $externalId,
+            'source' => 'APPLE_HEALTH',
+            'activityType' => 'walking',
+            'startedAt' => $startedAt->format(DateTimeInterface::ATOM),
+            'endedAt' => $startedAt->modify('+3300 seconds')->format(DateTimeInterface::ATOM),
         ];
     }
 }

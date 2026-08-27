@@ -155,15 +155,24 @@ final class LedgerRepartitionTest extends KernelTestCase
     /** Une table dont aucune ligne ne somme rond, comme dans AttributeSplitTest. */
     private static function split(): AttributeSplit
     {
-        return new AttributeSplit(array_map(
-            static fn (Discipline $discipline): array => [
-                'discipline' => $discipline->value,
-                'strength' => 33,
-                'endurance' => 33,
-                'mobility' => 17,
-                'dexterity' => 17,
-            ],
-            Discipline::cases(),
-        ));
+        // Toutes les disciplines créditent, dans cette table de test — WALKING y compris,
+        // pour que ce test reste centré sur l'arithmétique du plus fort reste et non sur
+        // la couverture réelle du #167.
+        return new AttributeSplit(
+            array_map(
+                static fn (Discipline $discipline): array => [
+                    'discipline' => $discipline->value,
+                    'strength' => 33,
+                    'endurance' => 33,
+                    'mobility' => 17,
+                    'dexterity' => 17,
+                ],
+                Discipline::cases(),
+            ),
+            array_map(
+                static fn (Discipline $discipline): array => ['discipline' => $discipline->value],
+                Discipline::cases(),
+            ),
+        );
     }
 }

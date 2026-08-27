@@ -46,6 +46,13 @@ use App\Training\Application\SessionCompletion;
  * la série au Lot 5, les arbres au Lot 7. Les ajouter plus tard obligerait le client déjà
  * déployé à traiter des champs qui apparaissent, donc à les rendre optionnels pour toujours ;
  * les déclarer maintenant coûte trois clés et fige la forme.
+ *
+ * **`xp.reason` (#167) explique un zéro qui n'est pas une punition.** Une marche est bien
+ * *ici* — dans `imported`, pas dans `skipped` : elle est écrite, visible, animée — mais ne
+ * rapporte aucune XP par conception. `null` pour toute séance normale ; sinon une valeur de
+ * `App\Progression\Domain\XpAwardReason` que le client rend en une phrase, à la place d'un
+ * `breakdown` vide qui ne dirait rien et d'une ligne « base : 0 » qui mentirait sur un
+ * calcul qui n'a jamais eu lieu.
  */
 final readonly class RewardSummaryResource
 {
@@ -78,6 +85,11 @@ final readonly class RewardSummaryResource
                     static fn (XpLine $line): array => ['source' => $line->source, 'amount' => $line->amount],
                     $this->reward->breakdown,
                 ),
+                // `null` sauf pour une discipline qui ne crédite pas d'XP par conception
+                // (#167) : `breakdown` reste vide dans ce cas, puisqu'il n'y a rien eu à
+                // calculer, et `reason` porte l'explication à sa place — jamais les deux
+                // vides en même temps sans un mot pour le dire.
+                'reason' => $this->reward->reason,
             ],
             // Entre `xp` et `level`, jamais ailleurs — voir le docblock de la classe.
             'attributes' => [

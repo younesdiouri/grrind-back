@@ -42,9 +42,23 @@ base_xp_per_hour: 60
 # Les disciplines à distance ont un plafond plus haut parce qu'elles peuvent légitimement
 # aller plus loin : un trail de trente kilomètres est une vraie journée de sport, pas un
 # abus, et le refuser serait exactement le genre de garde-fou qui punit le joueur assidu.
+#
+# ————— `WALKING` ne crédite pas (#167) ——————————————————————————————————————————————————
+#
+# Le document de game design est net : la marche n'alimente que Vitality, jamais l'XP.
+# `credits_xp: false` le dit explicitement, à la place d'un plafond et d'un `xp_per_km` —
+# et non un `daily_cap_xp: 0`, qui traverserait tout le calcul pour se faire écrêter à
+# l'arrivée et afficherait « 90 XP, écrêtés à 0 » au joueur, la punition qu'on cherche
+# justement à éviter. `XpRates::credits()` le fait dire à cette seule ligne, et
+# `Progression` s'arrête avant `XpCalculator` pour toute discipline qui répond non — voir
+# le docblock de `LedgerSessionRewards`.
+#
+# La discipline reste une valeur de `Discipline` à part entière : la séance est écrite et
+# visible dans l'historique, seul son crédit disparaît. La sortir de l'enum ferait
+# disparaître les séances de l'historique, ce qui est un bug du point de vue du joueur.
 disciplines:
     - { discipline: RUNNING, daily_cap_xp: 400, xp_per_km: 10 }
-    - { discipline: WALKING, daily_cap_xp: 200, xp_per_km: 5 }
+    - { discipline: WALKING, credits_xp: false }
     - { discipline: CYCLING, daily_cap_xp: 400, xp_per_km: 3 }
     - { discipline: SWIMMING, daily_cap_xp: 300, xp_per_km: 50 }
     - { discipline: HIKING, daily_cap_xp: 500, xp_per_km: 8, xp_per_100m_elevation: 20 }
