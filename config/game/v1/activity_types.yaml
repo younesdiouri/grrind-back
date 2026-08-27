@@ -55,6 +55,19 @@ apple_health:
     - { activity_type: preparationAndRecovery, discipline: MOBILITY }
     - { activity_type: cooldown, discipline: MOBILITY }
     - { activity_type: climbing, discipline: CLIMBING }
+    - { activity_type: soccer, discipline: FOOTBALL }
+    - { activity_type: rugby, discipline: FOOTBALL }
+    - { activity_type: americanFootball, discipline: FOOTBALL }
+    - { activity_type: australianFootball, discipline: FOOTBALL }
+    - { activity_type: basketball, discipline: COURT_SPORTS }
+    - { activity_type: handball, discipline: COURT_SPORTS }
+    - { activity_type: volleyball, discipline: COURT_SPORTS }
+    - { activity_type: tennis, discipline: RACKET_SPORTS }
+    - { activity_type: badminton, discipline: RACKET_SPORTS }
+    - { activity_type: tableTennis, discipline: RACKET_SPORTS }
+    - { activity_type: squash, discipline: RACKET_SPORTS }
+    - { activity_type: racquetball, discipline: RACKET_SPORTS }
+    - { activity_type: pickleball, discipline: RACKET_SPORTS }
 
 health_connect:
     - { activity_type: EXERCISE_TYPE_RUNNING, discipline: RUNNING }
@@ -74,3 +87,15 @@ health_connect:
     - { activity_type: EXERCISE_TYPE_PILATES, discipline: MOBILITY }
     - { activity_type: EXERCISE_TYPE_STRETCHING, discipline: MOBILITY }
     - { activity_type: EXERCISE_TYPE_ROCK_CLIMBING, discipline: CLIMBING }
+    - { activity_type: EXERCISE_TYPE_SOCCER, discipline: FOOTBALL }
+    - { activity_type: EXERCISE_TYPE_RUGBY, discipline: FOOTBALL }
+    - { activity_type: EXERCISE_TYPE_FOOTBALL_AMERICAN, discipline: FOOTBALL }
+    - { activity_type: EXERCISE_TYPE_FOOTBALL_AUSTRALIAN, discipline: FOOTBALL }
+    - { activity_type: EXERCISE_TYPE_BASKETBALL, discipline: COURT_SPORTS }
+    - { activity_type: EXERCISE_TYPE_HANDBALL, discipline: COURT_SPORTS }
+    - { activity_type: EXERCISE_TYPE_VOLLEYBALL, discipline: COURT_SPORTS }
+    - { activity_type: EXERCISE_TYPE_TENNIS, discipline: RACKET_SPORTS }
+    - { activity_type: EXERCISE_TYPE_BADMINTON, discipline: RACKET_SPORTS }
+    - { activity_type: EXERCISE_TYPE_TABLE_TENNIS, discipline: RACKET_SPORTS }
+    - { activity_type: EXERCISE_TYPE_SQUASH, discipline: RACKET_SPORTS }
+    - { activity_type: EXERCISE_TYPE_RACQUETBALL, discipline: RACKET_SPORTS }

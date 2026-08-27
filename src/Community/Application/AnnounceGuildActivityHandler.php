@@ -207,6 +207,9 @@ final readonly class AnnounceGuildActivityHandler
             Discipline::Hiking => 'randonnée',
             Discipline::Mobility => 'mobilité',
             Discipline::Climbing => 'escalade',
+            Discipline::Football => 'football',
+            Discipline::CourtSports => 'sport de salle',
+            Discipline::RacketSports => 'raquette',
         };
     }
 }

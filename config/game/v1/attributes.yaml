@@ -42,6 +42,9 @@ splits:
     - { discipline: HIIT, strength: 20, endurance: 25, mobility: 25, dexterity: 30 }
     - { discipline: MOBILITY, strength: 5, endurance: 10, mobility: 70, dexterity: 15 }
     - { discipline: CLIMBING, strength: 40, endurance: 20, mobility: 20, dexterity: 20 }
+    - { discipline: FOOTBALL, strength: 15, endurance: 30, mobility: 15, dexterity: 40 }
+    - { discipline: COURT_SPORTS, strength: 15, endurance: 30, mobility: 10, dexterity: 45 }
+    - { discipline: RACKET_SPORTS, strength: 10, endurance: 25, mobility: 10, dexterity: 55 }
 
 # Vitality (#161), la cinquième caractéristique du game design : entièrement dérivée des
 # quatre ci-dessus, jamais créditée directement — voir le docblock d'`App\Shared\Domain\
