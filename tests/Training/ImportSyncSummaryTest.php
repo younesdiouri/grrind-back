@@ -15,6 +15,7 @@ use App\Tests\Support\Workouts;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
@@ -205,6 +206,62 @@ final class ImportSyncSummaryTest extends ApiTestCase
     }
 
     /**
+     * **Le ticket #166.** Les trois nouvelles disciplines traversent l'import comme les
+     * sept de la V1 : la montre les mesure, `ActivityTypeMap` les traduit, et la séance
+     * portée par le `RewardSummary` affiche la bonne discipline.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function theThreeNewDisciplines(): iterable
+    {
+        yield 'football' => ['soccer', 'FOOTBALL'];
+        yield 'sport de salle' => ['basketball', 'COURT_SPORTS'];
+        yield 'raquette' => ['tennis', 'RACKET_SPORTS'];
+    }
+
+    #[DataProvider('theThreeNewDisciplines')]
+    public function testANewDisciplineTraversesTheImport(string $activityType, string $expectedDiscipline): void
+    {
+        $bob = $this->openAccount();
+
+        $body = self::decode($this->import($bob, [self::candidate(activityType: $activityType)]));
+
+        self::assertIsArray($body['imported']);
+        self::assertCount(1, $body['imported']);
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+        self::assertIsArray($reward['session']);
+        self::assertSame($expectedDiscipline, $reward['session']['discipline']);
+    }
+
+    /**
+     * **Le garde-fou du ticket.** Sans ces trois disciplines, Dexterity ne dépassait jamais
+     * 30 % d'une séance. `RACKET_SPORTS` lui donne 55 % à la table de répartition — la
+     * preuve se fait sur le vrai payload, pas sur la table de configuration seule, pour
+     * couvrir aussi la méthode du plus fort reste.
+     */
+    public function testDexterityExceedsHalfOfASessionOnARacketSport(): void
+    {
+        $bob = $this->openAccount();
+
+        $body = self::decode($this->import($bob, [self::candidate(activityType: 'tennis')]));
+
+        self::assertIsArray($body['imported']);
+        $reward = $body['imported'][0];
+        self::assertIsArray($reward);
+        $xp = $reward['xp'];
+        $attributes = $reward['attributes'];
+        self::assertIsArray($xp);
+        self::assertIsArray($attributes);
+        self::assertIsInt($xp['awarded']);
+        $dexterity = $attributes['dexterity'];
+        self::assertIsArray($dexterity);
+        self::assertIsInt($dexterity['gained']);
+
+        self::assertGreaterThan($xp['awarded'] / 2, $dexterity['gained']);
+    }
+
+    /**
      * L'ordre est **chronologique**, celui du crédit — pas celui du lot. Le client joue la
      * liste de haut en bas sans la trier.
      */
@@ -345,14 +402,14 @@ final class ImportSyncSummaryTest extends ApiTestCase
      *
      * @return array<string, mixed>
      */
-    private static function candidate(string $externalId = 'HK-001', int $daysAgo = 3): array
+    private static function candidate(string $externalId = 'HK-001', int $daysAgo = 3, string $activityType = 'running'): array
     {
         $startedAt = new DateTimeImmutable(\sprintf('-%d days', $daysAgo))->setTime(7, 0);
 
         return [
             'externalId' => $externalId,
             'source' => 'APPLE_HEALTH',
-            'activityType' => 'running',
+            'activityType' => $activityType,
             'startedAt' => $startedAt->format(DateTimeInterface::ATOM),
             'endedAt' => $startedAt->modify('+1800 seconds')->format(DateTimeInterface::ATOM),
         ];

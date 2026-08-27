@@ -567,7 +567,7 @@ when@dev:
                         required: [id, discipline, source, trust, startedAt, endedAt, durationSeconds, distanceMeters, calories, elevationGainMeters, averageHeartRate, externalId]
                         properties:
                             id: { type: string, format: uuid }
-                            discipline: { type: string, enum: [RUNNING, WALKING, CYCLING, SWIMMING, STRENGTH, HIIT, HIKING, MOBILITY, CLIMBING] }
+                            discipline: { type: string, enum: [RUNNING, WALKING, CYCLING, SWIMMING, STRENGTH, HIIT, HIKING, MOBILITY, CLIMBING, FOOTBALL, COURT_SPORTS, RACKET_SPORTS] }
                             source:
                                 type: string
                                 enum: [APPLE_HEALTH, HEALTH_CONNECT]
@@ -976,7 +976,7 @@ when@dev:
                             id: { type: string, format: uuid }
                             sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant du workout." }
                             reason: { type: string, enum: [SESSION_COMPLETED, SESSION_INVALIDATED] }
-                            discipline: { type: string, enum: [RUNNING, WALKING, CYCLING, SWIMMING, STRENGTH, HIIT, HIKING, MOBILITY, CLIMBING] }
+                            discipline: { type: string, enum: [RUNNING, WALKING, CYCLING, SWIMMING, STRENGTH, HIIT, HIKING, MOBILITY, CLIMBING, FOOTBALL, COURT_SPORTS, RACKET_SPORTS] }
                             amount: { type: integer, description: "Signé. La somme du `breakdown`, jamais autre chose." }
                             durationSeconds: { type: integer, description: "Signée elle aussi — négative sur une annulation." }
                             breakdown:

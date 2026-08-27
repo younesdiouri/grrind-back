@@ -136,6 +136,9 @@ final class ActivityTypeMapTest extends TestCase
             ['activity_type' => 'hiking', 'discipline' => 'HIKING'],
             ['activity_type' => 'yoga', 'discipline' => 'MOBILITY'],
             ['activity_type' => 'climbing', 'discipline' => 'CLIMBING'],
+            ['activity_type' => 'soccer', 'discipline' => 'FOOTBALL'],
+            ['activity_type' => 'basketball', 'discipline' => 'COURT_SPORTS'],
+            ['activity_type' => 'tennis', 'discipline' => 'RACKET_SPORTS'],
         ];
     }
 
@@ -154,6 +157,9 @@ final class ActivityTypeMapTest extends TestCase
             ['activity_type' => 'EXERCISE_TYPE_HIKING', 'discipline' => 'HIKING'],
             ['activity_type' => 'EXERCISE_TYPE_YOGA', 'discipline' => 'MOBILITY'],
             ['activity_type' => 'EXERCISE_TYPE_ROCK_CLIMBING', 'discipline' => 'CLIMBING'],
+            ['activity_type' => 'EXERCISE_TYPE_SOCCER', 'discipline' => 'FOOTBALL'],
+            ['activity_type' => 'EXERCISE_TYPE_BASKETBALL', 'discipline' => 'COURT_SPORTS'],
+            ['activity_type' => 'EXERCISE_TYPE_TENNIS', 'discipline' => 'RACKET_SPORTS'],
         ];
     }
 }

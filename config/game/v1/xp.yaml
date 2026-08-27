@@ -22,6 +22,10 @@
 # dimension qu'on n'aurait que sur la moitié des appareils créerait deux jeux au lieu d'un,
 # et le joueur au bracelet d'entrée de gamme serait puni pour son matériel.
 #
+# `FOOTBALL`, `COURT_SPORTS` et `RACKET_SPORTS` (#166) les rejoignent, pour la même
+# raison : ni distance ni dénivelé fiables sur un match, quel que soit le fournisseur.
+# Bornées de fait par les rendements décroissants plus bas, comme les quatre autres.
+#
 # Le dénivelé n'est déclaré que sur `HIKING`, où il *est* l'effort. Une course en côte le
 # gagnera peut-être plus tard ; ce sera une ligne ici, et rien d'autre.
 #
@@ -48,6 +52,9 @@ disciplines:
     - { discipline: HIIT, daily_cap_xp: 200 }
     - { discipline: MOBILITY, daily_cap_xp: 200 }
     - { discipline: CLIMBING, daily_cap_xp: 200 }
+    - { discipline: FOOTBALL, daily_cap_xp: 200 }
+    - { discipline: COURT_SPORTS, daily_cap_xp: 200 }
+    - { discipline: RACKET_SPORTS, daily_cap_xp: 200 }
 
 # Rendements décroissants sur le **cumul de la journée**, toutes disciplines confondues, et
 # dans le fuseau du joueur. C'est le garde-fou anti-abus qui ne se ressent pas comme une

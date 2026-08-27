@@ -1153,6 +1153,9 @@ components:
             - HIKING
             - MOBILITY
             - CLIMBING
+            - FOOTBALL
+            - COURT_SPORTS
+            - RACKET_SPORTS
         source:
           description: "L'agrégateur de plateforme qui a rapporté la séance, pas l'appareil qui l'a\nmesurée : une montre Garmin arrive en `APPLE_HEALTH` sur iPhone et en\n`HEALTH_CONNECT` sur Android.\n"
           type: string
@@ -1655,6 +1658,9 @@ components:
             - HIKING
             - MOBILITY
             - CLIMBING
+            - FOOTBALL
+            - COURT_SPORTS
+            - RACKET_SPORTS
         amount:
           description: 'Signé. La somme du `breakdown`, jamais autre chose.'
           type: integer
@@ -1934,6 +1940,9 @@ components:
         - HIKING
         - MOBILITY
         - CLIMBING
+        - FOOTBALL
+        - COURT_SPORTS
+        - RACKET_SPORTS
     WorkoutHistoryQuery:
       properties:
         discipline:

@@ -503,6 +503,9 @@ final class XpCalculatorTest extends TestCase
             ['discipline' => 'HIIT', 'daily_cap_xp' => 220],
             ['discipline' => 'MOBILITY', 'daily_cap_xp' => 100],
             ['discipline' => 'CLIMBING', 'daily_cap_xp' => 170],
+            ['discipline' => 'FOOTBALL', 'daily_cap_xp' => 150],
+            ['discipline' => 'COURT_SPORTS', 'daily_cap_xp' => 150],
+            ['discipline' => 'RACKET_SPORTS', 'daily_cap_xp' => 150],
         ]);
     }
 
