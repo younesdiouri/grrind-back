@@ -188,7 +188,7 @@ final class ProgressionSnapshotTest extends TestCase
     /** Un plancher arbitraire mais documenté, indépendant de celui livré — la table de cas complète vit dans `VitalityTest`. */
     private static function vitality(): Vitality
     {
-        return new Vitality(250);
+        return new Vitality(250, 500, 200);
     }
 
     private static function now(): DateTimeImmutable

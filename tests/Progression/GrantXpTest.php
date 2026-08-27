@@ -357,14 +357,21 @@ final class GrantXpTest extends ApiTestCase
     }
 
     /**
-     * Le plancher livré, construit depuis son paramètre — même geste et même raison qu'à
-     * {@see curve()} : le conteneur n'expose pas `Vitality` en dehors du handler.
+     * Le plancher, la cible et le plafond livrés, construits depuis leurs paramètres — même
+     * geste et même raison qu'à {@see curve()} : le conteneur n'expose pas `Vitality` en
+     * dehors du handler.
      */
     private static function vitality(): Vitality
     {
         $floorPermille = self::getContainer()->getParameter('game.attributes.vitality.floor_permille');
         self::assertIsInt($floorPermille);
 
-        return new Vitality($floorPermille);
+        $targetActiveKcal = self::getContainer()->getParameter('game.attributes.vitality.target_active_kcal');
+        self::assertIsInt($targetActiveKcal);
+
+        $bonusCapPermille = self::getContainer()->getParameter('game.attributes.vitality.bonus_cap_permille');
+        self::assertIsInt($bonusCapPermille);
+
+        return new Vitality($floorPermille, $targetActiveKcal, $bonusCapPermille);
     }
 }

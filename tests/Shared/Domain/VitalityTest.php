@@ -6,23 +6,28 @@ namespace App\Tests\Shared\Domain;
 
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Vitality;
+use App\Shared\Domain\Activity\VitalityBreakdown;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * La table de cas du #161 : ce que le coefficient d'équilibre et son plancher rendent sur
- * les quatre totaux, sans base ni conteneur.
+ * La table de cas du #161 (le coefficient d'équilibre et son plancher) et du #165 (le
+ * bonus quotidien) : ce que `Vitality` rend sur les quatre totaux et une moyenne d'énergie
+ * active, sans base ni conteneur.
  *
- * Le plancher utilisé ici (`250` millièmes) est celui livré dans `attributes.yaml`, mais
- * rien dans ce fichier n'en dépend : chaque test le passe explicitement au constructeur,
- * exactement comme `AttributeSplitTest` construit sa propre table plutôt que de lire celle
- * livrée — {@see \App\Tests\Shared\Config\AttributeSplitCoverageTest} joue ce rôle-là pour
- * `Vitality` aussi, par la validation qu'`AttributeSplitSection` fait à la compilation.
+ * Le plancher, la cible et le plafond utilisés ici sont ceux livrés dans `attributes.yaml`,
+ * mais rien dans ce fichier n'en dépend : chaque test les passe explicitement au
+ * constructeur, exactement comme `AttributeSplitTest` construit sa propre table plutôt que
+ * de lire celle livrée — {@see \App\Tests\Shared\Config\AttributeSplitCoverageTest} joue ce
+ * rôle-là pour `Vitality` aussi, par la validation qu'`AttributeSplitSection` fait à la
+ * compilation.
  */
 final class VitalityTest extends TestCase
 {
     private const int FLOOR_PERMILLE = 250;
+    private const int TARGET_ACTIVE_KCAL = 500;
+    private const int BONUS_CAP_PERMILLE = 200;
 
     public function testMaximalWhenTheFourAttributesAreEqual(): void
     {
@@ -131,11 +136,96 @@ final class VitalityTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new Vitality($floorPermille);
+        new Vitality($floorPermille, self::TARGET_ACTIVE_KCAL, self::BONUS_CAP_PERMILLE);
+    }
+
+    public function testRefusesATargetOfZeroActiveKcal(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new Vitality(self::FLOOR_PERMILLE, 0, self::BONUS_CAP_PERMILLE);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function invalidBonusCaps(): iterable
+    {
+        yield 'négatif' => [-1];
+        yield 'au-delà du millier' => [1_001];
+    }
+
+    #[DataProvider('invalidBonusCaps')]
+    public function testRefusesABonusCapThatIsNotExpressedInPermille(int $bonusCapPermille): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new Vitality(self::FLOOR_PERMILLE, self::TARGET_ACTIVE_KCAL, $bonusCapPermille);
+    }
+
+    /**
+     * Le point 5 du ticket #165 : le bonus multiplie, il ne crée rien. Un joueur qui vient
+     * de s'inscrire a une énergie active moyenne nulle *et* une Vitality de base nulle —
+     * les deux zéros n'ont pas la même cause, mais le résultat doit être le même zéro.
+     */
+    public function testANewAccountStaysAtZeroEvenWithAPerfectBonus(): void
+    {
+        $vitality = self::vitality();
+
+        self::assertSame(0, $vitality->bonused(0, self::TARGET_ACTIVE_KCAL * 10));
+    }
+
+    /**
+     * Aucune donnée d'énergie active sur la fenêtre : le bonus est nul, la Vitality
+     * bonifiée égale exactement la base — un joueur qui n'envoie jamais rien à
+     * `PUT /api/daily-activity` ne doit ni gagner ni perdre par rapport à avant #165.
+     */
+    public function testNoActiveEnergyMeansNoBonus(): void
+    {
+        $vitality = self::vitality();
+
+        self::assertSame(1_000, $vitality->bonused(1_000, 0));
+        self::assertEquals(new VitalityBreakdown(0, self::TARGET_ACTIVE_KCAL, 0), $vitality->explain(0));
+    }
+
+    /**
+     * Atteindre pile la cible vaut le plafond du bonus, ni plus ni moins.
+     */
+    public function testReachingTheTargetGivesExactlyTheCappedBonus(): void
+    {
+        $vitality = self::vitality();
+
+        self::assertSame(
+            1_000 + intdiv(1_000 * self::BONUS_CAP_PERMILLE, 1_000),
+            $vitality->bonused(1_000, self::TARGET_ACTIVE_KCAL),
+        );
+        self::assertSame(self::BONUS_CAP_PERMILLE, $vitality->explain(self::TARGET_ACTIVE_KCAL)->bonusPermille);
+    }
+
+    /**
+     * Bien au-delà de la cible, le bonus reste plafonné — répéter la cible deux fois ne
+     * double pas le bonus.
+     */
+    public function testTheBonusNeverExceedsItsCap(): void
+    {
+        $vitality = self::vitality();
+
+        self::assertSame(self::BONUS_CAP_PERMILLE, $vitality->explain(self::TARGET_ACTIVE_KCAL * 10)->bonusPermille);
+    }
+
+    /**
+     * À mi-cible, le bonus vaut la moitié du plafond — la proportionnalité du #165, sur un
+     * cas sans ambiguïté d'arrondi.
+     */
+    public function testAHalfwayAverageGivesHalfTheCappedBonus(): void
+    {
+        $vitality = self::vitality();
+
+        self::assertSame(intdiv(self::BONUS_CAP_PERMILLE, 2), $vitality->explain(self::TARGET_ACTIVE_KCAL / 2)->bonusPermille);
     }
 
     private static function vitality(): Vitality
     {
-        return new Vitality(self::FLOOR_PERMILLE);
+        return new Vitality(self::FLOOR_PERMILLE, self::TARGET_ACTIVE_KCAL, self::BONUS_CAP_PERMILLE);
     }
 }
