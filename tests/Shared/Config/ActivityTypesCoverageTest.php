@@ -68,6 +68,64 @@ final class ActivityTypesCoverageTest extends KernelTestCase
     }
 
     /**
+     * Les trois disciplines du #166, sur les deux fournisseurs — c'est précisément ce que
+     * `ActivityTypesSection` refuse de démarrer sans, donc les deux côtés se prouvent
+     * ensemble plutôt que dans deux tests qui pourraient diverger.
+     *
+     * @return iterable<string, array{string, string, Discipline}>
+     */
+    public static function theThreeSportsThatFeedDexterity(): iterable
+    {
+        yield 'football, Apple, ballon au pied' => ['APPLE_HEALTH', 'soccer', Discipline::Football];
+        yield 'football, Apple, rugby' => ['APPLE_HEALTH', 'rugby', Discipline::Football];
+        yield 'football, Apple, américain' => ['APPLE_HEALTH', 'americanFootball', Discipline::Football];
+        yield 'football, Apple, australien' => ['APPLE_HEALTH', 'australianFootball', Discipline::Football];
+        yield 'football, Google, ballon au pied' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_SOCCER', Discipline::Football];
+        yield 'football, Google, rugby' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_RUGBY', Discipline::Football];
+        yield 'football, Google, américain' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_FOOTBALL_AMERICAN', Discipline::Football];
+        yield 'football, Google, australien' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_FOOTBALL_AUSTRALIAN', Discipline::Football];
+
+        yield 'sport de salle, Apple, basket' => ['APPLE_HEALTH', 'basketball', Discipline::CourtSports];
+        yield 'sport de salle, Apple, hand' => ['APPLE_HEALTH', 'handball', Discipline::CourtSports];
+        yield 'sport de salle, Apple, volley' => ['APPLE_HEALTH', 'volleyball', Discipline::CourtSports];
+        yield 'sport de salle, Google, basket' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_BASKETBALL', Discipline::CourtSports];
+        yield 'sport de salle, Google, hand' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_HANDBALL', Discipline::CourtSports];
+        yield 'sport de salle, Google, volley' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_VOLLEYBALL', Discipline::CourtSports];
+
+        yield 'raquette, Apple, tennis' => ['APPLE_HEALTH', 'tennis', Discipline::RacketSports];
+        yield 'raquette, Apple, badminton' => ['APPLE_HEALTH', 'badminton', Discipline::RacketSports];
+        yield 'raquette, Apple, tennis de table' => ['APPLE_HEALTH', 'tableTennis', Discipline::RacketSports];
+        yield 'raquette, Apple, squash' => ['APPLE_HEALTH', 'squash', Discipline::RacketSports];
+        yield 'raquette, Apple, racquetball' => ['APPLE_HEALTH', 'racquetball', Discipline::RacketSports];
+        yield 'raquette, Apple, pickleball' => ['APPLE_HEALTH', 'pickleball', Discipline::RacketSports];
+        yield 'raquette, Google, tennis' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_TENNIS', Discipline::RacketSports];
+        yield 'raquette, Google, badminton' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_BADMINTON', Discipline::RacketSports];
+        yield 'raquette, Google, tennis de table' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_TABLE_TENNIS', Discipline::RacketSports];
+        yield 'raquette, Google, squash' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_SQUASH', Discipline::RacketSports];
+        yield 'raquette, Google, racquetball' => ['HEALTH_CONNECT', 'EXERCISE_TYPE_RACQUETBALL', Discipline::RacketSports];
+    }
+
+    #[DataProvider('theThreeSportsThatFeedDexterity')]
+    public function testTheThreeNewSportsAreTranslatedOnBothProviders(string $source, string $activityType, Discipline $expected): void
+    {
+        self::assertSame($expected, self::shippedMap()->disciplineFor($source, $activityType));
+    }
+
+    /**
+     * **Le piège du ticket.** `paddleSports` est le kayak et le canoë — la pagaie, pas la
+     * raquette. Le mapper sous `RACKET_SPORTS` enverrait toutes les descentes de rivière
+     * du pays sur la Dexterity ; il reste donc non traduit, comme avant ce ticket. Même
+     * vigilance côté Health Connect avec `EXERCISE_TYPE_PADDLING`.
+     */
+    public function testPaddleSportsIsKayakingNotPadelAndStaysUntranslated(): void
+    {
+        $map = self::shippedMap();
+
+        self::assertNull($map->disciplineFor('APPLE_HEALTH', 'paddleSports'));
+        self::assertNull($map->disciplineFor('HEALTH_CONNECT', 'EXERCISE_TYPE_PADDLING'));
+    }
+
+    /**
      * Le type que l'Apple Watch écrit pour « Cardio varié », et le repli de plusieurs
      * appareils de salle.
      *
