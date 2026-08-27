@@ -33,7 +33,9 @@ interface SessionRewards
     /**
      * **Appelé dans la transaction d'import, jamais en dehors.** L'implémentation pose un
      * verrou sur la ligne de progression du joueur ; hors transaction, il se relâcherait
-     * aussitôt et ne sérialiserait rien.
+     * aussitôt et ne sérialiserait rien. Sauf pour une discipline qui ne crédite pas d'XP
+     * par conception (#167, la marche) : rien n'y étant écrit, aucun verrou n'y est pris —
+     * voir le docblock de `LedgerSessionRewards`.
      *
      * Appelé **N fois** dans un lot, et c'est sans conséquence sur le verrou : un verrou de
      * ligne est ré-entrant dans une transaction, donc il est pris au premier workout et
@@ -46,7 +48,8 @@ interface SessionRewards
      *
      * Une panne se propage plutôt que de se rattraper : un workout écrit sans XP créditée
      * est une perte silencieuse pour le joueur, et c'est le rôle de la transaction appelante
-     * de tout défaire.
+     * de tout défaire. Une discipline qui ne crédite jamais rien n'est pas ce cas : `null`
+     * n'y est jamais perdu, c'est le comportement voulu, rendu lisible par `SessionReward::$reason`.
      */
     public function creditFor(WorkoutImported $workout): SessionReward;
 }

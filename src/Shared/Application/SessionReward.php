@@ -36,6 +36,14 @@ use App\Shared\Domain\Activity\AttributeGains;
  * première fois depuis longtemps. `attributeGains`, lui, est le détail par caractéristique
  * de `xpAwarded` — la même donnée que porte déjà `XpAward`, réexportée en `AttributeGains`
  * puisque c'est déjà un type de `Shared`.
+ *
+ * **`reason` explique un zéro qui n'est pas une punition (#167).** `null` pour toute séance
+ * créditée normalement — y compris une séance totalement écrêtée par le plafond quotidien,
+ * dont le breakdown porte déjà sa ligne `DAILY_CAP`. Non nul uniquement pour une discipline
+ * qui ne crédite pas d'XP par conception (la marche) : `breakdown` reste vide, puisque
+ * `Progression` n'a rien calculé du tout pour elle, et `reason` porte l'explication à sa
+ * place — même geste que `Training\Domain\ImportSkipReason` pour les séances écartées,
+ * côté vocabulaire de `Progression` cette fois.
  */
 final readonly class SessionReward
 {
@@ -73,6 +81,12 @@ final readonly class SessionReward
         public int $vitalityAfter,
         /** L'équilibrage sous lequel ce montant a été accordé, tel qu'il est écrit au ledger. */
         public string $rulesetVersion,
+        /**
+         * Une valeur de `App\Progression\Domain\XpAwardReason`, ou `null` — voir le
+         * docblock de la classe. Une chaîne et non l'enum lui-même, pour la même raison
+         * que `XpLine::$source` : le vocabulaire appartient à `Progression`.
+         */
+        public ?string $reason = null,
     ) {
     }
 }
