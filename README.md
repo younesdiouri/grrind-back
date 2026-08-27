@@ -36,7 +36,7 @@ correspondante de [CLAUDE.md](CLAUDE.md).
 ## Architecture
 
 Monolithe modulaire : `Shared`, `Identity`, `Training`, `Progression`, `Rewards`, `Engagement`.
-Un module ne connaît que `Shared` — Deptrac le vérifie en CI.
+Un module ne connaît que `Shared` — `make qa` le vérifie, et casse sur une flèche interdite.
 
 👉 **[ARCHITECTURE.md](ARCHITECTURE.md) est la vue d'ensemble en schémas** : la carte des modules,
 la vie d'un import, la transaction d'import, le modèle de données, l'authentification et la
@@ -55,8 +55,9 @@ make openapi       # régénère le fichier depuis les routes et les attributs
 ```
 
 Il n'y a **pas de route de documentation** — le contrat est le fichier, pas un endpoint de plus sous
-`^/api`, et le bundle qui le produit n'est chargé qu'en dev. Deux garde-fous le tiennent : la CI
-régénère et refuse un fichier en retard, et `OpenApiContractTest` refuse une route non décrite.
+`^/api`, et le bundle qui le produit n'est chargé qu'en dev. Deux garde-fous le tiennent :
+`OpenApiContractTest` refuse une route non décrite, et `make openapi` avant chaque push refuse —
+par le `git diff` qui suit — un fichier en retard sur le code.
 
 ## Déploiement
 

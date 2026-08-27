@@ -24,11 +24,11 @@ use Symfony\Component\Yaml\Yaml;
  * `openapi.yaml` est le contrat que le dépôt front consomme, et un contrat qui oublie une
  * route est pire qu'un contrat absent : il donne confiance.
  *
- * **Ce test compare le fichier au routeur, pas à lui-même.** Le check de dérive de la CI
- * (`make openapi` puis `git diff --exit-code`) prouve que le fichier committé est bien celui
- * que le code produit ; il ne dit rien de ce que le code a oublié de décrire. C'est ce
- * trou-là que ce test bouche : une route ajoutée sans attributs OpenAPI le fait échouer,
- * en test, avant la revue.
+ * **Ce test compare le fichier au routeur, pas à lui-même.** Le check de dérive
+ * (`make openapi` puis `git diff`, à la main avant de pousser depuis #178) prouve que le fichier
+ * committé est bien celui que le code produit ; il ne dit rien de ce que le code a oublié de
+ * décrire. C'est ce trou-là que ce test bouche : une route ajoutée sans attributs OpenAPI le
+ * fait échouer, en test, avant la revue.
  *
  * Il ne vérifie pas les *formes* des réponses — c'est le travail des suites de chaque
  * module, qui les figent contre la vraie API jusqu'à l'ordre des clés du `RewardSummary`.

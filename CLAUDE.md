@@ -30,6 +30,35 @@ Le virage santé l'a **renforcé** plutôt que remis en cause : le module natif 
 Android — Health Connect, en Kotlin — est un second module natif derrière la même interface JS.
 C'est exactement l'option que React Native préservait.
 
+## Où en est le produit : phase de dev, aucun joueur
+
+**Grrind n'est pas déployé et n'a pas d'utilisateurs.** Le back tourne sur Fly, la base de dev est
+jetable, et les seuls comptes qui existent sont ceux de l'auteur et de deux amis qui testent. Ça
+n'est pas un détail de contexte : c'est ce qui rend recevable une décision qu'on refuserait en
+production.
+
+Ce que cette phase autorise, sans avoir à le demander ni à s'en excuser :
+
+- une migration destructive, un renommage sans reprise de données, un `db-reset` ;
+- couper une mécanique avant que son remplacement existe ;
+- changer une valeur du contrat client, tant que le ticket côté app suit ;
+- **fusionner soi-même sur `main`** une PR qu'on vient de relire, sans redemander.
+
+Ce qu'elle n'autorise pas, et qui reste à signaler avec la même exigence qu'après le lancement :
+une **logique fausse**, un **contrat qui ment**, un **invariant cassé**. Ceux-là survivent à la
+phase de dev ; les autres non.
+
+**Concrètement, quand on rédige un ticket ou un rapport de fin de tâche** : ne pas invoquer un
+préjudice joueur qui n'existe pas. « Couper maintenant punirait le joueur qui… », « on perdrait
+des gens », « fenêtre de régression pour les utilisateurs » — ces arguments sont vrais dans
+l'absolu et faux ici, et les écrire fait perdre du temps à tout le monde : ils bloquent des
+tickets qui n'ont aucune raison d'attendre. Écrire la décision destructive dans le docblock du
+fichier ou de la migration, pour qu'elle reste lisible quand la fenêtre sera fermée — mais ne
+pas en faire une alerte.
+
+Cette section a une date de péremption : **au premier joueur réel, elle saute**, et tout ce
+qu'elle autorise redevient un sujet.
+
 ## Règle n°0 : priorité à l'écosystème Symfony
 
 **Ce que Symfony fournit ne se réécrit pas.** Avant d'écrire une classe, la question est
@@ -424,3 +453,27 @@ et porte les six interdits sous une forme opérationnelle.
 **La revue finale revient à l'architecte**, et elle se fait *contre le ticket* : ce qui est coché
 l'est-il vraiment, ce qui ne l'est pas est-il expliqué, et la PR a-t-elle tranché quelque chose
 qui aurait dû remonter. C'est là, et pas dans le CI, que les décisions de produit se tiennent.
+
+**Et l'architecte fusionne lui-même sur `main`**, dans la foulée de sa revue, sans demander la
+permission de le faire. La revue *est* l'autorisation ; redemander après l'avoir donnée n'ajoute
+aucune sécurité, ça ajoute un aller-retour. Ce qui reste à remonter avant de fusionner est la
+seule chose qui compte : une PR qui a tranché quelque chose que le ticket ne tranchait pas.
+
+## Il n'y a pas de CI, et les barrières tournent avant le push
+
+Le workflow GitHub Actions a été supprimé (#178) : il rejouait, sur une image reconstruite à
+chaque fois, exactement ce que `make qa` et `make test` font en local en une fraction du temps.
+Le développeur les lance **avant de pousser**, et c'est la version qui fait foi — pas une seconde
+exécution plus lente sur une machine qu'on ne regarde qu'après coup.
+
+```bash
+make qa          # phpstan + cs-fixer + deptrac
+make test        # phpunit
+make openapi     # puis vérifier que `git diff openapi.yaml` est vide
+```
+
+**La troisième ligne est celle qu'on oublie, et c'est la seule que la CI attrapait vraiment.**
+`openapi.yaml` est du contrat versionné : le dépôt front en génère son client TypeScript. Un
+fichier en retard d'une route, c'est une intégration qui casse là-bas pour une raison qui vient
+d'ici, et personne ne pense spontanément à `make openapi` en ajoutant un endpoint. Toute PR qui
+touche à une route la relance et committe le résultat.
