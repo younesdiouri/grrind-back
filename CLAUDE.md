@@ -30,6 +30,34 @@ Le virage santé l'a **renforcé** plutôt que remis en cause : le module natif 
 Android — Health Connect, en Kotlin — est un second module natif derrière la même interface JS.
 C'est exactement l'option que React Native préservait.
 
+## Où en est le produit : phase de dev, aucun joueur
+
+**Grrind n'est pas déployé et n'a pas d'utilisateurs.** Le back tourne sur Fly, la base de dev est
+jetable, et les seuls comptes qui existent sont ceux de l'auteur et de deux amis qui testent. Ça
+n'est pas un détail de contexte : c'est ce qui rend recevable une décision qu'on refuserait en
+production.
+
+Ce que cette phase autorise, sans avoir à le demander ni à s'en excuser :
+
+- une migration destructive, un renommage sans reprise de données, un `db-reset` ;
+- couper une mécanique avant que son remplacement existe ;
+- changer une valeur du contrat client, tant que le ticket côté app suit.
+
+Ce qu'elle n'autorise pas, et qui reste à signaler avec la même exigence qu'après le lancement :
+une **logique fausse**, un **contrat qui ment**, un **invariant cassé**. Ceux-là survivent à la
+phase de dev ; les autres non.
+
+**Concrètement, quand on rédige un ticket ou un rapport de fin de tâche** : ne pas invoquer un
+préjudice joueur qui n'existe pas. « Couper maintenant punirait le joueur qui… », « on perdrait
+des gens », « fenêtre de régression pour les utilisateurs » — ces arguments sont vrais dans
+l'absolu et faux ici, et les écrire fait perdre du temps à tout le monde : ils bloquent des
+tickets qui n'ont aucune raison d'attendre. Écrire la décision destructive dans le docblock du
+fichier ou de la migration, pour qu'elle reste lisible quand la fenêtre sera fermée — mais ne
+pas en faire une alerte.
+
+Cette section a une date de péremption : **au premier joueur réel, elle saute**, et tout ce
+qu'elle autorise redevient un sujet.
+
 ## Règle n°0 : priorité à l'écosystème Symfony
 
 **Ce que Symfony fournit ne se réécrit pas.** Avant d'écrire une classe, la question est
