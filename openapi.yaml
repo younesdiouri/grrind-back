@@ -583,6 +583,26 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/daily-activity:
+    put:
+      tags:
+        - Entraînement
+      operationId: put_training_daily_activity_upsert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DailyActivityUpsertRequest'
+      responses:
+        '204':
+          description: 'Chaque journée du lot est à jour. Une journée déjà connue a été révisée, jamais dupliquée.'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /api/workouts/import:
     post:
       tags:
@@ -909,6 +929,7 @@ components:
         - xpToNextLevel
         - title
         - attributes
+        - vitalityBreakdown
       properties:
         id:
           type: string
@@ -957,9 +978,26 @@ components:
               type: integer
               example: 1500
             vitality:
-              description: 'Dérivée des quatre autres, jamais créditée directement — voir `Progression.attributes.vitality`.'
+              description: "Dérivée des quatre autres, puis bonifiée par l'énergie active de la fenêtre glissante (#165) — voir `vitalityBreakdown` et `Progression.attributes.vitality`."
               type: integer
               example: 310
+          type: object
+        vitalityBreakdown:
+          description: "Ce qui explique `attributes.vitality` — même forme qu'à `GET /api/progression` (`Progression.vitalityBreakdown`)."
+          required:
+            - windowAverageActiveKcal
+            - targetActiveKcal
+            - bonusPermille
+          properties:
+            windowAverageActiveKcal:
+              type: integer
+              example: 420
+            targetActiveKcal:
+              type: integer
+              example: 500
+            bonusPermille:
+              type: integer
+              example: 168
           type: object
       type: object
     GuildMember:
@@ -1282,6 +1320,41 @@ components:
           maximum: 300
           minimum: 1
       type: object
+    DailyActivityUpsertRequest:
+      description: "Un lot de journées à réviser (#165), en dehors de la synchro d'import : une journée\nsédentaire doit pouvoir se remonter sans aucun workout à envoyer.\n"
+      required:
+        - days
+      properties:
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyActivityEntry'
+          maxItems: 90
+          minItems: 1
+      type: object
+    DailyActivityEntry:
+      description: "Une journée : l'énergie active seule — `activeEnergyBurned` chez Apple,\n`ActiveCaloriesBurnedRecord` chez Health Connect. Ni pas, ni étages, ni heures\nactives : une seule métrique, une seule permission de plus côté client.\n"
+      required:
+        - day
+        - activeEnergyKcal
+        - source
+      properties:
+        day:
+          description: "Une date civile, jamais un instant : c'est le client qui sait dans quel fuseau\nla montre a agrégé la journée, exactement comme pour le streak.\n"
+          type: string
+          format: date
+          example: '2026-08-27'
+        activeEnergyKcal:
+          description: "La borne haute est un garde-fou contre une unité mal convertie, pas une opinion sur ce qu'une journée humaine peut brûler."
+          type: integer
+          maximum: 20000
+          minimum: 0
+        source:
+          type: string
+          enum:
+            - APPLE_HEALTH
+            - HEALTH_CONNECT
+      type: object
     SyncSummary:
       description: "**Le contrat le plus coûteux à casser du produit**, dans sa forme multi-workouts. Ce que\nle joueur reçoit quand sa montre a fini de parler.\n\n**L'ordre des champs est l'ordre de l'animation**, à deux niveaux : d'abord entre les\nworkouts — `imported` est chronologique, celui du crédit — puis à l'intérieur de chacun.\n\n**Rien n'est tronqué.** Au-delà d'une vingtaine de workouts, tout jouer prend plusieurs\nminutes : c'est une décision de mise en scène, et elle appartient au client. Le serveur\nenvoie tout, le client décide de ce qu'il joue.\n"
       required:
@@ -1543,6 +1616,7 @@ components:
         - xpToNextLevel
         - skillPoints
         - attributes
+        - vitalityBreakdown
         - activeTitle
         - unlockedTitles
         - rulesetVersion
@@ -1591,9 +1665,29 @@ components:
               type: integer
               example: 1500
             vitality:
-              description: 'Dérivée des quatre autres, jamais créditée directement — voir `RewardSummary.attributes.vitality`.'
+              description: "Dérivée des quatre autres, puis bonifiée par l'énergie active de la fenêtre glissante (#165) — jamais créditée directement. Voir `vitalityBreakdown` pour ce qui explique le bonus, et `RewardSummary.attributes.vitality` pour la même valeur, non bonifiée, au moment d'une séance."
               type: integer
               example: 310
+          type: object
+        vitalityBreakdown:
+          description: "Ce qui explique `attributes.vitality` (#165) : sans ces trois nombres, une\nVitality qui bouge sans qu'aucune séance n'ait été créditée ne récompenserait\nrien aux yeux du joueur.\n"
+          required:
+            - windowAverageActiveKcal
+            - targetActiveKcal
+            - bonusPermille
+          properties:
+            windowAverageActiveKcal:
+              description: "L'énergie active moyenne sur la fenêtre glissante — une journée absente y compte pour zéro, c'est précisément ce qui mesure la sédentarité."
+              type: integer
+              example: 420
+            targetActiveKcal:
+              description: "La cible d'équilibrage : l'atteindre en moyenne vaut le bonus plafond."
+              type: integer
+              example: 500
+            bonusPermille:
+              description: 'Le bonus effectivement appliqué à `attributes.vitality`, en millièmes du socle.'
+              type: integer
+              example: 168
           type: object
         activeTitle:
           nullable: true
@@ -1877,6 +1971,36 @@ components:
       enum:
         - APPLE_HEALTH
         - HEALTH_CONNECT
+    DailyActivityEntryRequest:
+      properties:
+        day:
+          type: string
+          format: date-time
+          nullable: true
+          default: null
+        activeEnergyKcal:
+          type: integer
+          nullable: true
+          default: null
+          maximum: 20000
+          minimum: 0
+        source:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/WorkoutSource'
+          default: null
+      type: object
+    DailyActivityUpsertRequest2:
+      properties:
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyActivityEntryRequest'
+          default: []
+          maxItems: 90
+          minItems: 1
+      type: object
     ImportedWorkoutRequest:
       properties:
         externalId:

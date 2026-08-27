@@ -51,6 +51,11 @@ final class ProgressionStateTest extends ApiTestCase
             ['strength' => 0, 'endurance' => 0, 'mobility' => 0, 'dexterity' => 0, 'vitality' => 0],
             $state['attributes'],
         );
+        // Aucune journée envoyée : le bonus (#165) reste nul, comme la base.
+        self::assertSame(
+            ['windowAverageActiveKcal' => 0, 'targetActiveKcal' => self::getContainer()->getParameter('game.attributes.vitality.target_active_kcal'), 'bonusPermille' => 0],
+            $state['vitalityBreakdown'],
+        );
         self::assertNull($state['activeTitle']);
         self::assertSame([], $state['unlockedTitles']);
         self::assertNull($state['lastProgressionAt']);
@@ -100,6 +105,11 @@ final class ProgressionStateTest extends ApiTestCase
                 'vitality' => $granted->snapshot->vitality(),
             ],
             $state['attributes'],
+        );
+        // Toujours aucune journée envoyée dans ce test : le bonus (#165) reste nul.
+        self::assertSame(
+            ['windowAverageActiveKcal' => 0, 'targetActiveKcal' => self::getContainer()->getParameter('game.attributes.vitality.target_active_kcal'), 'bonusPermille' => 0],
+            $state['vitalityBreakdown'],
         );
         self::assertIsString($state['lastProgressionAt']);
     }

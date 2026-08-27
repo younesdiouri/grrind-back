@@ -9,6 +9,7 @@ use App\Progression\Domain\TitleProgress;
 use App\Progression\Infrastructure\Translation\TitleTranslator;
 use App\Shared\Application\PlayerTitle;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\VitalityBreakdown;
 use DateTimeImmutable;
 use DateTimeInterface;
 
@@ -36,6 +37,15 @@ use DateTimeInterface;
  * `vitality`) parce qu'un client qui les lirait sous deux orthographes écrirait deux
  * mappings pour le même concept ; c'est la forme, pas le vocabulaire, qui diffère
  * légitimement.
+ *
+ * **`vitalityBreakdown` (#165) n'a pas d'équivalent dans `RewardSummary`.**
+ * `attributes.vitality` porte désormais la Vitality *bonifiée* par l'énergie active de la
+ * fenêtre glissante — une valeur qui peut bouger sans qu'aucune séance n'ait été créditée,
+ * simplement parce qu'une journée vient de s'ajouter à la fenêtre. Sans `vitalityBreakdown`,
+ * ce mouvement serait injustifiable pour le joueur ; avec lui, l'écran peut dire « +8 %
+ * parce que tu as bougé 420 kcal en moyenne sur 500 visées ». Il n'a donc de sens qu'à côté
+ * d'un état, jamais d'un passage — ce qui explique aussi pourquoi il n'entre pas dans
+ * `RewardSummary`, où Vitality n'anime déjà qu'un avant/après sans bonus (#162).
  */
 final readonly class ProgressionResource
 {
@@ -51,6 +61,7 @@ final readonly class ProgressionResource
         public int $availableSkillPoints,
         public AttributeGains $attributes,
         public int $vitality,
+        public VitalityBreakdown $vitalityBreakdown,
         public ?PlayerTitle $activeTitle,
         public array $unlockedTitles,
         public string $rulesetVersion,
@@ -77,6 +88,7 @@ final readonly class ProgressionResource
             $state->availableSkillPoints,
             $state->attributes,
             $state->vitality,
+            $state->vitalityBreakdown,
             // Cherché parmi les acquis et non lu du champ brut : un titre retiré du
             // catalogue laisse sa ligne en base, et il n'a rien à faire dans une réponse
             // qui ne le liste plus.
@@ -110,6 +122,12 @@ final readonly class ProgressionResource
                 'mobility' => $this->attributes->mobility,
                 'dexterity' => $this->attributes->dexterity,
                 'vitality' => $this->vitality,
+            ],
+            // Ce qui explique la valeur juste au-dessus — voir le docblock de la classe.
+            'vitalityBreakdown' => [
+                'windowAverageActiveKcal' => $this->vitalityBreakdown->windowAverageActiveKcal,
+                'targetActiveKcal' => $this->vitalityBreakdown->targetActiveKcal,
+                'bonusPermille' => $this->vitalityBreakdown->bonusPermille,
             ],
             // La même forme qu'à `GET /api/me` et `GET /api/titles` : un seul type à
             // décoder et un seul composant à dessiner côté client.

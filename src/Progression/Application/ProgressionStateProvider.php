@@ -12,8 +12,12 @@ use App\Progression\Domain\TitleProgress;
 use App\Progression\Infrastructure\Doctrine\ActiveTitleRepository;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\UnlockedTitleRepository;
+use App\Shared\Application\PlayerTimezones;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\LocalDay;
 use DateTimeImmutable;
+use DateTimeZone;
+use Psr\Clock\ClockInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -28,6 +32,13 @@ use Symfony\Component\Uid\Uuid;
  * **Aucune écriture.** Un joueur qui n'a jamais rien fait n'a pas de ligne, et lire son
  * état n'a pas à en créer une : c'est le premier crédit qui la pose, sous verrou. Une
  * lecture qui écrit, c'est un `GET` qui n'est plus rejouable et un verrou pris pour rien.
+ *
+ * **Une quatrième lecture depuis #165, hors snapshot : le bonus de Vitality.** `$timezones`
+ * et `$clock` n'existaient pas ici avant lui — ils ne servent qu'à situer « aujourd'hui »
+ * pour *ce* joueur, dans *son* fuseau, avant de demander la moyenne de sa fenêtre à
+ * `VitalityBonusProvider`. C'est la précision qu'un lot de plusieurs joueurs ne peut pas
+ * se permettre au même coût — voir le docblock de `TranslatedPlayerProgressions`, qui
+ * tranche différemment pour cette raison.
  */
 final readonly class ProgressionStateProvider
 {
@@ -37,6 +48,9 @@ final readonly class ProgressionStateProvider
         private ActiveTitleRepository $activeTitles,
         private TitleCatalog $catalog,
         private LevelCurve $curve,
+        private VitalityBonusProvider $vitalityBonus,
+        private PlayerTimezones $timezones,
+        private ClockInterface $clock,
         private string $rulesetVersion,
     ) {
     }
@@ -47,6 +61,15 @@ final readonly class ProgressionStateProvider
         $standing = self::standingOf($snapshot, $this->curve);
         $unlockedAt = $this->unlockedTitles->unlockedBy($userId);
 
+        // Le jour civil du joueur, dans son fuseau — pas un instant : voir le docblock de
+        // `VitalityBonusProvider` pour pourquoi `$endingOn` n'est jamais lu d'une horloge
+        // à l'intérieur de lui.
+        $today = LocalDay::containing($this->clock->now(), $this->timezones->of($userId));
+        $endingOn = new DateTimeImmutable($today->date, new DateTimeZone('UTC'));
+
+        $baseVitality = $snapshot?->vitality() ?? 0;
+        $bonused = $this->vitalityBonus->of([$userId->toRfc4122() => $baseVitality], [$userId], $endingOn)[$userId->toRfc4122()];
+
         return new ProgressionState(
             $snapshot?->totalXp() ?? 0,
             $standing,
@@ -54,11 +77,11 @@ final readonly class ProgressionStateProvider
             // que pour `standingOf()` : c'est l'état neutre d'un compte qui vient de
             // s'inscrire, pas une base manquante.
             $snapshot?->attributes() ?? new AttributeGains(0, 0, 0, 0),
-            // Vitality suit la même règle (#163) : lue du snapshot, jamais rederivée ici. Un
-            // compte sans ligne vaut 0 sur les quatre caractéristiques, donc 0 ici aussi —
-            // `Vitality::of()` rendrait exactement ce zéro pour un total nul, quel que soit
-            // le plancher configuré.
-            $snapshot?->vitality() ?? 0,
+            // Vitality est bonifiée depuis #165 — voir le docblock de `ProgressionState`.
+            // Sa base, elle, suit toujours la règle du #163 : lue du snapshot, jamais
+            // rederivée des quatre caractéristiques ici.
+            $bonused->value,
+            $bonused->breakdown,
             // Accordés moins dépensés — et rien ne se dépense avant les arbres de
             // compétences (#32). Le calcul vit ici plutôt que dans la réponse pour qu'il
             // n'y ait qu'un endroit à ouvrir au Lot 7.
