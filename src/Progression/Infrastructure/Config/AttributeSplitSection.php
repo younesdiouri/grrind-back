@@ -29,6 +29,18 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
  * La couverture des disciplines, l'absence de doublon et la somme à 100 par ligne sont
  * dites par `AttributeSplit` ; les bornes du plancher par `Vitality` : une règle de
  * cohérence entre plusieurs clés ne s'écrit pas deux fois.
+ *
+ * **Ce que ce fichier seul ne peut pas valider (#167).** `AttributeSplit` n'exige une
+ * ligne que des disciplines qui créditent de l'XP — une donnée qui vit dans `xp.yaml`, pas
+ * ici, puisque `GameBalanceLoader` valide chaque fichier indépendamment des autres. La
+ * vérification ci-dessous repasse donc `$values['splits']` comme second argument : les
+ * disciplines qui **apparaissent** dans `splits` sont, par construction, celles que ce
+ * seul fichier peut affirmer créditer, donc la couverture y est triviale — elle prouve
+ * malgré tout la somme à 100 %, l'absence de doublon et les noms de discipline connus. Le
+ * vrai croisement avec `xp.yaml` — quelles disciplines créditent réellement, et la
+ * `WALKING` qui ne doit plus avoir de ligne — n'est vérifié qu'à la construction réelle du
+ * service, câblée par `services.yaml` avec `%game.xp.disciplines%`, et prouvé par
+ * `AttributeSplitCoverageTest`.
  */
 final class AttributeSplitSection implements GameBalanceSection
 {
@@ -69,7 +81,15 @@ final class AttributeSplitSection implements GameBalanceSection
                 ->always(static function (array $values): array {
                     /** @var array{splits: list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}>, vitality: array{floor_permille: int}} $values */
                     try {
-                        new AttributeSplit($values['splits']);
+                        // Voir le docblock de la classe : les disciplines de `splits`
+                        // servent aussi d'univers des disciplines créditantes ici, faute
+                        // de pouvoir lire `xp.yaml` depuis ce fichier-ci.
+                        $disciplines = array_map(
+                            static fn (array $split): array => ['discipline' => $split['discipline']],
+                            $values['splits'],
+                        );
+
+                        new AttributeSplit($values['splits'], $disciplines);
                         new Vitality($values['vitality']['floor_permille']);
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);

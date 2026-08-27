@@ -17,25 +17,29 @@
 #
 # ————— Ce que cette table ne prétend pas dire ———————————————————————————————————————————
 #
-# Ces valeurs sont reprises du document de game design tel quel, avec trois écarts
+# Ces valeurs sont reprises du document de game design tel quel, avec deux écarts
 # assumés et confirmés en revue — de l'équilibrage, qui se patche ici sans migration :
 #
 #   - `STRENGTH` : le document écrit 75/15/5/0, qui somme à 95 — une coquille, seule
 #     ligne dans ce cas. Le point manquant va en Dexterity.
-#   - `WALKING` et `HIIT` n'ont pas de ligne au document. `HIIT` reprend la famille
-#     « Fitness / gymnastique » ; `WALKING` s'aligne sur `RUNNING` en déplaçant sa
-#     Dexterity vers Mobility — on ne pivote pas sur ses appuis en marchant comme en
-#     courant.
+#   - `HIIT` n'a pas de ligne au document. Il reprend la famille « Fitness / gymnastique ».
 #   - `CLIMBING` reprend l'exemple d'escalade donné au fil du texte du document.
 #
 # Aucune formule ne relie une ligne à la charge réelle du sport : ce n'est pas mesuré,
 # c'est choisi. Le jour où un Effort Score par famille de sport existera, il changera peut-
 # être `base_xp_per_hour` d'`xp.yaml` ; il ne changera pas cette table, qui répond à une
 # question différente — pas combien, mais vers où.
+#
+# ————— `WALKING` n'a pas de ligne, et ne doit pas en avoir (#167) ——————————————————————
+#
+# La marche ne crédite plus d'XP — voir `xp.yaml`, `credits_xp: false` — donc il n'y a
+# rien à répartir pour elle : `XpCalculator` ne l'atteint jamais, `AttributeSplit` ne
+# l'exige plus. Une ligne gardée « au cas où » serait de la config morte qui pourrit sans
+# que personne s'en aperçoive ; `AttributeSplit` la refuserait d'ailleurs, comme il refuse
+# toute ligne pour une discipline qui ne crédite pas.
 splits:
     - { discipline: STRENGTH, strength: 75, endurance: 15, mobility: 5, dexterity: 5 }
     - { discipline: RUNNING, strength: 5, endurance: 75, mobility: 5, dexterity: 15 }
-    - { discipline: WALKING, strength: 5, endurance: 80, mobility: 10, dexterity: 5 }
     - { discipline: CYCLING, strength: 15, endurance: 60, mobility: 10, dexterity: 15 }
     - { discipline: SWIMMING, strength: 15, endurance: 55, mobility: 20, dexterity: 10 }
     - { discipline: HIKING, strength: 10, endurance: 55, mobility: 20, dexterity: 15 }

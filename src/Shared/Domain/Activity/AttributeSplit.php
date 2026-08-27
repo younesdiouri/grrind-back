@@ -42,6 +42,16 @@ use InvalidArgumentException;
  * quel ou négate chacune de ses quatre composantes selon le signe d'origine. Les deux
  * appels partagent donc la même répartition en valeur absolue par construction — il ne
  * peut pas exister de cas où ils divergent.
+ *
+ * ## Une discipline qui ne crédite pas n'a rien à répartir (#167)
+ *
+ * `WALKING` ne rapporte plus d'XP — voir le docblock de `App\Progression\Domain\XpRates` —
+ * donc `distribute()` n'est jamais appelée pour elle : `XpCalculator` s'arrête avant. La
+ * couverture exigée ici en tient compte, et le second paramètre du constructeur est **la
+ * même liste brute que `XpRates` consomme** (`game.xp.disciplines`), passée telle quelle
+ * plutôt que pré-filtrée : les deux tables ne peuvent alors pas diverger sur « qui crédite »
+ * sans qu'un seul fichier bouge. Une ligne de répartition pour une discipline qui ne
+ * crédite pas serait de la config morte — refusée au même titre qu'une ligne manquante.
  */
 final readonly class AttributeSplit
 {
@@ -50,10 +60,22 @@ final readonly class AttributeSplit
 
     /**
      * @param list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}> $splits
+     * @param list<array{discipline: string, credits_xp?: bool}>                                            $disciplines la liste brute de `xp.yaml` — seule `credits_xp` compte ici
      */
-    public function __construct(array $splits)
+    public function __construct(array $splits, array $disciplines)
     {
         $percentages = [];
+
+        $creditingDisciplines = [];
+
+        foreach ($disciplines as $rate) {
+            $discipline = Discipline::tryFrom($rate['discipline'])
+                ?? throw new InvalidArgumentException(\sprintf('Discipline inconnue dans la liste des disciplines de "xp.yaml" : "%s".', $rate['discipline']));
+
+            if (false !== ($rate['credits_xp'] ?? true)) {
+                $creditingDisciplines[$discipline->value] = true;
+            }
+        }
 
         foreach ($splits as $split) {
             $discipline = Discipline::tryFrom($split['discipline'])
@@ -61,6 +83,13 @@ final readonly class AttributeSplit
 
             if (isset($percentages[$discipline->value])) {
                 throw new InvalidArgumentException(\sprintf('Discipline en double à la table de répartition : "%s".', $discipline->value));
+            }
+
+            // Une ligne pour une discipline qui ne crédite pas ne sera jamais lue par
+            // `XpCalculator` : la garder serait de la config morte qui pourrit sans que
+            // personne s'en aperçoive.
+            if (!isset($creditingDisciplines[$discipline->value])) {
+                throw new InvalidArgumentException(\sprintf('"%s" ne crédite pas d\'XP, elle ne devrait pas avoir de ligne à la table de répartition.', $discipline->value));
             }
 
             $byAttribute = [
@@ -81,11 +110,12 @@ final readonly class AttributeSplit
             $percentages[$discipline->value] = $byAttribute;
         }
 
-        // Une discipline sans ligne rapporterait zéro caractéristique en silence — un
-        // joueur découvrirait le trou, pas nous. On préfère ne pas démarrer.
-        foreach (Discipline::cases() as $discipline) {
-            if (!isset($percentages[$discipline->value])) {
-                throw new InvalidArgumentException(\sprintf('Aucune répartition à la table pour la discipline "%s".', $discipline->value));
+        // Une discipline qui crédite et sans ligne rapporterait zéro caractéristique en
+        // silence — un joueur découvrirait le trou, pas nous. On préfère ne pas démarrer.
+        // Une discipline qui ne crédite pas n'a, à l'inverse, rien à exiger.
+        foreach (array_keys($creditingDisciplines) as $value) {
+            if (!isset($percentages[$value])) {
+                throw new InvalidArgumentException(\sprintf('Aucune répartition à la table pour la discipline "%s".', $value));
             }
         }
 
@@ -96,10 +126,16 @@ final readonly class AttributeSplit
      * Répartit `$amount` entre les quatre caractéristiques selon la discipline pratiquée.
      * Fonction pure, plus fort reste, symétrique sur les négatifs — voir le docblock de la
      * classe pour les trois.
+     *
+     * @throws InvalidArgumentException appelé pour une discipline qui ne crédite pas — un
+     *                                  bug d'appelant, `XpCalculator` ne doit jamais l'atteindre
      */
     public function distribute(Discipline $discipline, int $amount): AttributeGains
     {
-        $magnitude = self::largestRemainder($this->percentages[$discipline->value], abs($amount));
+        $percentages = $this->percentages[$discipline->value]
+            ?? throw new InvalidArgumentException(\sprintf('"%s" ne crédite pas d\'XP, elle n\'a pas de ligne à la table de répartition.', $discipline->value));
+
+        $magnitude = self::largestRemainder($percentages, abs($amount));
 
         if ($amount < 0) {
             $magnitude = array_map(static fn (int $share): int => -$share, $magnitude);

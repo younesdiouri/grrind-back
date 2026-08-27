@@ -22,10 +22,20 @@ use InvalidArgumentException;
  * **Arithmétique entière de bout en bout.** Les trois divisions tronquent vers le bas : une
  * séance ne rapporte jamais plus que ce que le barème annonce, et aucun arrondi flottant ne
  * se glisse dans une valeur qui finira au ledger.
+ *
+ * **Une discipline peut ne pas créditer du tout (#167).** `WALKING` porte `credits_xp:
+ * false` au lieu d'un plafond : la marche n'alimente que Vitality, jamais l'XP, et cette
+ * marque le dit explicitement plutôt qu'un `daily_cap_xp: 0` qui traverserait tout le
+ * calcul pour se faire écrêter à l'arrivée — le breakdown afficherait « 90 XP, écrêtés à
+ * 0 », la punition qu'on cherche justement à éviter. `credits()` est la question que pose
+ * `LedgerSessionRewards` **avant** d'appeler quoi que ce soit d'autre sur cette classe :
+ * une discipline qui ne crédite pas n'atteint jamais `baseFor()`, `dailyCapOf()` ni les
+ * bonus de terrain, et ne consomme donc ni les rendements décroissants ni le plafond
+ * quotidien d'aucune autre discipline pratiquée le même jour.
  */
 final readonly class XpRates
 {
-    /** @var array<string, int> valeur de discipline → plafond d'XP quotidien */
+    /** @var array<string, int> valeur de discipline → plafond d'XP quotidien, uniquement les disciplines qui créditent */
     private array $dailyCap;
 
     /** @var array<string, int> valeur de discipline → XP par kilomètre, absente si la discipline n'en accorde pas */
@@ -34,9 +44,12 @@ final readonly class XpRates
     /** @var array<string, int> valeur de discipline → XP par 100 m de dénivelé positif */
     private array $perHundredMetresOfElevation;
 
+    /** @var array<string, true> valeur de discipline → présente si elle ne crédite pas d'XP */
+    private array $nonCrediting;
+
     /**
-     * @param int                                                                                              $baseXpPerHour 60 : une minute, un point
-     * @param list<array{discipline: string, daily_cap_xp: int, xp_per_km?: int, xp_per_100m_elevation?: int}> $disciplines
+     * @param int                                                                                                                  $baseXpPerHour 60 : une minute, un point
+     * @param list<array{discipline: string, daily_cap_xp?: int, xp_per_km?: int, xp_per_100m_elevation?: int, credits_xp?: bool}> $disciplines
      */
     public function __construct(
         private int $baseXpPerHour,
@@ -49,13 +62,38 @@ final readonly class XpRates
         $dailyCap = [];
         $perKilometre = [];
         $perHundredMetresOfElevation = [];
+        $nonCrediting = [];
 
         foreach ($disciplines as $rate) {
             $discipline = Discipline::tryFrom($rate['discipline'])
                 ?? throw new InvalidArgumentException(\sprintf('Discipline inconnue au barème d\'XP : "%s".', $rate['discipline']));
 
-            if (isset($dailyCap[$discipline->value])) {
+            if (isset($dailyCap[$discipline->value]) || isset($nonCrediting[$discipline->value])) {
                 throw new InvalidArgumentException(\sprintf('Discipline en double au barème d\'XP : "%s".', $discipline->value));
+            }
+
+            // `credits_xp: true` ne dirait rien de plus que son absence : la seule valeur
+            // qui a un sens à écrire est `false`, donc c'est la seule qu'on accepte.
+            if (\array_key_exists('credits_xp', $rate) && true === $rate['credits_xp']) {
+                throw new InvalidArgumentException(\sprintf('"%s" porte "credits_xp: true", qui ne dit rien de plus que son absence — retirer la clé.', $discipline->value));
+            }
+
+            // Rejeté juste au-dessus si elle vaut `true` : n'atteint ce point qu'absente
+            // ou explicitement `false`.
+            if (false === ($rate['credits_xp'] ?? true)) {
+                // Ni plafond ni bonus : une discipline qui ne crédite pas n'a rien à
+                // écrêter, et un `xp_per_km` resterait une promesse que personne ne tient.
+                if (isset($rate['daily_cap_xp']) || isset($rate['xp_per_km']) || isset($rate['xp_per_100m_elevation'])) {
+                    throw new InvalidArgumentException(\sprintf('"%s" porte à la fois "credits_xp: false" et un plafond ou un bonus — les deux ne peuvent pas coexister.', $discipline->value));
+                }
+
+                $nonCrediting[$discipline->value] = true;
+
+                continue;
+            }
+
+            if (!isset($rate['daily_cap_xp'])) {
+                throw new InvalidArgumentException(\sprintf('"%s" ne porte ni plafond quotidien ni "credits_xp: false" — l\'un des deux est obligatoire.', $discipline->value));
             }
 
             // Un plafond sous ce qu'une seule heure de socle rapporte ferait du garde-fou le
@@ -81,9 +119,10 @@ final readonly class XpRates
         }
 
         // Une discipline sans barème rapporterait zéro en silence — un joueur découvrirait
-        // le trou, pas nous. On préfère ne pas démarrer.
+        // le trou, pas nous. On préfère ne pas démarrer. Créditer ou pas, chaque discipline
+        // doit trancher explicitement.
         foreach (Discipline::cases() as $discipline) {
-            if (!isset($dailyCap[$discipline->value])) {
+            if (!isset($dailyCap[$discipline->value]) && !isset($nonCrediting[$discipline->value])) {
                 throw new InvalidArgumentException(\sprintf('Aucun barème d\'XP pour la discipline "%s".', $discipline->value));
             }
         }
@@ -91,6 +130,7 @@ final readonly class XpRates
         $this->dailyCap = $dailyCap;
         $this->perKilometre = $perKilometre;
         $this->perHundredMetresOfElevation = $perHundredMetresOfElevation;
+        $this->nonCrediting = $nonCrediting;
     }
 
     public function baseXpPerHour(): int
@@ -98,10 +138,26 @@ final readonly class XpRates
         return $this->baseXpPerHour;
     }
 
-    /** Le maximum d'XP que cette discipline peut accorder sur une journée du joueur. */
+    /**
+     * La question à poser avant tout le reste. `false` pour une discipline comme
+     * `WALKING` : `LedgerSessionRewards` s'arrête là, avant `XpCalculator`, avant la
+     * charge du jour — rien de tout ça n'a de sens pour une discipline qui n'accorde rien.
+     */
+    public function credits(Discipline $discipline): bool
+    {
+        return !isset($this->nonCrediting[$discipline->value]);
+    }
+
+    /**
+     * Le maximum d'XP que cette discipline peut accorder sur une journée du joueur.
+     *
+     * @throws InvalidArgumentException appelé pour une discipline qui ne crédite pas — un
+     *                                  bug d'appelant, `credits()` doit être vérifié avant
+     */
     public function dailyCapOf(Discipline $discipline): int
     {
-        return $this->dailyCap[$discipline->value];
+        return $this->dailyCap[$discipline->value]
+            ?? throw new InvalidArgumentException(\sprintf('"%s" ne crédite pas d\'XP, elle n\'a pas de plafond quotidien — vérifier credits() avant d\'appeler dailyCapOf().', $discipline->value));
     }
 
     /**
