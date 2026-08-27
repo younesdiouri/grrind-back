@@ -209,7 +209,7 @@ final readonly class AnnounceGuildActivityHandler
             Discipline::Climbing => 'escalade',
             Discipline::Football => 'football',
             Discipline::CourtSports => 'sport de salle',
-            Discipline::RacketSports => 'raquette',
+            Discipline::RacketSports => 'sport de raquette',
         };
     }
 }
