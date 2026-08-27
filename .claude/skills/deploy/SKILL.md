@@ -30,7 +30,7 @@ suivant.
 
 | Quoi | Où |
 |---|---|
-| App | `grrind-back`, région `iad` |
+| App | `grrind-back`, région **`cdg`** — Paris, parce que l'auteur et ses testeurs sont en France. `primary_region` de `fly.toml` fait foi |
 | Image | construite par `fly deploy` depuis le stage `prod` du `Dockerfile` |
 | Base | **Supabase**, pas Fly. `fly mpg list` et `fly postgres list` ne rendent rien, c'est normal |
 | Secrets | `APP_SECRET`, `DATABASE_URL`, `JWT_PASSPHRASE`, `JWT_SECRET_KEY`, `JWT_PUBLIC_KEY` — déjà posés, à vérifier avec `flyctl secrets list -a grrind-back` |
@@ -42,10 +42,16 @@ Les clés JWT sont des **secrets portant le PEM brut**, pas des fichiers montés
 
 ## Deux groupes de processus depuis le #153
 
-`flyctl machine list -a grrind-back` rend **deux machines**, pas une : `app` (FrankenPHP,
-sert le trafic HTTP) et `worker` (`messenger:consume outbox`, consomme l'outbox Messenger).
-`flyctl ssh console` sans `-C` ou une commande visant explicitement une machine peut tomber
-sur l'une ou l'autre — préciser l'ID quand la distinction compte.
+`flyctl machine list -a grrind-back` rend **deux machines**, une par groupe : `app`
+(FrankenPHP, sert le trafic HTTP) et `worker` (`messenger:consume outbox`, consomme l'outbox
+Messenger). `flyctl ssh console` sans `-C` ou une commande visant explicitement une machine
+peut tomber sur l'une ou l'autre — préciser l'ID avec `--machine` quand la distinction compte.
+
+**Le compte d'un groupe est un état de scaling, pas une ligne de `fly.toml`.** C'est ce qui a
+fait apparaître un *second* worker sans que personne ne l'écrive : Fly en crée deux par défaut
+quand un groupe de processus naît. Ramené à 1 le 2026-08-27 (#185) — un seul consommateur
+suffit, et deux sur la même outbox n'apportent qu'une concurrence dont personne n'a besoin ici.
+`flyctl scale show -a grrind-back` est la seule source de vérité sur ce compte.
 
 Le groupe `worker` **tourne en permanence** (`[[restart]] policy = 'always'` scopé à
 `processes = ['worker']` dans `fly.toml`) : `min_machines_running = 0` du `[http_service]`
@@ -59,7 +65,7 @@ commentaire de `fly.toml` et le #153 pour l'arbitrage complet.
 politique par défaut de Fly (`on-failure`) ne l'aurait jamais relancé, et le worker se
 serait arrêté pour de bon au bout d'une heure.
 
-## Les cinq pièges
+## Les six pièges
 
 **1. Les machines `app` sont arrêtées la plupart du temps ; `worker`, jamais.**
 `min_machines_running = 0` et `auto_stop_machines = 'stop'` ne visent que le groupe `app` :
@@ -92,7 +98,19 @@ preload opcache. Passé à **512MB** le 2026-08-18 (les deux champs s'accordent 
 parce qu'un Symfony qui tourne le justifiait. Si l'app démarre puis meurt, `flyctl logs
 -a grrind-back` avant de chercher ailleurs.
 
-**5. Le dashboard Fly ouvre une PR automatique après un scale fait depuis l'UI**
+**5. `scale count` à la baisse détruit la machine qui *tourne*, pas celle qui dort.**
+`flyctl scale count worker=1` a détruit la machine démarrée et gardé l'arrêtée : l'app s'est
+retrouvée avec son unique worker à l'arrêt, sans que la commande signale rien — elle avait fait
+ce qu'on lui demandait. L'outbox aurait gonflé en silence, la panne du #153 en plus discret,
+puisque cette fois `flyctl scale show` affiche bien `worker │ 1`.
+
+Après **tout** `scale count` à la baisse : relire `flyctl machine list`, démarrer la survivante
+si elle est arrêtée, et vérifier qu'elle **consomme** — pas seulement qu'elle est `started`. La
+seule vérification qui prouve quelque chose est un import réel suivi de `messenger:stats` : une
+machine démarrée qui ne consomme pas rend exactement le même `outbox 0` qu'une machine qui
+consomme, tant que personne ne produit de message.
+
+**6. Le dashboard Fly ouvre une PR automatique après un scale fait depuis l'UI**
 (`flyio-scale-from-ui`, auteur `app/fly-io`), pour resynchroniser `fly.toml`. **Ne pas la
 merger telle quelle** : elle ajoute un *second* bloc `[[vm]]` scopé par `processes` au lieu
 de modifier celui qui existe, et repart de la dernière version de `main` — donc écrase
@@ -109,6 +127,19 @@ trafic, et un échec interrompt le déploiement, ce qui est mot pour mot ce que 
 docblock de `make migrate-prod`. Il n'y est pas parce que la chaîne de déploiement
 définitive se décide au **Lot 9 — Durcissement** (cible ECS Fargate, cf. README). Si
 l'utilisateur le demande, ça mérite un ticket, pas une ligne glissée en passant.
+
+## Ce que ça coûte
+
+**La seule ligne qui tourne en permanence est le `worker`.** `app` s'arrête tout seul entre deux
+requêtes (`min_machines_running = 0`) et ne coûte que le temps où il sert ; les machines
+arrêtées ne se facturent qu'au stockage de leur système de fichiers. En environnement de dev,
+la facture Fly *est* donc le worker allumé 24 h/24 — et c'est pour ça que le second était du
+gaspillage pur, pas un détail.
+
+Ce qui reste comme leviers, par ordre décroissant de gain et croissant de risque : le nombre de
+machines toujours allumées (fait), leur taille (512 MB aujourd'hui, alors que
+`messenger:consume` s'auto-limite à 128 MB côté PHP), puis la fréquence de consommation — mais
+celle-là a été tranchée au #153 et la rouvrir défait un arbitrage, elle ne l'optimise pas.
 
 ## Le test de fumée
 
