@@ -53,15 +53,60 @@ use InvalidArgumentException;
  * correct** : le plancher protège le joueur monospécialisé, pas la page blanche — un socle
  * qui s'appliquerait même à zéro punirait d'avoir commencé plutôt que de protéger d'avoir
  * choisi un seul sport.
+ *
+ * ## Le bonus quotidien : un second facteur, jamais une seconde base (#165)
+ *
+ * Le coefficient et le plancher ci-dessus répondent à « la pratique est-elle variée » ;
+ * `bonused()` répond à une question différente — « la journée a-t-elle été active » — sur
+ * l'énergie active moyenne d'une fenêtre glissante :
+ *
+ *     bonused = base × (1000 + bonusPermille) / 1000
+ *
+ * **Toujours reçue en paramètre, jamais recherchée ici.** La fonction reste pure : ni
+ * fenêtre, ni journée, ni fournisseur ne se lisent dans cette classe. C'est l'appelant —
+ * `Progression`, à la lecture — qui interroge le port de `Shared` que `Training` implémente
+ * pour obtenir la moyenne, exactement comme {@see of()} reçoit déjà les quatre totaux
+ * plutôt que d'aller les chercher au ledger.
+ *
+ * **Un multiplicateur, jamais un crédit.** `bonused(0, ...)` vaut `0` quel que soit le
+ * bonus : `scale()` multiplie par zéro avant de diviser, comme `of()` le fait déjà pour un
+ * total nul. Il n'y a pas de garde explicite pour ce cas — il n'y en a pas besoin, c'est
+ * l'arithmétique elle-même qui l'impose, et c'est exactement ce qui interdit à ce bonus de
+ * créer de la Vitality à partir de rien pour un compte qui vient de s'inscrire.
+ *
+ * **Jamais au ledger, jamais sur le snapshot.** `ProgressionSnapshot::vitality()` reste la
+ * valeur *non* bonifiée — voir son docblock — parce que la fenêtre glissante change à
+ * chaque minute qui passe sans qu'aucune séance n'ait eu lieu : la stocker figerait un
+ * bonus qui n'a pourtant pas besoin d'écriture pour rester vrai, à l'inverse du reste du
+ * snapshot, qui est un cache d'un ledger append-only. `bonused()` et {@see explain()} se
+ * rappellent donc à chaque lecture de `/api/progression` et du profil public.
  */
 final readonly class Vitality
 {
     private const int PERMILLE = 1000;
 
-    public function __construct(private int $floorPermille)
-    {
+    public function __construct(
+        private int $floorPermille,
+        /** L'énergie active moyenne, sur la fenêtre, qui vaut le bonus plein — voir {@see bonusPermilleFor()}. */
+        private int $targetActiveKcal,
+        /** Le bonus ne dépasse jamais ce plafond, même très au-delà de la cible. */
+        private int $bonusCapPermille,
+    ) {
         if ($floorPermille < 0 || $floorPermille > self::PERMILLE) {
             throw new InvalidArgumentException(\sprintf('Le plancher de Vitality s\'exprime en millièmes, entre 0 et 1000 : %d reçu.', $floorPermille));
+        }
+
+        if ($targetActiveKcal < 1) {
+            throw new InvalidArgumentException(\sprintf('La cible d\'énergie active doit valoir au moins 1 kcal : %d reçu.', $targetActiveKcal));
+        }
+
+        // Pas de borne basse à zéro exclu : un bonus coupé à zéro reviendrait à ne pas en
+        // avoir, ce qui est une configuration valide, pas une erreur. La borne haute, elle,
+        // protège contre un zéro de trop dans le YAML — un bonus qui doublerait la Vitality
+        // ferait de la journée active le seul levier du jeu, devant la variété des sports
+        // que le coefficient plus haut existe pour récompenser.
+        if ($bonusCapPermille < 0 || $bonusCapPermille > self::PERMILLE) {
+            throw new InvalidArgumentException(\sprintf('Le plafond de bonus de Vitality s\'exprime en millièmes, entre 0 et 1000 : %d reçu.', $bonusCapPermille));
         }
     }
 
@@ -86,6 +131,27 @@ final readonly class Vitality
         );
     }
 
+    /**
+     * La Vitality bonifiée, prête à être affichée — `$base` est {@see of()}, déjà calculée
+     * par l'appelant à partir du snapshot ou du ledger.
+     */
+    public function bonused(int $base, int $windowAverageActiveKcal): int
+    {
+        return self::scale($base, self::PERMILLE + $this->bonusPermilleFor($windowAverageActiveKcal));
+    }
+
+    /**
+     * De quoi expliquer le bonus au joueur, sans redonner la valeur bonifiée elle-même —
+     * {@see bonused()} la porte déjà. Un joueur qui voit sa Vitality monter sans savoir
+     * pourquoi ne comprend rien à la mécanique ; ces trois nombres répondent à « pourquoi ».
+     */
+    public function explain(int $windowAverageActiveKcal): VitalityBreakdown
+    {
+        $average = max(0, $windowAverageActiveKcal);
+
+        return new VitalityBreakdown($average, $this->targetActiveKcal, $this->bonusPermilleFor($average));
+    }
+
     private function coefficientPermille(AttributeGains $totals): int
     {
         // Chaque composante est bornée à zéro avant d'entrer dans un produit : un total par
@@ -102,6 +168,18 @@ final readonly class Vitality
         // AM-GM garantit que le rapport ne dépasse jamais 1 ; le `min` n'est qu'une garde
         // contre l'imprécision flottante à la marge, pas une correction du calcul.
         return max(0, min(self::PERMILLE, (int) round(self::PERMILLE * $geometricMean / $arithmeticMean)));
+    }
+
+    /**
+     * Proportionnel à la cible, plafonné : une journée sans donnée vaut zéro, une journée
+     * qui atteint la cible vaut le plafond, et rien au-delà — reproduire la cible deux fois
+     * ne double pas le bonus, ce n'est déjà plus ce qui distingue un joueur actif d'un autre.
+     */
+    private function bonusPermilleFor(int $windowAverageActiveKcal): int
+    {
+        $average = max(0, $windowAverageActiveKcal);
+
+        return max(0, min($this->bonusCapPermille, intdiv($average * $this->bonusCapPermille, $this->targetActiveKcal)));
     }
 
     private static function scale(int $total, int $permille): int

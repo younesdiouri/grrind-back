@@ -343,7 +343,7 @@ when@dev:
 
                     Player:
                         type: object
-                        required: [id, displayName, registeredAt, level, xpIntoLevel, xpToNextLevel, title, attributes]
+                        required: [id, displayName, registeredAt, level, xpIntoLevel, xpToNextLevel, title, attributes, vitalityBreakdown]
                         description: |
                             Un joueur **tel que les autres joueurs le voient** — la seule forme sous
                             laquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par
@@ -397,7 +397,15 @@ when@dev:
                                     vitality:
                                         type: integer
                                         example: 310
-                                        description: "Dérivée des quatre autres, jamais créditée directement — voir `Progression.attributes.vitality`."
+                                        description: "Dérivée des quatre autres, puis bonifiée par l'énergie active de la fenêtre glissante (#165) — voir `vitalityBreakdown` et `Progression.attributes.vitality`."
+                            vitalityBreakdown:
+                                type: object
+                                description: "Ce qui explique `attributes.vitality` — même forme qu'à `GET /api/progression` (`Progression.vitalityBreakdown`)."
+                                required: [windowAverageActiveKcal, targetActiveKcal, bonusPermille]
+                                properties:
+                                    windowAverageActiveKcal: { type: integer, example: 420 }
+                                    targetActiveKcal: { type: integer, example: 500 }
+                                    bonusPermille: { type: integer, example: 168 }
 
                     GuildMember:
                         description: |
@@ -680,6 +688,41 @@ when@dev:
                             elevationGainMeters: { type: integer, minimum: 0, nullable: true }
                             averageHeartRate: { type: integer, minimum: 1, maximum: 300, nullable: true }
 
+                    DailyActivityUpsertRequest:
+                        type: object
+                        description: |
+                            Un lot de journées à réviser (#165), en dehors de la synchro d'import : une journée
+                            sédentaire doit pouvoir se remonter sans aucun workout à envoyer.
+                        required: [days]
+                        properties:
+                            days:
+                                type: array
+                                minItems: 1
+                                maxItems: 90
+                                items: { $ref: '#/components/schemas/DailyActivityEntry' }
+
+                    DailyActivityEntry:
+                        type: object
+                        description: |
+                            Une journée : l'énergie active seule — `activeEnergyBurned` chez Apple,
+                            `ActiveCaloriesBurnedRecord` chez Health Connect. Ni pas, ni étages, ni heures
+                            actives : une seule métrique, une seule permission de plus côté client.
+                        required: [day, activeEnergyKcal, source]
+                        properties:
+                            day:
+                                type: string
+                                format: date
+                                example: '2026-08-27'
+                                description: |
+                                    Une date civile, jamais un instant : c'est le client qui sait dans quel fuseau
+                                    la montre a agrégé la journée, exactement comme pour le streak.
+                            activeEnergyKcal:
+                                type: integer
+                                minimum: 0
+                                maximum: 20000
+                                description: "La borne haute est un garde-fou contre une unité mal convertie, pas une opinion sur ce qu'une journée humaine peut brûler."
+                            source: { type: string, enum: [APPLE_HEALTH, HEALTH_CONNECT] }
+
                     SyncSummary:
                         type: object
                         description: |
@@ -924,7 +967,7 @@ when@dev:
                     Progression:
                         type: object
                         description: "L'état du joueur — l'écran d'accueil de l'app en une requête, servi du seul snapshot."
-                        required: [level, totalXp, xpIntoLevel, xpToNextLevel, skillPoints, attributes, activeTitle, unlockedTitles, rulesetVersion, lastProgressionAt]
+                        required: [level, totalXp, xpIntoLevel, xpToNextLevel, skillPoints, attributes, vitalityBreakdown, activeTitle, unlockedTitles, rulesetVersion, lastProgressionAt]
                         properties:
                             level: { type: integer }
                             totalXp: { type: integer }
@@ -958,7 +1001,27 @@ when@dev:
                                     vitality:
                                         type: integer
                                         example: 310
-                                        description: "Dérivée des quatre autres, jamais créditée directement — voir `RewardSummary.attributes.vitality`."
+                                        description: "Dérivée des quatre autres, puis bonifiée par l'énergie active de la fenêtre glissante (#165) — jamais créditée directement. Voir `vitalityBreakdown` pour ce qui explique le bonus, et `RewardSummary.attributes.vitality` pour la même valeur, non bonifiée, au moment d'une séance."
+                            vitalityBreakdown:
+                                type: object
+                                description: |
+                                    Ce qui explique `attributes.vitality` (#165) : sans ces trois nombres, une
+                                    Vitality qui bouge sans qu'aucune séance n'ait été créditée ne récompenserait
+                                    rien aux yeux du joueur.
+                                required: [windowAverageActiveKcal, targetActiveKcal, bonusPermille]
+                                properties:
+                                    windowAverageActiveKcal:
+                                        type: integer
+                                        example: 420
+                                        description: "L'énergie active moyenne sur la fenêtre glissante — une journée absente y compte pour zéro, c'est précisément ce qui mesure la sédentarité."
+                                    targetActiveKcal:
+                                        type: integer
+                                        example: 500
+                                        description: "La cible d'équilibrage : l'atteindre en moyenne vaut le bonus plafond."
+                                    bonusPermille:
+                                        type: integer
+                                        example: 168
+                                        description: "Le bonus effectivement appliqué à `attributes.vitality`, en millièmes du socle."
                             activeTitle:
                                 nullable: true
                                 allOf: [{ $ref: '#/components/schemas/PlayerTitle' }]

@@ -81,5 +81,31 @@ splits:
 # l'inscription serait une punition pour avoir commencé. `total = 0` fait exception :
 # c'est l'état d'un compte qui vient de s'inscrire, pas celui d'une pratique déséquilibrée,
 # et le plancher ne s'y applique pas — voir `Vitality::of()`.
+#
+# ————— Le bonus quotidien (#165) ————————————————————————————————————————————————————————
+#
+# La seconde moitié du game design : « active toute la journée, pas restée sédentaire trop
+# d'heures ». Mesurée sur l'énergie active seule — voir le docblock du ticket #165 pour
+# pourquoi ni les pas ni les étages n'entrent ici — moyennée sur une fenêtre glissante et
+# appliquée en facteur, jamais en base :
+#
+#     vitality = max(total × coefficient, total × floor_permille / 1000) × (1000 + bonus) / 1000
+#
+# `window_days` est la largeur de la fenêtre ; une journée qu'elle ne couvre pas compte pour
+# zéro dans la moyenne, ce n'est pas une donnée manquante qu'on ignore — c'est précisément
+# ce qui mesure la sédentarité. `target_active_kcal` est la moyenne quotidienne qui vaut le
+# bonus plein ; `bonus_cap_permille` ce plafond, en millièmes du socle.
+#
+# **Ces trois valeurs n'étaient pas dans le document de game design au moment du #165** —
+# lui donne le mécanisme (« un bonus quotidien selon l'activité ») sans le chiffrer. Elles
+# sont posées ici comme premier jet d'équilibrage, dans le même esprit que `base_xp_per_hour`
+# d'`xp.yaml` : une semaine de fenêtre, un demi-millier de kcal actives par jour pour le
+# bonus plein — l'ordre de grandeur qu'Apple retient par défaut pour son anneau « Move » —
+# et un bonus plafonné à 20 %, pour qu'il reste un supplément et jamais le levier principal
+# de Vitality face au coefficient de variété du #161. À corriger en revue comme le reste de
+# ce fichier, sans migration : c'est tout l'intérêt d'un fichier de config.
 vitality:
     floor_permille: 250
+    window_days: 7
+    target_active_kcal: 500
+    bonus_cap_permille: 200

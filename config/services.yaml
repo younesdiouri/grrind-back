@@ -125,9 +125,23 @@ services:
 
     # Vitality (#161), dérivée des quatre caractéristiques ci-dessus — même fichier, même
     # geste : le domaine reçoit un objet validé, pas un entier venu tel quel du YAML.
+    # `$targetActiveKcal` et `$bonusCapPermille` sont le bonus quotidien du #165 ; voir le
+    # docblock de la classe pour pourquoi ils voyagent avec le plancher plutôt qu'à part.
     App\Shared\Domain\Activity\Vitality:
         arguments:
             $floorPermille: '%game.attributes.vitality.floor_permille%'
+            $targetActiveKcal: '%game.attributes.vitality.target_active_kcal%'
+            $bonusCapPermille: '%game.attributes.vitality.bonus_cap_permille%'
+
+    # Le #165 : la largeur de la fenêtre glissante du bonus de Vitality, seul réglage que
+    # `Vitality` elle-même n'a pas à connaître — voir le docblock d'`AttributeSplitSection`.
+    App\Progression\Application\VitalityBonusProvider:
+        arguments:
+            $windowDays: '%game.attributes.vitality.window_days%'
+
+    # Le pendant du #165, dans l'autre sens : `Training` possède `daily_activity`,
+    # `Progression` ne connaît que l'interface — voir le docblock du port.
+    App\Shared\Application\ActiveEnergyWindows: '@App\Training\Infrastructure\Doctrine\DailyActivityRepository'
 
     # Le fuseau du joueur traverse la frontière des modules par ce seul point : `Identity`
     # implémente le port, `Progression` et `Engagement` ne connaissent que l'interface.

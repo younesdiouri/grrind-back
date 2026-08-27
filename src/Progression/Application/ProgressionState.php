@@ -7,6 +7,7 @@ namespace App\Progression\Application;
 use App\Progression\Domain\LevelStanding;
 use App\Progression\Domain\TitleProgress;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\VitalityBreakdown;
 use DateTimeImmutable;
 
 /**
@@ -22,19 +23,27 @@ use DateTimeImmutable;
  * montre que l'acquis, et c'est précisément ce qui permet de se passer du ledger.
  *
  * `attributes` porte les quatre caractéristiques (#160), lues du snapshot comme le reste.
- * `vitality` s'y ajoute (#163) — **lue du snapshot elle aussi**, jamais recalculée ici :
- * `ProgressionSnapshot::project()` l'a déjà dérivée des quatre autres, une seconde version
- * du calcul divergerait au premier changement de coefficient. `/api/progression` les rend
- * désormais toutes les cinq (#163) ; le #162 les avait servies en premier par le
+ * `vitality` s'y ajoute (#163) — **sa base est lue du snapshot**, jamais rederivée des
+ * quatre caractéristiques ici : `ProgressionSnapshot::project()` l'a déjà fait, une seconde
+ * version du calcul divergerait au premier changement de coefficient. `/api/progression` les
+ * rend désormais toutes les cinq (#163) ; le #162 les avait servies en premier par le
  * `RewardSummary`, où l'avant/après anime les cinq jauges — cette route-ci ne rend qu'un
  * instant, donc l'état courant seul, sans `gained` ni avant/après.
+ *
+ * **`vitality` est bonifiée (#165), et c'est la seule valeur de cette classe qui n'est pas
+ * qu'une relecture du snapshot.** `ProgressionStateProvider` la fait passer par
+ * `VitalityBonusProvider` avant de construire cet objet — voir son docblock pour pourquoi
+ * ça reste hors du snapshot plutôt qu'une nouvelle colonne. `vitalityBreakdown` porte de
+ * quoi l'expliquer : sans lui, une valeur qui bouge sans qu'aucune séance n'y soit pour rien
+ * ne récompenserait rien aux yeux du joueur.
  */
 final readonly class ProgressionState
 {
     /**
      * @param LevelStanding                    $standing          projeté par la courbe, relu tel quel du snapshot
      * @param AttributeGains                   $attributes        les quatre caractéristiques, relues telles quelles du snapshot
-     * @param int                              $vitality          la cinquième, relue elle aussi du snapshot — jamais rederivée ici
+     * @param int                              $vitality          la cinquième, bonifiée par l'énergie active de la fenêtre — voir le docblock de la classe
+     * @param VitalityBreakdown                $vitalityBreakdown ce qui explique le bonus ci-dessus
      * @param list<TitleProgress>              $unlockedTitles    les seuls acquis, dans l'ordre du catalogue
      * @param array<string, DateTimeImmutable> $unlockedAt        identifiant de titre → date de déblocage
      * @param string|null                      $activeTitleId     le titre affiché, s'il y en a un
@@ -45,6 +54,7 @@ final readonly class ProgressionState
         public LevelStanding $standing,
         public AttributeGains $attributes,
         public int $vitality,
+        public VitalityBreakdown $vitalityBreakdown,
         public int $availableSkillPoints,
         public array $unlockedTitles,
         public array $unlockedAt,

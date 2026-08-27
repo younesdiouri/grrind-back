@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Progression\Infrastructure\Translation;
 
+use App\Progression\Application\VitalityBonusProvider;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\PlayerCharacteristics;
 use App\Progression\Domain\PlayerStanding;
@@ -16,6 +17,8 @@ use App\Shared\Application\PlayerProgression;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Application\PlayerTitle;
 use DateTimeImmutable;
+use DateTimeZone;
+use Psr\Clock\ClockInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -34,6 +37,16 @@ use Symfony\Component\Uid\Uuid;
  * les cinq caractéristiques (#176) voyagent dans **une seule** de ces requêtes — voir le
  * docblock de {@see ProgressionSnapshotRepository::progressionsOf()}
  * pour pourquoi les séparer romprait la cohérence entre les deux.
+ *
+ * **Le bonus de Vitality (#165) utilise un jour de référence commun, en UTC, pas le fuseau
+ * de chaque joueur.** C'est un compromis assumé, tranché ici faute d'un chiffrage explicite
+ * dans le ticket : le rendre exact demanderait un port de fuseaux **batch** qui n'existe pas
+ * — {@see \App\Shared\Application\PlayerTimezones} ne sert qu'un joueur à la fois, et
+ * l'ajouter pour ce seul besoin romprait le nombre constant de requêtes que cette classe
+ * existe pour garantir. L'écart ne dépasse jamais un jour à la marge de la fenêtre
+ * glissante, sur un bonus qui reste un supplément — voir `attributes.yaml` — jamais un
+ * calcul d'XP, où un tel écart n'aurait pas été acceptable. `/api/progression`, servi à un
+ * seul joueur, n'a pas ce compromis à faire : voir le docblock de `ProgressionStateProvider`.
  */
 final readonly class TranslatedPlayerProgressions implements PlayerProgressions
 {
@@ -44,6 +57,8 @@ final readonly class TranslatedPlayerProgressions implements PlayerProgressions
         private TitleCatalog $catalog,
         private LevelCurve $curve,
         private TitleTranslator $titles,
+        private VitalityBonusProvider $vitalityBonus,
+        private ClockInterface $clock,
     ) {
     }
 
@@ -62,6 +77,17 @@ final readonly class TranslatedPlayerProgressions implements PlayerProgressions
         $worn = $this->activeTitles->titleIdsOf($playerIds);
         $unlockedAt = $this->unlockedTitles->unlockedAtOf($playerIds, array_values(array_unique($worn)));
 
+        $baseVitality = [];
+        foreach ($playerIds as $playerId) {
+            $key = $playerId->toRfc4122();
+            $baseVitality[$key] = ($rows[$key] ?? null)?->characteristics->vitality ?? 0;
+        }
+
+        // Voir le docblock de la classe pour pourquoi c'est un jour UTC commun, et non le
+        // fuseau de chacun.
+        $today = new DateTimeImmutable($this->clock->now()->format('Y-m-d'), new DateTimeZone('UTC'));
+        $bonusedVitality = $this->vitalityBonus->of($baseVitality, $playerIds, $today);
+
         $progressions = [];
 
         foreach ($playerIds as $playerId) {
@@ -75,6 +101,7 @@ final readonly class TranslatedPlayerProgressions implements PlayerProgressions
             // caractéristiques, elles, replient sur la constante, zéro partout n'ayant rien
             // d'un choix d'équilibrage.
             $row = $rows[$key] ?? new PlayerStanding($this->curve->standingAt(0), PlayerCharacteristics::untouched());
+            $bonused = $bonusedVitality[$key];
 
             $progressions[$key] = new PlayerProgression(
                 $row->standing->level,
@@ -82,7 +109,8 @@ final readonly class TranslatedPlayerProgressions implements PlayerProgressions
                 $row->standing->xpToNextLevel,
                 $this->wornTitleOf($playerId, $worn[$key] ?? null, $unlockedAt),
                 $row->characteristics->attributes,
-                $row->characteristics->vitality,
+                $bonused->value,
+                $bonused->breakdown,
             );
         }
 

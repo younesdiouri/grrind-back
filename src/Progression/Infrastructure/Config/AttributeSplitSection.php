@@ -22,9 +22,10 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
  *
  * `splits` est une **liste** et non une table indexée par discipline, pour la même raison
  * qu'à `XpSection` : le chargeur ne descend pas dans les listes, donc `game.attributes.splits`
- * reste un paramètre unique qu'`AttributeSplit` consomme d'un bloc. `vitality`, lui, n'a
- * qu'un seul réglage : le coefficient d'équilibre n'a pas de paramètre libre, tranché en
- * revue — voir le docblock de `Vitality` — seul le plancher se patche.
+ * reste un paramètre unique qu'`AttributeSplit` consomme d'un bloc. `vitality` porte le
+ * plancher (#161) et, depuis #165, les trois réglages du bonus quotidien
+ * (`window_days`, `target_active_kcal`, `bonus_cap_permille`) — le coefficient d'équilibre
+ * lui-même n'a pas de paramètre libre, tranché en revue, voir le docblock de `Vitality`.
  *
  * La couverture des disciplines, l'absence de doublon et la somme à 100 par ligne sont
  * dites par `AttributeSplit` ; les bornes du plancher par `Vitality` : une règle de
@@ -74,12 +75,17 @@ final class AttributeSplitSection implements GameBalanceSection
                         // En millièmes : `Vitality::of()` ne laisse jamais un flottant en
                         // sortir, et ce réglage ne fait pas exception dès l'entrée.
                         ->integerNode('floor_permille')->isRequired()->min(0)->max(1000)->end()
+                        // Le bonus quotidien (#165) — voir le docblock du fichier YAML pour
+                        // le sens des trois valeurs et pourquoi elles sont un premier jet.
+                        ->integerNode('window_days')->isRequired()->min(1)->end()
+                        ->integerNode('target_active_kcal')->isRequired()->min(1)->end()
+                        ->integerNode('bonus_cap_permille')->isRequired()->min(0)->max(1000)->end()
                     ->end()
                 ->end()
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
-                    /** @var array{splits: list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}>, vitality: array{floor_permille: int}} $values */
+                    /** @var array{splits: list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}>, vitality: array{floor_permille: int, window_days: int, target_active_kcal: int, bonus_cap_permille: int}} $values */
                     try {
                         // Voir le docblock de la classe : les disciplines de `splits`
                         // servent aussi d'univers des disciplines créditantes ici, faute
@@ -90,7 +96,15 @@ final class AttributeSplitSection implements GameBalanceSection
                         );
 
                         new AttributeSplit($values['splits'], $disciplines);
-                        new Vitality($values['vitality']['floor_permille']);
+                        // `window_days` n'entre pas dans `Vitality` : il ne sert qu'à
+                        // délimiter la requête vers `Training`, câblée directement en
+                        // paramètre scalaire par `services.yaml`. Son seul garde-fou est
+                        // `min(1)` ci-dessus.
+                        new Vitality(
+                            $values['vitality']['floor_permille'],
+                            $values['vitality']['target_active_kcal'],
+                            $values['vitality']['bonus_cap_permille'],
+                        );
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);
                     }

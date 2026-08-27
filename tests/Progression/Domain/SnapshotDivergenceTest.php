@@ -157,6 +157,6 @@ final class SnapshotDivergenceTest extends TestCase
     /** Un plancher arbitraire mais documenté, indépendant de celui livré — voir `VitalityTest` pour la table complète. */
     private static function vitality(): Vitality
     {
-        return new Vitality(250);
+        return new Vitality(250, 500, 200);
     }
 }

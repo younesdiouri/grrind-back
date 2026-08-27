@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Application;
 
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\VitalityBreakdown;
 
 /**
  * Où en est un joueur, tel qu'un autre module l'affiche : un niveau, une barre, un titre —
@@ -29,6 +30,11 @@ use App\Shared\Domain\Activity\AttributeGains;
  * profil de jeu. Le prochain champ qui tenterait d'y entrer doit répondre à la même
  * question que celui-ci — « est-ce une donnée de jeu qu'on a décidé de partager » — et pas
  * se contenter d'être disponible.
+ *
+ * **`vitality` est bonifiée depuis #165**, comme sur `/api/progression` : la variété des
+ * sports d'un co-équipier n'est pas la seule chose qu'une guilde donne envie de comparer,
+ * son assiduité quotidienne aussi. `vitalityBreakdown` porte de quoi l'expliquer, pour la
+ * même raison qu'à `ProgressionState` — voir son docblock.
  */
 final readonly class PlayerProgression
 {
@@ -42,8 +48,10 @@ final readonly class PlayerProgression
         public ?PlayerTitle $title,
         /** Les quatre caractéristiques, à l'instant présent — un état, jamais un passage. */
         public AttributeGains $attributes,
-        /** La cinquième, dérivée des quatre autres — voir {@see AttributeGains}. */
+        /** La cinquième, bonifiée par l'énergie active de la fenêtre — voir le docblock de la classe. */
         public int $vitality,
+        /** Ce qui explique `vitality` ci-dessus. */
+        public VitalityBreakdown $vitalityBreakdown,
     ) {
     }
 
@@ -61,6 +69,6 @@ final readonly class PlayerProgression
      */
     public static function untouched(): self
     {
-        return new self(1, 0, null, null, new AttributeGains(0, 0, 0, 0), 0);
+        return new self(1, 0, null, null, new AttributeGains(0, 0, 0, 0), 0, new VitalityBreakdown(0, 0, 0));
     }
 }

@@ -7,6 +7,7 @@ namespace App\Community\UI\Http\Response;
 use App\Shared\Application\PlayerProfile;
 use App\Shared\Application\PlayerProgression;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\VitalityBreakdown;
 use DateTimeInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -29,6 +30,9 @@ use Symfony\Component\Uid\Uuid;
  *
  * Elle sert la liste des membres (#117) et le profil d'un co-équipier (#119) : mêmes ports,
  * même ressource, donc un seul type à décoder et un seul composant à dessiner côté client.
+ *
+ * **`vitality` est bonifiée (#165), `vitalityBreakdown` l'explique** — même vocabulaire et
+ * même forme qu'à `GET /api/progression` (`ProgressionResource`), voir son docblock.
  */
 final readonly class PlayerResource
 {
@@ -44,6 +48,7 @@ final readonly class PlayerResource
         /** L'état courant des quatre caractéristiques — même vocabulaire qu'à `GET /api/progression`. */
         public AttributeGains $attributes,
         public int $vitality,
+        public VitalityBreakdown $vitalityBreakdown,
     ) {
     }
 
@@ -59,6 +64,7 @@ final readonly class PlayerResource
             $progression->title?->toArray(),
             $progression->attributes,
             $progression->vitality,
+            $progression->vitalityBreakdown,
         );
     }
 
@@ -85,6 +91,12 @@ final readonly class PlayerResource
                 'mobility' => $this->attributes->mobility,
                 'dexterity' => $this->attributes->dexterity,
                 'vitality' => $this->vitality,
+            ],
+            // Ce qui explique le champ juste au-dessus — voir le docblock de la classe.
+            'vitalityBreakdown' => [
+                'windowAverageActiveKcal' => $this->vitalityBreakdown->windowAverageActiveKcal,
+                'targetActiveKcal' => $this->vitalityBreakdown->targetActiveKcal,
+                'bonusPermille' => $this->vitalityBreakdown->bonusPermille,
             ],
         ];
     }
