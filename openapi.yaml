@@ -1131,9 +1131,7 @@ components:
           type: string
           format: uuid
         discipline:
-          allOf:
-            -
-              $ref: '#/components/schemas/Discipline'
+          $ref: '#/components/schemas/Discipline'
         senderId:
           type: string
           format: uuid
