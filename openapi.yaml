@@ -1186,10 +1186,11 @@ components:
             $ref: '#/components/schemas/Discipline'
       type: object
     Risalat:
-      description: "L'écran des Risālāt d'un bloc. L'onglet ne s'ouvre jamais sans les deux, et les\nséparer coûterait un aller-retour pour un écran qui n'a rien à afficher\nentre-temps — même raison que `GuildDetail`.\n"
+      description: "L'écran des Risālāt d'un bloc. L'onglet ne s'ouvre jamais sans les trois, et les\nséparer coûterait un aller-retour pour un écran qui n'a rien à afficher\nentre-temps — même raison que `GuildDetail`.\n"
       required:
         - risalat
         - turn
+        - nextRevealAt
       properties:
         risalat:
           description: "Les vivantes, **dans l'ordre de révélation** — qui est aussi celui de leur extinction."
@@ -1202,6 +1203,10 @@ components:
           allOf:
             -
               $ref: '#/components/schemas/RisalaTurn'
+        nextRevealAt:
+          description: "Le prochain rendez-vous hebdomadaire — quand la Risāla du tour part et quand\nle tour suivant se tire. **Toujours rendu**, y compris sans Risāla ni tour :\nc'est justement là, les deux premières semaines d'une guilde neuve, que le\nclient n'a rien d'autre à dire.\n\nRendu comme un instant, jamais comme la grille qui le produit : nommer un\njour et une heure côté client reviendrait à nommer ceux du fuseau de la\nsemaine de jeu, pas celui du lecteur — faux pour qui n'est pas dans ce\nfuseau, et faux en silence le jour où l'équilibrage de la grille change,\npuisqu'une phrase codée en dur dans une app déjà publiée continuerait\nd'annoncer l'ancienne sans que rien ne le signale.\n\nCoïncide avec `turn.deadline` quand un tour est ouvert et que la bascule qui\nl'a créé s'est exécutée à l'heure — mais c'est une conséquence du calendrier,\npas une garantie du contrat : ne pas s'y fier pour déduire l'un de l'autre.\n"
+          type: string
+          format: date-time
       type: object
     UserProfile:
       required:

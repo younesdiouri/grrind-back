@@ -87,6 +87,10 @@ final readonly class RisalatBoardProvider
                 $mine ? $turn->discipline() : null,
                 $this->choosableIn($live),
             ),
+            // Depuis l'instant de la requête, pas de la dernière bascule enregistrée : une
+            // bascule ratée ou en retard laisserait sinon `deadline` déjà passée, et le client
+            // afficherait un rendez-vous échu (#202).
+            $this->rules->nextRevealAfter($now),
         );
     }
 
