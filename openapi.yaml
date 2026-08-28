@@ -1596,7 +1596,7 @@ components:
         - amount
       properties:
         source:
-          description: "`BASE` est le temps — une minute vaut un point. `DISTANCE` et `ELEVATION`\nsont ce que le terrain ajoute, et n'apparaissent que sur les disciplines où\nune montre les mesure de façon fiable. Les quatre suivantes sont les\ncontributeurs de modificateurs ; les deux dernières, les garde-fous.\n"
+          description: "`BASE` est le temps — une minute vaut un point. `DISTANCE` et `ELEVATION`\nsont ce que le terrain ajoute, et n'apparaissent que sur les disciplines où\nune montre les mesure de façon fiable. Les cinq suivantes sont les\ncontributeurs de modificateurs ; les deux dernières, les garde-fous.\n"
           type: string
           enum:
             - BASE
@@ -1606,6 +1606,7 @@ components:
             - ITEM
             - SKILL
             - LEAGUE
+            - GUILD
             - DIMINISHING
             - DAILY_CAP
         amount:

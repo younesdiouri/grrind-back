@@ -929,11 +929,11 @@ when@dev:
                         properties:
                             source:
                                 type: string
-                                enum: [BASE, DISTANCE, ELEVATION, STREAK, ITEM, SKILL, LEAGUE, DIMINISHING, DAILY_CAP]
+                                enum: [BASE, DISTANCE, ELEVATION, STREAK, ITEM, SKILL, LEAGUE, GUILD, DIMINISHING, DAILY_CAP]
                                 description: |
                                     `BASE` est le temps — une minute vaut un point. `DISTANCE` et `ELEVATION`
                                     sont ce que le terrain ajoute, et n'apparaissent que sur les disciplines où
-                                    une montre les mesure de façon fiable. Les quatre suivantes sont les
+                                    une montre les mesure de façon fiable. Les cinq suivantes sont les
                                     contributeurs de modificateurs ; les deux dernières, les garde-fous.
                             amount: { type: integer, example: -55 }
 
