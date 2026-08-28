@@ -11,6 +11,7 @@ use App\Community\Infrastructure\Doctrine\RisalaRepository;
 use App\Shared\Domain\Activity\CreditingDisciplines;
 use App\Shared\Domain\Activity\Discipline;
 use DateTimeImmutable;
+use DateTimeInterface;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Types\UuidType;
@@ -152,7 +153,7 @@ class Risala
     public function choose(Discipline $discipline, CreditingDisciplines $crediting, array $challenged, DateTimeImmutable $now): void
     {
         if (RisalaStatus::Drawn !== $this->status || $now >= $this->deadline) {
-            throw new RisalaTurnIsClosed(\sprintf('Le tour s\'est refermé le %s.', $this->deadline->format('c')));
+            throw new RisalaTurnIsClosed($this->deadline->format(DateTimeInterface::ATOM));
         }
 
         if (!$crediting->credits($discipline)) {

@@ -284,6 +284,71 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  /api/guilds/mine/risalat:
+    get:
+      tags:
+        - Guildes
+      operationId: get_community_risalat_show
+      responses:
+        '200':
+          description: "Les Risālāt vivantes **dans l'ordre de révélation** — qui est aussi celui de leur\nextinction — et le tour en cours. Deux en régime établi, une seule après un tour manqué,\naucune la première quinzaine d'une guilde neuve."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Risalat'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "Le joueur n'a pas de guilde (`guild-not-found`). Contrairement à `GET /api/guilds/mine`, cet écran n'existe qu'à l'intérieur d'une guilde."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /api/guilds/mine/risalat/turn:
+    put:
+      tags:
+        - Guildes
+      operationId: put_community_risala_choose
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - discipline
+              properties:
+                discipline:
+                  description: 'Le sport envoyé à la guilde. Doit figurer dans le `choosable` du tour.'
+                  type: string
+                  enum: [RUNNING, WALKING, CYCLING, SWIMMING, STRENGTH, HIIT, HIKING, MOBILITY, CLIMBING, FOOTBALL, COURT_SPORTS, RACKET_SPORTS]
+              type: object
+      responses:
+        '200':
+          description: "Le choix est enregistré, et l'écran complet est rendu — rien à recharger."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Risalat'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: "Le tour appartient à quelqu'un d'autre (`risala-turn-is-not-yours`). **403 et non 404**,\ncontrairement au reste du module : le refus ne protège rien, puisque\n`GET /api/guilds/mine/risalat` a déjà dit à l'appelant à qui appartient le tour."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: "Pas de guilde (`guild-not-found`), ou aucun tour ouvert (`risala-turn-is-not-open`) —\nune guilde d'un seul membre n'en tire pas, et une guilde neuve attend la bascule."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: "Trois refus, un `type` chacun : l'échéance est passée (`risala-turn-is-closed`), la\ndiscipline ne rapporte pas d'XP (`discipline-does-not-credit`), ou une Risāla vivante la\nporte déjà (`discipline-already-challenged`). Le premier ne se réessaie pas ; les deux\nautres se corrigent en choisissant dans `choosable`."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   /api/devices:
     post:
       tags:
@@ -771,6 +836,11 @@ components:
             - 'https://grrind.app/problems/player-is-not-a-member'
             - 'https://grrind.app/problems/founder-cannot-exclude-himself'
             - 'https://grrind.app/problems/player-not-found'
+            - 'https://grrind.app/problems/risala-turn-is-closed'
+            - 'https://grrind.app/problems/discipline-does-not-credit'
+            - 'https://grrind.app/problems/discipline-already-challenged'
+            - 'https://grrind.app/problems/risala-turn-is-not-open'
+            - 'https://grrind.app/problems/risala-turn-is-not-yours'
         title:
           type: string
           example: Conflict
@@ -1044,6 +1114,92 @@ components:
           allOf:
             -
               $ref: '#/components/schemas/GuildDetail'
+      type: object
+    Risala:
+      description: "Un défi sportif envoyé par un membre à toute sa guilde, vivant deux semaines.\nDeux cohabitent en régime établi : une nouvelle arrive chaque semaine, la plus\nancienne s'éteint à la seconde exacte où la nouvelle naît.\n"
+      required:
+        - id
+        - discipline
+        - senderId
+        - senderDisplayName
+        - revealedAt
+        - expiresAt
+        - bonusPercent
+      properties:
+        id:
+          type: string
+          format: uuid
+        discipline:
+          type: string
+          example: CLIMBING
+        senderId:
+          type: string
+          format: uuid
+        senderDisplayName:
+          description: "`null` si l'expéditeur a quitté la guilde depuis la révélation : son défi reste, son nom n'est plus celui d'un co-équipier."
+          type: string
+          nullable: true
+        revealedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        bonusPercent:
+          description: "**Résolu pour l'appelant** : ce qu'il touche sur cette discipline, en\npourcentage du socle. 150 s'il reçoit la Risāla, 50 s'il l'a envoyée.\nLe serveur arbitre les valeurs de jeu — un client qui dériverait son\npropre bonus pourrait aussi se tromper, et l'écart avec le ledger ne\nse verrait qu'au signalement d'un joueur.\n"
+          type: integer
+          example: 150
+      type: object
+    RisalaTurn:
+      description: "Le tour en cours : qui doit choisir la Risāla de la semaine, et jusqu'à quand.\nUne information pour tout le monde, une action pour un seul.\n"
+      required:
+        - senderId
+        - senderDisplayName
+        - mine
+        - deadline
+        - discipline
+        - choosable
+      properties:
+        senderId:
+          type: string
+          format: uuid
+        senderDisplayName:
+          type: string
+          nullable: true
+        mine:
+          description: "Évite au client de comparer des UUID pour savoir s'il dessine un bouton ou une phrase."
+          type: boolean
+        deadline:
+          description: "Limite pour choisir **et** instant de la révélation : un seul point sur la\ngrille hebdomadaire, donc il n'existe jamais de fenêtre où le choix est\nencore possible alors que la Risāla est déjà partie.\n"
+          type: string
+          format: date-time
+        discipline:
+          description: "**Renseignée seulement pour son auteur**, et seulement s'il a déjà choisi.\nLe choix se fait à l'aveugle : c'est toute la mécanique, et l'annoncer\nd'avance viderait le rendez-vous du dimanche soir de sa raison d'être.\n"
+          type: string
+          nullable: true
+        choosable:
+          description: "Les disciplines qu'un tour peut encore demander : celles qui créditent de\nl'XP, moins celles déjà portées par une Risāla vivante. Rendue à tout le\nmonde — c'est une propriété de l'état de la guilde, pas un secret de son\nporteur — et calculée par le serveur, qui valide le choix avec la même\nliste.\n"
+          type: array
+          items:
+            type: string
+      type: object
+    Risalat:
+      description: "L'écran des Risālāt d'un bloc. L'onglet ne s'ouvre jamais sans les deux, et les\nséparer coûterait un aller-retour pour un écran qui n'a rien à afficher\nentre-temps — même raison que `GuildDetail`.\n"
+      required:
+        - risalat
+        - turn
+      properties:
+        risalat:
+          description: "Les vivantes, **dans l'ordre de révélation** — qui est aussi celui de leur extinction."
+          type: array
+          items:
+            $ref: '#/components/schemas/Risala'
+        turn:
+          description: "`null` quand la guilde n'a pas encore de tour : un seul membre, ou fondée depuis la dernière bascule hebdomadaire."
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/RisalaTurn'
       type: object
     UserProfile:
       required:
@@ -1838,6 +1994,30 @@ components:
           maxLength: 8
           minLength: 8
       type: object
+    Discipline:
+      type: string
+      enum:
+        - RUNNING
+        - WALKING
+        - CYCLING
+        - SWIMMING
+        - STRENGTH
+        - HIIT
+        - HIKING
+        - MOBILITY
+        - CLIMBING
+        - FOOTBALL
+        - COURT_SPORTS
+        - RACKET_SPORTS
+    ChooseRisalaRequest:
+      properties:
+        discipline:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/Discipline'
+          default: null
+      type: object
     DevicePlatform:
       type: string
       enum:
@@ -2059,21 +2239,6 @@ components:
           maxItems: 200
           minItems: 1
       type: object
-    Discipline:
-      type: string
-      enum:
-        - RUNNING
-        - WALKING
-        - CYCLING
-        - SWIMMING
-        - STRENGTH
-        - HIIT
-        - HIKING
-        - MOBILITY
-        - CLIMBING
-        - FOOTBALL
-        - COURT_SPORTS
-        - RACKET_SPORTS
     WorkoutHistoryQuery:
       properties:
         discipline:

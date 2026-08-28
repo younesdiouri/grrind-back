@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Community\Domain\Exception;
 
 use App\Shared\Domain\Activity\Discipline;
-use DomainException;
+use App\Shared\Domain\Exception\RuleViolationError;
 
 /**
  * Une Risāla vivante porte déjà cette discipline.
@@ -15,10 +15,18 @@ use DomainException;
  * faire essayer *autre chose* — proposer le sport que la guilde pratique déjà depuis une
  * semaine rate l'intention de la mécanique.
  */
-final class DisciplineAlreadyChallenged extends DomainException
+final class DisciplineAlreadyChallenged extends RuleViolationError
 {
-    public function __construct(public readonly Discipline $discipline)
+    public function __construct(Discipline $discipline)
     {
-        parent::__construct(\sprintf('Une Risāla vivante porte déjà "%s".', $discipline->value));
+        parent::__construct(
+            \sprintf('Une Risāla vivante porte déjà "%s".', $discipline->value),
+            ['discipline' => $discipline->value],
+        );
+    }
+
+    public function type(): string
+    {
+        return 'discipline-already-challenged';
     }
 }
