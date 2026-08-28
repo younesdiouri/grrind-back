@@ -11,12 +11,21 @@ namespace App\Shared\Domain;
  * lirait que `category` sait *quoi* s'est produit, jamais *lequel* — la ligue a beau être
  * fermée, elle ne dit pas de quel joueur il s'agit.
  *
- * **Une seule valeur pour l'instant**, comme {@see NotificationCategory} au #132 : le
- * #144 n'a qu'un consommateur, `GUILD_ACTIVITY` vers le profil de l'auteur. Level-up,
- * guilde et ligue apporteront leur propre cas le jour où un ticket en a besoin — ce n'est
+ * Level-up et ligue apporteront leur propre cas le jour où un ticket en a besoin — ce n'est
  * pas un catalogue à deviner à l'avance.
  */
 enum PushRouteType: string
 {
     case PlayerProfile = 'PLAYER_PROFILE';
+
+    /**
+     * L'écran des Risālāt d'une guilde (#194). `targetId` porte **l'identifiant de la
+     * guilde** et non celui de la Risāla : l'écran est propre à la guilde et ne prend pas
+     * d'élément — `GET /api/guilds/mine/risalat` n'accepte aucun identifiant — et l'id d'une
+     * Risāla n'est de toute façon pas une clé que le client sache résoudre.
+     *
+     * Il reste utile plutôt que décoratif : le jour où un compte appartient à plusieurs
+     * guildes, la route sait déjà laquelle ouvrir, sans qu'un push en vol devienne ambigu.
+     */
+    case GuildRisalat = 'GUILD_RISALAT';
 }

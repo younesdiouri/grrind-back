@@ -93,6 +93,15 @@ framework:
             # séances créditées du même lot.
             App\Community\Application\AnnounceGuildActivity: outbox
 
+            # Les deux annonces des Risālāt (#194), publiées depuis la transaction de la
+            # bascule hebdomadaire et consommées après son `COMMIT`. Sans `DelayStamp` à la
+            # publication, contrairement à `AnnounceGuildActivity` : rien d'autre n'est en
+            # file pour le même fait, donc il n'y a aucun ordre à garantir. Celle du tour
+            # peut en poser un elle-même, pour se reporter à la sortie des heures calmes de
+            # son destinataire — voir `AnnounceRisalaTurnHandler`.
+            App\Community\Application\AnnounceRisala: outbox
+            App\Community\Application\AnnounceRisalaTurn: outbox
+
             # Même geste, côté `Shared` (#131) : un déclencheur sans charge utile, jamais
             # traité avant le `DelayStamp` posé par `ExpoPushSender` ou par le handler
             # lui-même — voir le docblock de `CheckExpoPushReceipts`.

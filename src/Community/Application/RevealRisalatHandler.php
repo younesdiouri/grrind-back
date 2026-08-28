@@ -9,12 +9,14 @@ use App\Community\Domain\GuildMembership;
 use App\Community\Domain\Risala;
 use App\Community\Domain\RisalaRotation;
 use App\Community\Domain\RisalaRules;
+use App\Community\Domain\RisalaStatus;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
 use App\Community\Infrastructure\Doctrine\RisalaRepository;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -48,6 +50,10 @@ final readonly class RevealRisalatHandler
         private GuildRepository $guilds,
         private RisalaRepository $risalat,
         private RisalaRules $rules,
+        // Sans `#[Target]`, volontairement (#155) : les deux annonces ne sont pas des
+        // `DomainEvent`, elles doivent rester sur le bus strict — celui que
+        // `MessageBusInterface` résout par défaut.
+        private MessageBusInterface $bus,
         private ClockInterface $clock,
         private EntityManagerInterface $entityManager,
     ) {
@@ -86,6 +92,14 @@ final readonly class RevealRisalatHandler
             // Le second refus du scellement : celui qui a quitté la guilde n'envoie plus
             // rien, même s'il avait choisi. Voir {@see Risala::seal()}.
             $open->seal($this->rules, $guild->hasMember($open->senderId()));
+
+            // Publiée **dans la transaction** : le transport Doctrine partage la connexion,
+            // donc l'écriture du message participe au même `COMMIT` que la révélation. On
+            // n'annonce jamais un fait encore annulable, et on ne perd jamais une annonce
+            // dont le fait est acquis — c'est l'outbox du #133, au même endroit du geste.
+            if (RisalaStatus::Sent === $open->status()) {
+                $this->bus->dispatch(new AnnounceRisala($open->id()));
+            }
 
             // **Deux `flush()`, et le premier n'est pas décoratif.** Doctrine écrit les
             // insertions avant les mises à jour dans un même `flush()` : le tour neuf
@@ -128,6 +142,11 @@ final readonly class RevealRisalatHandler
         // (`drawRoll`, `drawPoolSize`) suffit à le rejouer.
         $roll = random_int(0, \count($rotation->pool) - 1);
 
-        $this->risalat->add(Risala::draw($guild, $rotation, $roll, $now, $this->rules->nextRevealAfter($now)));
+        $this->risalat->add($turn = Risala::draw($guild, $rotation, $roll, $now, $this->rules->nextRevealAfter($now)));
+
+        // Après l'`add()` mais l'identifiant existe déjà : il est tiré par le constructeur,
+        // pas par la base. L'annonce peut donc partir avant le `flush()` — le message et la
+        // ligne sortent de toute façon dans le même `COMMIT`.
+        $this->bus->dispatch(new AnnounceRisalaTurn($turn->id()));
     }
 }

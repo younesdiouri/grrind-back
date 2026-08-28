@@ -649,7 +649,8 @@ when@dev:
                             doit donc générer `routeType` plutôt que d'en recopier les valeurs.
 
                             **Rien à afficher tel quel.** `routeId` est une clé de ressource à relire —
-                            pour `PLAYER_PROFILE`, l'identifiant que `GET /api/players/{id}` résout. Une
+                            pour `PLAYER_PROFILE`, l'identifiant que `GET /api/players/{id}` résout ; pour
+                            `GUILD_RISALAT`, celui de la guilde dont il faut ouvrir l'écran des Risālāt. Une
                             notification peut dormir des heures dans le centre de notifications ; ce que le
                             tap montre ensuite doit être exact, donc relu depuis l'API. `groupingKey`, lui,
                             ne se lit pas : il dit seulement quelle notification une nouvelle remplace.
