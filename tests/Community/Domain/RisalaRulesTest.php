@@ -85,25 +85,44 @@ final class RisalaRulesTest extends TestCase
         // disparaîtrait, et avec lui les quinze jours pour caler la séance.
         $this->expectException(InvalidArgumentException::class);
 
-        new RisalaRules(1, 7, 20, 'Europe/Paris');
+        new RisalaRules(1, 7, 20, 'Europe/Paris', 150, 50);
     }
 
     public function testAnInventedTimezoneStopsTheBoot(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new RisalaRules(2, 7, 20, 'Europe/Atlantide');
+        new RisalaRules(2, 7, 20, 'Europe/Atlantide', 150, 50);
     }
 
     public function testAWeekdayOutsideTheIsoRangeIsRefused(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new RisalaRules(2, 8, 20, 'Europe/Paris');
+        new RisalaRules(2, 8, 20, 'Europe/Paris', 150, 50);
+    }
+
+    public function testASenderPaidAsWellAsThoseHeChallengesIsRefused(): void
+    {
+        // Il choisirait le sport qu'il pratique déjà, et la Risāla cesserait de faire
+        // découvrir quoi que ce soit. Le déséquilibre *est* la règle, pas un réglage.
+        $this->expectException(InvalidArgumentException::class);
+
+        new RisalaRules(2, 7, 20, 'Europe/Paris', 150, 150);
+    }
+
+    public function testABonusOfZeroIsRefused(): void
+    {
+        // Une Risāla qui ne change rien à la séance : la mécanique n'existerait plus, mais
+        // tout continuerait de tourner — le pire des deux mondes, puisque personne ne verrait
+        // la panne.
+        $this->expectException(InvalidArgumentException::class);
+
+        new RisalaRules(2, 7, 20, 'Europe/Paris', 150, 0);
     }
 
     private static function rules(): RisalaRules
     {
-        return new RisalaRules(2, 7, 20, 'Europe/Paris');
+        return new RisalaRules(2, 7, 20, 'Europe/Paris', 150, 50);
     }
 }

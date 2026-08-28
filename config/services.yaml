@@ -82,6 +82,8 @@ services:
             $revealWeekday: '%game.community.risala.reveal_day%'
             $revealHour: '%game.community.risala.reveal_hour%'
             $weekTimezone: '%game.community.risala.week_timezone%'
+            $recipientBonusPercent: '%game.community.risala.recipient_bonus_percent%'
+            $senderBonusPercent: '%game.community.risala.sender_bonus_percent%'
 
     # Les disciplines qui créditent, lues une seule fois depuis la **même** liste brute que
     # `XpRates` et `AttributeSplit` consomment (#191). `Community` en a besoin pour refuser
@@ -365,6 +367,11 @@ when@test:
             public: true
 
         App\Community\Infrastructure\Doctrine\GuildRepository:
+            public: true
+
+        # Public pour que le #192 interroge le contributeur directement, sans passer par un
+        # crédit : ce qu'il rend est une liste de modificateurs, et c'est elle qui se lit.
+        App\Community\Application\RisalaModifiers:
             public: true
 
         # `$disciplines` répété : la redéclaration d'un service déjà défini plus haut ne

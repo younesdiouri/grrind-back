@@ -61,3 +61,19 @@ risala:
   # réellement répartie sur trois continents, c'est ce réglage qui devra devenir un attribut
   # de guilde — pas la règle qui devra changer.
   week_timezone: Europe/Paris
+
+  # ————— Ce qu'une Risāla rapporte (#192) ——————————————————————————————————————————————
+  #
+  # Les deux taux disent la même chose dans les deux sens : assez pour que découvrir un sport
+  # inconnu soit la meilleure séance de la semaine, et assez pour que proposer ne soit pas un
+  # sacrifice — mais pas au point qu'on choisisse sa Risāla pour soi.
+  #
+  # Un expéditeur à +150 % choisirait le sport qu'il pratique déjà, et la mécanique se
+  # retournerait en une semaine : elle existe pour faire essayer autre chose. À +50 %, il n'y
+  # gagne vraiment qu'en emmenant les autres avec lui.
+  #
+  # Ce sont des pourcentages **du socle**, additifs comme tous les modificateurs — voir le
+  # docblock de `XpCalculator`. Une Risāla escalade (+150 %) sur une première séance
+  # d'escalade, avec le bonus de reprise à venir (+100 %), donnera ×3,5 et non ×5.
+  recipient_bonus_percent: 150
+  sender_bonus_percent: 50

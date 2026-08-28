@@ -169,7 +169,7 @@ final class RisalaTest extends TestCase
 
     private static function rules(): RisalaRules
     {
-        return new RisalaRules(2, 7, 20, 'Europe/Paris');
+        return new RisalaRules(2, 7, 20, 'Europe/Paris', 150, 50);
     }
 
     /** Toutes les disciplines créditent, sauf `WALKING` — l'état réel de `xp.yaml`. */
