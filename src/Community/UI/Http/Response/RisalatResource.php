@@ -7,6 +7,7 @@ namespace App\Community\UI\Http\Response;
 use App\Community\Application\RisalatBoard;
 use App\Community\Application\RisalaView;
 use DateTimeInterface;
+use DateTimeZone;
 
 /**
  * L'écran des Risālāt d'un bloc : les vivantes, le tour en cours, puis le prochain rendez-vous.
@@ -15,6 +16,12 @@ use DateTimeInterface;
  * `GuildDetail` au #117. Et dans cet ordre, qui est celui de l'écran : ce qui court
  * maintenant d'abord, ce qui se prépare ensuite, puis le rendez-vous qui fait basculer les
  * deux (#202).
+ *
+ * **`nextRevealAt` est reposé en UTC avant d'être rendu**, comme {@see \App\Shared\Domain\LocalDay}
+ * repose ses bornes : c'est la seule date du contrat calculée dans un autre fuseau que celui du
+ * stockage, et l'offset la trahirait. `…T20:00:00+02:00` livre en clair l'heure *et* le fuseau
+ * de la semaine de jeu — c'est-à-dire la grille que le #202 refuse justement de rendre, pour
+ * que le client ne soit pas invité à recalculer le rendez-vous suivant lui-même.
  */
 final readonly class RisalatResource
 {
@@ -31,7 +38,7 @@ final readonly class RisalatResource
         return new self(
             array_map(static fn (RisalaView $risala): RisalaResource => RisalaResource::from($risala), $board->live),
             null === $board->turn ? null : RisalaTurnResource::from($board->turn),
-            $board->nextRevealAt->format(DateTimeInterface::ATOM),
+            $board->nextRevealAt->setTimezone(new DateTimeZone('UTC'))->format(DateTimeInterface::ATOM),
         );
     }
 
