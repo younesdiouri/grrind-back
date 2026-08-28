@@ -9,7 +9,8 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 
 /**
- * Le calendrier des Risālāt : quand la semaine bascule, et combien de temps une Risāla vit.
+ * Le calendrier des Risālāt et leur barème : quand la semaine bascule, combien de temps une
+ * Risāla vit, et ce qu'elle rapporte de chaque côté.
  *
  * De l'équilibrage, pas des constantes de classe — même geste que {@see GuildRules} : la
  * bonne durée d'un défi est une question de produit qui bougera après les premiers joueurs.
@@ -46,6 +47,10 @@ final readonly class RisalaRules
         public int $revealWeekday,
         public int $revealHour,
         string $weekTimezone,
+        /** Ce que touche un membre sur la discipline demandée, en pourcentage du socle. */
+        public int $recipientBonusPercent,
+        /** Ce que touche celui qui l'a envoyée, sur la même discipline. */
+        public int $senderBonusPercent,
     ) {
         $this->weekTimezone = Timezone::fromString($weekTimezone);
 
@@ -62,6 +67,20 @@ final readonly class RisalaRules
 
         if ($revealHour < 0 || $revealHour > 23) {
             throw new InvalidArgumentException(\sprintf('L\'heure de révélation se borne entre 0 et 23, %d donnée.', $revealHour));
+        }
+
+        // Un bonus nul ferait une Risāla qui ne change rien à la séance : la mécanique
+        // n'existerait plus, mais tout continuerait de tourner — le pire des deux mondes,
+        // puisque personne ne verrait la panne.
+        if ($recipientBonusPercent < 1 || $senderBonusPercent < 1) {
+            throw new InvalidArgumentException(\sprintf('Une Risāla doit rapporter quelque chose aux deux côtés, %d %% et %d %% demandés.', $recipientBonusPercent, $senderBonusPercent));
+        }
+
+        // L'expéditeur au moins aussi bien servi que ceux qu'il défie retournerait la
+        // mécanique : il choisirait le sport qu'il pratique déjà, et la Risāla cesserait de
+        // faire découvrir quoi que ce soit. Le déséquilibre *est* la règle.
+        if ($senderBonusPercent >= $recipientBonusPercent) {
+            throw new InvalidArgumentException(\sprintf('L\'expéditeur ne peut pas gagner autant que ceux qu\'il défie : %d %% contre %d %%.', $senderBonusPercent, $recipientBonusPercent));
         }
     }
 

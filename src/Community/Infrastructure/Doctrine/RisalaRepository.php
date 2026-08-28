@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Community\Infrastructure\Doctrine;
 
 use App\Community\Domain\Guild;
+use App\Community\Domain\GuildMembership;
 use App\Community\Domain\Risala;
 use App\Community\Domain\RisalaStatus;
 use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Uid\Uuid;
 
@@ -58,6 +60,40 @@ class RisalaRepository extends ServiceEntityRepository
             ->andWhere('r.expiresAt > :at')
             ->orderBy('r.revealedAt', 'ASC')
             ->setParameter('guild', $guild)
+            ->setParameter('sent', RisalaStatus::Sent)
+            ->setParameter('at', $at)
+            ->getQuery()
+            ->getResult();
+
+        return $live;
+    }
+
+    /**
+     * Les Risālāt vivantes de la guilde **d'un joueur**, à un instant donné.
+     *
+     * Le pendant de {@see liveIn()}, pris par l'autre bout : celle-là part de la guilde — ce
+     * que l'écran et le choix demandent —, celle-ci part du joueur, ce dont le moteur d'XP a
+     * besoin (#192). Deux méthodes plutôt qu'une composition côté appelant, parce que la
+     * composition ferait deux requêtes là où la jointure en fait une : ce contributeur est
+     * appelé **une fois par séance créditée, dans la transaction verrouillée**, et un import
+     * en porte dix.
+     *
+     * Un joueur sans guilde ne produit aucune ligne — la jointure s'en charge, sans qu'un
+     * appelant ait à poser la question d'abord.
+     *
+     * @return list<Risala>
+     */
+    public function liveForPlayer(Uuid $playerId, DateTimeImmutable $at): array
+    {
+        /** @var list<Risala> $live */
+        $live = $this->createQueryBuilder('r')
+            ->join(GuildMembership::class, 'm', Join::WITH, 'm.guild = r.guild')
+            ->where('m.playerId = :player')
+            ->andWhere('r.status = :sent')
+            ->andWhere('r.revealedAt <= :at')
+            ->andWhere('r.expiresAt > :at')
+            ->orderBy('r.revealedAt', 'ASC')
+            ->setParameter('player', $playerId)
             ->setParameter('sent', RisalaStatus::Sent)
             ->setParameter('at', $at)
             ->getQuery()

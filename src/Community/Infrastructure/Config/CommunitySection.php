@@ -42,12 +42,14 @@ final class CommunitySection implements GameBalanceSection
                         ->integerNode('reveal_day')->isRequired()->min(1)->max(7)->end()
                         ->integerNode('reveal_hour')->isRequired()->min(0)->max(23)->end()
                         ->scalarNode('week_timezone')->isRequired()->cannotBeEmpty()->end()
+                        ->integerNode('recipient_bonus_percent')->isRequired()->min(1)->end()
+                        ->integerNode('sender_bonus_percent')->isRequired()->min(1)->end()
                     ->end()
                 ->end()
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
-                    /** @var array{maximum_members: int, invite_code_lifetime_hours: int, risala: array{active_weeks: int, reveal_day: int, reveal_hour: int, week_timezone: string}} $values les `integerNode` ci-dessus ont déjà fait ce travail */
+                    /** @var array{maximum_members: int, invite_code_lifetime_hours: int, risala: array{active_weeks: int, reveal_day: int, reveal_hour: int, week_timezone: string, recipient_bonus_percent: int, sender_bonus_percent: int}} $values les `integerNode` ci-dessus ont déjà fait ce travail */
                     try {
                         new GuildRules($values['maximum_members'], $values['invite_code_lifetime_hours']);
 
@@ -60,6 +62,8 @@ final class CommunitySection implements GameBalanceSection
                             $values['risala']['reveal_day'],
                             $values['risala']['reveal_hour'],
                             $values['risala']['week_timezone'],
+                            $values['risala']['recipient_bonus_percent'],
+                            $values['risala']['sender_bonus_percent'],
                         );
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);
