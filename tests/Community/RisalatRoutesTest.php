@@ -67,6 +67,18 @@ final class RisalatRoutesTest extends ApiTestCase
         self::assertNotContains(self::CHALLENGED, $choosable);
         self::assertNotContains('WALKING', $choosable);
         self::assertContains('SWIMMING', $choosable);
+
+        // Vrai ici parce que `guildInFullSwing()` a fait basculer la guilde exactement à
+        // l'échéance : la bascule a posé `deadline` au prochain point de la même grille que
+        // celui que la requête recalcule. Ce n'est pas une garantie du contrat — une bascule en
+        // retard laisserait les deux diverger — seulement une propriété de cette mise en place.
+        //
+        // Comparaison **de chaîne à chaîne**, et c'est ce qui compte : `nextRevealAt` est le
+        // seul instant du contrat calculé dans le fuseau de la semaine de jeu, et le rendre tel
+        // quel livrerait son offset — donc l'heure et le fuseau de la grille. Une comparaison
+        // par instant passerait au vert sur `+02:00` comme sur `+00:00` et ne dirait rien.
+        self::assertIsString($deadline = $turn['deadline']);
+        self::assertSame($deadline, $body['nextRevealAt']);
     }
 
     public function testTheSenderOfALiveRisalaSeesHisOwnRateOnIt(): void
@@ -173,6 +185,17 @@ final class RisalatRoutesTest extends ApiTestCase
         $body = self::decode($this->get('/api/guilds/mine/risalat', $founder->headers));
         self::assertSame([], $body['risalat']);
         self::assertNull($body['turn']);
+
+        // C'est justement là — ni Risāla ni tour — que le client n'a rien d'autre à dire : le
+        // rendez-vous reste rendu, et strictement dans le futur puisqu'il est calculé depuis
+        // l'instant de la requête.
+        self::assertIsString($nextRevealAt = $body['nextRevealAt']);
+        self::assertGreaterThan(new DateTimeImmutable(), new DateTimeImmutable($nextRevealAt));
+
+        // Sans tour, aucune autre date à quoi le comparer : l'UTC se vérifie ici sur la chaîne
+        // elle-même, sinon la seule guilde qui n'a rien d'autre à afficher serait aussi la
+        // seule à recevoir l'offset de la grille.
+        self::assertStringEndsWith('+00:00', $nextRevealAt);
 
         $refusal = self::decode($this->choose($founder, 'SWIMMING', Response::HTTP_NOT_FOUND));
         self::assertSame('risala-turn-is-not-open', self::typeOf($refusal));

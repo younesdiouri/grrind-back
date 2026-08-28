@@ -539,9 +539,9 @@ when@dev:
 
                     Risalat:
                         type: object
-                        required: [risalat, turn]
+                        required: [risalat, turn, nextRevealAt]
                         description: |
-                            L'écran des Risālāt d'un bloc. L'onglet ne s'ouvre jamais sans les deux, et les
+                            L'écran des Risālāt d'un bloc. L'onglet ne s'ouvre jamais sans les trois, et les
                             séparer coûterait un aller-retour pour un écran qui n'a rien à afficher
                             entre-temps — même raison que `GuildDetail`.
                         properties:
@@ -554,6 +554,25 @@ when@dev:
                                 description: "`null` quand la guilde n'a pas encore de tour : un seul membre, ou fondée depuis la dernière bascule hebdomadaire."
                                 allOf:
                                     - $ref: '#/components/schemas/RisalaTurn'
+                            nextRevealAt:
+                                type: string
+                                format: date-time
+                                description: |
+                                    Le prochain rendez-vous hebdomadaire — quand la Risāla du tour part et quand
+                                    le tour suivant se tire. **Toujours rendu**, y compris sans Risāla ni tour :
+                                    c'est justement là, les deux premières semaines d'une guilde neuve, que le
+                                    client n'a rien d'autre à dire.
+
+                                    Rendu comme un instant, jamais comme la grille qui le produit : nommer un
+                                    jour et une heure côté client reviendrait à nommer ceux du fuseau de la
+                                    semaine de jeu, pas celui du lecteur — faux pour qui n'est pas dans ce
+                                    fuseau, et faux en silence le jour où l'équilibrage de la grille change,
+                                    puisqu'une phrase codée en dur dans une app déjà publiée continuerait
+                                    d'annoncer l'ancienne sans que rien ne le signale.
+
+                                    Coïncide avec `turn.deadline` quand un tour est ouvert et que la bascule qui
+                                    l'a créé s'est exécutée à l'heure — mais c'est une conséquence du calendrier,
+                                    pas une garantie du contrat : ne pas s'y fier pour déduire l'un de l'autre.
 
                     UserProfile:
                         type: object
