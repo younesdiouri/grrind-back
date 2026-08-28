@@ -7,6 +7,7 @@ namespace App\Tests\Shared;
 use App\Progression\Domain\XpBreakdownSource;
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRoute;
+use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
 use App\Shared\UI\Http\ProblemDetails;
@@ -191,6 +192,28 @@ final class OpenApiContractTest extends KernelTestCase
             $source['enum'],
             'Le contrat et `XpBreakdownSource` ne portent plus les mêmes valeurs, dans le même '
             .'ordre. Recale l\'énumération de `XpLine.source` dans nelmio_api_doc.yaml, puis `make openapi`.',
+        );
+    }
+
+    /**
+     * Le schéma `Discipline` n'est pas écrit à la main : le générateur le produit depuis l'enum
+     * PHP, parce que `ChooseRisalaRequest` porte une propriété typée avec (#201). Ce test ne
+     * prouve donc pas qu'une recopie suit l'enum — il n'y en a plus — il prouve que ce mécanisme
+     * de génération tient toujours : que `Discipline` existe encore dans le contrat, et qu'il
+     * sort encore de {@see Discipline}. Il tomberait si `ChooseRisalaRequest` cessait un jour
+     * d'être la seule classe qui type l'enum, ou si le générateur changeait de nom de schéma —
+     * deux pannes silencieuses qui laisseraient `Workout.discipline` et `XpTransaction.discipline`
+     * pointer vers un schéma qui a discrètement pris du retard (#205).
+     */
+    public function testTheDisciplineSchemaStillComesFromTheEnum(): void
+    {
+        self::assertSame(12, \count(Discipline::cases()), 'Discipline a changé de taille : recale cette assertion avant tout le reste.');
+
+        self::assertSame(
+            array_column(Discipline::cases(), 'value'),
+            $this->schema('Discipline')['enum'],
+            'Le schéma "Discipline" ne sort plus de l\'enum PHP, dans le même ordre. Vérifie que '
+            .'ChooseRisalaRequest type toujours sa propriété avec Discipline, puis `make openapi`.',
         );
     }
 
