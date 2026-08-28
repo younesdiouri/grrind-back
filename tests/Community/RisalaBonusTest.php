@@ -23,6 +23,7 @@ use DateTimeInterface;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Ce qu'une Risāla vaut réellement à un joueur, et jusqu'où ça remonte.
@@ -151,6 +152,52 @@ final class RisalaBonusTest extends ApiTestCase
             [['source' => 'BASE', 'amount' => 60], ['source' => 'GUILD', 'amount' => 90]],
             $xp['breakdown'],
         );
+
+        // La ligne qui rend la Risāla visible n'est pas seulement calculée juste : elle doit
+        // sortir de l'API avec une source que le contrat déclare (#200), sans quoi le client
+        // l'affiche sans libellé. `OpenApiContractTest` prouve que le contrat suit le domaine ;
+        // celui-ci prouve que la ligne réellement émise en fait partie.
+        $sources = array_column($xp['breakdown'], 'source');
+        self::assertContains('GUILD', $sources);
+
+        foreach ($sources as $emittedSource) {
+            self::assertContains(
+                $emittedSource,
+                $this->xpLineSourceEnum(),
+                \sprintf('La source "%s" sort de l\'API sans être déclarée dans le contrat.', $emittedSource),
+            );
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function xpLineSourceEnum(): array
+    {
+        $path = self::getContainer()->getParameter('kernel.project_dir').'/openapi.yaml';
+        self::assertIsString($path);
+
+        $spec = Yaml::parseFile($path);
+        self::assertIsArray($spec);
+        $components = $spec['components'];
+        self::assertIsArray($components);
+        $schemas = $components['schemas'];
+        self::assertIsArray($schemas);
+        $xpLine = $schemas['XpLine'];
+        self::assertIsArray($xpLine);
+        $properties = $xpLine['properties'];
+        self::assertIsArray($properties);
+        $source = $properties['source'];
+        self::assertIsArray($source);
+        $enum = $source['enum'];
+        self::assertIsArray($enum);
+
+        foreach ($enum as $value) {
+            self::assertIsString($value);
+        }
+
+        /** @var list<string> $enum */
+        return $enum;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared;
 
+use App\Progression\Domain\XpBreakdownSource;
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRoute;
 use App\Shared\Domain\NotificationCategory;
@@ -168,6 +169,28 @@ final class OpenApiContractTest extends KernelTestCase
         self::assertSame(
             array_column(PushRouteType::cases(), 'value'),
             $this->schema('PushRouteType')['enum'],
+        );
+    }
+
+    /**
+     * `XpBreakdownSource` est recopiée à la main dans `XpLine.properties.source.enum` — rien
+     * ne relie les deux, et c'est ce qui a laissé passer `GUILD` neuf séances après son entrée
+     * dans le domaine (#200). L'ordre compte autant que le contenu : c'est l'ordre d'animation
+     * du détail de calcul, et `assertSame` le vérifie là où `assertContains` aurait laissé
+     * passer une valeur au mauvais rang.
+     */
+    public function testTheContractDeclaresEveryXpBreakdownSource(): void
+    {
+        $source = $this->schema('XpLine')['properties'];
+        self::assertIsArray($source);
+        $source = $source['source'];
+        self::assertIsArray($source);
+
+        self::assertSame(
+            array_column(XpBreakdownSource::cases(), 'value'),
+            $source['enum'],
+            'Le contrat et `XpBreakdownSource` ne portent plus les mêmes valeurs, dans le même '
+            .'ordre. Recale l\'énumération de `XpLine.source` dans nelmio_api_doc.yaml, puis `make openapi`.',
         );
     }
 
