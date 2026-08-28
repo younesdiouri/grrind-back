@@ -1,0 +1,105 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Community\Domain;
+
+use App\Shared\Domain\Timezone;
+use DateTimeImmutable;
+use InvalidArgumentException;
+
+/**
+ * Le calendrier des Risālāt : quand la semaine bascule, et combien de temps une Risāla vit.
+ *
+ * De l'équilibrage, pas des constantes de classe — même geste que {@see GuildRules} : la
+ * bonne durée d'un défi est une question de produit qui bougera après les premiers joueurs.
+ *
+ * ## Un instant unique pour tout le monde
+ *
+ * `weekTimezone` n'est **pas** le fuseau d'un joueur. C'est celui de la semaine de jeu, et
+ * il est le même pour toutes les guildes : la révélation est simultanée ou elle n'est pas.
+ * Un joueur à Tokyo découvre sa Risāla le lundi matin, et c'est le prix accepté pour que
+ * « tout le monde apprend la même chose au même moment » reste vrai.
+ *
+ * C'est le seul endroit du projet où une date de jeu ne se calcule pas dans le fuseau du
+ * joueur, et l'exception est assumée : le streak et les plafonds quotidiens mesurent *sa*
+ * journée à lui, la Risāla est un rendez-vous collectif.
+ *
+ * ## L'échéance et la révélation sont le même instant
+ *
+ * Le membre tiré a jusqu'à `deadline` pour choisir ; c'est à `deadline` que sa Risāla part.
+ * Un seul instant sur la grille hebdomadaire, donc, et pas deux : c'est ce qui garantit
+ * qu'il n'existe jamais de fenêtre où le choix est encore possible alors que la révélation
+ * a déjà eu lieu — ni l'inverse.
+ */
+final readonly class RisalaRules
+{
+    public Timezone $weekTimezone;
+
+    /**
+     * @param string $weekTimezone identifiant IANA — la validation est celle de {@see Timezone},
+     *                             pas une seconde formulation qui finirait par diverger
+     */
+    public function __construct(
+        public int $activeWeeks,
+        /** ISO-8601 : 1 = lundi, 7 = dimanche. */
+        public int $revealWeekday,
+        public int $revealHour,
+        string $weekTimezone,
+    ) {
+        $this->weekTimezone = Timezone::fromString($weekTimezone);
+
+        // Une Risāla d'une seule semaine expirerait à l'instant même où la suivante est
+        // révélée : le roulement disparaîtrait, et avec lui les quinze jours pour caler la
+        // séance — c'est-à-dire tout ce que la mécanique achète.
+        if ($activeWeeks < 2) {
+            throw new InvalidArgumentException(\sprintf('Une Risāla doit vivre au moins deux semaines pour qu\'il y en ait deux à la fois, %d demandée(s).', $activeWeeks));
+        }
+
+        if ($revealWeekday < 1 || $revealWeekday > 7) {
+            throw new InvalidArgumentException(\sprintf('Le jour de révélation est un jour ISO-8601 entre 1 et 7, %d donné.', $revealWeekday));
+        }
+
+        if ($revealHour < 0 || $revealHour > 23) {
+            throw new InvalidArgumentException(\sprintf('L\'heure de révélation se borne entre 0 et 23, %d donnée.', $revealHour));
+        }
+    }
+
+    /**
+     * Le prochain rendez-vous hebdomadaire, **strictement après** `$instant`.
+     *
+     * Strictement, et c'est ce qui fait tourner la roue : la bascule s'exécute *à* l'instant
+     * du rendez-vous, et demande depuis là quand est le suivant. Une comparaison large
+     * rendrait le rendez-vous courant, donc une échéance déjà échue, donc un tour scellé
+     * `MISSED` dans l'heure qui suit sa naissance.
+     *
+     * Le calcul passe par le calendrier du fuseau et non par une addition de secondes : un
+     * changement d'heure ne doit ni avancer ni retarder la révélation d'une heure.
+     */
+    public function nextRevealAfter(DateTimeImmutable $instant): DateTimeImmutable
+    {
+        $local = $instant->setTimezone($this->weekTimezone->toDateTimeZone());
+
+        $candidate = $local->setTime($this->revealHour, 0);
+        $candidate = $candidate->modify(\sprintf('+%d days', ($this->revealWeekday - (int) $candidate->format('N') + 7) % 7));
+
+        // `modify()` conserve l'heure locale au passage d'un changement d'heure, mais la
+        // reposer coûte une ligne et ferme la question pour de bon.
+        $candidate = $candidate->setTime($this->revealHour, 0);
+
+        return $candidate > $local ? $candidate : $candidate->modify('+7 days')->setTime($this->revealHour, 0);
+    }
+
+    /**
+     * Quand s'éteint une Risāla révélée à `$revealedAt` — un instant de la grille, donc son
+     * expiration en est un aussi.
+     *
+     * C'est ce qui fait qu'il y en a exactement deux : à la révélation de la semaine N, celle
+     * de N−2 expire à la seconde même où celle de N naît. Un décalage d'une seule seconde
+     * entre les deux ferait apparaître une troisième Risāla vivante, ou un trou.
+     */
+    public function expiryOf(DateTimeImmutable $revealedAt): DateTimeImmutable
+    {
+        return $revealedAt->modify(\sprintf('+%d weeks', $this->activeWeeks));
+    }
+}

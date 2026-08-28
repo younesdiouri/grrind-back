@@ -66,16 +66,10 @@ final readonly class AttributeSplit
     {
         $percentages = [];
 
-        $creditingDisciplines = [];
-
-        foreach ($disciplines as $rate) {
-            $discipline = Discipline::tryFrom($rate['discipline'])
-                ?? throw new InvalidArgumentException(\sprintf('Discipline inconnue dans la liste des disciplines de "xp.yaml" : "%s".', $rate['discipline']));
-
-            if (false !== ($rate['credits_xp'] ?? true)) {
-                $creditingDisciplines[$discipline->value] = true;
-            }
-        }
+        // La lecture de « qui crédite » vit dans son propre objet depuis le #191, où un
+        // troisième lecteur est apparu dans un autre module. Rien ne change ici : c'est
+        // toujours la liste brute de `xp.yaml` qui entre, et toujours elle qui décide.
+        $crediting = new CreditingDisciplines($disciplines);
 
         foreach ($splits as $split) {
             $discipline = Discipline::tryFrom($split['discipline'])
@@ -88,7 +82,7 @@ final readonly class AttributeSplit
             // Une ligne pour une discipline qui ne crédite pas ne sera jamais lue par
             // `XpCalculator` : la garder serait de la config morte qui pourrit sans que
             // personne s'en aperçoive.
-            if (!isset($creditingDisciplines[$discipline->value])) {
+            if (!$crediting->credits($discipline)) {
                 throw new InvalidArgumentException(\sprintf('"%s" ne crédite pas d\'XP, elle ne devrait pas avoir de ligne à la table de répartition.', $discipline->value));
             }
 
@@ -113,9 +107,9 @@ final readonly class AttributeSplit
         // Une discipline qui crédite et sans ligne rapporterait zéro caractéristique en
         // silence — un joueur découvrirait le trou, pas nous. On préfère ne pas démarrer.
         // Une discipline qui ne crédite pas n'a, à l'inverse, rien à exiger.
-        foreach (array_keys($creditingDisciplines) as $value) {
-            if (!isset($percentages[$value])) {
-                throw new InvalidArgumentException(\sprintf('Aucune répartition à la table pour la discipline "%s".', $value));
+        foreach ($crediting->all() as $discipline) {
+            if (!isset($percentages[$discipline->value])) {
+                throw new InvalidArgumentException(\sprintf('Aucune répartition à la table pour la discipline "%s".', $discipline->value));
             }
         }
 
