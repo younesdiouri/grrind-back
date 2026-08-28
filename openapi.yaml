@@ -779,8 +779,9 @@ components:
       type: string
       enum:
         - PLAYER_PROFILE
+        - GUILD_RISALAT
     PushNotificationData:
-      description: "Le `data` d'une notification push, **le seul morceau qui se décode plutôt que\ns'affiche**. Il n'arrive par aucune route : le canal est APNs via Expo, pas HTTP.\nIl est décrit ici parce que c'est le même contrat — le client route dessus, il\ndoit donc générer `routeType` plutôt que d'en recopier les valeurs.\n\n**Rien à afficher tel quel.** `routeId` est une clé de ressource à relire —\npour `PLAYER_PROFILE`, l'identifiant que `GET /api/players/{id}` résout. Une\nnotification peut dormir des heures dans le centre de notifications ; ce que le\ntap montre ensuite doit être exact, donc relu depuis l'API. `groupingKey`, lui,\nne se lit pas : il dit seulement quelle notification une nouvelle remplace.\n"
+      description: "Le `data` d'une notification push, **le seul morceau qui se décode plutôt que\ns'affiche**. Il n'arrive par aucune route : le canal est APNs via Expo, pas HTTP.\nIl est décrit ici parce que c'est le même contrat — le client route dessus, il\ndoit donc générer `routeType` plutôt que d'en recopier les valeurs.\n\n**Rien à afficher tel quel.** `routeId` est une clé de ressource à relire —\npour `PLAYER_PROFILE`, l'identifiant que `GET /api/players/{id}` résout ; pour\n`GUILD_RISALAT`, celui de la guilde dont il faut ouvrir l'écran des Risālāt. Une\nnotification peut dormir des heures dans le centre de notifications ; ce que le\ntap montre ensuite doit être exact, donc relu depuis l'API. `groupingKey`, lui,\nne se lit pas : il dit seulement quelle notification une nouvelle remplace.\n"
       required:
         - groupingKey
         - routeType
@@ -2057,6 +2058,8 @@ components:
       type: string
       enum:
         - GUILD_ACTIVITY
+        - RISALA_TURN
+        - RISALA_REVEALED
     NotificationPreferenceRequest:
       properties:
         category:

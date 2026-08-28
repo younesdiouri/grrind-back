@@ -7,6 +7,7 @@ namespace App\Tests\Community\Domain;
 use App\Community\Domain\QuietHours;
 use App\Shared\Domain\Timezone;
 use DateTimeImmutable;
+use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -65,5 +66,62 @@ final class QuietHoursTest extends TestCase
         $hours = new QuietHours(9, 9);
 
         self::assertFalse($hours->contains(new DateTimeImmutable('2026-08-19T09:00:00+00:00'), Timezone::fromString('Europe/Paris')));
+    }
+
+    public function testAnInstantOutsideTheRangeIsItsOwnWakeUpTime(): void
+    {
+        // Rien à reporter : le message part maintenant. Rendre `$instant` tel quel évite à
+        // l'appelant un `if` de plus, et un `if` de plus est un `if` qu'on oublie.
+        $hours = new QuietHours(22, 8);
+        $noon = new DateTimeImmutable('2026-08-19T10:00:00+00:00');
+
+        self::assertEquals($noon, $hours->endsAfter($noon, Timezone::fromString('Europe/Paris')));
+    }
+
+    public function testAnInstantBeforeMidnightWakesUpTheNextMorning(): void
+    {
+        // 23h à Paris : la plage franchit minuit, donc la sortie est le lendemain 8h.
+        $hours = new QuietHours(22, 8);
+
+        self::assertSame(
+            '2026-08-20 08:00:00',
+            $hours->endsAfter(new DateTimeImmutable('2026-08-19T21:00:00+00:00'), Timezone::fromString('Europe/Paris'))
+                ->setTimezone(new DateTimeZone('Europe/Paris'))
+                ->format('Y-m-d H:i:s'),
+        );
+    }
+
+    public function testAnInstantPastMidnightWakesUpTheSameMorning(): void
+    {
+        // 3h du matin à Paris : la sortie est dans cinq heures, pas dans vingt-neuf.
+        $hours = new QuietHours(22, 8);
+
+        self::assertSame(
+            '2026-08-19 08:00:00',
+            $hours->endsAfter(new DateTimeImmutable('2026-08-19T01:00:00+00:00'), Timezone::fromString('Europe/Paris'))
+                ->setTimezone(new DateTimeZone('Europe/Paris'))
+                ->format('Y-m-d H:i:s'),
+        );
+    }
+
+    public function testTheWakeUpTimeIsReadInTheRecipientTimezone(): void
+    {
+        // Le même instant UTC : nuit à Tokyo, plein après-midi à Paris. Un seul des deux se
+        // reporte, et c'est toute la raison d'être du #194 — 20h à Paris est 3h à Tokyo
+        // *toutes les semaines*.
+        $hours = new QuietHours(22, 8);
+        $instant = new DateTimeImmutable('2026-08-19T18:00:00+00:00');
+
+        self::assertNotEquals($instant, $hours->endsAfter($instant, Timezone::fromString('Asia/Tokyo')));
+        self::assertEquals($instant, $hours->endsAfter($instant, Timezone::fromString('Europe/Paris')));
+    }
+
+    public function testWithoutAConfiguredRangeNothingIsEverPostponed(): void
+    {
+        // Un réglage à zéro ne doit jamais rendre la guilde muette — ni la faire attendre.
+        $hours = new QuietHours(0, 0);
+        $midnight = new DateTimeImmutable('2026-08-19T00:00:00+00:00');
+
+        self::assertEquals($midnight, $hours->endsAfter($midnight, Timezone::fromString('Europe/Paris')));
     }
 }

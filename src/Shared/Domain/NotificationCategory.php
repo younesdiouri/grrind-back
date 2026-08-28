@@ -20,11 +20,21 @@ namespace App\Shared\Domain;
  * (`Shared/Application`) en dépendre dans le sens habituel — Application vers Domain,
  * jamais l'inverse.
  *
- * Une seule valeur pour l'instant : `GUILD_ACTIVITY`, un co-équipier qui s'est entraîné.
  * Level-up, ligue et rival viendront avec leurs propres tickets — ce n'en est pas un
  * catalogue à deviner à l'avance, seulement celui qu'un consommateur a déjà.
+ *
+ * **Les deux Risālāt sont séparées et non fondues en une catégorie `RISALA` (#194)**, parce
+ * que les préférences de `/api/me` se coupent par catégorie : on peut vouloir faire taire le
+ * bavardage de sa guilde sans faire taire ce qui nous demande d'agir. Les fondre obligerait à
+ * choisir entre les deux, et le joueur qui coupe finirait par manquer son tour.
  */
 enum NotificationCategory: string
 {
     case GuildActivity = 'GUILD_ACTIVITY';
+
+    /** C'est ton tour : choisis la Risāla de la semaine avant l'échéance. À une seule personne. */
+    case RisalaTurn = 'RISALA_TURN';
+
+    /** La Risāla de la semaine est partie. À toute la guilde, au même instant. */
+    case RisalaRevealed = 'RISALA_REVEALED';
 }

@@ -13,11 +13,11 @@ use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\LocalHours;
 use App\Tests\Support\Messaging\WorkoutCreditedSpy;
 use App\Tests\Support\SpyingPushSender;
 use DateTimeImmutable;
 use DateTimeInterface;
-use DateTimeZone;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -45,40 +45,7 @@ use Symfony\Component\Uid\Uuid;
  */
 final class GuildActivityNotifierTest extends ApiTestCase
 {
-    /**
-     * Un fuseau IANA réel sans heure d'été par décalage UTC entier, pour
-     * {@see self::timezoneShiftingUtcHourTo()}.
-     *
-     * @var array<int, string>
-     */
-    private const array ZONE_BY_UTC_OFFSET = [
-        0 => 'UTC',
-        1 => 'Africa/Lagos',
-        2 => 'Africa/Johannesburg',
-        3 => 'Africa/Nairobi',
-        4 => 'Asia/Dubai',
-        5 => 'Asia/Karachi',
-        6 => 'Asia/Dhaka',
-        7 => 'Asia/Bangkok',
-        8 => 'Asia/Shanghai',
-        9 => 'Asia/Tokyo',
-        10 => 'Australia/Brisbane',
-        11 => 'Pacific/Noumea',
-        12 => 'Pacific/Wallis',
-        13 => 'Pacific/Tongatapu',
-        14 => 'Pacific/Kiritimati',
-        -1 => 'Atlantic/Cape_Verde',
-        -2 => 'America/Noronha',
-        -3 => 'America/Sao_Paulo',
-        -4 => 'America/La_Paz',
-        -5 => 'America/Bogota',
-        -6 => 'America/Guatemala',
-        -7 => 'America/Phoenix',
-        -8 => 'Pacific/Pitcairn',
-        -9 => 'Pacific/Gambier',
-        -10 => 'Pacific/Honolulu',
-        -11 => 'Pacific/Pago_Pago',
-    ];
+    use LocalHours;
 
     protected function setUp(): void
     {
@@ -441,24 +408,6 @@ final class GuildActivityNotifierTest extends ApiTestCase
             ['workouts' => $workouts],
             $account->headers + ['Idempotency-Key' => $key],
         );
-    }
-
-    /**
-     * Le fuseau dont l'heure locale vaut `$targetLocalHour` **à l'instant où le test
-     * tourne** — pas un fuseau fixé une fois pour toutes, dont l'écart avec l'heure réelle
-     * changerait selon le jour de l'exécution et rendrait ce test dépendant de l'heure à
-     * laquelle la suite passe.
-     */
-    private static function timezoneShiftingUtcHourTo(int $targetLocalHour): string
-    {
-        $utcHour = (int) new DateTimeImmutable('now', new DateTimeZone('UTC'))->format('G');
-        $offset = ($targetLocalHour - $utcHour + 24) % 24;
-
-        if ($offset > 14) {
-            $offset -= 24;
-        }
-
-        return self::ZONE_BY_UTC_OFFSET[$offset];
     }
 
     /**

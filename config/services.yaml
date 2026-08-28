@@ -374,6 +374,21 @@ when@test:
         App\Community\Application\RisalaModifiers:
             public: true
 
+        # Les deux annonces des Risālāt (#194) : publiques pour que les tests les invoquent
+        # sans drainer l'outbox, et branchées sur l'espion plutôt que sur le vrai
+        # `PushSender` — même geste qu'`AnnounceGuildActivityHandler` plus haut, et pour la
+        # même raison : l'alias global reste câblé vers `ExpoPushSender`, ce que
+        # `PushSenderWiringTest` prouve.
+        App\Community\Application\AnnounceRisalaHandler:
+            public: true
+            arguments:
+                $pushSender: '@App\Tests\Support\SpyingPushSender'
+
+        App\Community\Application\AnnounceRisalaTurnHandler:
+            public: true
+            arguments:
+                $pushSender: '@App\Tests\Support\SpyingPushSender'
+
         # `$disciplines` répété : la redéclaration d'un service déjà défini plus haut ne
         # fusionne pas ses arguments, elle les remplace.
         App\Shared\Domain\Activity\CreditingDisciplines:

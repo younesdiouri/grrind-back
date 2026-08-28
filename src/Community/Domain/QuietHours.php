@@ -27,6 +27,34 @@ final readonly class QuietHours
         }
     }
 
+    /**
+     * Le premier instant à partir duquel une notification peut repartir — `$instant`
+     * lui-même si la plage n'est pas ouverte.
+     *
+     * **Pour ce qui se reporte, pas pour ce qui se perd (#194).** Une annonce d'activité de
+     * guilde qui tombe en pleine nuit est simplement abandonnée : elle sera périmée au
+     * réveil, et le co-équipier la lira dans l'app. Un tour de Risāla, lui, a une échéance —
+     * le manquer coûte une semaine à toute la guilde — et 20h à Paris tombe à 3h du matin à
+     * Tokyo *toutes les semaines*. Abandonner condamnerait un joueur lointain au silence
+     * permanent ; réveiller à 3h serait pire ; reporter est le seul des trois qui tienne.
+     *
+     * La sortie de plage se calcule par le calendrier du fuseau et non par une addition de
+     * secondes : un changement d'heure ne doit ni avancer ni retarder le réveil d'une heure.
+     */
+    public function endsAfter(DateTimeImmutable $instant, Timezone $timezone): DateTimeImmutable
+    {
+        if (!$this->contains($instant, $timezone)) {
+            return $instant;
+        }
+
+        $local = $instant->setTimezone($timezone->toDateTimeZone());
+        $end = $local->setTime($this->endHour, 0);
+
+        // La borne de fin est déjà passée dans la journée locale : c'est une plage qui
+        // franchit minuit, et elle se referme demain matin.
+        return $end > $local ? $end : $end->modify('+1 day')->setTime($this->endHour, 0);
+    }
+
     public function contains(DateTimeImmutable $instant, Timezone $timezone): bool
     {
         // Identiques : aucune plage calme n'est configurée, plutôt qu'une plage de

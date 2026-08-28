@@ -23,7 +23,14 @@ final class MeTest extends ApiTestCase
         self::assertSame(self::EMAIL, $body['email']);
         self::assertSame('Bob', $body['displayName']);
         self::assertSame('Europe/Paris', $body['timezone']);
-        self::assertSame(['GUILD_ACTIVITY' => true], $body['notificationPreferences'], 'Le défaut à l\'inscription est activé (#132).');
+        // Toutes activées à l'inscription (#132), et la liste grandit avec le catalogue :
+        // `UserResource` itère sur `NotificationCategory`, donc une catégorie ajoutée
+        // apparaît ici sans qu'on y touche — et c'est ce test qui le rappelle.
+        self::assertSame(
+            ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            $body['notificationPreferences'],
+            'Le défaut à l\'inscription est activé (#132).',
+        );
     }
 
     public function testRefusesAnAnonymousCall(): void
@@ -101,7 +108,10 @@ final class MeTest extends ApiTestCase
         ], $headers);
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-        self::assertSame(['GUILD_ACTIVITY' => false], self::decode($response)['notificationPreferences']);
+        self::assertSame(
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            self::decode($response)['notificationPreferences'],
+        );
     }
 
     public function testACategoryAbsentFromThePatchStaysUntouched(): void
@@ -118,7 +128,10 @@ final class MeTest extends ApiTestCase
         // même garantie que `displayName`/`timezone`.
         $this->send('PATCH', '/api/me', ['displayName' => 'Bobby'], $headers);
 
-        self::assertSame(['GUILD_ACTIVITY' => false], self::decode($this->get('/api/me', $headers))['notificationPreferences']);
+        self::assertSame(
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            self::decode($this->get('/api/me', $headers))['notificationPreferences'],
+        );
     }
 
     public function testThePreferenceSurvivesTheRequest(): void
@@ -131,7 +144,10 @@ final class MeTest extends ApiTestCase
             ],
         ], $headers);
 
-        self::assertSame(['GUILD_ACTIVITY' => false], self::decode($this->get('/api/me', $headers))['notificationPreferences']);
+        self::assertSame(
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            self::decode($this->get('/api/me', $headers))['notificationPreferences'],
+        );
     }
 
     public function testRejectsAnUnknownCategory(): void
