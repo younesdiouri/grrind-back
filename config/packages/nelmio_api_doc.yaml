@@ -483,7 +483,7 @@ when@dev:
                             ancienne s'éteint à la seconde exacte où la nouvelle naît.
                         properties:
                             id: { type: string, format: uuid }
-                            discipline: { type: string, example: CLIMBING }
+                            discipline: { $ref: '#/components/schemas/Discipline' }
                             senderId: { type: string, format: uuid }
                             senderDisplayName:
                                 type: string
@@ -521,15 +521,15 @@ when@dev:
                                     grille hebdomadaire, donc il n'existe jamais de fenêtre où le choix est
                                     encore possible alors que la Risāla est déjà partie.
                             discipline:
-                                type: string
                                 nullable: true
+                                allOf: [{ $ref: '#/components/schemas/Discipline' }]
                                 description: |
                                     **Renseignée seulement pour son auteur**, et seulement s'il a déjà choisi.
                                     Le choix se fait à l'aveugle : c'est toute la mécanique, et l'annoncer
                                     d'avance viderait le rendez-vous du dimanche soir de sa raison d'être.
                             choosable:
                                 type: array
-                                items: { type: string }
+                                items: { $ref: '#/components/schemas/Discipline' }
                                 description: |
                                     Les disciplines qu'un tour peut encore demander : celles qui créditent de
                                     l'XP, moins celles déjà portées par une Risāla vivante. Rendue à tout le

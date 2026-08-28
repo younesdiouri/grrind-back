@@ -1131,8 +1131,7 @@ components:
           type: string
           format: uuid
         discipline:
-          type: string
-          example: CLIMBING
+          $ref: '#/components/schemas/Discipline'
         senderId:
           type: string
           format: uuid
@@ -1176,13 +1175,15 @@ components:
           format: date-time
         discipline:
           description: "**Renseignée seulement pour son auteur**, et seulement s'il a déjà choisi.\nLe choix se fait à l'aveugle : c'est toute la mécanique, et l'annoncer\nd'avance viderait le rendez-vous du dimanche soir de sa raison d'être.\n"
-          type: string
           nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/Discipline'
         choosable:
           description: "Les disciplines qu'un tour peut encore demander : celles qui créditent de\nl'XP, moins celles déjà portées par une Risāla vivante. Rendue à tout le\nmonde — c'est une propriété de l'état de la guilde, pas un secret de son\nporteur — et calculée par le serveur, qui valide le choix avec la même\nliste.\n"
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/Discipline'
       type: object
     Risalat:
       description: "L'écran des Risālāt d'un bloc. L'onglet ne s'ouvre jamais sans les deux, et les\nséparer coûterait un aller-retour pour un écran qui n'a rien à afficher\nentre-temps — même raison que `GuildDetail`.\n"
