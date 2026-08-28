@@ -72,6 +72,25 @@ services:
             $maximumMembers: '%game.community.maximum_members%'
             $inviteCodeLifetimeHours: '%game.community.invite_code_lifetime_hours%'
 
+    # Le calendrier des Risālāt (#191), tiré du même fichier que la taille des guildes.
+    # `week_timezone` est le fuseau de la *semaine de jeu*, pas celui d'un joueur — voir le
+    # docblock de `RisalaRules` pour pourquoi c'est la seule date du projet qui échappe au
+    # fuseau de celui qu'elle concerne.
+    App\Community\Domain\RisalaRules:
+        arguments:
+            $activeWeeks: '%game.community.risala.active_weeks%'
+            $revealWeekday: '%game.community.risala.reveal_day%'
+            $revealHour: '%game.community.risala.reveal_hour%'
+            $weekTimezone: '%game.community.risala.week_timezone%'
+
+    # Les disciplines qui créditent, lues une seule fois depuis la **même** liste brute que
+    # `XpRates` et `AttributeSplit` consomment (#191). `Community` en a besoin pour refuser
+    # une Risāla sur une discipline qui ne rapporte rien, et Deptrac lui interdit de lire
+    # quoi que ce soit de `Progression` — d'où l'objet, dans `Shared`.
+    App\Shared\Domain\Activity\CreditingDisciplines:
+        arguments:
+            $disciplines: '%game.xp.disciplines%'
+
     # Les heures calmes d'un destinataire (#133), tirées de `game/v1/notifications.yaml`.
     App\Community\Domain\QuietHours:
         arguments:
@@ -325,6 +344,35 @@ when@test:
             public: true
             arguments:
                 $expoDsn: '%env(EXPO_DSN)%'
+
+        # Le temps piloté (#191) : la bascule des Risālāt se démontre sur trois semaines, et
+        # personne n'attendra trois semaines. `MockClock` vient du composant Clock — c'est
+        # exactement ce pour quoi il existe, et il n'est injecté qu'au handler de la bascule :
+        # le reste de l'application garde l'horloge réelle, donc rien d'autre ne se met à
+        # vivre dans un futur inventé.
+        Symfony\Component\Clock\MockClock:
+            arguments: ['2026-08-30 20:00:00', 'Europe/Paris']
+            public: true
+
+        # Public pour que les tests appellent la bascule sans attendre le battement horaire
+        # du planificateur — même besoin que `AnnounceGuildActivityHandler` plus haut.
+        App\Community\Application\RevealRisalatHandler:
+            public: true
+            arguments:
+                $clock: '@Symfony\Component\Clock\MockClock'
+
+        App\Community\Infrastructure\Doctrine\RisalaRepository:
+            public: true
+
+        App\Community\Infrastructure\Doctrine\GuildRepository:
+            public: true
+
+        # `$disciplines` répété : la redéclaration d'un service déjà défini plus haut ne
+        # fusionne pas ses arguments, elle les remplace.
+        App\Shared\Domain\Activity\CreditingDisciplines:
+            public: true
+            arguments:
+                $disciplines: '%game.xp.disciplines%'
 
         # L'abonné qui prouve qu'un module tiers réagit à un workout importé sans être
         # nommé nulle part. Il n'est pas autoconfiguré par le `App\Tests\` du dessus — il

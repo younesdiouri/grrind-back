@@ -15,6 +15,11 @@ primary_region = 'cdg'
   # attend du HTTP en clair sur `internal_port`.
   SERVER_NAME = ':80'
 
+# `scheduler_risala` (#191) est consommé par le **même** worker que l'outbox, et pas par un
+# groupe à part : le transport du composant Scheduler ne fait que produire un message à
+# l'heure ronde, il n'a pas de charge propre. Un second groupe de machines coûterait une
+# machine allumée en permanence pour une requête par heure.
+#
 # `app` : la commande par défaut de l'image (FrankenPHP en mode worker, cf.
 # FRANKENPHP_CONFIG dans le Dockerfile — sans rapport avec le groupe `worker` ci-dessous)
 # — chaîne vide pour ne pas la remplacer.
@@ -23,7 +28,7 @@ primary_region = 'cdg'
 # `WorkoutImported` en attente, aucune annonce de guilde jamais partie.
 [processes]
   app = ""
-  worker = "php bin/console messenger:consume outbox --time-limit=3600 --memory-limit=128M"
+  worker = "php bin/console messenger:consume outbox scheduler_risala --time-limit=3600 --memory-limit=128M"
 
 [http_service]
   internal_port = 80

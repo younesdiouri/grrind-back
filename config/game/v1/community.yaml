@@ -27,3 +27,37 @@ maximum_members: 30
 # existe. Quarante-huit heures couvrent « je t'invite ce week-end » sans couvrir « on avait
 # parlé de ça le mois dernier ».
 invite_code_lifetime_hours: 48
+
+# ————— Les Risālāt (#191) —————————————————————————————————————————————————————————————
+#
+# Une Risāla est le défi sportif qu'un membre envoie à toute sa guilde. Ce bloc dit *quand*
+# la semaine bascule et *combien de temps* un défi vit — pas ce qu'il rapporte, qui arrive
+# avec le bonus lui-même.
+risala:
+  # Deux semaines, donc deux Risālāt vivantes en régime établi : une nouvelle chaque
+  # semaine, la plus ancienne s'éteint à la seconde où la nouvelle naît.
+  #
+  # C'est la durée qui fait la mécanique, pas une commodité. Une Risāla d'une semaine
+  # reviendrait à ne récompenser que ceux dont l'emploi du temps était déjà libre — or tout
+  # l'intérêt est de faire essayer un sport qu'on n'aurait jamais choisi, ce qui demande de
+  # trouver un créneau, un lieu, parfois quelqu'un pour y aller avec.
+  #
+  # En dessous de deux, il n'y en aurait jamais qu'une à la fois : le domaine refuse de
+  # démarrer plutôt que de laisser le roulement disparaître en silence.
+  active_weeks: 2
+
+  # ISO-8601 : 1 = lundi, 7 = dimanche. Le dimanche soir parce que c'est le moment où l'on
+  # regarde la semaine qui vient, pas celle qui finit.
+  reveal_day: 7
+  reveal_hour: 20
+
+  # **Le fuseau de la semaine de jeu, pas celui d'un joueur.** C'est le seul endroit du
+  # projet où une date ne se calcule pas dans le fuseau de celui qu'elle concerne, et
+  # l'exception est assumée : le streak et les plafonds quotidiens mesurent *sa* journée à
+  # lui, la révélation d'une Risāla est un rendez-vous collectif. Simultané, ou ce n'est pas
+  # un rendez-vous.
+  #
+  # Un joueur à Tokyo découvre donc sa Risāla le lundi matin. Le jour où une guilde sera
+  # réellement répartie sur trois continents, c'est ce réglage qui devra devenir un attribut
+  # de guilde — pas la règle qui devra changer.
+  week_timezone: Europe/Paris
