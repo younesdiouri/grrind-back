@@ -34,7 +34,10 @@ use Psr\Clock\ClockInterface;
  *    lorsque les deux arrivent dans le même lot ;
  * 3. **résoudre les modificateurs actifs**, après le verrou pour la même raison : le
  *    streak et les objets équipés changent à l'intérieur de cette transaction-là, et un
- *    ensemble lu avant elle créditerait des bonus déjà périmés ;
+ *    ensemble lu avant elle créditerait des bonus déjà périmés. Ils se résolvent **à la
+ *    date du sport** (#190) — la même que la charge du jour reçoit juste en dessous : une
+ *    source bornée dans le temps, la Risāla d'une guilde et ses deux semaines, ne doit pas
+ *    bonifier une séance d'il y a trois semaines qu'un import vient de remonter ;
  * 4. **calculer**, purement, et écrire l'XpTransaction ;
  * 5. **reprojeter** le snapshot sur le nouveau total et la nouvelle répartition par
  *    caractéristique (#160) ;
@@ -71,7 +74,7 @@ final readonly class GrantXpHandler
             $award = $this->calculator->calculate(
                 $command->discipline,
                 $command->durationSeconds,
-                $this->modifiers->of($command->userId),
+                $this->modifiers->of($command->userId, $command->occurredAt),
                 // La journée du **sport**, pas celle de l'appel. Sur un import, les deux
                 // sont à des jours d'écart, et c'est bien la charge de ce jour-là qui place
                 // le workout sur la courbe des rendements décroissants.

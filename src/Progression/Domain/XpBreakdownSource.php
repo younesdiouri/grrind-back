@@ -12,12 +12,13 @@ use App\Shared\Domain\Modifier\ModifierSource;
  *
  * Fermé et stocké : ajouter une valeur est une migration de données autant qu'une
  * évolution de code, puisque l'historique restera lisible avec l'ancien vocabulaire. Les
- * quatre sources de bonus correspondent une pour une aux contributeurs du
+ * cinq sources de bonus correspondent une pour une aux contributeurs du
  * `ModifierResolver` (#18) ; les deux dernières sont des garde-fous, et leur contribution
  * est négative par construction.
  *
  * L'ordre de déclaration est **l'ordre d'animation** : ce que la séance vaut, ce que le
- * terrain ajoute, ce que le personnage ajoute, puis ce que les garde-fous reprennent.
+ * terrain ajoute, ce que le personnage ajoute, ce que le groupe ajoute, puis ce que les
+ * garde-fous reprennent.
  */
 enum XpBreakdownSource: string
 {
@@ -41,6 +42,14 @@ enum XpBreakdownSource: string
     case Skill = 'SKILL';
     case League = 'LEAGUE';
 
+    /**
+     * La guilde (#190) : la Risāla de la semaine, et ce qui viendra s'ajouter à côté
+     * d'elle. **Après `League` et pas avant** — l'ordre de déclaration est l'ordre
+     * d'animation, et ce que le groupe apporte se joue après ce que le personnage a
+     * construit tout seul.
+     */
+    case Guild = 'GUILD';
+
     /** Les rendements décroissants de la journée (#15) : négatif au crédit. */
     case Diminishing = 'DIMINISHING';
 
@@ -60,6 +69,7 @@ enum XpBreakdownSource: string
             ModifierSource::Skill => self::Skill,
             ModifierSource::Item => self::Item,
             ModifierSource::League => self::League,
+            ModifierSource::Guild => self::Guild,
         };
     }
 }

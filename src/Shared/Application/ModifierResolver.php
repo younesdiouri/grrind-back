@@ -6,6 +6,7 @@ namespace App\Shared\Application;
 
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierSource;
+use DateTimeImmutable;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Uid\Uuid;
 
@@ -27,6 +28,10 @@ use Symfony\Component\Uid\Uuid;
  * streak au Lot 5, les objets au Lot 6. Le resolver rend donc un ensemble vide, et c'est
  * délibérément le branchement — pas le contenu — qui est éprouvé au Lot 3. C'est le seul
  * moment où on peut le faire sans qu'un test de bonus le masque.
+ *
+ * Il ne possède pas d'horloge non plus, et c'est le même refus (#190) : la date de la
+ * séance traverse depuis l'appelant jusqu'aux contributeurs sans que personne en chemin
+ * ait le droit d'en inventer une autre.
  */
 final readonly class ModifierResolver
 {
@@ -47,14 +52,16 @@ final readonly class ModifierResolver
      * identiques laissent deux traces différentes. Le tri ne coûte rien, il y a quatre
      * sources.
      *
+     * @param DateTimeImmutable $occurredAt la date **du sport** — voir {@see ModifierContributor::modifiersOf()}
+     *
      * @return list<Modifier>
      */
-    public function of(Uuid $userId): array
+    public function of(Uuid $userId, DateTimeImmutable $occurredAt): array
     {
         $contributed = [];
 
         foreach ($this->contributors as $contributor) {
-            foreach ($contributor->modifiersOf($userId) as $modifier) {
+            foreach ($contributor->modifiersOf($userId, $occurredAt) as $modifier) {
                 $contributed[$modifier->source->value][] = $modifier;
             }
         }

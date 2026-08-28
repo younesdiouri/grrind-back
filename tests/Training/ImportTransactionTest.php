@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Training;
 
+use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Modifier\Modifier;
+use App\Shared\Domain\Modifier\ModifierSource;
+use App\Shared\Domain\Modifier\ModifierType;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\ProgrammableModifiers;
@@ -61,6 +65,66 @@ final class ImportTransactionTest extends ApiTestCase
         // Trois journées distinctes, donc aucun rendement décroissant : 30 chacune.
         self::assertSame(3, $this->ledgerSize());
         self::assertSame(90, $this->snapshotTotalOf($bob));
+    }
+
+    /**
+     * **Le test qui porte le #190.** Un modificateur borné dans le temps ne bonifie que les
+     * séances qui tombent dedans, et c'est ici que ça se démontre : nulle part ailleurs
+     * deux dates différentes ne traversent la même transaction.
+     *
+     * Le rattrapage d'un joueur absent est le cas nominal, pas l'exception : dix jours en
+     * une synchronisation, dont une seule séance postérieure à la Risāla de sa guilde. Si
+     * les modificateurs se résolvaient au moment du crédit — « ici et maintenant » —, les
+     * deux séances seraient bonifiées et le ledger porterait un montant que rien ne
+     * pourrait plus justifier.
+     */
+    public function testABoundedModifierOnlyBonusesTheSessionsThatFallInsideIt(): void
+    {
+        $bob = $this->openAccount();
+
+        $revealedAt = new DateTimeImmutable('-3 days');
+        ProgrammableModifiers::grantFrom(
+            $revealedAt,
+            new Modifier(ModifierType::XpMultiplier, 150, ModifierSource::Guild, Discipline::Running),
+        );
+
+        $this->import($bob, [
+            self::candidate(externalId: 'HK-AVANT', startedAt: self::atSevenOClock('-10 days'), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-APRES', startedAt: self::atSevenOClock('-1 day'), durationSeconds: 1800),
+        ]);
+
+        // Deux journées distinctes, donc aucun rendement décroissant : 30 chacune, et
+        // +45 sur la seule qui a eu lieu après la révélation.
+        self::assertSame(105, $this->ledgerTotalOf($bob));
+    }
+
+    /**
+     * Le pendant du test précédent, et il n'est pas redondant : c'est la **ligne** du détail
+     * qui remonte jusqu'au client, pas seulement le total. Sans elle, le montant serait juste
+     * et l'animation muette.
+     */
+    public function testTheBonusedSessionCarriesItsGuildLineToTheClient(): void
+    {
+        $bob = $this->openAccount();
+
+        ProgrammableModifiers::grantFrom(
+            new DateTimeImmutable('-3 days'),
+            new Modifier(ModifierType::XpMultiplier, 150, ModifierSource::Guild, Discipline::Running),
+        );
+
+        $body = self::decode($this->import($bob, [
+            self::candidate(externalId: 'HK-AVANT', startedAt: self::atSevenOClock('-10 days'), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-APRES', startedAt: self::atSevenOClock('-1 day'), durationSeconds: 1800),
+        ]));
+
+        self::assertIsArray($body['imported']);
+        self::assertSame(
+            [
+                ['BASE'],
+                ['BASE', 'GUILD'],
+            ],
+            array_map(self::breakdownSourcesOf(...), $body['imported']),
+        );
     }
 
     /**
@@ -217,6 +281,38 @@ final class ImportTransactionTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
         self::assertSame(30, $this->snapshotTotalOf($bob));
+    }
+
+    /**
+     * Une date relative à l'exécution, posée à 7h. Les autres suites datent en dur, ce
+     * qu'elles peuvent se permettre ; celles du #190 comparent une séance à une fenêtre
+     * ouverte « il y a trois jours », donc leurs deux bornes doivent glisser ensemble.
+     */
+    private static function atSevenOClock(string $modifier): string
+    {
+        return new DateTimeImmutable($modifier)->setTime(7, 0)->format(DateTimeInterface::ATOM);
+    }
+
+    /**
+     * @param mixed $imported une entrée de `imported`, telle que la réponse la rend
+     *
+     * @return list<string>
+     */
+    private static function breakdownSourcesOf(mixed $imported): array
+    {
+        self::assertIsArray($imported);
+        self::assertIsArray($imported['xp']);
+        self::assertIsArray($lines = $imported['xp']['breakdown']);
+
+        return array_map(
+            static function (mixed $line): string {
+                self::assertIsArray($line);
+                self::assertIsString($source = $line['source']);
+
+                return $source;
+            },
+            array_values($lines),
+        );
     }
 
     /**
