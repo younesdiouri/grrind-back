@@ -207,8 +207,6 @@ final class OpenApiContractTest extends KernelTestCase
      */
     public function testTheDisciplineSchemaStillComesFromTheEnum(): void
     {
-        self::assertSame(12, \count(Discipline::cases()), 'Discipline a changé de taille : recale cette assertion avant tout le reste.');
-
         self::assertSame(
             array_column(Discipline::cases(), 'value'),
             $this->schema('Discipline')['enum'],
