@@ -10,6 +10,7 @@ use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierSource;
 use App\Shared\Domain\Modifier\ModifierType;
+use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
@@ -27,12 +28,12 @@ final class ModifierResolverTest extends TestCase
     {
         // L'état du Lot 3, et il doit rester un cas normal : le calcul d'XP tourne pour un
         // joueur qui n'a ni série, ni objet, ni compétence.
-        self::assertSame([], new ModifierResolver([])->of(Uuid::v7()));
+        self::assertSame([], new ModifierResolver([])->of(Uuid::v7(), self::aSunday()));
     }
 
     public function testAContributorWithNothingToSayIsNotAnError(): void
     {
-        self::assertSame([], self::resolverOf(self::contributor())->of(Uuid::v7()));
+        self::assertSame([], self::resolverOf(self::contributor())->of(Uuid::v7(), self::aSunday()));
     }
 
     public function testGathersTheContributionsOfEveryModule(): void
@@ -44,7 +45,7 @@ final class ModifierResolverTest extends TestCase
         $resolved = self::resolverOf(
             self::contributor($streak),
             self::contributor($boots, $luck),
-        )->of(Uuid::v7());
+        )->of(Uuid::v7(), self::aSunday());
 
         // Rien n'est composé, filtré ni dédoublonné : décider ce qui s'applique est le
         // travail du consommateur, qui seul connaît sa discipline et le type qui l'intéresse.
@@ -57,18 +58,20 @@ final class ModifierResolverTest extends TestCase
         $skill = self::bonus(ModifierSource::Skill, 5);
         $item = self::bonus(ModifierSource::Item, 15);
         $league = self::bonus(ModifierSource::League, 10);
+        $guild = self::bonus(ModifierSource::Guild, 150);
 
         // Le conteneur range les services tagués comme il veut ; le resolver, lui, rend
         // toujours la même suite. Sans ça, un ensemble résolu — donc un breakdown affiché
         // et un tirage de loot audité — dépendrait d'un ordre de compilation.
         $resolved = self::resolverOf(
+            self::contributor($guild),
             self::contributor($league),
             self::contributor($item),
             self::contributor($skill),
             self::contributor($streak),
-        )->of(Uuid::v7());
+        )->of(Uuid::v7(), self::aSunday());
 
-        self::assertSame([$streak, $skill, $item, $league], $resolved);
+        self::assertSame([$streak, $skill, $item, $league, $guild], $resolved);
     }
 
     public function testKeepsTheOrderAModuleGaveItsOwnModifiers(): void
@@ -78,7 +81,7 @@ final class ModifierResolverTest extends TestCase
         $first = self::bonus(ModifierSource::Item, 15);
         $second = self::bonus(ModifierSource::Item, 5);
 
-        self::assertSame([$first, $second], self::resolverOf(self::contributor($first, $second))->of(Uuid::v7()));
+        self::assertSame([$first, $second], self::resolverOf(self::contributor($first, $second))->of(Uuid::v7(), self::aSunday()));
     }
 
     public function testAFailingContributorFailsTheWholeResolution(): void
@@ -90,12 +93,12 @@ final class ModifierResolverTest extends TestCase
         self::resolverOf(
             self::contributor(self::bonus(ModifierSource::Streak, 20)),
             new class implements ModifierContributor {
-                public function modifiersOf(Uuid $userId): array
+                public function modifiersOf(Uuid $userId, DateTimeImmutable $occurredAt): array
                 {
                     throw new RuntimeException('la table des objets est injoignable');
                 }
             },
-        )->of(Uuid::v7());
+        )->of(Uuid::v7(), self::aSunday());
     }
 
     public function testEachContributorIsAskedAboutThePlayerAtHand(): void
@@ -111,14 +114,45 @@ final class ModifierResolverTest extends TestCase
             {
             }
 
-            public function modifiersOf(Uuid $userId): array
+            public function modifiersOf(Uuid $userId, DateTimeImmutable $occurredAt): array
             {
                 return $userId->equals($this->player) ? [$this->streak] : [];
             }
         });
 
-        self::assertSame([$streak], $resolver->of($player));
-        self::assertSame([], $resolver->of(Uuid::v7()));
+        self::assertSame([$streak], $resolver->of($player, self::aSunday()));
+        self::assertSame([], $resolver->of(Uuid::v7(), self::aSunday()));
+    }
+
+    public function testTheDateOfTheSportReachesEveryContributor(): void
+    {
+        $risala = self::bonus(ModifierSource::Guild, 150);
+        $revealedAt = new DateTimeImmutable('2026-08-23 18:00:00');
+
+        // Le resolver n'a pas d'horloge et ne doit jamais en avoir une : une source bornée
+        // dans le temps répond « oui » ou « non » selon la date du sport, et c'est
+        // l'appelant — la transaction de crédit — qui sait laquelle. Un resolver qui
+        // demanderait l'heure au système bonifierait un rattrapage de dix jours au tarif du
+        // jour de la synchronisation (#190).
+        $resolver = self::resolverOf(new class($revealedAt, $risala) implements ModifierContributor {
+            public function __construct(private readonly DateTimeImmutable $from, private readonly Modifier $risala)
+            {
+            }
+
+            public function modifiersOf(Uuid $userId, DateTimeImmutable $occurredAt): array
+            {
+                return $occurredAt >= $this->from ? [$this->risala] : [];
+            }
+        });
+
+        self::assertSame([$risala], $resolver->of(Uuid::v7(), $revealedAt->modify('+1 day')));
+        self::assertSame([], $resolver->of(Uuid::v7(), $revealedAt->modify('-1 day')));
+    }
+
+    /** Une date de séance quelconque : les tests qui ne parlent pas du temps n'en dépendent pas. */
+    private static function aSunday(): DateTimeImmutable
+    {
+        return new DateTimeImmutable('2026-08-23 09:30:00');
     }
 
     private static function resolverOf(ModifierContributor ...$contributors): ModifierResolver
@@ -134,7 +168,7 @@ final class ModifierResolverTest extends TestCase
             {
             }
 
-            public function modifiersOf(Uuid $userId): array
+            public function modifiersOf(Uuid $userId, DateTimeImmutable $occurredAt): array
             {
                 return $this->modifiers;
             }

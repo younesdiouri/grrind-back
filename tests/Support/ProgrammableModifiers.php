@@ -6,6 +6,7 @@ namespace App\Tests\Support;
 
 use App\Shared\Application\ModifierContributor;
 use App\Shared\Domain\Modifier\Modifier;
+use DateTimeImmutable;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 
@@ -36,6 +37,13 @@ final class ProgrammableModifiers implements ModifierContributor
     /** @var list<Modifier> */
     private static array $granted = [];
 
+    /**
+     * Le pendant daté de `$granted` — voir {@see grantFrom()}.
+     *
+     * @var array{from: DateTimeImmutable, modifiers: list<Modifier>}|null
+     */
+    private static ?array $dated = null;
+
     /** @see failAfter() */
     private static ?int $remainingBeforeFailure = null;
 
@@ -44,9 +52,24 @@ final class ProgrammableModifiers implements ModifierContributor
         self::$granted = array_values($modifiers);
     }
 
+    /**
+     * Accorde `$modifiers` **aux seules séances datées de `$from` ou après** — le cas d'une
+     * source bornée dans le temps, la Risāla d'une guilde en premier (#191).
+     *
+     * C'est ce que le #190 rend démontrable, et rien d'autre ne le rend : sans un
+     * contributeur qui regarde la date reçue, une signature datée reste une signature que
+     * personne n'utilise, et le jour où un contributeur réel oublierait de s'en servir,
+     * aucun test ne le verrait.
+     */
+    public static function grantFrom(DateTimeImmutable $from, Modifier ...$modifiers): void
+    {
+        self::$dated = ['from' => $from, 'modifiers' => array_values($modifiers)];
+    }
+
     public static function grantNothing(): void
     {
         self::$granted = [];
+        self::$dated = null;
         self::$remainingBeforeFailure = null;
     }
 
@@ -69,12 +92,16 @@ final class ProgrammableModifiers implements ModifierContributor
         self::$remainingBeforeFailure = $successes;
     }
 
-    public function modifiersOf(Uuid $userId): array
+    public function modifiersOf(Uuid $userId, DateTimeImmutable $occurredAt): array
     {
         if (null !== self::$remainingBeforeFailure && self::$remainingBeforeFailure-- <= 0) {
             throw new RuntimeException('Panne provoquée au milieu du lot.');
         }
 
-        return self::$granted;
+        if (null === self::$dated || $occurredAt < self::$dated['from']) {
+            return self::$granted;
+        }
+
+        return [...self::$granted, ...self::$dated['modifiers']];
     }
 }
