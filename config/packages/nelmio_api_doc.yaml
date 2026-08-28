@@ -222,6 +222,25 @@ when@dev:
                                     # de création — l'API deviendrait un moyen d'énumérer les
                                     # comptes ouverts un jour donné.
                                     - https://grrind.app/problems/player-not-found
+                                    # Risālāt (#193). Les trois premiers sont des 422 et non des
+                                    # 409 : une échéance passée ne revient jamais, une discipline
+                                    # sans XP n'en gagnera pas, et une discipline déjà défiée se
+                                    # corrige en en choisissant une autre — le client ne doit pas
+                                    # réessayer la même requête.
+                                    - https://grrind.app/problems/risala-turn-is-closed
+                                    - https://grrind.app/problems/discipline-does-not-credit
+                                    - https://grrind.app/problems/discipline-already-challenged
+                                    # Aucun tour à honorer : la guilde n'a qu'un membre, ou elle
+                                    # attend sa première bascule hebdomadaire. Ce n'est pas un état
+                                    # transitoire de la ressource, c'est son absence.
+                                    - https://grrind.app/problems/risala-turn-is-not-open
+                                    # **Le seul 403 métier du projet**, et l'exception est raisonnée :
+                                    # l'appelant est membre de la guilde, `GET /api/guilds/mine/risalat`
+                                    # lui a déjà dit à qui appartient le tour, et le lui redire dans un
+                                    # code de statut ne lui apprend rien. Le 404 sert à cacher
+                                    # l'*existence* d'une ressource ; ici elle est visible et c'est
+                                    # l'action qui est refusée.
+                                    - https://grrind.app/problems/risala-turn-is-not-yours
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }
@@ -454,6 +473,87 @@ when@dev:
                                 nullable: true
                                 allOf:
                                     - $ref: '#/components/schemas/GuildDetail'
+
+                    Risala:
+                        type: object
+                        required: [id, discipline, senderId, senderDisplayName, revealedAt, expiresAt, bonusPercent]
+                        description: |
+                            Un défi sportif envoyé par un membre à toute sa guilde, vivant deux semaines.
+                            Deux cohabitent en régime établi : une nouvelle arrive chaque semaine, la plus
+                            ancienne s'éteint à la seconde exacte où la nouvelle naît.
+                        properties:
+                            id: { type: string, format: uuid }
+                            discipline: { type: string, example: CLIMBING }
+                            senderId: { type: string, format: uuid }
+                            senderDisplayName:
+                                type: string
+                                nullable: true
+                                description: "`null` si l'expéditeur a quitté la guilde depuis la révélation : son défi reste, son nom n'est plus celui d'un co-équipier."
+                            revealedAt: { type: string, format: date-time }
+                            expiresAt: { type: string, format: date-time }
+                            bonusPercent:
+                                type: integer
+                                example: 150
+                                description: |
+                                    **Résolu pour l'appelant** : ce qu'il touche sur cette discipline, en
+                                    pourcentage du socle. 150 s'il reçoit la Risāla, 50 s'il l'a envoyée.
+                                    Le serveur arbitre les valeurs de jeu — un client qui dériverait son
+                                    propre bonus pourrait aussi se tromper, et l'écart avec le ledger ne
+                                    se verrait qu'au signalement d'un joueur.
+
+                    RisalaTurn:
+                        type: object
+                        required: [senderId, senderDisplayName, mine, deadline, discipline, choosable]
+                        description: |
+                            Le tour en cours : qui doit choisir la Risāla de la semaine, et jusqu'à quand.
+                            Une information pour tout le monde, une action pour un seul.
+                        properties:
+                            senderId: { type: string, format: uuid }
+                            senderDisplayName: { type: string, nullable: true }
+                            mine:
+                                type: boolean
+                                description: "Évite au client de comparer des UUID pour savoir s'il dessine un bouton ou une phrase."
+                            deadline:
+                                type: string
+                                format: date-time
+                                description: |
+                                    Limite pour choisir **et** instant de la révélation : un seul point sur la
+                                    grille hebdomadaire, donc il n'existe jamais de fenêtre où le choix est
+                                    encore possible alors que la Risāla est déjà partie.
+                            discipline:
+                                type: string
+                                nullable: true
+                                description: |
+                                    **Renseignée seulement pour son auteur**, et seulement s'il a déjà choisi.
+                                    Le choix se fait à l'aveugle : c'est toute la mécanique, et l'annoncer
+                                    d'avance viderait le rendez-vous du dimanche soir de sa raison d'être.
+                            choosable:
+                                type: array
+                                items: { type: string }
+                                description: |
+                                    Les disciplines qu'un tour peut encore demander : celles qui créditent de
+                                    l'XP, moins celles déjà portées par une Risāla vivante. Rendue à tout le
+                                    monde — c'est une propriété de l'état de la guilde, pas un secret de son
+                                    porteur — et calculée par le serveur, qui valide le choix avec la même
+                                    liste.
+
+                    Risalat:
+                        type: object
+                        required: [risalat, turn]
+                        description: |
+                            L'écran des Risālāt d'un bloc. L'onglet ne s'ouvre jamais sans les deux, et les
+                            séparer coûterait un aller-retour pour un écran qui n'a rien à afficher
+                            entre-temps — même raison que `GuildDetail`.
+                        properties:
+                            risalat:
+                                type: array
+                                description: "Les vivantes, **dans l'ordre de révélation** — qui est aussi celui de leur extinction."
+                                items: { $ref: '#/components/schemas/Risala' }
+                            turn:
+                                nullable: true
+                                description: "`null` quand la guilde n'a pas encore de tour : un seul membre, ou fondée depuis la dernière bascule hebdomadaire."
+                                allOf:
+                                    - $ref: '#/components/schemas/RisalaTurn'
 
                     UserProfile:
                         type: object

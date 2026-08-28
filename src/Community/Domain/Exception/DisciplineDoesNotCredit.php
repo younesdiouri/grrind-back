@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Community\Domain\Exception;
 
 use App\Shared\Domain\Activity\Discipline;
-use DomainException;
+use App\Shared\Domain\Exception\RuleViolationError;
 
 /**
  * La discipline demandée ne rapporte pas d'XP, donc la Risāla ne promettrait rien.
@@ -15,10 +15,18 @@ use DomainException;
  * rapporte zéro est une promesse que le produit ne tient pas, et le joueur ne peut pas le
  * deviner depuis l'écran.
  */
-final class DisciplineDoesNotCredit extends DomainException
+final class DisciplineDoesNotCredit extends RuleViolationError
 {
-    public function __construct(public readonly Discipline $discipline)
+    public function __construct(Discipline $discipline)
     {
-        parent::__construct(\sprintf('"%s" ne rapporte pas d\'XP : une Risāla sur cette discipline ne promettrait rien.', $discipline->value));
+        parent::__construct(
+            \sprintf('"%s" ne rapporte pas d\'XP : une Risāla sur cette discipline ne promettrait rien.', $discipline->value),
+            ['discipline' => $discipline->value],
+        );
+    }
+
+    public function type(): string
+    {
+        return 'discipline-does-not-credit';
     }
 }

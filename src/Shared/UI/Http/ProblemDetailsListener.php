@@ -6,6 +6,7 @@ namespace App\Shared\UI\Http;
 
 use App\Shared\Domain\Exception\ConflictError;
 use App\Shared\Domain\Exception\DomainError;
+use App\Shared\Domain\Exception\ForbiddenError;
 use App\Shared\Domain\Exception\NotFoundError;
 use App\Shared\Domain\Exception\RuleViolationError;
 use App\Shared\Domain\Exception\UnauthorizedError;
@@ -83,6 +84,10 @@ final readonly class ProblemDetailsListener
         return match (true) {
             $error instanceof UnauthorizedError => Response::HTTP_UNAUTHORIZED,
             $error instanceof NotFoundError => Response::HTTP_NOT_FOUND,
+            // Avant `ConflictError` et `RuleViolationError` sans que l'ordre compte : les
+            // quatre catégories sont disjointes. Voir le docblock de `ForbiddenError` pour
+            // pourquoi un 403 ne se prononce jamais sur une lecture.
+            $error instanceof ForbiddenError => Response::HTTP_FORBIDDEN,
             $error instanceof ConflictError => Response::HTTP_CONFLICT,
             $error instanceof RuleViolationError => Response::HTTP_UNPROCESSABLE_ENTITY,
             default => Response::HTTP_BAD_REQUEST,
