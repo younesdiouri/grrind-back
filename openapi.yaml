@@ -1343,20 +1343,7 @@ components:
           type: string
           format: uuid
         discipline:
-          type: string
-          enum:
-            - RUNNING
-            - WALKING
-            - CYCLING
-            - SWIMMING
-            - STRENGTH
-            - HIIT
-            - HIKING
-            - MOBILITY
-            - CLIMBING
-            - FOOTBALL
-            - COURT_SPORTS
-            - RACKET_SPORTS
+          $ref: '#/components/schemas/Discipline'
         source:
           description: "L'agrégateur de plateforme qui a rapporté la séance, pas l'appareil qui l'a\nmesurée : une montre Garmin arrive en `APPLE_HEALTH` sur iPhone et en\n`HEALTH_CONNECT` sur Android.\n"
           type: string
@@ -1912,20 +1899,7 @@ components:
             - SESSION_COMPLETED
             - SESSION_INVALIDATED
         discipline:
-          type: string
-          enum:
-            - RUNNING
-            - WALKING
-            - CYCLING
-            - SWIMMING
-            - STRENGTH
-            - HIIT
-            - HIKING
-            - MOBILITY
-            - CLIMBING
-            - FOOTBALL
-            - COURT_SPORTS
-            - RACKET_SPORTS
+          $ref: '#/components/schemas/Discipline'
         amount:
           description: 'Signé. La somme du `breakdown`, jamais autre chose.'
           type: integer
