@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Combat\Infrastructure\Config\CombatSection;
 use App\Community\Infrastructure\Config\CommunitySection;
 use App\Community\Infrastructure\Config\NotificationsSection;
 use App\Progression\Infrastructure\Config\AttributeSplitSection;
@@ -42,6 +43,7 @@ class Kernel extends BaseKernel
             new TitlesSection(),
             new CommunitySection(),
             new NotificationsSection(),
+            new CombatSection(),
         ));
     }
 }

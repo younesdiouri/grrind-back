@@ -1,0 +1,101 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Combat\Domain;
+
+use App\Combat\Domain\Enemy;
+use App\Combat\Domain\EnemyCatalog;
+use InvalidArgumentException;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Le catalogue est du config-as-code : ce qui se vérifie ici est autant ce qu'il calcule que
+ * ce qu'il **refuse**. Un catalogue incohérent doit casser la compilation du conteneur, pas
+ * se découvrir le jour où un joueur ne trouve aucun adversaire.
+ */
+final class EnemyCatalogTest extends TestCase
+{
+    public function testFindsAnEnemyByItsKey(): void
+    {
+        $catalog = self::catalogOf(
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
+        );
+
+        $enemy = $catalog->find('SAND_JACKAL');
+
+        self::assertInstanceOf(Enemy::class, $enemy);
+        self::assertSame(120, $enemy->hp);
+        self::assertNull($catalog->find('DUNE_RAIDER'));
+    }
+
+    public function testFindsTheExactLevelWhenItExists(): void
+    {
+        $catalog = self::catalogOf(
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60],
+        );
+
+        self::assertSame('DUNE_RAIDER', $catalog->forLevel(5)->key);
+    }
+
+    /**
+     * Le catalogue ne couvre pas forcément chaque niveau : au-delà du dernier ennemi livré,
+     * c'est lui qui reste opposé, jamais `null` — voir le docblock de la classe.
+     */
+    public function testFallsBackToTheHighestEnemyAtOrBelowThePlayerLevel(): void
+    {
+        $catalog = self::catalogOf(
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60],
+        );
+
+        // Niveau 3 : rien d'écrit pour ce palier, le chacal du niveau 1 reste opposé.
+        self::assertSame('SAND_JACKAL', $catalog->forLevel(3)->key);
+
+        // Niveau 99 : au-delà du dernier ennemi livré, c'est encore lui qui répond.
+        self::assertSame('DUNE_RAIDER', $catalog->forLevel(99)->key);
+    }
+
+    public function testAnEmptyCatalogueIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new EnemyCatalog([]);
+    }
+
+    /**
+     * Deux ennemis pour le même niveau feraient taire silencieusement l'un des deux :
+     * `forLevel()` ne pourrait rendre que le dernier écrit.
+     */
+    public function testTwoEnemiesForTheSameLevelIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogOf(
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
+            ['key' => 'DUNE_RAIDER', 'level' => 1, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60],
+        );
+    }
+
+    /**
+     * Le niveau 1 est celui qu'un compte neuf rencontre : son absence laisserait le premier
+     * combat sans adversaire.
+     */
+    public function testAMissingLevelOneIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogOf(
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60],
+        );
+    }
+
+    /**
+     * @param array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int} ...$enemies
+     */
+    private static function catalogOf(array ...$enemies): EnemyCatalog
+    {
+        return new EnemyCatalog(array_values($enemies));
+    }
+}

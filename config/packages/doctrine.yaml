@@ -48,6 +48,16 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Community/Domain'
                 prefix: 'App\Community\Domain'
                 alias: Community
+            # Pas encore d'entité : `Enemy` et `EnemyCatalog` sont des objets de domaine
+            # purs, chargés depuis `combat.yaml`, jamais persistés (#208). Déclaré dès
+            # maintenant — même règle que Deptrac — pour que `Battle`, au #211, n'ait rien
+            # d'autre à câbler ici.
+            Combat:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Combat/Domain'
+                prefix: 'App\Combat\Domain'
+                alias: Combat
 
 when@test:
     doctrine:
