@@ -245,6 +245,13 @@ when@dev:
                                     # l'appelant — même raisonnement que `player-not-found` : jamais
                                     # de 403, les UUID v7 se devinent par plage temporelle.
                                     - https://grrind.app/problems/battle-not-found
+                                    # Le choix de l'adversaire (#219). Deux `type` distincts et non
+                                    # un seul : la clé n'existe pas n'est pas la même panne que « tu
+                                    # n'as pas le niveau », et le client ne doit pas les confondre.
+                                    # 422 dans les deux cas, jamais 404 — le catalogue est public par
+                                    # `GET /api/enemies`, il n'y a rien à protéger.
+                                    - https://grrind.app/problems/enemy-key-unknown
+                                    - https://grrind.app/problems/enemy-level-too-low
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }
@@ -1327,6 +1334,49 @@ when@dev:
                                 type: array
                                 description: 'Lot 6 : toujours vide aujourd''hui — voir la description de la classe.'
                                 items: { type: object }
+
+                    # Nommé différemment de la classe `FightBattleRequest` qui porte réellement le
+                    # champ — même geste que `WorkoutImportRequest` / `ImportWorkoutsRequest` plus
+                    # haut : nelmio génère aussi un schéma depuis le type de `#[MapRequestPayload]`,
+                    # et un même nom produirait un doublon numéroté (`FightBattleRequest2`) plutôt
+                    # qu'une fusion.
+                    ChosenEnemyRequest:
+                        type: object
+                        description: |
+                            Le corps, facultatif, de `POST /api/battles` (#219). Absent — ou `{"enemy": null}` —
+                            le serveur choisit l'ennemi au niveau du joueur, comportement inchangé depuis le
+                            #212. `enemy` porte n'importe quelle clé du catalogue rendu par `GET /api/enemies`,
+                            boss comme ennemi ordinaire.
+                        properties:
+                            enemy:
+                                type: string
+                                nullable: true
+                                example: DUNE_SOVEREIGN
+
+                    Enemy:
+                        type: object
+                        description: |
+                            Une entrée du catalogue rendu par `GET /api/enemies` — ennemi ordinaire ou boss,
+                            sous la même forme : le corps de `POST /api/battles` les choisit tous les deux de
+                            la même façon.
+
+                            **`minimumLevel` est le niveau requis pour choisir cette clé explicitement.** Pour
+                            un ennemi ordinaire, c'est aussi le palier auquel le serveur le choisirait tout
+                            seul en l'absence de corps ; pour un boss, c'est le seul verrou — il reste
+                            affrontable au-delà.
+                        required: [key, name, minimumLevel, hp, damage, mitigationPercent, extraTurnPercent, dodgePercent]
+                        properties:
+                            key: { type: string, example: DUNE_SOVEREIGN }
+                            name:
+                                type: string
+                                example: Souverain des dunes
+                                description: "Déjà traduit, dans la langue négociée sur `Accept-Language`."
+                            minimumLevel: { type: integer, example: 10 }
+                            hp: { type: integer, example: 700 }
+                            damage: { type: integer, example: 40 }
+                            mitigationPercent: { type: integer, example: 20 }
+                            extraTurnPercent: { type: integer, example: 12 }
+                            dodgePercent: { type: integer, example: 9 }
 
             # Par défaut tout est authentifié : c'est l'état d'`^/api`, et l'oubli
             # dangereux est dans l'autre sens. Les routes publiques le disent une par une.

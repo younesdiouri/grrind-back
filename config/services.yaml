@@ -145,9 +145,11 @@ services:
 
     # Le catalogue d'ennemis (#208), d'un bloc pour la même raison que le barème de titres :
     # c'est une liste, et son ordre de déclaration doit survivre au conteneur compilé.
+    # `$bosses` (#219) suit le même geste, en bloc séparé — voir le docblock d'`EnemyCatalog`.
     App\Combat\Domain\EnemyCatalog:
         arguments:
             $enemies: '%game.combat.enemies%'
+            $bosses: '%game.combat.bosses%'
 
     App\Progression\Domain\DiminishingReturns:
         arguments:
@@ -443,11 +445,12 @@ when@test:
         App\Combat\Application\FighterFactory:
             public: true
 
-        # `$enemies` répété, pour la même raison que `$rulesetVersion` ci-dessus.
+        # `$enemies` et `$bosses` répétés, pour la même raison que `$rulesetVersion` ci-dessus.
         App\Combat\Domain\EnemyCatalog:
             public: true
             arguments:
                 $enemies: '%game.combat.enemies%'
+                $bosses: '%game.combat.bosses%'
 
         App\Combat\Domain\BattleSimulator:
             public: true

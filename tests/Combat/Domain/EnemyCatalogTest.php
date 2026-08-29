@@ -133,10 +133,167 @@ final class EnemyCatalogTest extends TestCase
     }
 
     /**
+     * Un boss se retrouve par sa clé, jamais par `forLevel()` : il n'entre pas dans
+     * `byLevel`, voir le docblock de la classe.
+     */
+    public function testFindsABossByItsKeyAndNeverThroughForLevel(): void
+    {
+        $catalog = self::catalogWithBosses(
+            [
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ],
+            [
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+            ],
+        );
+
+        $boss = $catalog->findBoss('DUNE_SOVEREIGN');
+
+        self::assertInstanceOf(Enemy::class, $boss);
+        self::assertSame(10, $boss->level, '`minimum_level` alimente le même champ `level` qu\'un ennemi ordinaire.');
+        self::assertNull($catalog->find('DUNE_SOVEREIGN'), 'Un boss ne se trouve pas par `find()`.');
+        self::assertNull($catalog->findBoss('SAND_JACKAL'), 'Un ennemi ordinaire ne se trouve pas par `findBoss()`.');
+
+        // `forLevel()` ne rend jamais un boss, quel que soit le niveau demandé.
+        self::assertSame('SAND_JACKAL', $catalog->forLevel(99)->key);
+    }
+
+    public function testBossesAreListedSeparatelyFromEnemies(): void
+    {
+        $catalog = self::catalogWithBosses(
+            [
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ],
+            [
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+            ],
+        );
+
+        self::assertCount(1, $catalog->all());
+        self::assertCount(1, $catalog->bosses());
+        self::assertSame('DUNE_SOVEREIGN', $catalog->bosses()[0]->key);
+    }
+
+    /**
+     * Contrairement aux ennemis ordinaires, deux boss peuvent partager un `minimum_level` :
+     * seule la clé les distingue, voir le docblock de la classe.
+     */
+    public function testTwoBossesCanShareTheSameMinimumLevel(): void
+    {
+        $catalog = self::catalogWithBosses(
+            [
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ],
+            [
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+                ['key' => 'STORM_MATRIARCH', 'minimum_level' => 10, 'hp' => 1150, 'damage' => 62, 'mitigation_permille' => 260, 'extra_turn_permille' => 170, 'dodge_permille' => 130],
+            ],
+        );
+
+        self::assertCount(2, $catalog->bosses());
+    }
+
+    public function testTwoBossesForTheSameKeyIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogWithBosses(
+            [
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ],
+            [
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 20, 'hp' => 1150, 'damage' => 62, 'mitigation_permille' => 260, 'extra_turn_permille' => 170, 'dodge_permille' => 130],
+            ],
+        );
+    }
+
+    /**
+     * `find()` et `findBoss()` doivent rester sans ambiguïté — voir le docblock de la
+     * classe : une clé des deux côtés leur ferait rendre des réponses différentes selon
+     * celle qu'on appelle.
+     */
+    public function testAKeyUsedByBothAnEnemyAndABossIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogWithBosses(
+            [
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ],
+            [
+                ['key' => 'SAND_JACKAL', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+            ],
+        );
+    }
+
+    /**
+     * Même refus qu'un ennemi ordinaire, et pour la même raison : à 1000 ‰ de mitigation, un
+     * boss deviendrait invulnérable. `CombatSection` ne borne ce champ que par le bas, donc
+     * c'est ici que le refus doit vivre.
+     */
+    public function testABossReachingInvulnerabilityIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogWithBosses(
+            [
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ],
+            [
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 1000, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+            ],
+        );
+    }
+
+    /**
+     * Même refus, par un second chemin : un boss qui ne rendrait jamais la main.
+     */
+    public function testABossNeverYieldingTheirTurnIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogWithBosses(
+            [
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ],
+            [
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 1000, 'dodge_permille' => 90],
+            ],
+        );
+    }
+
+    /**
+     * Même refus, par un troisième chemin (#218) : un boss qui esquiverait toujours.
+     */
+    public function testABossDodgingEveryAttackIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogWithBosses(
+            [
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ],
+            [
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 1000],
+            ],
+        );
+    }
+
+    /**
      * @param array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int} ...$enemies
      */
     private static function catalogOf(array ...$enemies): EnemyCatalog
     {
         return new EnemyCatalog(array_values($enemies));
+    }
+
+    /**
+     * @param list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}>         $enemies
+     * @param list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses
+     */
+    private static function catalogWithBosses(array $enemies, array $bosses): EnemyCatalog
+    {
+        return new EnemyCatalog($enemies, $bosses);
     }
 }

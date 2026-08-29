@@ -9,3 +9,9 @@ iron_jackal.name: Chacal de fer
 storm_hyena.name: Hyène des tempêtes
 obsidian_wolf.name: Loup d'obsidienne
 ash_titan.name: Titan de cendres
+
+# Les boss (#219) — choisis par leur clé, jamais tirés automatiquement.
+dune_sovereign.name: Souverain des dunes
+storm_matriarch.name: Matriarche des tempêtes
+obsidian_warlord.name: Seigneur de guerre d'obsidienne
+cinder_sovereign.name: Souverain des cendres

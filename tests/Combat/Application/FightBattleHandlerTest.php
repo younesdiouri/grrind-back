@@ -12,7 +12,12 @@ use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
+use App\Progression\Domain\LevelCurve;
+use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Shared\Application\PlayerProgression;
+use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\Vitality;
+use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
@@ -167,5 +172,85 @@ final class FightBattleHandlerTest extends KernelTestCase
         self::assertSame($firstReloaded->playerSnapshot(), $secondReloaded->playerSnapshot());
         self::assertSame($firstReloaded->enemySnapshot(), $secondReloaded->enemySnapshot());
         self::assertSame($firstReloaded->seed(), $secondReloaded->seed());
+    }
+
+    /**
+     * Un boss nommé s'affronte dès que le `minimum_level` de `combat.yaml` est atteint, et
+     * le combat s'écrit exactement comme n'importe quel autre (#219) — même pipeline, seule
+     * la résolution de l'ennemi change. `DUNE_SOVEREIGN` exige le niveau 10, 3 060 XP à ce
+     * seuil (`levels.yaml`) ; c'est le total minimal qui l'atteint, le cas le plus
+     * défavorable qu'une requête légitime puisse produire.
+     */
+    public function testAPlayerCanFightABossOnceTheMinimumLevelIsReached(): void
+    {
+        $playerId = Uuid::v7();
+        $this->levelPlayerTo($playerId, 3_060);
+
+        $battle = ($this->handler)(new FightBattle($playerId, 'DUNE_SOVEREIGN'));
+
+        self::assertSame('DUNE_SOVEREIGN', $battle->enemySnapshot()['key']);
+
+        $this->entityManager->clear();
+        $reloaded = $this->battles->find($battle->id());
+        self::assertInstanceOf(Battle::class, $reloaded);
+        self::assertSame('DUNE_SOVEREIGN', $reloaded->enemySnapshot()['key']);
+    }
+
+    /**
+     * Verrouille, reprojette et écrit une ligne `progression_snapshot` directement — sans
+     * passer par un import ou un `GrantXp` réel, qui demanderaient plusieurs journées de
+     * sport pour atteindre un total pareil. Même geste que
+     * {@see \App\Tests\Progression\GrantXpTest::seedLedger()}, un cran plus loin : c'est le
+     * snapshot que `PlayerProgressions` lit, jamais le ledger — voir le docblock de
+     * `TranslatedPlayerProgressions`.
+     */
+    private function levelPlayerTo(Uuid $playerId, int $totalXp): void
+    {
+        $container = self::getContainer();
+
+        $snapshots = $container->get(ProgressionSnapshotRepository::class);
+        self::assertInstanceOf(ProgressionSnapshotRepository::class, $snapshots);
+
+        $curve = self::levelCurve();
+        $vitality = self::vitalityRules();
+        $attributes = new AttributeGains(0, 0, 0, 0);
+        $now = new DateTimeImmutable();
+
+        $this->entityManager->wrapInTransaction(static function () use ($snapshots, $playerId, $totalXp, $attributes, $curve, $vitality, $now): void {
+            $snapshot = $snapshots->lockFor($playerId, $curve, $vitality);
+            $snapshot->retotal($totalXp, $attributes, $curve, $vitality, $now);
+        });
+    }
+
+    /**
+     * La courbe livrée, construite depuis son paramètre — même geste que
+     * {@see \App\Tests\Progression\GrantXpTest::curve()}.
+     */
+    private static function levelCurve(): LevelCurve
+    {
+        $levels = self::getContainer()->getParameter('game.levels.levels');
+        self::assertIsArray($levels);
+
+        /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
+        return new LevelCurve($levels);
+    }
+
+    /**
+     * Même geste que {@see \App\Tests\Progression\GrantXpTest::vitality()}.
+     */
+    private static function vitalityRules(): Vitality
+    {
+        $container = self::getContainer();
+
+        $floorPermille = $container->getParameter('game.attributes.vitality.floor_permille');
+        self::assertIsInt($floorPermille);
+
+        $targetActiveKcal = $container->getParameter('game.attributes.vitality.target_active_kcal');
+        self::assertIsInt($targetActiveKcal);
+
+        $bonusCapPermille = $container->getParameter('game.attributes.vitality.bonus_cap_permille');
+        self::assertIsInt($bonusCapPermille);
+
+        return new Vitality($floorPermille, $targetActiveKcal, $bonusCapPermille);
     }
 }
