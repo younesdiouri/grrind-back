@@ -1,0 +1,11 @@
+# The PvE enemy names. One `<key>.name` entry per enemy in `config/game/v1/combat.yaml` — the
+# key in lowercase, as `EnemyTranslator` looks it up. A coverage test refuses an incomplete
+# catalogue, otherwise the translator's fallback would send `sand_jackal.name` to the player,
+# silently.
+
+sand_jackal.name: Sand Jackal
+dune_raider.name: Dune Raider
+iron_jackal.name: Iron Jackal
+storm_hyena.name: Storm Hyena
+obsidian_wolf.name: Obsidian Wolf
+ash_titan.name: Ash Titan
