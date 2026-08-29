@@ -9,3 +9,9 @@ iron_jackal.name: Iron Jackal
 storm_hyena.name: Storm Hyena
 obsidian_wolf.name: Obsidian Wolf
 ash_titan.name: Ash Titan
+
+# Les boss (#219) — chosen by key, never picked automatically.
+dune_sovereign.name: Dune Sovereign
+storm_matriarch.name: Storm Matriarch
+obsidian_warlord.name: Obsidian Warlord
+cinder_sovereign.name: Cinder Sovereign

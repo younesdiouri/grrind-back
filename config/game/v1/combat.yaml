@@ -102,3 +102,27 @@ enemies:
   - { key: STORM_HYENA, level: 20, hp: 640, damage: 40, mitigation_permille: 180, extra_turn_permille: 130, dodge_permille: 100 }
   - { key: OBSIDIAN_WOLF, level: 30, hp: 950, damage: 58, mitigation_permille: 240, extra_turn_permille: 170, dodge_permille: 130 }
   - { key: ASH_TITAN, level: 50, hp: 2400, damage: 132, mitigation_permille: 400, extra_turn_permille: 300, dodge_permille: 220 }
+
+# ————— Les boss (#219) —————————————————————————————————————————————————————————————————
+#
+# Ce que cette table décide : un boss est un ennemi avec de plus gros chiffres et un verrou
+# de niveau — rien de plus. `minimum_level` et non `level` : contrairement à un ennemi de
+# `enemies:`, un boss n'est jamais choisi automatiquement par `forLevel()`, il se choisit en
+# nommant sa clé dans le corps de `POST /api/battles`, et reste affrontable au-delà de son
+# palier — on y retourne quand on est plus fort, voir le docblock d'`EnemyCatalog`.
+#
+# Ce qu'elle ne décide pas : aucune limite de tentatives, aucune récompense particulière —
+# le ticket #219 laisse volontairement la question du farm à celui qui apportera une
+# récompense au combat. Pas de phase, pas de mécanique spéciale : un `Fighter` de plus dans
+# la même boucle que `BattleSimulator` connaît déjà.
+#
+# Un palier par boss, choisi pour recouper un niveau déjà couvert par `enemies:` ci-dessus
+# — c'est ce qui permet à `CombatCoverageTest` de réutiliser la même table de XP de
+# référence pour les deux. Les stats visent un adversaire nettement plus dur que l'ennemi
+# ordinaire du même palier, sans prétendre à un équilibrage précis : personne n'a encore
+# joué à ce jeu, voir la note au-dessus du catalogue d'ennemis pour la même réserve.
+bosses:
+  - { key: DUNE_SOVEREIGN, minimum_level: 10, hp: 700, damage: 40, mitigation_permille: 200, extra_turn_permille: 120, dodge_permille: 90 }
+  - { key: STORM_MATRIARCH, minimum_level: 20, hp: 1150, damage: 62, mitigation_permille: 260, extra_turn_permille: 170, dodge_permille: 130 }
+  - { key: OBSIDIAN_WARLORD, minimum_level: 30, hp: 1700, damage: 88, mitigation_permille: 320, extra_turn_permille: 220, dodge_permille: 170 }
+  - { key: CINDER_SOVEREIGN, minimum_level: 50, hp: 3600, damage: 190, mitigation_permille: 440, extra_turn_permille: 330, dodge_permille: 250 }

@@ -10,7 +10,10 @@ namespace App\Combat\Domain;
  * Un objet de domaine pur, jamais persisté : ce qui sera stocké au #211, c'est le combat
  * qui l'a opposé à un joueur, pas l'ennemi lui-même. `key` identifie l'entrée dans le
  * catalogue et sa traduction ({@see \App\Combat\Infrastructure\Translation\EnemyTranslator}) ;
- * `level` est le niveau de joueur auquel il est opposé, pas une caractéristique de combat.
+ * `level` n'est jamais une caractéristique de combat, mais sa lecture dépend de la liste de
+ * {@see EnemyCatalog} qui porte l'entrée (#219) : le palier auquel `forLevel()` le choisirait
+ * tout seul pour un ennemi de `enemies:`, le niveau minimum requis pour l'affronter pour un
+ * boss de `bosses:`. Une seule classe sert les deux, voir le docblock d'`EnemyCatalog`.
  *
  * Les stats de combat (`hp`, `damage`, `mitigationPermille`, `extraTurnPermille`,
  * `dodgePermille`) sont écrites en clair par palier plutôt que dérivées d'une formule : voir

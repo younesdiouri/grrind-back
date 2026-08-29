@@ -4,6 +4,20 @@ info:
   description: "L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.\n\n**Le serveur arbitre l'horloge.** L'import accepte les bornes du **fournisseur santé** — une\nséance a eu lieu avant que Grrind en entende parler, aucune horloge serveur n'existe pour un\nfait passé. Ce qu'il n'accepte pas, c'est une **durée** : elle se recalcule des deux bornes.\nLe reste de l'arbitrage — fenêtre d'antériorité, chevauchements, plancher et plafond — refuse\nce qui ne tient pas debout.\n\n**Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un\nen-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse\nd'origine sans rien réexécuter.\n\n**Les erreurs sont en `application/problem+json`** (RFC 9457). Le membre `type` est un\nidentifiant stable sur lequel un client peut brancher un comportement ; le `detail` est du\ntexte, il peut changer.\n"
   version: 1.0.0
 paths:
+  /api/enemies:
+    get:
+      tags:
+        - Combat
+      operationId: get_combat_enemies_list
+      responses:
+        '200':
+          description: 'Le catalogue entier — ennemis ordinaires et boss, dans cet ordre, chacun avec son nom traduit et son niveau minimum.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnemyCatalog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/battles:
     post:
       tags:
@@ -12,6 +26,12 @@ paths:
       parameters:
         -
           $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChosenEnemyRequest'
       responses:
         '201':
           description: "Le combat est joué et écrit. La timeline entière est rendue : un seul aller-retour, rien à recharger avant de l'animer."
@@ -25,6 +45,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          description: "Clé d'adversaire inconnue (`enemy-key-unknown`) ou niveau insuffisant (`enemy-level-too-low`)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   '/api/battles/{id}':
     get:
       tags:
@@ -891,6 +917,8 @@ components:
             - 'https://grrind.app/problems/risala-turn-is-not-open'
             - 'https://grrind.app/problems/risala-turn-is-not-yours'
             - 'https://grrind.app/problems/battle-not-found'
+            - 'https://grrind.app/problems/enemy-key-unknown'
+            - 'https://grrind.app/problems/enemy-level-too-low'
         title:
           type: string
           example: Conflict
@@ -2153,6 +2181,69 @@ components:
           type: array
           items:
             type: object
+      type: object
+    ChosenEnemyRequest:
+      description: "Le corps, facultatif, de `POST /api/battles` (#219). Absent — ou `{\"enemy\": null}` —\nle serveur choisit l'ennemi au niveau du joueur, comportement inchangé depuis le\n#212. `enemy` porte n'importe quelle clé du catalogue rendu par `GET /api/enemies`,\nboss comme ennemi ordinaire.\n"
+      properties:
+        enemy:
+          type: string
+          example: DUNE_SOVEREIGN
+          nullable: true
+      type: object
+    Enemy:
+      description: "Une entrée du catalogue rendu par `GET /api/enemies` — ennemi ordinaire ou boss,\nsous la même forme : le corps de `POST /api/battles` les choisit tous les deux de\nla même façon.\n\n**`minimumLevel` est le niveau requis pour choisir cette clé explicitement.** Pour\nun ennemi ordinaire, c'est aussi le palier auquel le serveur le choisirait tout\nseul en l'absence de corps ; pour un boss, c'est le seul verrou — il reste\naffrontable au-delà.\n"
+      required:
+        - key
+        - name
+        - minimumLevel
+        - hp
+        - damage
+        - mitigationPercent
+        - extraTurnPercent
+        - dodgePercent
+      properties:
+        key:
+          type: string
+          example: DUNE_SOVEREIGN
+        name:
+          description: 'Déjà traduit, dans la langue négociée sur `Accept-Language`.'
+          type: string
+          example: 'Souverain des dunes'
+        minimumLevel:
+          type: integer
+          example: 10
+        hp:
+          type: integer
+          example: 700
+        damage:
+          type: integer
+          example: 40
+        mitigationPercent:
+          type: integer
+          example: 20
+        extraTurnPercent:
+          type: integer
+          example: 12
+        dodgePercent:
+          type: integer
+          example: 9
+      type: object
+    EnemyCatalog:
+      description: "Le catalogue entier rendu par `GET /api/enemies` — niché sous `enemies`, jamais un\ntableau nu à la racine, même convention que `WorkoutPage` et `TitleBoard` : c'est ce\nqui laisse la place à un champ frère plus tard sans casser un client déjà déployé.\nEnnemis ordinaires puis boss, dans l'ordre de déclaration de chaque liste.\n"
+      required:
+        - enemies
+      properties:
+        enemies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Enemy'
+      type: object
+    FightBattleRequest:
+      properties:
+        enemy:
+          type: string
+          nullable: true
+          default: null
       type: object
     FoundGuildRequest:
       properties:

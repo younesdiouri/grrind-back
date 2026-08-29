@@ -10,6 +10,7 @@ use App\Combat\Domain\Attack;
 use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\CombatRules;
+use App\Combat\Domain\Enemy;
 use App\Combat\Domain\EnemyCatalog;
 use App\Shared\Application\PlayerProgression;
 use App\Shared\Domain\Activity\AttributeGains;
@@ -173,55 +174,95 @@ final class CombatCoverageTest extends KernelTestCase
         $simulator = self::shippedSimulator();
         $catalog = self::shippedCatalog();
 
-        // Le total d'XP au seuil de chaque palier (`levels.yaml`), réparti à parts égales
-        // sur les quatre caractéristiques — même geste que le joueur de haut niveau
-        // ci-dessus. Une clé de plus dans le catalogue sans entrée ici fait échouer ce
-        // test plutôt que de le laisser passer un palier non vérifié en silence.
-        $totalXpByLevel = [1 => 0, 5 => 760, 10 => 3_060, 20 => 12_160, 30 => 27_260, 50 => 75_460];
-
         foreach ($catalog->all() as $tier) {
-            self::assertArrayHasKey(
-                $tier->level,
-                $totalXpByLevel,
-                \sprintf('Palier de niveau %d ("%s") sans total d\'XP de référence dans ce test.', $tier->level, $tier->key),
-            );
+            self::assertStandingFight($factory, $simulator, $tier, "palier-{$tier->level}");
+        }
+    }
 
-            $perAttribute = intdiv($totalXpByLevel[$tier->level], 4);
+    /**
+     * Le même test de fumée, étendu aux boss (#219) : chacun produit un combat qui se
+     * termine, rend un vainqueur, et où les deux camps portent au moins un coup — rien de
+     * plus, voir le docblock de la classe pour ce qui reste hors de son périmètre. Le joueur
+     * simulé est pile au `minimum_level` du boss, le cas le plus défavorable qu'un combat
+     * légitime puisse rencontrer.
+     */
+    public function testEveryShippedBossProducesAStandingFight(): void
+    {
+        $factory = self::shippedFactory();
+        $simulator = self::shippedSimulator();
+        $catalog = self::shippedCatalog();
 
-            $challenger = new PlayerProgression(
-                level: $tier->level,
-                xpIntoLevel: 0,
-                xpToNextLevel: null,
-                title: null,
-                attributes: new AttributeGains($perAttribute, $perAttribute, $perAttribute, $perAttribute),
-                vitality: $totalXpByLevel[$tier->level],
-                vitalityBreakdown: new VitalityBreakdown(0, 1, 0),
-            );
+        foreach ($catalog->bosses() as $boss) {
+            self::assertStandingFight($factory, $simulator, $boss, "boss-{$boss->key}");
+        }
+    }
 
-            $player = $factory->forPlayer($challenger);
-            $enemy = $factory->forEnemy($tier);
+    /**
+     * Le corps commun aux deux tests de fumée ci-dessus (#219) : un joueur simulé pile au
+     * niveau de l'adversaire — le palier pour un ennemi ordinaire, `minimum_level` pour un
+     * boss, `Enemy::$level` porte les deux, voir son docblock — doit produire un combat qui
+     * se termine, rend un vainqueur, où les deux camps portent au moins un coup. Extraite
+     * une fois `all()` et `bosses()` en partage exactement le même corps, seule la source de
+     * la liste change.
+     */
+    private static function assertStandingFight(FighterFactory $factory, BattleSimulator $simulator, Enemy $tier, string $seed): void
+    {
+        $totalXp = self::totalXpAtLevel($tier->level, $tier->key);
+        $perAttribute = intdiv($totalXp, 4);
 
-            $outcome = $simulator->fight($player, $enemy, self::randomizer("palier-{$tier->level}"));
+        $challenger = new PlayerProgression(
+            level: $tier->level,
+            xpIntoLevel: 0,
+            xpToNextLevel: null,
+            title: null,
+            attributes: new AttributeGains($perAttribute, $perAttribute, $perAttribute, $perAttribute),
+            vitality: $totalXp,
+            vitalityBreakdown: new VitalityBreakdown(0, 1, 0),
+        );
 
-            $playerLandedAHit = false;
-            $enemyLandedAHit = false;
+        $player = $factory->forPlayer($challenger);
+        $enemy = $factory->forEnemy($tier);
 
-            foreach ($outcome->timeline as $event) {
-                if (!$event instanceof Attack) {
-                    continue;
-                }
+        $outcome = $simulator->fight($player, $enemy, self::randomizer($seed));
 
-                if (Actor::Player === $event->attacker) {
-                    $playerLandedAHit = true;
-                } else {
-                    $enemyLandedAHit = true;
-                }
+        $playerLandedAHit = false;
+        $enemyLandedAHit = false;
+
+        foreach ($outcome->timeline as $event) {
+            if (!$event instanceof Attack) {
+                continue;
             }
 
-            self::assertInstanceOf(BattleResult::class, $outcome->result, \sprintf('Le palier %d ("%s") doit rendre un vainqueur.', $tier->level, $tier->key));
-            self::assertTrue($playerLandedAHit, \sprintf('Le palier %d ("%s") ne doit pas laisser le joueur sans porter un seul coup.', $tier->level, $tier->key));
-            self::assertTrue($enemyLandedAHit, \sprintf('Le palier %d ("%s") ne doit pas laisser l\'ennemi sans porter un seul coup.', $tier->level, $tier->key));
+            if (Actor::Player === $event->attacker) {
+                $playerLandedAHit = true;
+            } else {
+                $enemyLandedAHit = true;
+            }
         }
+
+        self::assertInstanceOf(BattleResult::class, $outcome->result, \sprintf('"%s" (niveau %d) doit rendre un vainqueur.', $tier->key, $tier->level));
+        self::assertTrue($playerLandedAHit, \sprintf('"%s" (niveau %d) ne doit pas laisser le joueur sans porter un seul coup.', $tier->key, $tier->level));
+        self::assertTrue($enemyLandedAHit, \sprintf('"%s" (niveau %d) ne doit pas laisser l\'adversaire sans porter un seul coup.', $tier->key, $tier->level));
+    }
+
+    /**
+     * Le total d'XP au seuil de chaque palier (`levels.yaml`) — même table pour les ennemis
+     * ordinaires et les boss, puisque les `minimum_level` livrés dans `combat.yaml`
+     * recoupent volontairement des paliers déjà couverts ici, voir le commentaire au-dessus
+     * du bloc `bosses:`. Une clé de plus dans l'un des deux catalogues sans entrée ici fait
+     * échouer ce test plutôt que de laisser passer un adversaire non vérifié en silence.
+     */
+    private static function totalXpAtLevel(int $level, string $key): int
+    {
+        $totalXpByLevel = [1 => 0, 5 => 760, 10 => 3_060, 20 => 12_160, 30 => 27_260, 50 => 75_460];
+
+        self::assertArrayHasKey(
+            $level,
+            $totalXpByLevel,
+            \sprintf('Niveau %d ("%s") sans total d\'XP de référence dans ce test.', $level, $key),
+        );
+
+        return $totalXpByLevel[$level];
     }
 
     /**
@@ -273,8 +314,12 @@ final class CombatCoverageTest extends KernelTestCase
         $enemies = $container->getParameter('game.combat.enemies');
         self::assertIsArray($enemies);
 
+        $bosses = $container->getParameter('game.combat.bosses');
+        self::assertIsArray($bosses);
+
         /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */
-        return new EnemyCatalog($enemies);
+        /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses */
+        return new EnemyCatalog($enemies, $bosses);
     }
 
     private static function intParameter(ContainerInterface $container, string $name): int

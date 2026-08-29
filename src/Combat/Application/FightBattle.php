@@ -7,16 +7,19 @@ namespace App\Combat\Application;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Opposer un joueur à l'ennemi que le serveur choisit pour lui.
+ * Opposer un joueur à l'ennemi que le serveur choisit pour lui — ou, depuis le #219, à
+ * celui que le joueur a nommé.
  *
- * Le joueur vient du jeton, jamais du corps — même règle que partout ailleurs. Pas de
- * champ pour choisir l'adversaire : {@see FightBattleHandler} le prend au niveau du
- * joueur, voir le ticket #211 pour pourquoi c'est additif plutôt qu'un manque.
+ * Le joueur vient du jeton, jamais du corps — même règle que partout ailleurs.
+ * `$enemyKey` est le champ additif annoncé au #211 : `null` laisse
+ * {@see FightBattleHandler} choisir au niveau du joueur, exactement comme avant ; une clé
+ * lui fait résoudre l'adversaire nommé — voir son docblock pour ce que « nommé » couvre.
  */
 final readonly class FightBattle
 {
     public function __construct(
         public Uuid $playerId,
+        public ?string $enemyKey = null,
     ) {
     }
 }

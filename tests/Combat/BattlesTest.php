@@ -223,6 +223,57 @@ final class BattlesTest extends ApiTestCase
         );
     }
 
+    /**
+     * Le corps accepte n'importe quelle clé du catalogue, pas seulement les boss — voir le
+     * docblock de `FightBattleHandler`. Un compte neuf (niveau 1) qui nomme `SAND_JACKAL`
+     * (`level: 1`) obtient exactement ce que le choix automatique lui aurait donné, mais en
+     * le demandant explicitement.
+     */
+    public function testChoosingAKnownOrdinaryEnemyByKeyFightsIt(): void
+    {
+        $bob = $this->openAccount();
+
+        $response = $this->post('/api/battles', ['enemy' => 'SAND_JACKAL'], $bob->headers + ['Idempotency-Key' => 'contre-le-chacal']);
+
+        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
+        $enemy = self::decode($response)['enemy'];
+        self::assertIsArray($enemy);
+        self::assertSame('SAND_JACKAL', $enemy['key']);
+    }
+
+    /**
+     * Une clé qui ne désigne ni un ennemi ni un boss est un 422, pas un 404 : le catalogue
+     * est public par `GET /api/enemies`, il n'y a rien à cacher.
+     */
+    public function testChoosingAnUnknownEnemyKeyIsRefused(): void
+    {
+        $bob = $this->openAccount();
+
+        $response = $this->post('/api/battles', ['enemy' => 'GHOST_OF_A_KEY'], $bob->headers + ['Idempotency-Key' => 'clef-inconnue']);
+
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame('https://grrind.app/problems/enemy-key-unknown', self::decode($response)['type']);
+    }
+
+    /**
+     * Un compte neuf (niveau 1) qui nomme un boss dont le `minimum_level` n'est pas atteint
+     * reçoit un 422 dédié — et surtout, aucune ligne n'est écrite : le refus tombe avant que
+     * le combat ne soit joué, voir le docblock de `FightBattleHandler`.
+     */
+    public function testChoosingAnEnemyBelowTheRequiredLevelIsRefusedAndWritesNothing(): void
+    {
+        $bob = $this->openAccount();
+
+        $response = $this->post('/api/battles', ['enemy' => 'DUNE_SOVEREIGN'], $bob->headers + ['Idempotency-Key' => 'trop-tot']);
+
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame('https://grrind.app/problems/enemy-level-too-low', self::decode($response)['type']);
+
+        $repository = self::getContainer()->get(BattleRepository::class);
+        self::assertInstanceOf(BattleRepository::class, $repository);
+        self::assertSame(0, $repository->count([]), 'Le refus de niveau ne doit laisser aucun combat écrit.');
+    }
+
     private function fight(Account $account, string $key = 'combat-du-jour'): Response
     {
         return $this->post('/api/battles', [], $account->headers + ['Idempotency-Key' => $key]);
