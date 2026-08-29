@@ -109,6 +109,52 @@ final class BattleSimulatorTest extends TestCase
         self::assertSame(Actor::Player, $attackers[2]);
     }
 
+    public function testAttackReportsTheAmountAbsorbedByMitigation(): void
+    {
+        $simulator = self::simulatorOf();
+        $attacker = self::fighterOf(hp: 1000, damage: 100, mitigationPermille: 0, extraTurnPermille: 0);
+
+        $undefended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
+        // 699 : juste sous le plafond de 700 que `CombatRules` impose à la dérivation (#210).
+        $defended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 699, extraTurnPermille: 0);
+
+        $attackOn = static fn (Fighter $defender): Attack => self::firstAttack(
+            $simulator->fight($attacker, $defender, self::randomizer())->timeline,
+        );
+
+        $undefendedHit = $attackOn($undefended);
+        self::assertSame(0, $undefendedHit->mitigated);
+        self::assertSame($attacker->damage, $undefendedHit->damage + $undefendedHit->mitigated);
+
+        $defendedHit = $attackOn($defended);
+        // 100 - floor(100 * 699 / 1000) = 100 - 69 = 31 : l'absorbé est la différence
+        // exacte entre le dégât brut et le dégât porté, tant que le plancher ne mord pas.
+        self::assertSame(69, $defendedHit->mitigated);
+        self::assertSame(31, $defendedHit->damage);
+        self::assertSame($attacker->damage, $defendedHit->damage + $defendedHit->mitigated);
+    }
+
+    /**
+     * Le seul cas où `damage + mitigated` ne reconstitue plus le dégât brut : le plancher a
+     * remonté `damage` au-delà de ce que la mitigation seule aurait laissé passer, sans que
+     * `mitigated` — la réduction *théorique*, avant plancher — en soit changé. Voir le
+     * docblock d'`Attack` pour pourquoi c'est écrit là plutôt que découvert côté client.
+     */
+    public function testMitigatedDoesNotReconstituteRawDamageWhenTheFloorBites(): void
+    {
+        $simulator = self::simulatorOf(minimumDamage: 3);
+        $attacker = self::fighterOf(hp: 1000, damage: 4, mitigationPermille: 0, extraTurnPermille: 0);
+        $defender = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 999, extraTurnPermille: 0);
+
+        $hit = self::firstAttack($simulator->fight($attacker, $defender, self::randomizer())->timeline);
+
+        // reduction = floor(4 * 999 / 1000) = 3, donc un dégât porté de 4 - 3 = 1 sans
+        // plancher ; le plancher le remonte à 3, mais `mitigated` reste 3.
+        self::assertSame(3, $hit->mitigated);
+        self::assertSame(3, $hit->damage);
+        self::assertGreaterThan($attacker->damage, $hit->damage + $hit->mitigated);
+    }
+
     public function testDamageNeverGoesBelowMinimumDamageEvenAgainstHeavyMitigation(): void
     {
         $simulator = self::simulatorOf(minimumDamage: 3);
@@ -234,6 +280,27 @@ final class BattleSimulatorTest extends TestCase
 
         self::assertSame(4, $outcome->turns);
         self::assertSame(BattleResult::Victory, $outcome->result);
+    }
+
+    /**
+     * Si `max_turns` tombe juste après l'émission d'un `ExtraTurn`, la timeline ne doit
+     * jamais se terminer par un tour bonus annoncé sans l'attaque qu'il promet — le client
+     * jouerait « tour bonus ! » suivi de rien. `max_turns` est volontairement bas et
+     * `extraTurnPermille` à 1000 pour forcer la boucle à sortir juste après un proc garanti.
+     */
+    public function testAnExtraTurnNeverDanglesWhenMaxTurnsIsReached(): void
+    {
+        $simulator = self::simulatorOf(maxTurns: 5);
+        $player = self::fighterOf(hp: 100_000, damage: 1, mitigationPermille: 0, extraTurnPermille: 1000);
+        $enemy = self::fighterOf(hp: 100_000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
+
+        $outcome = $simulator->fight($player, $enemy, self::randomizer());
+
+        self::assertSame(5, $outcome->turns);
+
+        $count = \count($outcome->timeline);
+        self::assertInstanceOf(BattleFinished::class, $outcome->timeline[$count - 1]);
+        self::assertInstanceOf(Attack::class, $outcome->timeline[$count - 2]);
     }
 
     /**

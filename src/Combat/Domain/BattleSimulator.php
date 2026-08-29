@@ -80,7 +80,7 @@ final readonly class BattleSimulator
                 $targetHpRemaining = $playerHp;
             }
 
-            $timeline[] = new Attack($actor, $damage, $targetHpRemaining);
+            $timeline[] = new Attack($actor, $damage, $reduction, $targetHpRemaining);
 
             // La cible est morte : rien à tirer, la boucle sort d'elle-même à l'évaluation
             // suivante — mais sortir ici évite un tour supplémentaire accordé à un
@@ -92,7 +92,12 @@ final readonly class BattleSimulator
             // Le tour supplémentaire est un jet uniforme sur les millièmes : proc si le
             // tirage tombe sous le seuil, ce qui rend `getInt(0, 999) < 1000` toujours vrai
             // et `< 0` toujours faux, sans cas particulier à écrire pour les deux bornes.
-            if ($rng->getInt(0, 999) < $attacker->extraTurnPermille) {
+            //
+            // `$turns < maxTurns` d'abord, en court-circuit : si ce tour était le dernier
+            // autorisé, la boucle va sortir juste après quoi qu'il arrive, et émettre
+            // `ExtraTurn` ici laisserait un tour bonus annoncé sans l'attaque qu'il promet —
+            // le client jouerait « tour bonus ! » suivi de rien.
+            if ($turns < $this->rules->maxTurns && $rng->getInt(0, 999) < $attacker->extraTurnPermille) {
                 $timeline[] = new ExtraTurn($actor);
 
                 continue;
