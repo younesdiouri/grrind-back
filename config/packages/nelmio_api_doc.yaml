@@ -1378,6 +1378,19 @@ when@dev:
                             extraTurnPercent: { type: integer, example: 12 }
                             dodgePercent: { type: integer, example: 9 }
 
+                    EnemyCatalog:
+                        type: object
+                        description: |
+                            Le catalogue entier rendu par `GET /api/enemies` — niché sous `enemies`, jamais un
+                            tableau nu à la racine, même convention que `WorkoutPage` et `TitleBoard` : c'est ce
+                            qui laisse la place à un champ frère plus tard sans casser un client déjà déployé.
+                            Ennemis ordinaires puis boss, dans l'ordre de déclaration de chaque liste.
+                        required: [enemies]
+                        properties:
+                            enemies:
+                                type: array
+                                items: { $ref: '#/components/schemas/Enemy' }
+
             # Par défaut tout est authentifié : c'est l'état d'`^/api`, et l'oubli
             # dangereux est dans l'autre sens. Les routes publiques le disent une par une.
             security:

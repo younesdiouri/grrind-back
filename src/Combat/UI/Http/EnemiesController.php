@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Combat\UI\Http;
 
-use App\Combat\Domain\Enemy;
 use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
-use App\Combat\UI\Http\Response\EnemyResource;
+use App\Combat\UI\Http\Response\EnemyCatalogResource;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -42,16 +41,11 @@ final readonly class EnemiesController
     #[OA\Response(
         response: 200,
         description: 'Le catalogue entier — ennemis ordinaires et boss, dans cet ordre, chacun avec son nom traduit et son niveau minimum.',
-        content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/Enemy')),
+        content: new OA\JsonContent(ref: '#/components/schemas/EnemyCatalog'),
     )]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     public function __invoke(): JsonResponse
     {
-        $entries = array_map(
-            fn (Enemy $enemy): array => EnemyResource::from($enemy, $this->enemyNames)->toArray(),
-            [...$this->enemies->all(), ...$this->enemies->bosses()],
-        );
-
-        return new JsonResponse($entries);
+        return new JsonResponse(EnemyCatalogResource::from($this->enemies, $this->enemyNames)->toArray());
     }
 }

@@ -13,28 +13,46 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class EnemiesTest extends ApiTestCase
 {
-    public function testTheCatalogueIsRenderedWithTranslatedNamesAndBothOrdinaryEnemiesAndBosses(): void
+    /**
+     * Niché sous `enemies`, jamais un tableau nu à la racine — voir le docblock
+     * d'`EnemyCatalogResource`. Un seul champ aujourd'hui, mais c'est l'enveloppe qui laisse
+     * la place à un champ frère plus tard sans rien casser.
+     */
+    public function testTheResponseIsAnObjectNestingTheListUnderEnemies(): void
     {
         $bob = $this->openAccount();
 
-        $response = $this->get('/api/enemies', $bob->headers);
+        $payload = self::decode($this->get('/api/enemies', $bob->headers));
 
-        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame(['enemies'], array_keys($payload));
 
-        $content = $response->getContent();
-        self::assertIsString($content);
-        $entries = json_decode($content, true, 512, \JSON_THROW_ON_ERROR);
+        $entries = $payload['enemies'];
         self::assertIsArray($entries);
         self::assertNotEmpty($entries);
+    }
 
+    /**
+     * L'ordre des champs d'une entrée est du contrat versionné — même règle que
+     * {@see UI\Http\Response\BattleResourcePayloadTest} pour `BattleResource`.
+     */
+    public function testTheKeyOrderOfAnEntryIsFixed(): void
+    {
+        $entries = $this->catalogueEntries();
+
+        $first = $entries[0];
+        self::assertIsArray($first);
+        self::assertSame(
+            ['key', 'name', 'minimumLevel', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'],
+            array_keys($first),
+        );
+    }
+
+    public function testTheCatalogueIsRenderedWithTranslatedNamesAndBothOrdinaryEnemiesAndBosses(): void
+    {
         $byKey = [];
 
-        foreach ($entries as $entry) {
+        foreach ($this->catalogueEntries() as $entry) {
             self::assertIsArray($entry);
-            self::assertSame(
-                ['key', 'name', 'minimumLevel', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'],
-                array_keys($entry),
-            );
             self::assertIsString($entry['key']);
             self::assertIsString($entry['name']);
             self::assertNotSame('', $entry['name'], \sprintf('"%s" est rendu sans nom traduit.', $entry['key']));
@@ -56,5 +74,20 @@ final class EnemiesTest extends ApiTestCase
     public function testListingEnemiesRefusesAnAnonymousCaller(): void
     {
         self::assertSame(Response::HTTP_UNAUTHORIZED, $this->get('/api/enemies')->getStatusCode());
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function catalogueEntries(): array
+    {
+        $bob = $this->openAccount();
+
+        $payload = self::decode($this->get('/api/enemies', $bob->headers));
+
+        $entries = $payload['enemies'];
+        self::assertIsArray($entries);
+
+        return array_values($entries);
     }
 }

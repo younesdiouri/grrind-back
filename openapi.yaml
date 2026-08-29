@@ -15,9 +15,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Enemy'
+                $ref: '#/components/schemas/EnemyCatalog'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/battles:
@@ -2229,6 +2227,16 @@ components:
         dodgePercent:
           type: integer
           example: 9
+      type: object
+    EnemyCatalog:
+      description: "Le catalogue entier rendu par `GET /api/enemies` — niché sous `enemies`, jamais un\ntableau nu à la racine, même convention que `WorkoutPage` et `TitleBoard` : c'est ce\nqui laisse la place à un champ frère plus tard sans casser un client déjà déployé.\nEnnemis ordinaires puis boss, dans l'ordre de déclaration de chaque liste.\n"
+      required:
+        - enemies
+      properties:
+        enemies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Enemy'
       type: object
     FightBattleRequest:
       properties:
