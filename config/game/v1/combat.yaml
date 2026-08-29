@@ -3,8 +3,8 @@
 # conteneur par App\Combat\Infrastructure\Config\CombatSection, et il entre dans le
 # `rulesetVersion`. Une clé inconnue fait échouer le démarrage.
 #
-# La dérivation caractéristique → combattant n'est pas encore appliquée ici (#210), et le
-# combat lui-même n'existe pas encore (#209) : ce fichier ne fait que poser les nombres.
+# La dérivation caractéristique → combattant (#210, `FighterFactory`) et le combat lui-même
+# (#209, `BattleSimulator`) sont appliqués depuis ces nombres.
 
 # ————— Le combattant ————————————————————————————————————————————————————————————————————
 #
@@ -14,13 +14,20 @@
 # est choisi au niveau du joueur — voir `EnemyCatalog`. Le jour où un combat opposera deux
 # courbes qui ne montent pas au même rythme (PvP, ennemi de palier fixe), il faudra une
 # vraie courbe, sur le modèle de `LevelCurve` — ce sera un ticket, pas une rustine ici.
+#
+# `base_hp` et `base_damage` ont été relevés au #210, en revue du #208 : un compte neuf (les
+# quatre caractéristiques à zéro) perdait son premier combat contre `SAND_JACKAL`, et pas de
+# justesse — voir `CombatCoverageTest::testTheShippedFighterSocleWinsTheLevelOneEncounter()`
+# pour le calcul rejoué sur les valeurs livrées. Le socle est le seul levier qui compte pour
+# un compte neuf, puisque les quatre coefficients ci-dessous s'appliquent à des totaux
+# encore nuls — c'est pour ça qu'on le relève lui, pas eux.
 fighter:
   # Un socle de PV avant tout apport de Vitality : un joueur qui n'a encore rien réparti
   # ailleurs qu'en Strength ne doit pas se retrouver à un point de vie.
-  base_hp: 100
+  base_hp: 140
   hp_per_1000_vitality: 40
 
-  base_damage: 10
+  base_damage: 16
   damage_per_1000_strength: 6
 
   # La mitigation réduit le dégât reçu, en millièmes du dégât brut. Le plafond doit rester
@@ -53,10 +60,29 @@ fighter:
 #
 # Premier jet, à ajuster en jeu : les six premiers ennemis ne couvrent qu'un an et demi de
 # progression, le reste du catalogue s'ajoutera avec les niveaux au-delà de 50.
+#
+# `ASH_TITAN` a été relevé au #210, en revue du #208 : les quatre caractéristiques d'un
+# joueur sont des totaux d'XP répartis, donc **linéaires en XP** — et `total_xp` est
+# quadratique en niveau (`levels.yaml`). Un ennemi écrit à la main pour suivre le rythme des
+# niveaux, lui, ne l'est pas : sans ce relevé, un joueur de haut niveau dépassait le
+# catalogue de plus en plus largement, jusqu'à ne plus jamais être inquiété — voir
+# `CombatCoverageTest::testTheShippedTopTierEncounterIsNotAFormality()`. Ce n'est pas la
+# vraie correction — celle-là demande une courbe, voir plus haut — seulement de quoi rendre
+# le dernier palier livré à nouveau menaçant pour la fourchette de niveaux qu'il couvre.
+#
+# **`DUNE_RAIDER`, `IRON_JACKAL`, `STORM_HYENA` et `OBSIDIAN_WOLF` n'ont pas bougé au #210.**
+# Le socle du joueur (`fighter.base_hp`, `fighter.base_damage`), lui, a été relevé pour tout
+# le monde — voir plus haut — donc les niveaux 5 à 30 sont mécaniquement devenus *plus
+# faciles* qu'ils ne l'étaient déjà, alors que le seul constat écrit à ce jour porte sur les
+# niveaux 1 et 50. Ce n'est pas oublié, c'est délibérément laissé tel quel : personne n'a
+# encore joué à ce jeu, et accorder quatre paliers au jugé serait ajuster des chiffres contre
+# une intuition plutôt que contre une vraie partie. `CombatCoverageTest` ne pince donc que
+# les deux extrémités ; un test de fumée séparé vérifie seulement que chaque palier livré
+# produit un combat qui tient debout, sans juger de sa difficulté.
 enemies:
   - { key: SAND_JACKAL, level: 1, hp: 120, damage: 12, mitigation_permille: 50, extra_turn_permille: 40 }
   - { key: DUNE_RAIDER, level: 5, hp: 220, damage: 18, mitigation_permille: 80, extra_turn_permille: 60 }
   - { key: IRON_JACKAL, level: 10, hp: 380, damage: 26, mitigation_permille: 120, extra_turn_permille: 90 }
   - { key: STORM_HYENA, level: 20, hp: 640, damage: 40, mitigation_permille: 180, extra_turn_permille: 130 }
   - { key: OBSIDIAN_WOLF, level: 30, hp: 950, damage: 58, mitigation_permille: 240, extra_turn_permille: 170 }
-  - { key: ASH_TITAN, level: 50, hp: 1600, damage: 90, mitigation_permille: 320, extra_turn_permille: 220 }
+  - { key: ASH_TITAN, level: 50, hp: 2400, damage: 132, mitigation_permille: 400, extra_turn_permille: 300 }

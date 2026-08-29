@@ -29,6 +29,17 @@ use InvalidArgumentException;
  * ci-dessous), donc il existe toujours un candidat. C'est un choix de ce ticket, pas un
  * énoncé du #209 — un nouveau palier d'ennemi qui comble l'écart reste un ajout de config,
  * pas un changement de comportement.
+ *
+ * ## Les mêmes deux refus que `CombatRules`, et pour la même raison (#210)
+ *
+ * Un ennemi entre dans la boucle de {@see BattleSimulator} par la même porte qu'un
+ * combattant dérivé — voir {@see \App\Combat\Application\FighterFactory::forEnemy()} —
+ * donc l'invariant qui protège la terminaison sur ses propres mérites doit valoir des deux
+ * côtés. Le schéma de configuration (`CombatSection`) ne borne `mitigation_permille` et
+ * `extra_turn_permille` que par le bas ; c'est ici, pas dans le YAML, que le catalogue
+ * refuse ce que {@see CombatRules} refuse déjà au combattant dérivé : à 1000 ‰ de
+ * mitigation, un ennemi devient invulnérable ; à 1000 ‰ de tour supplémentaire, il ne rend
+ * jamais la main.
  */
 final readonly class EnemyCatalog
 {
@@ -63,6 +74,18 @@ final readonly class EnemyCatalog
                 $entry['mitigation_permille'],
                 $entry['extra_turn_permille'],
             );
+
+            // Même conséquence que pour le combattant dérivé, voir le docblock de la
+            // classe : un ennemi invulnérable ne perdrait jamais sur ses propres mérites.
+            if ($enemy->mitigationPermille >= 1000) {
+                throw new InvalidArgumentException(\sprintf('La mitigation de "%s" doit rester sous 1000 millièmes (100 %%), %d demandé.', $enemy->key, $enemy->mitigationPermille));
+            }
+
+            // Même conséquence, par l'autre chemin : un ennemi qui rejoue toujours son tour
+            // ne rendrait jamais la main.
+            if ($enemy->extraTurnPermille >= 1000) {
+                throw new InvalidArgumentException(\sprintf('Le tour supplémentaire de "%s" doit rester sous 1000 millièmes (100 %%), %d demandé.', $enemy->key, $enemy->extraTurnPermille));
+            }
 
             if (isset($byLevel[$enemy->level])) {
                 throw new InvalidArgumentException(\sprintf('Deux ennemis pour le niveau %d : "%s" et "%s".', $enemy->level, $byLevel[$enemy->level]->key, $enemy->key));
