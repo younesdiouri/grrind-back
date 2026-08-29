@@ -11,8 +11,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * L'équilibrage se valide au démarrage, pas à la première requête d'un joueur : c'est cette
  * classe que {@see \App\Combat\Infrastructure\Config\CombatSection} fait rejouer à la
- * compilation du conteneur. Chacun des trois refus rend la terminaison du combat
- * démontrable au #209 — voir le docblock de {@see CombatRules}.
+ * compilation du conteneur. Chacun des quatre refus rend la terminaison du combat
+ * démontrable au #209 et au #218 — voir le docblock de {@see CombatRules}.
  */
 final class CombatRulesTest extends TestCase
 {
@@ -67,10 +67,24 @@ final class CombatRulesTest extends TestCase
         self::rulesOf(extraTurnCapPermille: 1000);
     }
 
+    /**
+     * À 1000 millièmes de chance d'esquive, une cible n'encaisserait plus jamais rien : le
+     * combat ne se déciderait plus sur ses propres mérites, seul `maxTurns` l'arrêterait —
+     * voir le docblock de {@see \App\Combat\Domain\BattleSimulator} pour ce que ça change à
+     * sa démonstration de terminaison (#218).
+     */
+    public function testRefusesADodgeCapThatReachesCertainty(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::rulesOf(dodgeCapPermille: 1000);
+    }
+
     private static function rulesOf(
         int $mitigationCapPermille = 700,
         int $minimumDamage = 1,
         int $extraTurnCapPermille = 350,
+        int $dodgeCapPermille = 300,
     ): CombatRules {
         return new CombatRules(
             baseHp: 100,
@@ -81,6 +95,8 @@ final class CombatRulesTest extends TestCase
             mitigationCapPermille: $mitigationCapPermille,
             extraTurnPermillePer1000Dexterity: 12,
             extraTurnCapPermille: $extraTurnCapPermille,
+            dodgePermillePer1000Mobility: 10,
+            dodgeCapPermille: $dodgeCapPermille,
             minimumDamage: $minimumDamage,
             maxTurns: 200,
         );

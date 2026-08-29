@@ -10,19 +10,16 @@ use App\Combat\Domain\Fighter;
 use App\Shared\Application\PlayerProgression;
 
 /**
- * La traduction caractéristique → combattant, tranchée au #210 :
+ * La traduction caractéristique → combattant, tranchée au #210 (`Mobility` au #218) :
  *
- * | Effet en combat              | Caractéristique | Pourquoi celle-là                                                    |
- * |-------------------------------|------------------|-----------------------------------------------------------------------|
- * | Points de vie                 | `Vitality`       | `attributes.yaml` : « ce sera les HP du personnage au PvP ».         |
- * | Dégâts infligés                | `Strength`       | Direct.                                                                |
- * | Réduction des dégâts reçus     | `Endurance`      | La capacité à encaisser, sans doublonner les HP de Vitality.         |
- * | Tour supplémentaire            | `Dexterity`      | La caractéristique du réflexe dans `attributes.yaml`.                 |
- *
- * **`Mobility` n'entre pas en V1.** Elle est réservée à l'esquive — une mécanique qui n'existe
- * pas encore — et ce n'est pas un oubli : {@see \App\Tests\Combat\Application\FighterFactoryTest}
- * prouve qu'elle ne change rien au `Fighter` produit, pour qu'elle ne se retrouve pas branchée
- * ici par distraction le jour où l'esquive arrivera.
+ * | Effet en combat            | Caractéristique | Pourquoi celle-là                                                |
+ * |-----------------------------|------------------|--------------------------------------------------------------------|
+ * | Points de vie               | `Vitality`       | `attributes.yaml` : « ce sera les HP du personnage au PvP ».      |
+ * | Dégâts infligés              | `Strength`       | Direct.                                                            |
+ * | Réduction des dégâts reçus   | `Endurance`      | La capacité à encaisser, sans doublonner les HP de Vitality.      |
+ * | Tour supplémentaire          | `Dexterity`      | La caractéristique du réflexe dans `attributes.yaml`.              |
+ * | Chance d'esquive             | `Mobility`       | Strength frappe, Endurance encaisse, Dexterity rejoue, Mobility    |
+ * |                              |                  | évite — les quatre caractéristiques lisibles en combat (#218).    |
  *
  * ## Socle + contribution, jamais un multiplicateur du socle
  *
@@ -34,10 +31,10 @@ use App\Shared\Application\PlayerProgression;
  *
  * ## Les plafonds s'appliquent ici, pas au simulateur
  *
- * `mitigation_cap_permille` et `extra_turn_cap_permille` sont appliqués à la dérivation : un
- * `Fighter` sort déjà borné. {@see \App\Combat\Domain\BattleSimulator} ne replafonne rien et n'a
- * pas à le faire — voir le docblock de {@see Fighter}, qui ne garantit lui-même que la
- * non-négativité, pas les plafonds de `CombatRules`.
+ * `mitigation_cap_permille`, `extra_turn_cap_permille` et `dodge_cap_permille` sont appliqués
+ * à la dérivation : un `Fighter` sort déjà borné. {@see \App\Combat\Domain\BattleSimulator}
+ * ne replafonne rien et n'a pas à le faire — voir le docblock de {@see Fighter}, qui ne
+ * garantit lui-même que la non-négativité, pas les plafonds de `CombatRules`.
  *
  * ## Aucun port : `PlayerProgression` entre déjà par la porte de `Shared`
  *
@@ -80,21 +77,25 @@ final readonly class FighterFactory
                 $this->rules->extraTurnCapPermille,
                 self::scale(max(0, $attributes->dexterity), $this->rules->extraTurnPermillePer1000Dexterity),
             ),
+            dodgePermille: min(
+                $this->rules->dodgeCapPermille,
+                self::scale(max(0, $attributes->mobility), $this->rules->dodgePermillePer1000Mobility),
+            ),
         );
     }
 
     /**
      * Direct : le catalogue écrit déjà des valeurs de combattant, voir le docblock d'`Enemy`.
-     * Aucune dérivation à faire ici — mais pas « aucun plafond à réappliquer » : les deux
-     * mêmes refus que {@see CombatRules} impose au combattant dérivé (mitigation et tour
-     * supplémentaire strictement sous 1000 ‰) sont portés par {@see EnemyCatalog}, pas par
-     * cette méthode ni par `CombatSection`, qui ne borne les deux champs que par le bas — un
-     * ennemi entre dans la même boucle par la même porte qu'un joueur, il ne doit pas
-     * échapper à l'invariant qui la garde.
+     * Aucune dérivation à faire ici — mais pas « aucun plafond à réappliquer » : les trois
+     * mêmes refus que {@see CombatRules} impose au combattant dérivé (mitigation, tour
+     * supplémentaire et esquive strictement sous 1000 ‰) sont portés par {@see EnemyCatalog},
+     * pas par cette méthode ni par `CombatSection`, qui ne borne les trois champs que par le
+     * bas — un ennemi entre dans la même boucle par la même porte qu'un joueur, il ne doit
+     * pas échapper à l'invariant qui la garde.
      */
     public function forEnemy(Enemy $enemy): Fighter
     {
-        return new Fighter($enemy->hp, $enemy->damage, $enemy->mitigationPermille, $enemy->extraTurnPermille);
+        return new Fighter($enemy->hp, $enemy->damage, $enemy->mitigationPermille, $enemy->extraTurnPermille, $enemy->dodgePermille);
     }
 
     private static function scale(int $total, int $permille): int

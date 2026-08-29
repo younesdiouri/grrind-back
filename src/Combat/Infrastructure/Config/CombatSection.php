@@ -52,6 +52,10 @@ final class CombatSection implements GameBalanceSection
                         // Même garde-fou, même raison : `CombatRules` refuse un plafond qui
                         // atteint 1000 millièmes.
                         ->integerNode('extra_turn_cap_permille')->isRequired()->min(0)->end()
+                        ->integerNode('dodge_permille_per_1000_mobility')->isRequired()->min(0)->end()
+                        // Même garde-fou, même raison (#218) : `CombatRules` refuse un
+                        // plafond d'esquive qui atteint 1000 millièmes.
+                        ->integerNode('dodge_cap_permille')->isRequired()->min(0)->end()
                         // `CombatRules` refuse une valeur sous 1 : un dégât minimum nul
                         // laisserait un tour sans aucun effet.
                         ->integerNode('minimum_damage')->isRequired()->min(0)->end()
@@ -69,6 +73,7 @@ final class CombatSection implements GameBalanceSection
                             ->integerNode('damage')->isRequired()->min(0)->end()
                             ->integerNode('mitigation_permille')->isRequired()->min(0)->end()
                             ->integerNode('extra_turn_permille')->isRequired()->min(0)->end()
+                            ->integerNode('dodge_permille')->isRequired()->min(0)->end()
                         ->end()
                     ->end()
                 ->end()
@@ -77,8 +82,8 @@ final class CombatSection implements GameBalanceSection
                 ->always(static function (array $values): array {
                     /**
                      * @var array{
-                     *     fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, minimum_damage: int, max_turns: int},
-                     *     enemies: list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int}>,
+                     *     fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_turns: int},
+                     *     enemies: list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}>,
                      * } $values les nœuds ci-dessus ont déjà fait ce travail
                      */
                     try {
@@ -91,6 +96,8 @@ final class CombatSection implements GameBalanceSection
                             $values['fighter']['mitigation_cap_permille'],
                             $values['fighter']['extra_turn_permille_per_1000_dexterity'],
                             $values['fighter']['extra_turn_cap_permille'],
+                            $values['fighter']['dodge_permille_per_1000_mobility'],
+                            $values['fighter']['dodge_cap_permille'],
                             $values['fighter']['minimum_damage'],
                             $values['fighter']['max_turns'],
                         );

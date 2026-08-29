@@ -45,11 +45,11 @@ final class BattleResourcePayloadTest extends TestCase
 
         $player = $payload['player'];
         self::assertIsArray($player);
-        self::assertSame(['hp', 'damage', 'mitigationPercent', 'extraTurnPercent'], array_keys($player));
+        self::assertSame(['hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'], array_keys($player));
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'name', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent'], array_keys($enemy));
+        self::assertSame(['key', 'name', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'], array_keys($enemy));
 
         $events = $payload['events'];
         self::assertIsArray($events);
@@ -61,7 +61,7 @@ final class BattleResourcePayloadTest extends TestCase
 
     /**
      * Le domaine porte des millièmes, le contrat des pourcentages : la conversion est une
-     * division entière tronquée par 10, jamais deux taux que le client recomposerait.
+     * division entière tronquée par 10, jamais des taux que le client recomposerait.
      */
     public function testThePermilleFieldsAreConvertedToTruncatedPercentages(): void
     {
@@ -72,6 +72,8 @@ final class BattleResourcePayloadTest extends TestCase
         // 105 ‰ tronqué, pas arrondi : 10, jamais 11.
         self::assertSame(10, $player['mitigationPercent']);
         self::assertSame(5, $player['extraTurnPercent']);
+        // 20 ‰ tronqué : 2, jamais 3.
+        self::assertSame(2, $player['dodgePercent']);
     }
 
     /**
@@ -123,10 +125,10 @@ final class BattleResourcePayloadTest extends TestCase
             Uuid::v7(),
             new AttributeGains(10, 20, 30, 40),
             500,
-            // 105 ‰ et 55 ‰ : voir testThePermilleFieldsAreConvertedToTruncatedPercentages.
-            new Fighter(150, 12, 105, 55),
-            new Enemy($enemyKey, 1, 120, 10, 50, 40),
-            new Fighter(120, 10, 50, 40),
+            // 105 ‰, 55 ‰ et 20 ‰ : voir testThePermilleFieldsAreConvertedToTruncatedPercentages.
+            new Fighter(150, 12, 105, 55, 20),
+            new Enemy($enemyKey, 1, 120, 10, 50, 40, 30),
+            new Fighter(120, 10, 50, 40, 30),
             new BattleOutcome(
                 BattleResult::Victory,
                 [

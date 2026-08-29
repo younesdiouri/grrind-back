@@ -55,7 +55,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * ## La timeline et les snapshots : une forme explicite, jamais un cast d'objet
  *
- * Les quatre formes de {@see BattleEvent} et les deux `Fighter` snapshotés se sérialisent
+ * Les cinq formes de {@see BattleEvent} et les deux `Fighter` snapshotés se sérialisent
  * par un mapping écrit à la main ({@see eventToArray()}, {@see fighterToArray()}), avec des
  * clés nommées dans un ordre fixe. Jamais un `(array)` sur un objet ou un `json_encode`
  * implicite : l'un dépend de l'ordre de déclaration des propriétés PHP — qui bouge sans
@@ -89,7 +89,7 @@ class Battle
      * Les quatre caractéristiques, la Vitality, et le `Fighter` qui en a été dérivé — voir
      * {@see playerSnapshotOf()}.
      *
-     * @var array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}}
+     * @var array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
      */
     #[ORM\Column(type: Types::JSONB)]
     private array $playerSnapshot;
@@ -98,7 +98,7 @@ class Battle
      * La clé de l'ennemi du catalogue, et son `Fighter` au moment du combat — voir
      * {@see enemySnapshotOf()}.
      *
-     * @var array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}}
+     * @var array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
      */
     #[ORM\Column(type: Types::JSONB)]
     private array $enemySnapshot;
@@ -137,8 +137,8 @@ class Battle
     private DateTimeImmutable $foughtAt;
 
     /**
-     * @param array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}} $playerSnapshot
-     * @param array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}}                                                                                    $enemySnapshot
+     * @param array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}} $playerSnapshot
+     * @param array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}                                                                                    $enemySnapshot
      */
     private function __construct(
         Uuid $playerId,
@@ -206,7 +206,7 @@ class Battle
     }
 
     /**
-     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}}
+     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
      */
     public function playerSnapshot(): array
     {
@@ -214,7 +214,7 @@ class Battle
     }
 
     /**
-     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}}
+     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
      */
     public function enemySnapshot(): array
     {
@@ -256,7 +256,7 @@ class Battle
     }
 
     /**
-     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}}
+     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
      */
     private static function playerSnapshotOf(AttributeGains $attributes, int $vitality, Fighter $fighter): array
     {
@@ -268,7 +268,7 @@ class Battle
     }
 
     /**
-     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}}
+     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
      */
     private static function enemySnapshotOf(Enemy $enemy, Fighter $fighter): array
     {
@@ -279,7 +279,7 @@ class Battle
     }
 
     /**
-     * @return array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int}
+     * @return array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}
      */
     private static function fighterToArray(Fighter $fighter): array
     {
@@ -288,6 +288,7 @@ class Battle
             'damage' => $fighter->damage,
             'mitigationPermille' => $fighter->mitigationPermille,
             'extraTurnPermille' => $fighter->extraTurnPermille,
+            'dodgePermille' => $fighter->dodgePermille,
         ];
     }
 
@@ -312,6 +313,10 @@ class Battle
                 'mitigated' => $event->mitigated,
                 'targetHpRemaining' => $event->targetHpRemaining,
             ],
+            $event instanceof Dodge => [
+                'type' => 'DODGE',
+                'attacker' => $event->attacker->value,
+            ],
             $event instanceof ExtraTurn => [
                 'type' => 'EXTRA_TURN',
                 'actor' => $event->actor->value,
@@ -320,9 +325,9 @@ class Battle
                 'type' => 'BATTLE_FINISHED',
                 'result' => $event->result->value,
             ],
-            // Fermé aux quatre formes de BattleEvent : une cinquième qui arriverait sans
-            // mapping ici doit casser tout de suite, pas s'écrire silencieusement en JSONB
-            // amputée de ses champs.
+            // Fermé aux cinq formes de BattleEvent (#218 en ajoute une) : une sixième qui
+            // arriverait sans mapping ici doit casser tout de suite, pas s'écrire
+            // silencieusement en JSONB amputée de ses champs.
             default => throw new LogicException(\sprintf('Aucune forme de sérialisation pour un événement de combat "%s".', $event::class)),
         };
     }

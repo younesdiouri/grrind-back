@@ -32,6 +32,7 @@ final class FighterFactoryTest extends TestCase
         self::assertSame(10, $fighter->damage);
         self::assertSame(0, $fighter->mitigationPermille);
         self::assertSame(0, $fighter->extraTurnPermille);
+        self::assertSame(0, $fighter->dodgePermille);
     }
 
     public function testMoreVitalityYieldsMoreHpEverythingElseEqual(): void
@@ -75,18 +76,40 @@ final class FighterFactoryTest extends TestCase
     }
 
     /**
-     * `Mobility` n'entre pas en V1 — voir le docblock de {@see FighterFactory}. Ce test
-     * n'est pas décoratif : il fixe l'intention pour qu'on ne la branche pas par distraction
-     * dans six mois.
+     * `Mobility` entre en combat au #218 — voir le docblock de {@see FighterFactory}. Ce
+     * test était l'inverse jusque-là (#210) : il prouvait que la caractéristique ne changeait
+     * rien au `Fighter` produit, pour qu'elle ne soit pas branchée par distraction avant
+     * qu'on ait décidé à quoi. La décision est prise ; c'est maintenant l'inverse qui doit
+     * être vrai, et cette classe reste le seul endroit qui en parle.
      */
-    public function testMobilityChangesNothingAboutTheFighterProduced(): void
+    public function testMobilityChangesTheFighterProduced(): void
     {
         $factory = self::factoryOf();
 
         $withoutMobility = $factory->forPlayer(self::progressionOf(strength: 2_000, endurance: 2_000, dexterity: 2_000, mobility: 0));
         $withMobility = $factory->forPlayer(self::progressionOf(strength: 2_000, endurance: 2_000, dexterity: 2_000, mobility: 1_000_000));
 
-        self::assertEquals($withoutMobility, $withMobility);
+        self::assertNotEquals($withoutMobility, $withMobility);
+        self::assertGreaterThan($withoutMobility->dodgePermille, $withMobility->dodgePermille);
+    }
+
+    public function testMoreMobilityYieldsMoreDodgeChanceEverythingElseEqual(): void
+    {
+        $factory = self::factoryOf();
+
+        $low = $factory->forPlayer(self::progressionOf(mobility: 1_000));
+        $high = $factory->forPlayer(self::progressionOf(mobility: 5_000));
+
+        self::assertGreaterThan($low->dodgePermille, $high->dodgePermille);
+    }
+
+    public function testDodgeChanceNeverExceedsTheConfiguredCap(): void
+    {
+        $factory = self::factoryOf(dodgeCapPermille: 300);
+
+        $fighter = $factory->forPlayer(self::progressionOf(mobility: 1_000_000));
+
+        self::assertSame(300, $fighter->dodgePermille);
     }
 
     public function testMitigationNeverExceedsTheConfiguredCap(): void
@@ -115,7 +138,7 @@ final class FighterFactoryTest extends TestCase
     {
         $factory = self::factoryOf();
 
-        $enemy = new Enemy(key: 'SAND_JACKAL', level: 1, hp: 120, damage: 12, mitigationPermille: 50, extraTurnPermille: 40);
+        $enemy = new Enemy(key: 'SAND_JACKAL', level: 1, hp: 120, damage: 12, mitigationPermille: 50, extraTurnPermille: 40, dodgePermille: 30);
 
         $fighter = $factory->forEnemy($enemy);
 
@@ -123,11 +146,13 @@ final class FighterFactoryTest extends TestCase
         self::assertSame(12, $fighter->damage);
         self::assertSame(50, $fighter->mitigationPermille);
         self::assertSame(40, $fighter->extraTurnPermille);
+        self::assertSame(30, $fighter->dodgePermille);
     }
 
     private static function factoryOf(
         int $mitigationCapPermille = 700,
         int $extraTurnCapPermille = 350,
+        int $dodgeCapPermille = 300,
     ): FighterFactory {
         return new FighterFactory(new CombatRules(
             baseHp: 100,
@@ -138,6 +163,8 @@ final class FighterFactoryTest extends TestCase
             mitigationCapPermille: $mitigationCapPermille,
             extraTurnPermillePer1000Dexterity: 12,
             extraTurnCapPermille: $extraTurnCapPermille,
+            dodgePermillePer1000Mobility: 10,
+            dodgeCapPermille: $dodgeCapPermille,
             minimumDamage: 1,
             maxTurns: 200,
         ));

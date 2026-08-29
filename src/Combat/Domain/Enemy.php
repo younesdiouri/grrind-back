@@ -12,9 +12,9 @@ namespace App\Combat\Domain;
  * catalogue et sa traduction ({@see \App\Combat\Infrastructure\Translation\EnemyTranslator}) ;
  * `level` est le niveau de joueur auquel il est opposé, pas une caractéristique de combat.
  *
- * Les stats de combat (`hp`, `damage`, `mitigationPermille`, `extraTurnPermille`) sont
- * écrites en clair par palier plutôt que dérivées d'une formule : voir le docblock de
- * `EnemyCatalog` pour pourquoi.
+ * Les stats de combat (`hp`, `damage`, `mitigationPermille`, `extraTurnPermille`,
+ * `dodgePermille`) sont écrites en clair par palier plutôt que dérivées d'une formule : voir
+ * le docblock de `EnemyCatalog` pour pourquoi.
  */
 final readonly class Enemy
 {
@@ -25,6 +25,7 @@ final readonly class Enemy
         public int $damage,
         public int $mitigationPermille,
         public int $extraTurnPermille,
+        public int $dodgePermille,
     ) {
     }
 }

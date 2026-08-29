@@ -9,12 +9,12 @@ namespace App\Combat\UI\Http\Response;
  * docblock de {@see \App\Combat\Domain\Fighter} pour pourquoi les deux entrent par la même
  * porte.
  *
- * **Le domaine porte des millièmes, le contrat des pourcentages.** `mitigationPercent` et
- * `extraTurnPercent` sont résolus ici, jamais recomposés côté client à partir de deux
- * taux — même règle que `bonusPercent` sur une Risāla. La conversion est une division
- * entière tronquée par 10, le même geste arithmétique que partout ailleurs sur une valeur
- * de jeu (voir {@see \App\Combat\Application\FighterFactory::scale()}) : jamais de flottant,
- * même pour un simple affichage.
+ * **Le domaine porte des millièmes, le contrat des pourcentages.** `mitigationPercent`,
+ * `extraTurnPercent` et `dodgePercent` sont résolus ici, jamais recomposés côté client à
+ * partir de deux taux — même règle que `bonusPercent` sur une Risāla. La conversion est une
+ * division entière tronquée par 10, le même geste arithmétique que partout ailleurs sur une
+ * valeur de jeu (voir {@see \App\Combat\Application\FighterFactory::scale()}) : jamais de
+ * flottant, même pour un simple affichage.
  */
 final readonly class FighterResource
 {
@@ -23,11 +23,12 @@ final readonly class FighterResource
         public int $damage,
         public int $mitigationPercent,
         public int $extraTurnPercent,
+        public int $dodgePercent,
     ) {
     }
 
     /**
-     * @param array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int} $fighter
+     * @param array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int} $fighter
      */
     public static function from(array $fighter): self
     {
@@ -36,11 +37,12 @@ final readonly class FighterResource
             $fighter['damage'],
             self::percentOf($fighter['mitigationPermille']),
             self::percentOf($fighter['extraTurnPermille']),
+            self::percentOf($fighter['dodgePermille']),
         );
     }
 
     /**
-     * @return array{hp: int, damage: int, mitigationPercent: int, extraTurnPercent: int}
+     * @return array{hp: int, damage: int, mitigationPercent: int, extraTurnPercent: int, dodgePercent: int}
      */
     public function toArray(): array
     {
@@ -49,6 +51,7 @@ final readonly class FighterResource
             'damage' => $this->damage,
             'mitigationPercent' => $this->mitigationPercent,
             'extraTurnPercent' => $this->extraTurnPercent,
+            'dodgePercent' => $this->dodgePercent,
         ];
     }
 

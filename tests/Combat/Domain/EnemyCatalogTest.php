@@ -19,7 +19,7 @@ final class EnemyCatalogTest extends TestCase
     public function testFindsAnEnemyByItsKey(): void
     {
         $catalog = self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
         );
 
         $enemy = $catalog->find('SAND_JACKAL');
@@ -32,8 +32,8 @@ final class EnemyCatalogTest extends TestCase
     public function testFindsTheExactLevelWhenItExists(): void
     {
         $catalog = self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
-            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60, 'dodge_permille' => 30],
         );
 
         self::assertSame('DUNE_RAIDER', $catalog->forLevel(5)->key);
@@ -46,8 +46,8 @@ final class EnemyCatalogTest extends TestCase
     public function testFallsBackToTheHighestEnemyAtOrBelowThePlayerLevel(): void
     {
         $catalog = self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
-            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60, 'dodge_permille' => 30],
         );
 
         // Niveau 3 : rien d'écrit pour ce palier, le chacal du niveau 1 reste opposé.
@@ -73,8 +73,8 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
-            ['key' => 'DUNE_RAIDER', 'level' => 1, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ['key' => 'DUNE_RAIDER', 'level' => 1, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60, 'dodge_permille' => 30],
         );
     }
 
@@ -87,7 +87,7 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60],
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60, 'dodge_permille' => 30],
         );
     }
 
@@ -102,7 +102,7 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 1000, 'extra_turn_permille' => 40],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 1000, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
         );
     }
 
@@ -115,12 +115,25 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 1000],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 1000, 'dodge_permille' => 30],
         );
     }
 
     /**
-     * @param array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int} ...$enemies
+     * Même refus, par un troisième chemin (#218) : à 1000 ‰ d'esquive, un ennemi
+     * n'encaisserait plus jamais rien.
+     */
+    public function testAnEnemyDodgingEveryAttackIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogOf(
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 1000],
+        );
+    }
+
+    /**
+     * @param array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int} ...$enemies
      */
     private static function catalogOf(array ...$enemies): EnemyCatalog
     {

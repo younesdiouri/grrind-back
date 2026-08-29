@@ -258,6 +258,8 @@ final class CombatCoverageTest extends KernelTestCase
             self::intParameter($container, 'game.combat.fighter.mitigation_cap_permille'),
             self::intParameter($container, 'game.combat.fighter.extra_turn_permille_per_1000_dexterity'),
             self::intParameter($container, 'game.combat.fighter.extra_turn_cap_permille'),
+            self::intParameter($container, 'game.combat.fighter.dodge_permille_per_1000_mobility'),
+            self::intParameter($container, 'game.combat.fighter.dodge_cap_permille'),
             self::intParameter($container, 'game.combat.fighter.minimum_damage'),
             self::intParameter($container, 'game.combat.fighter.max_turns'),
         );
@@ -271,7 +273,7 @@ final class CombatCoverageTest extends KernelTestCase
         $enemies = $container->getParameter('game.combat.enemies');
         self::assertIsArray($enemies);
 
-        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int}> $enemies */
+        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */
         return new EnemyCatalog($enemies);
     }
 

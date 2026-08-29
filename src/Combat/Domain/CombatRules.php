@@ -8,10 +8,11 @@ use InvalidArgumentException;
 
 /**
  * Les socles et coefficients qui transforment les caractéristiques d'un joueur en
- * combattant — PV, dégâts, mitigation, chance de tour supplémentaire. De l'équilibrage,
- * pas des constantes de classe, même geste que {@see \App\Community\Domain\GuildRules} :
- * la bonne dureté d'un combat est une question de produit qui bougera après les premiers
- * joueurs, et elle se règle dans `config/game/v1/combat.yaml` sans toucher au code.
+ * combattant — PV, dégâts, mitigation, chance de tour supplémentaire, chance d'esquive. De
+ * l'équilibrage, pas des constantes de classe, même geste que
+ * {@see \App\Community\Domain\GuildRules} : la bonne dureté d'un combat est une question de
+ * produit qui bougera après les premiers joueurs, et elle se règle dans
+ * `config/game/v1/combat.yaml` sans toucher au code.
  *
  * **La dérivation elle-même n'est pas ici.** Ce ticket (#208) pose les nombres et leur
  * cohérence ; transformer une caractéristique en PV ou en dégâts est le #210. L'objet
@@ -19,11 +20,16 @@ use InvalidArgumentException;
  *
  * ## Ce que ce constructeur refuse, et pourquoi
  *
- * Les trois garde-fous ci-dessous ne sont pas des bornes de format — le composant Config
+ * Les quatre garde-fous ci-dessous ne sont pas des bornes de format — le composant Config
  * les laisserait passer, un entier reste un entier — ce sont des règles de cohérence qui
  * rendent la **terminaison du combat démontrable** au #209 : un combat sans elles pourrait
  * boucler indéfiniment, ou du moins ne jamais se décider sur ses propres mérites. Elles
  * appartiennent au domaine, pas au schéma, exactement comme {@see GuildRules}.
+ *
+ * Le quatrième, sur le plafond d'esquive, est arrivé au #218, de la même famille que les
+ * trois autres : un plafond qui atteindrait 1000 ‰ retire au combat sa capacité à se
+ * décider sur ses propres mérites — voir le docblock de {@see BattleSimulator} pour ce que
+ * ça change à sa démonstration de terminaison.
  */
 final readonly class CombatRules
 {
@@ -36,6 +42,8 @@ final readonly class CombatRules
         public int $mitigationCapPermille,
         public int $extraTurnPermillePer1000Dexterity,
         public int $extraTurnCapPermille,
+        public int $dodgePermillePer1000Mobility,
+        public int $dodgeCapPermille,
         public int $minimumDamage,
         public int $maxTurns,
     ) {
@@ -58,6 +66,12 @@ final readonly class CombatRules
         // ne se termine plus par lui-même — seul `maxTurns` l'arrêterait, pas la partie.
         if ($this->extraTurnCapPermille >= 1000) {
             throw new InvalidArgumentException(\sprintf('Le plafond de tour supplémentaire doit rester sous 1000 millièmes (100 %%), %d demandé.', $this->extraTurnCapPermille));
+        }
+
+        // Une cible qui esquive toujours (1000 ‰, 100 %) ne perd jamais un point de vie :
+        // le combat ne se décide plus sur ses propres mérites, seul `maxTurns` l'arrête.
+        if ($this->dodgeCapPermille >= 1000) {
+            throw new InvalidArgumentException(\sprintf('Le plafond d\'esquive doit rester sous 1000 millièmes (100 %%), %d demandé.', $this->dodgeCapPermille));
         }
     }
 }

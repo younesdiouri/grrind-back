@@ -11,6 +11,7 @@ use App\Combat\Domain\BattleFinished;
 use App\Combat\Domain\BattleOutcome;
 use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleStarted;
+use App\Combat\Domain\Dodge;
 use App\Combat\Domain\Enemy;
 use App\Combat\Domain\ExtraTurn;
 use App\Combat\Domain\Fighter;
@@ -36,7 +37,7 @@ final class BattleTest extends TestCase
             [
                 'attributes' => ['strength' => 10, 'endurance' => 20, 'mobility' => 30, 'dexterity' => 40],
                 'vitality' => 500,
-                'fighter' => ['hp' => 150, 'damage' => 12, 'mitigationPermille' => 100, 'extraTurnPermille' => 50],
+                'fighter' => ['hp' => 150, 'damage' => 12, 'mitigationPermille' => 100, 'extraTurnPermille' => 50, 'dodgePermille' => 25],
             ],
             $battle->playerSnapshot(),
         );
@@ -49,7 +50,7 @@ final class BattleTest extends TestCase
         self::assertSame(
             [
                 'key' => 'SAND_JACKAL',
-                'fighter' => ['hp' => 120, 'damage' => 10, 'mitigationPermille' => 50, 'extraTurnPermille' => 40],
+                'fighter' => ['hp' => 120, 'damage' => 10, 'mitigationPermille' => 50, 'extraTurnPermille' => 40, 'dodgePermille' => 20],
             ],
             $battle->enemySnapshot(),
         );
@@ -67,6 +68,7 @@ final class BattleTest extends TestCase
                 new BattleStarted(150, 120),
                 new Attack(Actor::Player, 12, 3, 108),
                 new ExtraTurn(Actor::Player),
+                new Dodge(Actor::Player),
                 new Attack(Actor::Player, 12, 3, 96),
                 new BattleFinished(BattleResult::Victory),
             ],
@@ -78,6 +80,7 @@ final class BattleTest extends TestCase
                 ['type' => 'BATTLE_STARTED', 'playerHp' => 150, 'enemyHp' => 120],
                 ['type' => 'ATTACK', 'attacker' => 'PLAYER', 'damage' => 12, 'mitigated' => 3, 'targetHpRemaining' => 108],
                 ['type' => 'EXTRA_TURN', 'actor' => 'PLAYER'],
+                ['type' => 'DODGE', 'attacker' => 'PLAYER'],
                 ['type' => 'ATTACK', 'attacker' => 'PLAYER', 'damage' => 12, 'mitigated' => 3, 'targetHpRemaining' => 96],
                 ['type' => 'BATTLE_FINISHED', 'result' => 'VICTORY'],
             ],
@@ -143,9 +146,9 @@ final class BattleTest extends TestCase
             Uuid::v7(),
             new AttributeGains(10, 20, 30, 40),
             500,
-            new Fighter(150, 12, 100, 50),
-            new Enemy('SAND_JACKAL', 1, 120, 10, 50, 40),
-            new Fighter(120, 10, 50, 40),
+            new Fighter(150, 12, 100, 50, 25),
+            new Enemy('SAND_JACKAL', 1, 120, 10, 50, 40, 20),
+            new Fighter(120, 10, 50, 40, 20),
             $outcome ?? new BattleOutcome(BattleResult::Victory, [new BattleStarted(150, 120), new BattleFinished(BattleResult::Victory)], 1),
             $seed,
             $rulesetVersion,
