@@ -293,7 +293,7 @@ final class OpenApiContractTest extends KernelTestCase
         sort($idempotent);
 
         self::assertSame(
-            ['POST /api/workouts/import'],
+            ['POST /api/battles', 'POST /api/workouts/import'],
             $idempotent,
             'La liste des routes idempotentes a changé. Toute route qui crédite doit y entrer, '
             .'et la mettre à jour ici est le geste qui le fait relire.',

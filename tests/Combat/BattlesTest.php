@@ -1,0 +1,173 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Combat;
+
+use App\Shared\UI\Http\IdempotencyListener;
+use App\Tests\Support\Account;
+use App\Tests\Support\ApiTestCase;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Uid\Uuid;
+
+/**
+ * `POST /api/battles` et `GET /api/battles/{id}` — la porte du combat PvE.
+ *
+ * Le combat lui-même (#208-#211) est déjà prouvé sans HTTP ; ce qui se joue ici est le
+ * contrat : la timeline complète en un seul aller-retour, l'idempotence d'un tirage qui ne
+ * se rattrape pas, et le 404 qui ne dit jamais qu'un combat existe.
+ */
+final class BattlesTest extends ApiTestCase
+{
+    public function testFightingCreatesABattleAndRendersItsTimeline(): void
+    {
+        $bob = $this->openAccount();
+
+        $response = $this->fight($bob);
+
+        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode(), (string) $response->getContent());
+
+        $body = self::decode($response);
+        self::assertIsString($body['id']);
+        self::assertContains($body['result'], ['VICTORY', 'DEFEAT']);
+        self::assertIsInt($body['turns']);
+        self::assertGreaterThan(0, $body['turns']);
+        self::assertIsString($body['foughtAt']);
+
+        $player = $body['player'];
+        self::assertIsArray($player);
+        self::assertArrayHasKey('hp', $player);
+        self::assertArrayHasKey('damage', $player);
+        self::assertArrayHasKey('mitigationPercent', $player);
+        self::assertArrayHasKey('extraTurnPercent', $player);
+
+        // Un compte neuf est niveau 1 : `EnemyCatalog::forLevel(1)` rend toujours SAND_JACKAL
+        // (`combat.yaml`) — ça prouve que le contrôleur ne choisit rien lui-même.
+        $enemy = $body['enemy'];
+        self::assertIsArray($enemy);
+        self::assertSame('SAND_JACKAL', $enemy['key']);
+        self::assertIsString($enemy['name']);
+        self::assertNotSame('', $enemy['name'], 'Le nom doit arriver traduit, jamais la clé brute.');
+
+        $events = $body['events'];
+        self::assertIsArray($events);
+        self::assertNotEmpty($events);
+
+        $first = $events[0];
+        self::assertIsArray($first);
+        self::assertSame('BATTLE_STARTED', $first['type']);
+
+        $last = $events[array_key_last($events)];
+        self::assertIsArray($last);
+        self::assertSame('BATTLE_FINISHED', $last['type']);
+        self::assertSame($body['result'], $last['result']);
+
+        // Aucune récompense en V1 : présente et vide, jamais absente.
+        self::assertSame([], $body['rewards']);
+    }
+
+    /**
+     * Le rejeu d'une requête dont la réponse s'est perdue rend le **même** combat, jamais un
+     * second : un tirage aléatoire ne se rattrape pas, contrairement à un import.
+     */
+    public function testReplayingTheSameKeyGivesBackTheSameBattle(): void
+    {
+        $bob = $this->openAccount();
+
+        $first = $this->fight($bob);
+        $replay = $this->fight($bob);
+
+        self::assertSame('true', $replay->headers->get(IdempotencyListener::REPLAY_HEADER));
+        self::assertSame($first->getContent(), $replay->getContent());
+    }
+
+    public function testTwoDistinctKeysProduceTwoDistinctBattles(): void
+    {
+        $bob = $this->openAccount();
+
+        $first = self::decode($this->fight($bob, 'premier-combat'));
+        $second = self::decode($this->fight($bob, 'second-combat'));
+
+        self::assertNotSame($first['id'], $second['id']);
+    }
+
+    public function testFightingWithoutAnIdempotencyKeyIsRefused(): void
+    {
+        $bob = $this->openAccount();
+
+        $response = $this->post('/api/battles', [], $bob->headers);
+
+        self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+    }
+
+    public function testFightingWithoutATokenIsRefused(): void
+    {
+        $response = $this->post('/api/battles', [], ['Idempotency-Key' => 'sans-jeton']);
+
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
+    }
+
+    public function testAPlayerCanReplayHisOwnBattle(): void
+    {
+        $bob = $this->openAccount();
+        $fought = self::decode($this->fight($bob));
+        self::assertIsString($fought['id']);
+
+        $response = $this->get('/api/battles/'.$fought['id'], $bob->headers);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+
+        // `assertEquals`, pas `assertSame` : PostgreSQL réordonne les clés d'un objet JSONB
+        // (par longueur puis ordre alphabétique) au stockage — un événement relu en base ne
+        // porte pas forcément ses champs dans l'ordre où `Battle::eventToArray()` les a
+        // écrits. Seul l'ordre des **éléments de la liste** `events` compte, et celui-là
+        // survit — voir le docblock de `Battle`.
+        self::assertEquals($fought, self::decode($response));
+    }
+
+    /**
+     * Le test qui porte la décision du ticket : un combat qui ne m'appartient pas et un UUID
+     * qui ne désigne personne doivent rendre la même réponse au champ près. Les vérifier
+     * séparément laisserait les deux chemins diverger, et la route redeviendrait un oracle.
+     */
+    public function testAStrangerAndAnUnknownUuidAreIndistinguishable(): void
+    {
+        $bob = $this->openAccount();
+        $alice = $this->openAccount('alice@grrind.app', 'Alice');
+        $fought = self::decode($this->fight($bob));
+        self::assertIsString($fought['id']);
+
+        $forbidden = $this->get('/api/battles/'.$fought['id'], $alice->headers);
+        $unknown = $this->get('/api/battles/'.Uuid::v7()->toRfc4122(), $alice->headers);
+
+        self::assertSame(Response::HTTP_NOT_FOUND, $forbidden->getStatusCode());
+        self::assertSame($forbidden->getStatusCode(), $unknown->getStatusCode());
+        self::assertSame(self::decode($forbidden), self::decode($unknown));
+        self::assertSame('https://grrind.app/problems/battle-not-found', self::decode($forbidden)['type']);
+        self::assertNotSame(Response::HTTP_FORBIDDEN, $forbidden->getStatusCode(), 'Un 403 confirmerait qu\'un combat porte cet UUID.');
+    }
+
+    public function testAMalformedIdentifierGetsTheSameAnswer(): void
+    {
+        $bob = $this->openAccount();
+
+        $malformed = $this->get('/api/battles/pas-un-uuid', $bob->headers);
+        $unknown = $this->get('/api/battles/'.Uuid::v7()->toRfc4122(), $bob->headers);
+
+        self::assertSame(Response::HTTP_NOT_FOUND, $malformed->getStatusCode());
+        self::assertSame(self::decode($unknown), self::decode($malformed));
+    }
+
+    public function testShowingABattleRefusesAnAnonymousCaller(): void
+    {
+        self::assertSame(
+            Response::HTTP_UNAUTHORIZED,
+            $this->get('/api/battles/'.Uuid::v7()->toRfc4122())->getStatusCode(),
+        );
+    }
+
+    private function fight(Account $account, string $key = 'combat-du-jour'): Response
+    {
+        return $this->post('/api/battles', [], $account->headers + ['Idempotency-Key' => $key]);
+    }
+}
