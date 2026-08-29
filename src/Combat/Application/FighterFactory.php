@@ -85,8 +85,12 @@ final readonly class FighterFactory
 
     /**
      * Direct : le catalogue écrit déjà des valeurs de combattant, voir le docblock d'`Enemy`.
-     * Aucune dérivation, aucun plafond à réappliquer — `CombatSection` a déjà validé le
-     * catalogue à la compilation du conteneur.
+     * Aucune dérivation à faire ici — mais pas « aucun plafond à réappliquer » : les deux
+     * mêmes refus que {@see CombatRules} impose au combattant dérivé (mitigation et tour
+     * supplémentaire strictement sous 1000 ‰) sont portés par {@see EnemyCatalog}, pas par
+     * cette méthode ni par `CombatSection`, qui ne borne les deux champs que par le bas — un
+     * ennemi entre dans la même boucle par la même porte qu'un joueur, il ne doit pas
+     * échapper à l'invariant qui la garde.
      */
     public function forEnemy(Enemy $enemy): Fighter
     {

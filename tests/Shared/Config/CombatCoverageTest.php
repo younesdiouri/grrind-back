@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Shared\Config;
 
 use App\Combat\Application\FighterFactory;
+use App\Combat\Domain\Actor;
+use App\Combat\Domain\Attack;
 use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\CombatRules;
@@ -155,6 +157,71 @@ final class CombatCoverageTest extends KernelTestCase
             $results,
             'Le haut niveau ne doit pas être une formalité : une victoire garantie sur toutes les graines montre que le catalogue ne suit plus le joueur.',
         );
+    }
+
+    /**
+     * Un test de fumée, pas un test d'équilibrage : il ne juge aucune difficulté, il vérifie
+     * seulement qu'aucun palier livré n'est cassé — un combat qui se termine, qui rend un
+     * vainqueur, où les deux camps portent au moins un coup. C'est ce qui manquait pour les
+     * quatre paliers intermédiaires que #210 n'a délibérément pas retouchés — voir la note
+     * dans `combat.yaml`, au-dessus du catalogue, pour pourquoi ils restent tels quels en
+     * attendant une vraie partie.
+     */
+    public function testEveryShippedTierProducesAStandingFight(): void
+    {
+        $factory = self::shippedFactory();
+        $simulator = self::shippedSimulator();
+        $catalog = self::shippedCatalog();
+
+        // Le total d'XP au seuil de chaque palier (`levels.yaml`), réparti à parts égales
+        // sur les quatre caractéristiques — même geste que le joueur de haut niveau
+        // ci-dessus. Une clé de plus dans le catalogue sans entrée ici fait échouer ce
+        // test plutôt que de le laisser passer un palier non vérifié en silence.
+        $totalXpByLevel = [1 => 0, 5 => 760, 10 => 3_060, 20 => 12_160, 30 => 27_260, 50 => 75_460];
+
+        foreach ($catalog->all() as $tier) {
+            self::assertArrayHasKey(
+                $tier->level,
+                $totalXpByLevel,
+                \sprintf('Palier de niveau %d ("%s") sans total d\'XP de référence dans ce test.', $tier->level, $tier->key),
+            );
+
+            $perAttribute = intdiv($totalXpByLevel[$tier->level], 4);
+
+            $challenger = new PlayerProgression(
+                level: $tier->level,
+                xpIntoLevel: 0,
+                xpToNextLevel: null,
+                title: null,
+                attributes: new AttributeGains($perAttribute, $perAttribute, $perAttribute, $perAttribute),
+                vitality: $totalXpByLevel[$tier->level],
+                vitalityBreakdown: new VitalityBreakdown(0, 1, 0),
+            );
+
+            $player = $factory->forPlayer($challenger);
+            $enemy = $factory->forEnemy($tier);
+
+            $outcome = $simulator->fight($player, $enemy, self::randomizer("palier-{$tier->level}"));
+
+            $playerLandedAHit = false;
+            $enemyLandedAHit = false;
+
+            foreach ($outcome->timeline as $event) {
+                if (!$event instanceof Attack) {
+                    continue;
+                }
+
+                if (Actor::Player === $event->attacker) {
+                    $playerLandedAHit = true;
+                } else {
+                    $enemyLandedAHit = true;
+                }
+            }
+
+            self::assertInstanceOf(BattleResult::class, $outcome->result, \sprintf('Le palier %d ("%s") doit rendre un vainqueur.', $tier->level, $tier->key));
+            self::assertTrue($playerLandedAHit, \sprintf('Le palier %d ("%s") ne doit pas laisser le joueur sans porter un seul coup.', $tier->level, $tier->key));
+            self::assertTrue($enemyLandedAHit, \sprintf('Le palier %d ("%s") ne doit pas laisser l\'ennemi sans porter un seul coup.', $tier->level, $tier->key));
+        }
     }
 
     /**

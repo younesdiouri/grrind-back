@@ -69,6 +69,16 @@ fighter:
 # `CombatCoverageTest::testTheShippedTopTierEncounterIsNotAFormality()`. Ce n'est pas la
 # vraie correction — celle-là demande une courbe, voir plus haut — seulement de quoi rendre
 # le dernier palier livré à nouveau menaçant pour la fourchette de niveaux qu'il couvre.
+#
+# **`DUNE_RAIDER`, `IRON_JACKAL`, `STORM_HYENA` et `OBSIDIAN_WOLF` n'ont pas bougé au #210.**
+# Le socle du joueur (`fighter.base_hp`, `fighter.base_damage`), lui, a été relevé pour tout
+# le monde — voir plus haut — donc les niveaux 5 à 30 sont mécaniquement devenus *plus
+# faciles* qu'ils ne l'étaient déjà, alors que le seul constat écrit à ce jour porte sur les
+# niveaux 1 et 50. Ce n'est pas oublié, c'est délibérément laissé tel quel : personne n'a
+# encore joué à ce jeu, et accorder quatre paliers au jugé serait ajuster des chiffres contre
+# une intuition plutôt que contre une vraie partie. `CombatCoverageTest` ne pince donc que
+# les deux extrémités ; un test de fumée séparé vérifie seulement que chaque palier livré
+# produit un combat qui tient debout, sans juger de sa difficulté.
 enemies:
   - { key: SAND_JACKAL, level: 1, hp: 120, damage: 12, mitigation_permille: 50, extra_turn_permille: 40 }
   - { key: DUNE_RAIDER, level: 5, hp: 220, damage: 18, mitigation_permille: 80, extra_turn_permille: 60 }

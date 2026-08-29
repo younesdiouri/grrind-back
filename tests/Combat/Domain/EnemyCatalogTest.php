@@ -92,6 +92,34 @@ final class EnemyCatalogTest extends TestCase
     }
 
     /**
+     * Même refus que {@see CombatRulesTest} sur le combattant dérivé, et pour la même
+     * raison : à 1000 ‰ de mitigation, un ennemi devient invulnérable. `CombatSection` ne
+     * borne ce champ que par le bas — voir le docblock de la classe — donc c'est ici que
+     * le refus doit vivre.
+     */
+    public function testAnEnemyReachingInvulnerabilityIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogOf(
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 1000, 'extra_turn_permille' => 40],
+        );
+    }
+
+    /**
+     * Même refus, par l'autre chemin : à 1000 ‰ de tour supplémentaire, un ennemi ne rend
+     * jamais la main.
+     */
+    public function testAnEnemyNeverYieldingTheirTurnIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        self::catalogOf(
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 1000],
+        );
+    }
+
+    /**
      * @param array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int} ...$enemies
      */
     private static function catalogOf(array ...$enemies): EnemyCatalog
