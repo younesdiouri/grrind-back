@@ -1335,6 +1335,53 @@ when@dev:
                                 description: 'Lot 6 : toujours vide aujourd''hui — voir la description de la classe.'
                                 items: { type: object }
 
+                    BattleSummary:
+                        type: object
+                        description: |
+                            Une ligne de `GET /api/battles` (#220) — **jamais la timeline**. `Battle` peut
+                            compter deux cents événements (`max_turns`) ; vingt résumés par page restent
+                            légers, et le client va chercher `GET /api/battles/{id}` au moment où il choisit
+                            un combat précis à rejouer.
+
+                            `result` est **toujours** `VICTORY` ou `DEFEAT`, y compris pour un combat conclu
+                            par `max_turns` sans KO — voir la description de `Battle.result`. C'est ce qui
+                            permet à la liste d'être colorée ligne par ligne sans aucun troisième état à
+                            dessiner.
+                        required: [id, result, enemy, turns, foughtAt]
+                        properties:
+                            id: { type: string, format: uuid }
+                            result:
+                                type: string
+                                enum: [VICTORY, DEFEAT]
+                            enemy:
+                                type: object
+                                description: |
+                                    La clé et le nom traduit seulement — pas les statistiques de combat, qui
+                                    n'ont pas leur place dans une ligne de liste. Le nom vient de la clé du
+                                    snapshot, jamais de `EnemyCatalog` : un combat déjà joué est un fait écrit,
+                                    voir la description de `Battle`.
+                                required: [key, name]
+                                properties:
+                                    key: { type: string, example: SAND_JACKAL }
+                                    name: { type: string, example: 'Chacal des sables' }
+                            turns: { type: integer, example: 7 }
+                            foughtAt: { type: string, format: date-time }
+
+                    BattlePage:
+                        type: object
+                        description: |
+                            Une page d'historique, **dans l'ordre du combat** : `foughtAt` décroissant, puis
+                            l'identifiant pour départager deux combats livrés à la même seconde.
+
+                            `nextCursor` est une **chaîne opaque** — le client la renvoie telle quelle. `null`
+                            signifie la fin ; il n'y a pas de total, un défilement infini n'en a aucun usage.
+                        required: [battles, nextCursor]
+                        properties:
+                            battles:
+                                type: array
+                                items: { $ref: '#/components/schemas/BattleSummary' }
+                            nextCursor: { type: string, nullable: true }
+
                     # Nommé différemment de la classe `FightBattleRequest` qui porte réellement le
                     # champ — même geste que `WorkoutImportRequest` / `ImportWorkoutsRequest` plus
                     # haut : nelmio génère aussi un schéma depuis le type de `#[MapRequestPayload]`,

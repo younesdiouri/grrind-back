@@ -72,7 +72,11 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: BattleRepository::class)]
 #[ORM\Table(name: 'combat_battle')]
-#[ORM\Index(name: 'idx_combat_battle_player', columns: ['player_id'])]
+// Sert `BattleRepository::history()` (#220) : `player_id` d'abord pour filtrer, puis l'ordre
+// exact du tri de la pagination pour que Postgres n'ait rien à trier à part — voir la
+// migration qui remplace cet index et son docblock pour pourquoi un `DROP` + `CREATE` plutôt
+// qu'un `ALTER`.
+#[ORM\Index(name: 'idx_combat_battle_player', columns: ['player_id', 'fought_at', 'id'])]
 class Battle
 {
     /** `Xoshiro256StarStar` exige exactement cette taille — voir le docblock de la classe. */

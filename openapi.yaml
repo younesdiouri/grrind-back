@@ -19,6 +19,39 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/battles:
+    get:
+      tags:
+        - Combat
+      operationId: get_combat_battle_list
+      parameters:
+        -
+          name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+            minimum: 1
+      responses:
+        '200':
+          description: "Une page d'historique, du plus récent au plus ancien — un résumé par combat, jamais sa timeline."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BattlePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
     post:
       tags:
         - Combat
@@ -2182,6 +2215,57 @@ components:
           items:
             type: object
       type: object
+    BattleSummary:
+      description: "Une ligne de `GET /api/battles` (#220) — **jamais la timeline**. `Battle` peut\ncompter deux cents événements (`max_turns`) ; vingt résumés par page restent\nlégers, et le client va chercher `GET /api/battles/{id}` au moment où il choisit\nun combat précis à rejouer.\n\n`result` est **toujours** `VICTORY` ou `DEFEAT`, y compris pour un combat conclu\npar `max_turns` sans KO — voir la description de `Battle.result`. C'est ce qui\npermet à la liste d'être colorée ligne par ligne sans aucun troisième état à\ndessiner.\n"
+      required:
+        - id
+        - result
+        - enemy
+        - turns
+        - foughtAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        result:
+          type: string
+          enum:
+            - VICTORY
+            - DEFEAT
+        enemy:
+          description: "La clé et le nom traduit seulement — pas les statistiques de combat, qui\nn'ont pas leur place dans une ligne de liste. Le nom vient de la clé du\nsnapshot, jamais de `EnemyCatalog` : un combat déjà joué est un fait écrit,\nvoir la description de `Battle`.\n"
+          required:
+            - key
+            - name
+          properties:
+            key:
+              type: string
+              example: SAND_JACKAL
+            name:
+              type: string
+              example: 'Chacal des sables'
+          type: object
+        turns:
+          type: integer
+          example: 7
+        foughtAt:
+          type: string
+          format: date-time
+      type: object
+    BattlePage:
+      description: "Une page d'historique, **dans l'ordre du combat** : `foughtAt` décroissant, puis\nl'identifiant pour départager deux combats livrés à la même seconde.\n\n`nextCursor` est une **chaîne opaque** — le client la renvoie telle quelle. `null`\nsignifie la fin ; il n'y a pas de total, un défilement infini n'en a aucun usage.\n"
+      required:
+        - battles
+        - nextCursor
+      properties:
+        battles:
+          type: array
+          items:
+            $ref: '#/components/schemas/BattleSummary'
+        nextCursor:
+          type: string
+          nullable: true
+      type: object
     ChosenEnemyRequest:
       description: "Le corps, facultatif, de `POST /api/battles` (#219). Absent — ou `{\"enemy\": null}` —\nle serveur choisit l'ennemi au niveau du joueur, comportement inchangé depuis le\n#212. `enemy` porte n'importe quelle clé du catalogue rendu par `GET /api/enemies`,\nboss comme ennemi ordinaire.\n"
       properties:
@@ -2244,6 +2328,18 @@ components:
           type: string
           nullable: true
           default: null
+      type: object
+    BattleHistoryQuery:
+      properties:
+        cursor:
+          type: string
+          nullable: true
+          default: null
+        limit:
+          type: integer
+          default: 20
+          maximum: 50
+          minimum: 1
       type: object
     FoundGuildRequest:
       properties:
