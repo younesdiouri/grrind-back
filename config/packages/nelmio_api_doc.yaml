@@ -1228,16 +1228,17 @@ when@dev:
                     BattleFighter:
                         type: object
                         description: |
-                            Un combattant tel qu'affiché. **`mitigationPercent` et `extraTurnPercent` sont
-                            résolus côté serveur**, jamais deux taux que le client recomposerait — même règle
-                            que `bonusPercent` sur une Risāla. Le domaine porte des millièmes ; ce sont des
-                            pourcentages entiers, tronqués.
-                        required: [hp, damage, mitigationPercent, extraTurnPercent]
+                            Un combattant tel qu'affiché. **`mitigationPercent`, `extraTurnPercent` et
+                            `dodgePercent` sont résolus côté serveur**, jamais des taux que le client
+                            recomposerait — même règle que `bonusPercent` sur une Risāla. Le domaine porte des
+                            millièmes ; ce sont des pourcentages entiers, tronqués.
+                        required: [hp, damage, mitigationPercent, extraTurnPercent, dodgePercent]
                         properties:
                             hp: { type: integer, example: 240 }
                             damage: { type: integer, example: 31 }
                             mitigationPercent: { type: integer, example: 18, description: "Réduction du dégât reçu." }
                             extraTurnPercent: { type: integer, example: 12, description: "Chance de rejouer un tour immédiatement." }
+                            dodgePercent: { type: integer, example: 8, description: "Chance d'esquiver entièrement un coup." }
 
                     BattleEnemy:
                         type: object
@@ -1247,7 +1248,7 @@ when@dev:
                             **Le nom arrive traduit**, comme les titres : le client n'a pas de table de
                             correspondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du
                             catalogue (`combat.yaml`), pas une donnée d'affichage.
-                        required: [key, name, hp, damage, mitigationPercent, extraTurnPercent]
+                        required: [key, name, hp, damage, mitigationPercent, extraTurnPercent, dodgePercent]
                         properties:
                             key: { type: string, example: SAND_JACKAL }
                             name:
@@ -1258,6 +1259,7 @@ when@dev:
                             damage: { type: integer, example: 22 }
                             mitigationPercent: { type: integer, example: 10 }
                             extraTurnPercent: { type: integer, example: 5 }
+                            dodgePercent: { type: integer, example: 3 }
 
                     BattleEvent:
                         type: object

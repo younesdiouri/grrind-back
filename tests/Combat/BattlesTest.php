@@ -50,6 +50,7 @@ final class BattlesTest extends ApiTestCase
         self::assertArrayHasKey('damage', $player);
         self::assertArrayHasKey('mitigationPercent', $player);
         self::assertArrayHasKey('extraTurnPercent', $player);
+        self::assertArrayHasKey('dodgePercent', $player);
 
         // Un compte neuf est niveau 1 : `EnemyCatalog::forLevel(1)` rend toujours SAND_JACKAL
         // (`combat.yaml`) — ça prouve que le contrôleur ne choisit rien lui-même.
