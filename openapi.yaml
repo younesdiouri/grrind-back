@@ -2056,7 +2056,7 @@ components:
           example: 5
       type: object
     BattleEvent:
-      description: "Un instant de la timeline. **Seul l'ordre des éléments de la liste compte** — voir\nla description de `Battle.events` — un événement isolé n'a pas de position propre.\n\nQuatre formes, distinguées par `type` ; seuls les champs de la forme concernée\nsont présents, les autres sont **absents**, jamais `null` :\n  - `BATTLE_STARTED` : `playerHp`, `enemyHp` — l'état de départ, avant le premier coup.\n  - `ATTACK` : `attacker`, `damage`, `mitigated`, `targetHpRemaining` — un coup porté,\n    la part absorbée par la mitigation, et ce qu'il reste à la cible.\n  - `EXTRA_TURN` : `actor` — qui rejoue un tour immédiatement.\n  - `BATTLE_FINISHED` : `result` — toujours le dernier événement de la timeline.\n"
+      description: "Un instant de la timeline. **Seul l'ordre des éléments de la liste compte** — voir\nla description de `Battle.events` — un événement isolé n'a pas de position propre.\n\nCinq formes, distinguées par `type` ; seuls les champs de la forme concernée\nsont présents, les autres sont **absents**, jamais `null` :\n  - `BATTLE_STARTED` : `playerHp`, `enemyHp` — l'état de départ, avant le premier coup.\n  - `ATTACK` : `attacker`, `damage`, `mitigated`, `targetHpRemaining` — un coup porté,\n    la part absorbée par la mitigation, et ce qu'il reste à la cible.\n  - `DODGE` : `attacker` — la cible de l'attaquant a esquivé, aucun dégât n'est\n    appliqué. Remplace l'`ATTACK` que ce tour aurait produit, ne s'ajoute jamais à\n    côté.\n  - `EXTRA_TURN` : `actor` — qui rejoue un tour immédiatement, que le tour qui l'a\n    déclenché ait porté ou été esquivé.\n  - `BATTLE_FINISHED` : `result` — toujours le dernier événement de la timeline.\n"
       required:
         - type
       properties:
@@ -2065,6 +2065,7 @@ components:
           enum:
             - BATTLE_STARTED
             - ATTACK
+            - DODGE
             - EXTRA_TURN
             - BATTLE_FINISHED
         playerHp:
@@ -2074,7 +2075,7 @@ components:
           description: '`BATTLE_STARTED` seulement.'
           type: integer
         attacker:
-          description: '`ATTACK` seulement.'
+          description: '`ATTACK` et `DODGE` seulement.'
           type: string
           enum:
             - PLAYER

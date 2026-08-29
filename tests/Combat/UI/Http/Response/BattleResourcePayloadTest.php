@@ -124,9 +124,9 @@ final class BattleResourcePayloadTest extends TestCase
             new AttributeGains(10, 20, 30, 40),
             500,
             // 105 ‰ et 55 ‰ : voir testThePermilleFieldsAreConvertedToTruncatedPercentages.
-            new Fighter(150, 12, 105, 55),
-            new Enemy($enemyKey, 1, 120, 10, 50, 40),
-            new Fighter(120, 10, 50, 40),
+            new Fighter(150, 12, 105, 55, 20),
+            new Enemy($enemyKey, 1, 120, 10, 50, 40, 30),
+            new Fighter(120, 10, 50, 40, 30),
             new BattleOutcome(
                 BattleResult::Victory,
                 [

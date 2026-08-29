@@ -186,9 +186,9 @@ final class BattlesTest extends ApiTestCase
             $bob->id,
             new AttributeGains(0, 0, 0, 0),
             0,
-            new Fighter(140, 16, 0, 0),
-            new Enemy('GHOST_ENEMY', 1, 120, 12, 50, 40),
-            new Fighter(120, 12, 50, 40),
+            new Fighter(140, 16, 0, 0, 0),
+            new Enemy('GHOST_ENEMY', 1, 120, 12, 50, 40, 30),
+            new Fighter(120, 12, 50, 40, 30),
             new BattleOutcome(
                 BattleResult::Victory,
                 [new BattleStarted(140, 120), new BattleFinished(BattleResult::Victory)],

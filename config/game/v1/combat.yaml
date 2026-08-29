@@ -42,6 +42,14 @@ fighter:
   extra_turn_permille_per_1000_dexterity: 12
   extra_turn_cap_permille: 350
 
+  # La chance, en millièmes, qu'une attaque contre ce combattant échoue entièrement : Mobility
+  # entre en combat (#218) — Strength frappe, Endurance encaisse, Dexterity rejoue, Mobility
+  # évite. Même garde-fou que les deux précédents : à 1000 (100 %), une cible n'encaisserait
+  # plus jamais rien, et le combat ne se déciderait plus que par `max_turns` — voir
+  # `CombatRules`.
+  dodge_permille_per_1000_mobility: 10
+  dodge_cap_permille: 300
+
   # Le plancher qui garantit qu'un tour fait toujours reculer un point de vie, quelle que
   # soit la mitigation en face — `CombatRules` refuse une valeur sous 1.
   minimum_damage: 1
@@ -79,10 +87,18 @@ fighter:
 # une intuition plutôt que contre une vraie partie. `CombatCoverageTest` ne pince donc que
 # les deux extrémités ; un test de fumée séparé vérifie seulement que chaque palier livré
 # produit un combat qui tient debout, sans juger de sa difficulté.
+#
+# `dodge_permille` (#218) suit la même progression que `extra_turn_permille` du même palier,
+# à l'échelle près : un ennemi qui rejoue plus souvent son tour est aussi un ennemi qui évite
+# mieux les coups, même geste de lisibilité que le reste du catalogue. Ces valeurs n'ont pas
+# eu besoin d'un second relevé comme celui d'`ASH_TITAN` au #210 : `CombatCoverageTest` passe
+# sans y toucher, esquive et tour supplémentaire compris — cette progression proportionnelle
+# suffit à laisser `testTheShippedFighterSocleWinsTheLevelOneEncounter()` gagnable et
+# `testTheShippedTopTierEncounterIsNotAFormality()` disputé.
 enemies:
-  - { key: SAND_JACKAL, level: 1, hp: 120, damage: 12, mitigation_permille: 50, extra_turn_permille: 40 }
-  - { key: DUNE_RAIDER, level: 5, hp: 220, damage: 18, mitigation_permille: 80, extra_turn_permille: 60 }
-  - { key: IRON_JACKAL, level: 10, hp: 380, damage: 26, mitigation_permille: 120, extra_turn_permille: 90 }
-  - { key: STORM_HYENA, level: 20, hp: 640, damage: 40, mitigation_permille: 180, extra_turn_permille: 130 }
-  - { key: OBSIDIAN_WOLF, level: 30, hp: 950, damage: 58, mitigation_permille: 240, extra_turn_permille: 170 }
-  - { key: ASH_TITAN, level: 50, hp: 2400, damage: 132, mitigation_permille: 400, extra_turn_permille: 300 }
+  - { key: SAND_JACKAL, level: 1, hp: 120, damage: 12, mitigation_permille: 50, extra_turn_permille: 40, dodge_permille: 30 }
+  - { key: DUNE_RAIDER, level: 5, hp: 220, damage: 18, mitigation_permille: 80, extra_turn_permille: 60, dodge_permille: 45 }
+  - { key: IRON_JACKAL, level: 10, hp: 380, damage: 26, mitigation_permille: 120, extra_turn_permille: 90, dodge_permille: 70 }
+  - { key: STORM_HYENA, level: 20, hp: 640, damage: 40, mitigation_permille: 180, extra_turn_permille: 130, dodge_permille: 100 }
+  - { key: OBSIDIAN_WOLF, level: 30, hp: 950, damage: 58, mitigation_permille: 240, extra_turn_permille: 170, dodge_permille: 130 }
+  - { key: ASH_TITAN, level: 50, hp: 2400, damage: 132, mitigation_permille: 400, extra_turn_permille: 300, dodge_permille: 220 }

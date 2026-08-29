@@ -30,16 +30,16 @@ use InvalidArgumentException;
  * énoncé du #209 — un nouveau palier d'ennemi qui comble l'écart reste un ajout de config,
  * pas un changement de comportement.
  *
- * ## Les mêmes deux refus que `CombatRules`, et pour la même raison (#210)
+ * ## Les mêmes trois refus que `CombatRules`, et pour la même raison (#210, #218)
  *
  * Un ennemi entre dans la boucle de {@see BattleSimulator} par la même porte qu'un
  * combattant dérivé — voir {@see \App\Combat\Application\FighterFactory::forEnemy()} —
  * donc l'invariant qui protège la terminaison sur ses propres mérites doit valoir des deux
- * côtés. Le schéma de configuration (`CombatSection`) ne borne `mitigation_permille` et
- * `extra_turn_permille` que par le bas ; c'est ici, pas dans le YAML, que le catalogue
- * refuse ce que {@see CombatRules} refuse déjà au combattant dérivé : à 1000 ‰ de
- * mitigation, un ennemi devient invulnérable ; à 1000 ‰ de tour supplémentaire, il ne rend
- * jamais la main.
+ * côtés. Le schéma de configuration (`CombatSection`) ne borne `mitigation_permille`,
+ * `extra_turn_permille` et `dodge_permille` que par le bas ; c'est ici, pas dans le YAML,
+ * que le catalogue refuse ce que {@see CombatRules} refuse déjà au combattant dérivé : à
+ * 1000 ‰ de mitigation, un ennemi devient invulnérable ; à 1000 ‰ de tour supplémentaire, il
+ * ne rend jamais la main ; à 1000 ‰ d'esquive, il n'encaisse plus jamais rien.
  */
 final readonly class EnemyCatalog
 {
@@ -50,7 +50,7 @@ final readonly class EnemyCatalog
     private array $byLevel;
 
     /**
-     * @param list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int}> $enemies
+     * @param list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
@@ -73,6 +73,7 @@ final readonly class EnemyCatalog
                 $entry['damage'],
                 $entry['mitigation_permille'],
                 $entry['extra_turn_permille'],
+                $entry['dodge_permille'],
             );
 
             // Même conséquence que pour le combattant dérivé, voir le docblock de la
@@ -85,6 +86,12 @@ final readonly class EnemyCatalog
             // ne rendrait jamais la main.
             if ($enemy->extraTurnPermille >= 1000) {
                 throw new InvalidArgumentException(\sprintf('Le tour supplémentaire de "%s" doit rester sous 1000 millièmes (100 %%), %d demandé.', $enemy->key, $enemy->extraTurnPermille));
+            }
+
+            // Même conséquence, par un troisième chemin (#218) : un ennemi qui esquive
+            // toujours n'encaisserait plus jamais rien.
+            if ($enemy->dodgePermille >= 1000) {
+                throw new InvalidArgumentException(\sprintf('L\'esquive de "%s" doit rester sous 1000 millièmes (100 %%), %d demandé.', $enemy->key, $enemy->dodgePermille));
             }
 
             if (isset($byLevel[$enemy->level])) {

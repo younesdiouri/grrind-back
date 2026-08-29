@@ -138,6 +138,8 @@ services:
             $mitigationCapPermille: '%game.combat.fighter.mitigation_cap_permille%'
             $extraTurnPermillePer1000Dexterity: '%game.combat.fighter.extra_turn_permille_per_1000_dexterity%'
             $extraTurnCapPermille: '%game.combat.fighter.extra_turn_cap_permille%'
+            $dodgePermillePer1000Mobility: '%game.combat.fighter.dodge_permille_per_1000_mobility%'
+            $dodgeCapPermille: '%game.combat.fighter.dodge_cap_permille%'
             $minimumDamage: '%game.combat.fighter.minimum_damage%'
             $maxTurns: '%game.combat.fighter.max_turns%'
 

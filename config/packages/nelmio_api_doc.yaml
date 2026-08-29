@@ -1265,21 +1265,25 @@ when@dev:
                             Un instant de la timeline. **Seul l'ordre des éléments de la liste compte** — voir
                             la description de `Battle.events` — un événement isolé n'a pas de position propre.
 
-                            Quatre formes, distinguées par `type` ; seuls les champs de la forme concernée
+                            Cinq formes, distinguées par `type` ; seuls les champs de la forme concernée
                             sont présents, les autres sont **absents**, jamais `null` :
                               - `BATTLE_STARTED` : `playerHp`, `enemyHp` — l'état de départ, avant le premier coup.
                               - `ATTACK` : `attacker`, `damage`, `mitigated`, `targetHpRemaining` — un coup porté,
                                 la part absorbée par la mitigation, et ce qu'il reste à la cible.
-                              - `EXTRA_TURN` : `actor` — qui rejoue un tour immédiatement.
+                              - `DODGE` : `attacker` — la cible de l'attaquant a esquivé, aucun dégât n'est
+                                appliqué. Remplace l'`ATTACK` que ce tour aurait produit, ne s'ajoute jamais à
+                                côté.
+                              - `EXTRA_TURN` : `actor` — qui rejoue un tour immédiatement, que le tour qui l'a
+                                déclenché ait porté ou été esquivé.
                               - `BATTLE_FINISHED` : `result` — toujours le dernier événement de la timeline.
                         required: [type]
                         properties:
                             type:
                                 type: string
-                                enum: [BATTLE_STARTED, ATTACK, EXTRA_TURN, BATTLE_FINISHED]
+                                enum: [BATTLE_STARTED, ATTACK, DODGE, EXTRA_TURN, BATTLE_FINISHED]
                             playerHp: { type: integer, description: "`BATTLE_STARTED` seulement." }
                             enemyHp: { type: integer, description: "`BATTLE_STARTED` seulement." }
-                            attacker: { type: string, enum: [PLAYER, ENEMY], description: "`ATTACK` seulement." }
+                            attacker: { type: string, enum: [PLAYER, ENEMY], description: "`ATTACK` et `DODGE` seulement." }
                             damage: { type: integer, description: "`ATTACK` seulement." }
                             mitigated: { type: integer, description: "`ATTACK` seulement : la part du dégât brut absorbée par la mitigation." }
                             targetHpRemaining: { type: integer, description: "`ATTACK` seulement." }

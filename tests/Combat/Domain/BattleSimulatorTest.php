@@ -12,6 +12,7 @@ use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\BattleStarted;
 use App\Combat\Domain\CombatRules;
+use App\Combat\Domain\Dodge;
 use App\Combat\Domain\ExtraTurn;
 use App\Combat\Domain\Fighter;
 use PHPUnit\Framework\TestCase;
@@ -21,9 +22,10 @@ use Random\Randomizer;
 /**
  * Le moteur seul, sans base ni horloge : des `Fighter` et un `Randomizer` entrent, une
  * timeline sort. Ce qui se démontre ici n'est pas « ça marche sur un exemple », c'est que
- * la boucle **termine toujours** — voir le docblock de {@see BattleSimulator} pour les deux
- * garde-fous qui le garantissent — et que la timeline qu'elle produit est le contrat
- * d'animation qu'elle prétend être.
+ * la boucle **termine toujours** — voir le docblock de {@see BattleSimulator} pour ce que
+ * l'esquive (#218) a changé à cette démonstration, `max_turns` en étant désormais le seul
+ * garant dur — et que la timeline qu'elle produit est le contrat d'animation qu'elle
+ * prétend être.
  */
 final class BattleSimulatorTest extends TestCase
 {
@@ -107,6 +109,110 @@ final class BattleSimulatorTest extends TestCase
         self::assertSame(Actor::Player, $attackers[0]);
         self::assertSame(Actor::Enemy, $attackers[1]);
         self::assertSame(Actor::Player, $attackers[2]);
+    }
+
+    /**
+     * `dodgePermille` à 1000 (100 %) est refusé par `CombatRules`, mais {@see Fighter} ne
+     * le réapplique pas — voir son docblock — précisément pour que ce test puisse forcer la
+     * valeur : une cible qui esquive toujours n'encaisse jamais rien, et le combat ne se
+     * termine plus que par `max_turns`, devenu le seul garant dur (#218).
+     */
+    public function testADodgePermilleOfOneThousandAlwaysDodgesAndTheBattleEndsByMaxTurns(): void
+    {
+        $simulator = self::simulatorOf(maxTurns: 10);
+        // Dégât nul des deux côtés : le seul dégât qui peut jamais s'appliquer vient du
+        // plancher (`minimum_damage`), jamais assez pour achever qui que ce soit avant
+        // `max_turns` sur un point de vie aussi haut.
+        $player = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
+        $enemy = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 1000);
+
+        $outcome = $simulator->fight($player, $enemy, self::randomizer());
+
+        self::assertSame(10, $outcome->turns);
+        self::assertSame(
+            [],
+            array_values(array_filter($outcome->timeline, static fn (BattleEvent $event): bool => $event instanceof Attack && Actor::Player === $event->attacker)),
+            'Une cible qui esquive toujours ne doit jamais encaisser une attaque.',
+        );
+    }
+
+    public function testADodgePermilleOfZeroNeverAppearsInTheTimeline(): void
+    {
+        $simulator = self::simulatorOf();
+        $player = self::fighterOf(hp: 200, damage: 15, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 0);
+        $enemy = self::fighterOf(hp: 200, damage: 14, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 0);
+
+        $timeline = $simulator->fight($player, $enemy, self::randomizer())->timeline;
+
+        self::assertSame([], array_values(array_filter($timeline, static fn (BattleEvent $event): bool => $event instanceof Dodge)));
+    }
+
+    /**
+     * Le piège le plus facile à écrire à l'envers : le jet d'esquive se joue sur la mobilité
+     * de la CIBLE, pas de l'attaquant. Le joueur, très évasif, ne dodge jamais **ses
+     * propres** attaques — il les porte contre un ennemi qui n'esquive pas — mais évite
+     * systématiquement celles de l'ennemi.
+     */
+    public function testDodgeIsRolledOnTheTargetsMobilityNotTheAttackers(): void
+    {
+        $simulator = self::simulatorOf(maxTurns: 6);
+        $player = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 1000);
+        $enemy = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 0);
+
+        $timeline = $simulator->fight($player, $enemy, self::randomizer())->timeline;
+
+        $attacks = array_values(array_filter($timeline, static fn (BattleEvent $event): bool => $event instanceof Attack));
+        $dodges = array_values(array_filter($timeline, static fn (BattleEvent $event): bool => $event instanceof Dodge));
+
+        self::assertNotSame([], $attacks);
+        self::assertNotSame([], $dodges);
+
+        // Le joueur (dodge 1000) porte tous les coups qui atterrissent : sa cible, l'ennemi,
+        // n'esquive jamais (dodge 0).
+        foreach ($attacks as $attack) {
+            self::assertSame(Actor::Player, $attack->attacker);
+        }
+
+        // L'ennemi (dodge 0) ne rate jamais sa cible par sa propre faute : c'est le joueur,
+        // en face, qui esquive systématiquement grâce à sa propre mobilité.
+        foreach ($dodges as $dodge) {
+            self::assertSame(Actor::Enemy, $dodge->attacker);
+        }
+    }
+
+    /**
+     * Un tour esquivé ne retire aucun point de vie : les PV restants relevés sur les
+     * `Attack` de la timeline — les seuls événements qui en portent — ne remontent jamais,
+     * y compris entrecoupés d'esquives.
+     */
+    public function testADodgedTurnRemovesNoHitPointAndHpNeverIncreases(): void
+    {
+        $simulator = self::simulatorOf(maxTurns: 30);
+        $player = self::fighterOf(hp: 500, damage: 20, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 500);
+        $enemy = self::fighterOf(hp: 500, damage: 20, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 500);
+
+        $outcome = $simulator->fight($player, $enemy, self::randomizer());
+
+        $dodges = array_values(array_filter($outcome->timeline, static fn (BattleEvent $event): bool => $event instanceof Dodge));
+        self::assertNotSame([], $dodges, 'Le scénario doit produire au moins une esquive pour être un test utile.');
+
+        $playerHpTrail = [];
+        $enemyHpTrail = [];
+
+        foreach ($outcome->timeline as $event) {
+            if (!$event instanceof Attack) {
+                continue;
+            }
+
+            if (Actor::Player === $event->attacker) {
+                $enemyHpTrail[] = $event->targetHpRemaining;
+            } else {
+                $playerHpTrail[] = $event->targetHpRemaining;
+            }
+        }
+
+        self::assertSame($enemyHpTrail, self::sortedDescending($enemyHpTrail));
+        self::assertSame($playerHpTrail, self::sortedDescending($playerHpTrail));
     }
 
     public function testAttackReportsTheAmountAbsorbedByMitigation(): void
@@ -339,9 +445,9 @@ final class BattleSimulatorTest extends TestCase
         return new Randomizer(new Xoshiro256StarStar(hash('sha256', $seed, true)));
     }
 
-    private static function fighterOf(int $hp, int $damage, int $mitigationPermille, int $extraTurnPermille): Fighter
+    private static function fighterOf(int $hp, int $damage, int $mitigationPermille, int $extraTurnPermille, int $dodgePermille = 0): Fighter
     {
-        return new Fighter($hp, $damage, $mitigationPermille, $extraTurnPermille);
+        return new Fighter($hp, $damage, $mitigationPermille, $extraTurnPermille, $dodgePermille);
     }
 
     private static function simulatorOf(int $minimumDamage = 1, int $maxTurns = 200): BattleSimulator
@@ -355,6 +461,8 @@ final class BattleSimulatorTest extends TestCase
             mitigationCapPermille: 700,
             extraTurnPermillePer1000Dexterity: 12,
             extraTurnCapPermille: 350,
+            dodgePermillePer1000Mobility: 10,
+            dodgeCapPermille: 300,
             minimumDamage: $minimumDamage,
             maxTurns: $maxTurns,
         ));

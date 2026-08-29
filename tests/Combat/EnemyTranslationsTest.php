@@ -49,7 +49,7 @@ final class EnemyTranslationsTest extends KernelTestCase
         $enemies = self::getContainer()->getParameter('game.combat.enemies');
         self::assertIsArray($enemies);
 
-        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int}> $enemies */
+        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */
         return new EnemyCatalog($enemies);
     }
 }
