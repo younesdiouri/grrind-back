@@ -241,6 +241,10 @@ when@dev:
                                     # l'*existence* d'une ressource ; ici elle est visible et c'est
                                     # l'action qui est refusée.
                                     - https://grrind.app/problems/risala-turn-is-not-yours
+                                    # Combat (#212). Un combat inconnu ou qui n'a pas été mené par
+                                    # l'appelant — même raisonnement que `player-not-found` : jamais
+                                    # de 403, les UUID v7 se devinent par plage temporelle.
+                                    - https://grrind.app/problems/battle-not-found
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }
@@ -1219,6 +1223,104 @@ when@dev:
                                 type: array
                                 items: { $ref: '#/components/schemas/XpTransaction' }
                             nextCursor: { type: string, nullable: true }
+
+                    # ————— Combat ——————————————————————————————————————————————————————
+                    BattleFighter:
+                        type: object
+                        description: |
+                            Un combattant tel qu'affiché. **`mitigationPercent` et `extraTurnPercent` sont
+                            résolus côté serveur**, jamais deux taux que le client recomposerait — même règle
+                            que `bonusPercent` sur une Risāla. Le domaine porte des millièmes ; ce sont des
+                            pourcentages entiers, tronqués.
+                        required: [hp, damage, mitigationPercent, extraTurnPercent]
+                        properties:
+                            hp: { type: integer, example: 240 }
+                            damage: { type: integer, example: 31 }
+                            mitigationPercent: { type: integer, example: 18, description: "Réduction du dégât reçu." }
+                            extraTurnPercent: { type: integer, example: 12, description: "Chance de rejouer un tour immédiatement." }
+
+                    BattleEnemy:
+                        type: object
+                        description: |
+                            L'adversaire : les mêmes champs qu'un `BattleFighter`, plus son identité.
+
+                            **Le nom arrive traduit**, comme les titres : le client n'a pas de table de
+                            correspondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du
+                            catalogue (`combat.yaml`), pas une donnée d'affichage.
+                        required: [key, name, hp, damage, mitigationPercent, extraTurnPercent]
+                        properties:
+                            key: { type: string, example: SAND_JACKAL }
+                            name:
+                                type: string
+                                example: Chacal des sables
+                                description: "Déjà traduit, dans la langue négociée sur `Accept-Language`."
+                            hp: { type: integer, example: 180 }
+                            damage: { type: integer, example: 22 }
+                            mitigationPercent: { type: integer, example: 10 }
+                            extraTurnPercent: { type: integer, example: 5 }
+
+                    BattleEvent:
+                        type: object
+                        description: |
+                            Un instant de la timeline. **Seul l'ordre des éléments de la liste compte** — voir
+                            la description de `Battle.events` — un événement isolé n'a pas de position propre.
+
+                            Quatre formes, distinguées par `type` ; seuls les champs de la forme concernée
+                            sont présents, les autres sont **absents**, jamais `null` :
+                              - `BATTLE_STARTED` : `playerHp`, `enemyHp` — l'état de départ, avant le premier coup.
+                              - `ATTACK` : `attacker`, `damage`, `mitigated`, `targetHpRemaining` — un coup porté,
+                                la part absorbée par la mitigation, et ce qu'il reste à la cible.
+                              - `EXTRA_TURN` : `actor` — qui rejoue un tour immédiatement.
+                              - `BATTLE_FINISHED` : `result` — toujours le dernier événement de la timeline.
+                        required: [type]
+                        properties:
+                            type:
+                                type: string
+                                enum: [BATTLE_STARTED, ATTACK, EXTRA_TURN, BATTLE_FINISHED]
+                            playerHp: { type: integer, description: "`BATTLE_STARTED` seulement." }
+                            enemyHp: { type: integer, description: "`BATTLE_STARTED` seulement." }
+                            attacker: { type: string, enum: [PLAYER, ENEMY], description: "`ATTACK` seulement." }
+                            damage: { type: integer, description: "`ATTACK` seulement." }
+                            mitigated: { type: integer, description: "`ATTACK` seulement : la part du dégât brut absorbée par la mitigation." }
+                            targetHpRemaining: { type: integer, description: "`ATTACK` seulement." }
+                            actor: { type: string, enum: [PLAYER, ENEMY], description: "`EXTRA_TURN` seulement." }
+                            result: { type: string, enum: [VICTORY, DEFEAT], description: "`BATTLE_FINISHED` seulement." }
+
+                    Battle:
+                        type: object
+                        description: |
+                            Un combat PvE joué et jugé — ce que rendent `POST /api/battles` et
+                            `GET /api/battles/{id}`, à l'identique.
+
+                            **L'ordre des champs est l'ordre de l'animation**, et c'est un contrat, pas une
+                            convention d'écriture — même règle que `RewardSummary`.
+
+                            **`rewards` est présent et vide dès maintenant.** Aucune récompense en V1, mais
+                            il y en aura une : la déclarer plus tard obligerait un client déjà déployé à la
+                            traiter comme facultative pour toujours — même argument que `loot`, `streak` et
+                            `unlockableNodes` sur le `RewardSummary`.
+                        required: [id, result, turns, foughtAt, player, enemy, events, rewards]
+                        properties:
+                            id: { type: string, format: uuid }
+                            result:
+                                type: string
+                                enum: [VICTORY, DEFEAT]
+                                description: "Toujours renseigné, du point de vue du joueur : un combat se termine toujours avec un vainqueur."
+                            turns: { type: integer, example: 7 }
+                            foughtAt:
+                                type: string
+                                format: date-time
+                                description: "L'instant de la requête : contrairement à un workout, un combat n'a aucune antériorité au serveur."
+                            player: { $ref: '#/components/schemas/BattleFighter' }
+                            enemy: { $ref: '#/components/schemas/BattleEnemy' }
+                            events:
+                                type: array
+                                description: "La timeline complète, dans l'ordre de l'animation."
+                                items: { $ref: '#/components/schemas/BattleEvent' }
+                            rewards:
+                                type: array
+                                description: 'Lot 6 : toujours vide aujourd''hui — voir la description de la classe.'
+                                items: { type: object }
 
             # Par défaut tout est authentifié : c'est l'état d'`^/api`, et l'oubli
             # dangereux est dans l'autre sens. Les routes publiques le disent une par une.
