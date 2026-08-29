@@ -12,7 +12,6 @@ use App\Combat\Domain\BattleOutcome;
 use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleStarted;
 use App\Combat\Domain\Enemy;
-use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Domain\ExtraTurn;
 use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
@@ -28,9 +27,9 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * casser du module — même règle que {@see \App\Tests\Training\RewardSummaryPayloadTest}.
  *
  * Sans HTTP et sans base : {@see Battle::conclude()} (#211) est déjà pur, et
- * {@see EnemyCatalog} ne dépend d'aucun conteneur. Seul {@see EnemyTranslator} a besoin d'un
- * `TranslatorInterface` — un stub minimal suffit ici ; la vraie traduction se prouve dans
- * {@see \App\Tests\Combat\EnemyTranslationsTest}.
+ * {@see BattleResource::from()} ne consulte plus `EnemyCatalog` — voir son docblock. Seul
+ * {@see EnemyTranslator} a besoin d'un `TranslatorInterface` — un stub minimal suffit ici ;
+ * la vraie traduction se prouve dans {@see \App\Tests\Combat\EnemyTranslationsTest}.
  */
 final class BattleResourcePayloadTest extends TestCase
 {
@@ -93,15 +92,40 @@ final class BattleResourcePayloadTest extends TestCase
         self::assertSame('Chacal des sables', $enemy['name']);
     }
 
+    /**
+     * Le pire cas d'une clé absente du catalogue de traduction (ennemi retiré ou renommé de
+     * `combat.yaml` après que le combat a été joué) est un nom qui s'affiche comme sa clé —
+     * dégradé et lisible — jamais une exception : la ressource ne consulte pas `EnemyCatalog`,
+     * voir son docblock.
+     */
+    public function testAnEnemyMissingFromTheCatalogueDegradesInsteadOfCrashing(): void
+    {
+        $battle = self::battleAgainst('GHOST_ENEMY');
+
+        $payload = BattleResource::from($battle, new EnemyTranslator(self::stubTranslator()))->toArray();
+
+        $enemy = $payload['enemy'];
+        self::assertIsArray($enemy);
+        self::assertSame('GHOST_ENEMY', $enemy['key']);
+        // Le stub ne connaît que `sand_jackal.name` : toute autre clé revient inchangée,
+        // exactement comme le ferait le repli du vrai traducteur Symfony.
+        self::assertSame('ghost_enemy.name', $enemy['name']);
+    }
+
     private static function resource(): BattleResource
     {
-        $battle = Battle::conclude(
+        return BattleResource::from(self::battleAgainst('SAND_JACKAL'), new EnemyTranslator(self::stubTranslator()));
+    }
+
+    private static function battleAgainst(string $enemyKey): Battle
+    {
+        return Battle::conclude(
             Uuid::v7(),
             new AttributeGains(10, 20, 30, 40),
             500,
             // 105 ‰ et 55 ‰ : voir testThePermilleFieldsAreConvertedToTruncatedPercentages.
             new Fighter(150, 12, 105, 55),
-            new Enemy('SAND_JACKAL', 1, 120, 10, 50, 40),
+            new Enemy($enemyKey, 1, 120, 10, 50, 40),
             new Fighter(120, 10, 50, 40),
             new BattleOutcome(
                 BattleResult::Victory,
@@ -117,12 +141,6 @@ final class BattleResourcePayloadTest extends TestCase
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
         );
-
-        $enemies = new EnemyCatalog([
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 10, 'mitigation_permille' => 50, 'extra_turn_permille' => 40],
-        ]);
-
-        return BattleResource::from($battle, $enemies, new EnemyTranslator(self::stubTranslator()));
     }
 
     private static function stubTranslator(): TranslatorInterface

@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Combat\Infrastructure\Translation;
 
-use App\Combat\Domain\Enemy;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Met un nom sur un ennemi — même geste que
  * {@see \App\Progression\Infrastructure\Translation\TitleTranslator} pour les titres.
+ *
+ * **Traduit depuis la clé, jamais depuis un `Enemy` du catalogue.** Elle n'a jamais eu
+ * besoin de plus que `$enemy->key` ; prendre un `Enemy` en argument forçait quiconque
+ * rend un combat déjà joué à retrouver l'ennemi dans `EnemyCatalog::find()` pour en
+ * extraire cette seule chaîne — un aller-retour inutile qui rendait, en plus, le rendu
+ * d'un vieux combat dépendant de l'état *courant* du catalogue. Voir le docblock de
+ * `BattleResource` pour ce que ça a coûté.
  *
  * **Le seul endroit qui connaît les clés de traduction.** Elles se déduisent de la clé de
  * l'ennemi — `sand_jackal.name` — donc ajouter un ennemi ne demande rien ici : le YAML
@@ -29,8 +35,13 @@ final readonly class EnemyTranslator
     {
     }
 
-    public function nameOf(Enemy $enemy): string
+    /**
+     * @param string $key la clé du catalogue (`Enemy::$key`) — pas nécessairement encore
+     *                    présente dans `EnemyCatalog` : un combat déjà joué la porte dans
+     *                    son snapshot indépendamment du catalogue courant
+     */
+    public function nameOf(string $key): string
     {
-        return $this->translator->trans(strtolower($enemy->key).'.name', domain: self::DOMAIN);
+        return $this->translator->trans(strtolower($key).'.name', domain: self::DOMAIN);
     }
 }

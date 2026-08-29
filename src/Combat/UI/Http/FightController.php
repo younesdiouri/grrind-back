@@ -6,7 +6,6 @@ namespace App\Combat\UI\Http;
 
 use App\Combat\Application\FightBattle;
 use App\Combat\Application\FightBattleHandler;
-use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Response\BattleResource;
 use App\Shared\UI\Http\Idempotent;
@@ -37,7 +36,6 @@ final readonly class FightController
 {
     public function __construct(
         private FightBattleHandler $fight,
-        private EnemyCatalog $enemies,
         private EnemyTranslator $enemyNames,
     ) {
     }
@@ -61,7 +59,7 @@ final readonly class FightController
         $battle = ($this->fight)(new FightBattle(Uuid::fromString($user->getUserIdentifier())));
 
         return new JsonResponse(
-            BattleResource::from($battle, $this->enemies, $this->enemyNames)->toArray(),
+            BattleResource::from($battle, $this->enemyNames)->toArray(),
             Response::HTTP_CREATED,
         );
     }

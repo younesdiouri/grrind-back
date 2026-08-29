@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Combat\UI\Http\Response;
 
 use App\Combat\Domain\Battle;
-use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use DateTimeInterface;
 
@@ -22,11 +21,18 @@ use DateTimeInterface;
  * pour toujours ; même argument que `loot`, `streak` et `unlockableNodes` sur le
  * `RewardSummary`.
  *
- * **Le nom de l'ennemi arrive traduit.** Il se résout depuis {@see EnemyCatalog}, pas depuis
- * le snapshot persisté : celui-ci ne porte que la clé — voir le docblock de `Battle` pour
- * pourquoi les stats d'un ennemi ne sont pas re-dérivées à la lecture. Le catalogue est
- * additif (voir son docblock) : une clé déjà jouée y reste, donc `find()` ne rend jamais
- * `null` pour un combat réellement écrit par {@see \App\Combat\Application\FightBattleHandler}.
+ * **Le nom de l'ennemi se traduit depuis la clé du snapshot, jamais depuis
+ * `EnemyCatalog`.** Un combat déjà joué est un fait écrit : sa lecture ne doit rien à l'état
+ * *courant* d'un fichier de config-as-code qui, lui, continue de bouger — même raison que le
+ * snapshot lui-même ne re-dérive pas les stats de l'ennemi au moment de la lecture (voir le
+ * docblock de `Battle`). Consulter le catalogue ici forçait, en plus, un cas d'erreur qui
+ * n'existait nulle part ailleurs dans le module : retirer ou renommer une entrée de
+ * `combat.yaml` — un geste que ce fichier annonce lui-même comme normal — rendait alors
+ * illisible tout combat déjà joué contre cet ennemi. Le pire cas est désormais un nom qui
+ * s'affiche comme sa clé de traduction si l'entrée disparaît aussi de
+ * `translations/enemies.*.yaml` — dégradé et lisible, jamais un 500. Même principe que
+ * `RisalaResource`, qui rend `senderDisplayName` à `null` plutôt que de faire dépendre un
+ * défi déjà envoyé de la présence actuelle de son expéditeur dans la guilde.
  */
 final readonly class BattleResource
 {
@@ -36,13 +42,9 @@ final readonly class BattleResource
     ) {
     }
 
-    public static function from(Battle $battle, EnemyCatalog $enemies, EnemyTranslator $translator): self
+    public static function from(Battle $battle, EnemyTranslator $translator): self
     {
-        $key = $battle->enemySnapshot()['key'];
-        $enemy = $enemies->find($key);
-        \assert(null !== $enemy, \sprintf('L\'ennemi "%s" a disparu du catalogue.', $key));
-
-        return new self($battle, $translator->nameOf($enemy));
+        return new self($battle, $translator->nameOf($battle->enemySnapshot()['key']));
     }
 
     /**

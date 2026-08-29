@@ -4,9 +4,19 @@ declare(strict_types=1);
 
 namespace App\Tests\Combat;
 
+use App\Combat\Domain\Battle;
+use App\Combat\Domain\BattleFinished;
+use App\Combat\Domain\BattleOutcome;
+use App\Combat\Domain\BattleResult;
+use App\Combat\Domain\BattleStarted;
+use App\Combat\Domain\Enemy;
+use App\Combat\Domain\Fighter;
+use App\Combat\Infrastructure\Doctrine\BattleRepository;
+use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
@@ -156,6 +166,52 @@ final class BattlesTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_NOT_FOUND, $malformed->getStatusCode());
         self::assertSame(self::decode($unknown), self::decode($malformed));
+    }
+
+    /**
+     * Le catalogue est du config-as-code, fait pour être édité — `combat.yaml` annonce
+     * lui-même que des paliers s'ajouteront. Un combat déjà joué est un fait écrit : sa
+     * lecture ne doit rien à l'état *courant* du catalogue, voir le docblock de
+     * `BattleResource`. Retirer ou renommer une entrée ne doit donc jamais faire tomber
+     * cette route.
+     */
+    public function testABattleAgainstAnEnemyNoLongerInTheCatalogueStillRenders200(): void
+    {
+        $bob = $this->openAccount();
+
+        $repository = self::getContainer()->get(BattleRepository::class);
+        self::assertInstanceOf(BattleRepository::class, $repository);
+
+        $battle = Battle::conclude(
+            $bob->id,
+            new AttributeGains(0, 0, 0, 0),
+            0,
+            new Fighter(140, 16, 0, 0),
+            new Enemy('GHOST_ENEMY', 1, 120, 12, 50, 40),
+            new Fighter(120, 12, 50, 40),
+            new BattleOutcome(
+                BattleResult::Victory,
+                [new BattleStarted(140, 120), new BattleFinished(BattleResult::Victory)],
+                1,
+            ),
+            random_bytes(32),
+            'v1-000000000000',
+            new DateTimeImmutable(),
+        );
+
+        $repository->add($battle);
+        $repository->commit();
+
+        $response = $this->get('/api/battles/'.$battle->id()->toRfc4122(), $bob->headers);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+
+        $enemy = self::decode($response)['enemy'];
+        self::assertIsArray($enemy);
+        self::assertSame('GHOST_ENEMY', $enemy['key']);
+        // Dégradé et lisible plutôt qu'un écran mort : le vrai traducteur Symfony rend l'id
+        // tel quel quand la clé manque à translations/enemies.*.yaml.
+        self::assertSame('ghost_enemy.name', $enemy['name']);
     }
 
     public function testShowingABattleRefusesAnAnonymousCaller(): void
