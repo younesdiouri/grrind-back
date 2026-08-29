@@ -1,0 +1,11 @@
+# Les noms des ennemis PvE. Une entrée `<clé>.name` par ennemi de `config/game/v1/combat.yaml`
+# — la clé en minuscules, comme `EnemyTranslator` la cherche. Un test de couverture refuse un
+# catalogue incomplet, sinon le repli du traducteur enverrait `sand_jackal.name` au joueur, en
+# silence.
+
+sand_jackal.name: Chacal des sables
+dune_raider.name: Pillard des dunes
+iron_jackal.name: Chacal de fer
+storm_hyena.name: Hyène des tempêtes
+obsidian_wolf.name: Loup d'obsidienne
+ash_titan.name: Titan de cendres

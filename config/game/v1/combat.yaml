@@ -1,0 +1,62 @@
+# Le combat PvE : les socles d'un combattant, et le catalogue des ennemis. Ce fichier est de
+# la donnée, pas de la configuration Symfony : il est lu et validé à la compilation du
+# conteneur par App\Combat\Infrastructure\Config\CombatSection, et il entre dans le
+# `rulesetVersion`. Une clé inconnue fait échouer le démarrage.
+#
+# La dérivation caractéristique → combattant n'est pas encore appliquée ici (#210), et le
+# combat lui-même n'existe pas encore (#209) : ce fichier ne fait que poser les nombres.
+
+# ————— Le combattant ————————————————————————————————————————————————————————————————————
+#
+# Une dérivation **linéaire** des quatre caractéristiques, assumée en V1 : elles sont des
+# totaux d'XP répartis, donc sans borne, et une dérivation linéaire donne des dégâts qui
+# croissent sans borne eux aussi. C'est acceptable *uniquement* parce que l'ennemi opposé
+# est choisi au niveau du joueur — voir `EnemyCatalog`. Le jour où un combat opposera deux
+# courbes qui ne montent pas au même rythme (PvP, ennemi de palier fixe), il faudra une
+# vraie courbe, sur le modèle de `LevelCurve` — ce sera un ticket, pas une rustine ici.
+fighter:
+  # Un socle de PV avant tout apport de Vitality : un joueur qui n'a encore rien réparti
+  # ailleurs qu'en Strength ne doit pas se retrouver à un point de vie.
+  base_hp: 100
+  hp_per_1000_vitality: 40
+
+  base_damage: 10
+  damage_per_1000_strength: 6
+
+  # La mitigation réduit le dégât reçu, en millièmes du dégât brut. Le plafond doit rester
+  # *strictement* sous 1000 (100 %) — `CombatRules` le refuse, voir son docblock : à 1000,
+  # un combattant devient invulnérable et la boucle ne se termine plus sur ses propres
+  # mérites.
+  mitigation_permille_per_1000_endurance: 15
+  mitigation_cap_permille: 700
+
+  # La chance, en millièmes, de rejouer un tour immédiatement. Même garde-fou que la
+  # mitigation : à 1000 (100 %), le joueur ne rendrait jamais la main.
+  extra_turn_permille_per_1000_dexterity: 12
+  extra_turn_cap_permille: 350
+
+  # Le plancher qui garantit qu'un tour fait toujours reculer un point de vie, quelle que
+  # soit la mitigation en face — `CombatRules` refuse une valeur sous 1.
+  minimum_damage: 1
+
+  # Le filet de sécurité algorithmique, indépendant des deux plafonds ci-dessus : même une
+  # dérivation cohérente doit avoir une borne dure sur la durée d'un combat, pour que le
+  # #209 puisse le prouver sans compter sur l'équilibrage pour rester sage.
+  max_turns: 200
+
+# ————— Le catalogue d'ennemis ——————————————————————————————————————————————————————————
+#
+# Un ennemi par palier, pas une courbe : ses stats sont écrites en clair, pas dérivées d'une
+# formule — voir le docblock d'`EnemyCatalog`. Les paliers suivent le rythme de la courbe de
+# niveaux (`levels.yaml` : 5 ~ 1 semaine, 10 ~ 1 mois, 20 ~ 4 mois, 30 ~ 9 mois, 50 ~ 2 ans),
+# pour qu'il y ait toujours un adversaire récent à opposer à un joueur qui progresse.
+#
+# Premier jet, à ajuster en jeu : les six premiers ennemis ne couvrent qu'un an et demi de
+# progression, le reste du catalogue s'ajoutera avec les niveaux au-delà de 50.
+enemies:
+  - { key: SAND_JACKAL, level: 1, hp: 120, damage: 12, mitigation_permille: 50, extra_turn_permille: 40 }
+  - { key: DUNE_RAIDER, level: 5, hp: 220, damage: 18, mitigation_permille: 80, extra_turn_permille: 60 }
+  - { key: IRON_JACKAL, level: 10, hp: 380, damage: 26, mitigation_permille: 120, extra_turn_permille: 90 }
+  - { key: STORM_HYENA, level: 20, hp: 640, damage: 40, mitigation_permille: 180, extra_turn_permille: 130 }
+  - { key: OBSIDIAN_WOLF, level: 30, hp: 950, damage: 58, mitigation_permille: 240, extra_turn_permille: 170 }
+  - { key: ASH_TITAN, level: 50, hp: 1600, damage: 90, mitigation_permille: 320, extra_turn_permille: 220 }

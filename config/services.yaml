@@ -125,6 +125,28 @@ services:
         arguments:
             $titles: '%game.titles.titles%'
 
+    # Les socles d'un combattant (#208), tirés de `game/v1/combat.yaml`. Même raison que
+    # `WorkoutRules` : le domaine reçoit un objet validé, pas dix entiers venus tel quels
+    # du YAML. La dérivation caractéristique → combattant elle-même arrive au #210.
+    App\Combat\Domain\CombatRules:
+        arguments:
+            $baseHp: '%game.combat.fighter.base_hp%'
+            $hpPer1000Vitality: '%game.combat.fighter.hp_per_1000_vitality%'
+            $baseDamage: '%game.combat.fighter.base_damage%'
+            $damagePer1000Strength: '%game.combat.fighter.damage_per_1000_strength%'
+            $mitigationPermillePer1000Endurance: '%game.combat.fighter.mitigation_permille_per_1000_endurance%'
+            $mitigationCapPermille: '%game.combat.fighter.mitigation_cap_permille%'
+            $extraTurnPermillePer1000Dexterity: '%game.combat.fighter.extra_turn_permille_per_1000_dexterity%'
+            $extraTurnCapPermille: '%game.combat.fighter.extra_turn_cap_permille%'
+            $minimumDamage: '%game.combat.fighter.minimum_damage%'
+            $maxTurns: '%game.combat.fighter.max_turns%'
+
+    # Le catalogue d'ennemis (#208), d'un bloc pour la même raison que le barème de titres :
+    # c'est une liste, et son ordre de déclaration doit survivre au conteneur compilé.
+    App\Combat\Domain\EnemyCatalog:
+        arguments:
+            $enemies: '%game.combat.enemies%'
+
     App\Progression\Domain\DiminishingReturns:
         arguments:
             $brackets: '%game.xp.diminishing_returns%'

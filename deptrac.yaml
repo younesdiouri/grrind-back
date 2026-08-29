@@ -41,6 +41,11 @@ deptrac:
         - type: directory
           value: src/Community/.*
 
+    - name: Combat
+      collectors:
+        - type: directory
+          value: src/Combat/.*
+
   ruleset:
     # Shared ne dépend d'aucun module métier : c'est ce qui le garde partageable.
     Shared: ~
@@ -57,4 +62,8 @@ deptrac:
     # La guilde réunit des joueurs sans rien savoir d'eux : ni `Identity` ni `Progression`
     # n'apparaissent ici. Ce qu'elle affiche d'un membre arrive par les ports de `Shared`.
     Community:
+      - Shared
+    # Le combat PvE oppose un joueur à un ennemi du catalogue de config-as-code : aucun
+    # module métier n'a encore à y contribuer.
+    Combat:
       - Shared
