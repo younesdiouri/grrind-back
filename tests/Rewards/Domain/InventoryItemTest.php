@@ -32,20 +32,20 @@ final class InventoryItemTest extends TestCase
 
     /**
      * `$quantity` ne redescend jamais dans ce ticket (#29) : la seule mutation possible est
-     * additive, et elle glisse la provenance vers le tirage le plus récent — voir le docblock
-     * de la classe.
+     * additive, et elle ne touche pas à la provenance — voir le docblock de la classe pour
+     * pourquoi la date d'obtention reste celle de la toute première acquisition.
      */
-    public function testGrantOneMoreIncrementsAndTracksTheMostRecentRoll(): void
+    public function testGrantOneMoreIncrementsWithoutTouchingTheProvenance(): void
     {
-        $item = InventoryItem::firstGrant(Uuid::v7(), 'WORN_RUNNING_SHOES', Uuid::v7(), new DateTimeImmutable('2026-08-01T08:00:00+00:00'));
+        $firstRollId = Uuid::v7();
+        $firstObtainedAt = new DateTimeImmutable('2026-08-01T08:00:00+00:00');
+        $item = InventoryItem::firstGrant(Uuid::v7(), 'WORN_RUNNING_SHOES', $firstRollId, $firstObtainedAt);
 
-        $secondRollId = Uuid::v7();
-        $secondObtainedAt = new DateTimeImmutable('2026-08-15T08:00:00+00:00');
-        $item->grantOneMore($secondRollId, $secondObtainedAt);
+        $item->grantOneMore();
 
         self::assertSame(2, $item->quantity());
-        self::assertTrue($secondRollId->equals($item->lootRollId()));
-        self::assertEquals($secondObtainedAt, $item->obtainedAt());
+        self::assertTrue($firstRollId->equals($item->lootRollId()));
+        self::assertEquals($firstObtainedAt, $item->obtainedAt());
     }
 
     public function testEquipIntoSetsTheSlot(): void

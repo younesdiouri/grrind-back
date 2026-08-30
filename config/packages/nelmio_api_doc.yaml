@@ -262,11 +262,12 @@ when@dev:
                                     # ticket — aucune n'existe encore, voir #30 — mais listés dès maintenant,
                                     # même geste qu'`insufficient-coin-balance` ci-dessus : ce sont les
                                     # types que la future route émettra sur ses trois refus, pas une
-                                    # nouveauté à introduire à ce moment-là.
+                                    # nouveauté à introduire à ce moment-là. Un emplacement déjà occupé par
+                                    # un autre objet n'en fait pas partie : `PUT /api/inventory/equipment/{slot}`
+                                    # échange plutôt que de refuser, voir le docblock d'`InventoryItemRepository::equip()`.
                                     - https://grrind.app/problems/item-not-owned
                                     - https://grrind.app/problems/equipment-slot-unknown
                                     - https://grrind.app/problems/equipment-slot-incompatible
-                                    - https://grrind.app/problems/equipment-slot-occupied
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }

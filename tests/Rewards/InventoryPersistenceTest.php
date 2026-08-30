@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Rewards;
 
 use App\Rewards\Domain\EquipmentSlot;
-use App\Rewards\Domain\Exception\EquipmentSlotOccupied;
 use App\Rewards\Domain\Exception\ItemNotOwned;
 use App\Rewards\Domain\InventoryItem;
 use App\Rewards\Domain\Item;
@@ -53,26 +52,27 @@ final class InventoryPersistenceTest extends ApiTestCase
 
     /**
      * Le cœur de la table : deux tirages du même objet pour le même joueur fusionnent en une
-     * seule ligne — voir le docblock d'`InventoryItem` — la provenance glissant vers le plus
-     * récent.
+     * seule ligne — voir le docblock d'`InventoryItem` — la provenance restant celle de la
+     * **première** acquisition : un objet gagné il y a trois semaines qui retombe aujourd'hui
+     * ne date pas d'aujourd'hui.
      */
-    public function testGrantingTheSameItemTwiceMergesIntoOneRowWithTheLatestProvenance(): void
+    public function testGrantingTheSameItemTwiceMergesIntoOneRowKeepingTheFirstProvenance(): void
     {
         $repository = self::repository();
         $userId = Uuid::v7();
 
-        $repository->grant($userId, 'WORN_RUNNING_SHOES', Uuid::v7(), new DateTimeImmutable('2026-08-01T08:00:00+00:00'));
+        $firstRollId = Uuid::v7();
+        $firstObtainedAt = new DateTimeImmutable('2026-08-01T08:00:00+00:00');
+        $repository->grant($userId, 'WORN_RUNNING_SHOES', $firstRollId, $firstObtainedAt);
 
-        $secondRollId = Uuid::v7();
-        $secondObtainedAt = new DateTimeImmutable('2026-08-15T08:00:00+00:00');
-        $repository->grant($userId, 'WORN_RUNNING_SHOES', $secondRollId, $secondObtainedAt);
+        $repository->grant($userId, 'WORN_RUNNING_SHOES', Uuid::v7(), new DateTimeImmutable('2026-08-15T08:00:00+00:00'));
 
         $stored = $repository->ofPlayerAndItem($userId, 'WORN_RUNNING_SHOES');
 
         self::assertInstanceOf(InventoryItem::class, $stored);
         self::assertSame(2, $stored->quantity());
-        self::assertTrue($secondRollId->equals($stored->lootRollId()));
-        self::assertEquals($secondObtainedAt, $stored->obtainedAt());
+        self::assertTrue($firstRollId->equals($stored->lootRollId()));
+        self::assertEquals($firstObtainedAt, $stored->obtainedAt());
     }
 
     public function testEquippingAnOwnedItemPersistsTheSlot(): void
@@ -102,12 +102,15 @@ final class InventoryPersistenceTest extends ApiTestCase
     }
 
     /**
-     * **Le cœur du ticket, en base.** L'unicité partielle refuse un second objet dans le même
-     * emplacement — c'est elle, pas cette vérification applicative seule, qui protège
-     * l'invariant sous concurrence ; ce test prouve que le chemin applicatif la respecte déjà,
-     * sans jamais laisser la contrainte se déclencher.
+     * **Le cœur du ticket, en base.** `PUT /api/inventory/equipment/{slot}` (#30) dit « fais
+     * que cet emplacement contienne ceci » — `equip()` échange donc l'occupant plutôt que de
+     * refuser, voir le docblock d'`InventoryItemRepository`. L'ancien occupant redevient un
+     * objet du sac : toujours possédé, sa quantité inchangée, simplement plus équipé nulle
+     * part. L'unicité partielle, elle, continue de garantir qu'il n'existe jamais deux objets
+     * dans le même emplacement, y compris pendant l'échange — voir le docblock d'`equip()`
+     * pour l'ordre des deux `flush()`.
      */
-    public function testEquippingIntoAnOccupiedSlotIsRefused(): void
+    public function testEquippingIntoAnOccupiedSlotSwapsTheOccupantOut(): void
     {
         $repository = self::repository();
         $userId = Uuid::v7();
@@ -116,10 +119,16 @@ final class InventoryPersistenceTest extends ApiTestCase
         $repository->equip($userId, self::gauntlets(), EquipmentSlot::Hands);
 
         $repository->grant($userId, 'OTHER_HAND_ITEM', Uuid::v7(), new DateTimeImmutable());
-
-        $this->expectException(EquipmentSlotOccupied::class);
-
         $repository->equip($userId, self::otherHandItem(), EquipmentSlot::Hands);
+
+        $newOccupant = $repository->equippedIn($userId, EquipmentSlot::Hands);
+        self::assertInstanceOf(InventoryItem::class, $newOccupant);
+        self::assertSame('OTHER_HAND_ITEM', $newOccupant->itemKey());
+
+        $formerOccupant = $repository->ofPlayerAndItem($userId, 'IRON_GAUNTLETS');
+        self::assertInstanceOf(InventoryItem::class, $formerOccupant);
+        self::assertNull($formerOccupant->slot(), 'L\'ancien occupant redevient un objet du sac.');
+        self::assertSame(1, $formerOccupant->quantity(), 'Il reste possédé, rien ne quitte l\'inventaire.');
     }
 
     /** Ré-équiper le même objet dans le même emplacement est un no-op, pas un conflit. */

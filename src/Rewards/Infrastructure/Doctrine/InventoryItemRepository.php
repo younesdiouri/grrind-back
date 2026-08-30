@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Rewards\Infrastructure\Doctrine;
 
 use App\Rewards\Domain\EquipmentSlot;
-use App\Rewards\Domain\Exception\EquipmentSlotOccupied;
 use App\Rewards\Domain\Exception\ItemNotOwned;
 use App\Rewards\Domain\InventoryItem;
 use App\Rewards\Domain\Item;
@@ -30,10 +29,20 @@ use Symfony\Component\Uid\Uuid;
  *
  * ## `equip()` et `unequip()` portent toute la règle, pas seulement l'écriture
  *
- * Même choix que {@see CoinTransactionRepository::record()} : la vérification du solde vit
- * dans le repository, sous le même verrou et la même transaction que l'écriture, parce
- * qu'une vérification faite avant le verrou pourrait être périmée au moment d'écrire. Ici,
- * « le solde » c'est « qui d'autre porte déjà cet emplacement ».
+ * Même choix que {@see CoinTransactionRepository::record()} : la vérification de possession
+ * vit dans le repository, sous le même verrou et la même transaction que l'écriture, parce
+ * qu'une vérification faite avant le verrou pourrait être périmée au moment d'écrire.
+ *
+ * ## `equip()` échange, il ne refuse jamais un emplacement occupé
+ *
+ * `PUT /api/inventory/equipment/{slot}` (#30) dit « fais que cet emplacement contienne ceci » —
+ * la sémantique d'un `PUT` est de remplacer, pas de constater un conflit. Un joueur qui
+ * possède deux paires de bottes et en porte déjà une n'a pas à faire un `DELETE` puis un
+ * `PUT` : deux requêtes, une fenêtre où il ne porte rien, et un état intermédiaire à rattraper
+ * si la seconde échoue. `equip()` sort donc l'occupant de l'emplacement avant d'y poser le
+ * nouvel objet, dans la même transaction, sous le même verrou. **Ce n'est pas une perte** :
+ * l'occupant retourne dans le sac ({@see InventoryItem::unequip()}), il ne quitte
+ * l'inventaire à aucun moment — voir {@see equip()} pour pourquoi deux `flush()` distincts.
  *
  * @extends ServiceEntityRepository<InventoryItem>
  */
@@ -57,7 +66,7 @@ class InventoryItemRepository extends ServiceEntityRepository
             $owned = $this->ofPlayerAndItem($userId, $itemKey);
 
             if (null !== $owned) {
-                $owned->grantOneMore($lootRollId, $obtainedAt);
+                $owned->grantOneMore();
                 $this->getEntityManager()->flush();
 
                 return $owned;
@@ -77,9 +86,19 @@ class InventoryItemRepository extends ServiceEntityRepository
      * vérification pure, qui n'a besoin d'aucun verrou puisqu'elle ne regarde que le
      * catalogue, jamais l'inventaire.
      *
-     * @throws ItemNotOwned          aucune ligne pour `$item`, ou une quantité nulle
-     * @throws EquipmentSlotOccupied un **autre** objet porte déjà `$slot` — voir le docblock
-     *                               de l'exception pour pourquoi aucun échange n'est tenté
+     * **Échange plutôt que refus** — voir le docblock de la classe pour pourquoi. Si un
+     * *autre* objet occupe déjà `$slot`, il en est retiré (il redevient un objet du sac,
+     * toujours possédé) avant que `$item` y entre. Le retrait se flush séparément, **avant**
+     * la pose du nouvel objet : l'index unique partiel `(user_id, slot) WHERE slot IS NOT
+     * NULL` n'est pas différable, Postgres le vérifie à la fin de chaque instruction — flush
+     * les deux mutations ensemble risquerait que l'`UPDATE` qui pose le nouvel objet
+     * s'exécute avant celui qui libère l'ancien, et percute la contrainte pour un état qui
+     * n'aurait pourtant duré qu'un instant.
+     *
+     * `$occupant === $owned` (le même objet déjà dans ce même emplacement) est un
+     * ré-équipement idempotent : rien à échanger, `equipInto()` repose la même valeur.
+     *
+     * @throws ItemNotOwned aucune ligne pour `$item`, ou une quantité nulle
      */
     public function equip(Uuid $userId, Item $item, EquipmentSlot $slot): InventoryItem
     {
@@ -94,10 +113,11 @@ class InventoryItemRepository extends ServiceEntityRepository
 
             $occupant = $this->equippedIn($userId, $slot);
 
-            // `$occupant === $owned` (la même ligne) est un ré-équipement idempotent, pas un
-            // conflit — voir le docblock d'`InventoryItem::unequip()`.
             if (null !== $occupant && $occupant->itemKey() !== $item->key) {
-                throw new EquipmentSlotOccupied($item->key, $occupant->itemKey(), $slot);
+                $occupant->unequip();
+                // Flush isolé : voir le docblock de la méthode pour pourquoi cet ordre n'est
+                // pas négociable face à un index unique non différable.
+                $this->getEntityManager()->flush();
             }
 
             $owned->equipInto($slot);

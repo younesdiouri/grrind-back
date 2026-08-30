@@ -26,9 +26,9 @@ use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
  * 3. la compatibilité — `$item->slot` est l'unique emplacement où le catalogue autorise cet
  *    objet, voir {@see \App\Rewards\Domain\Item} — se vérifie ensuite, **avant** le verrou :
  *    c'est une lecture pure du catalogue, elle n'a besoin d'aucune transaction ;
- * 4. la possession et l'occupation de l'emplacement, les deux seules vérifications qui
- *    dépendent d'un état mutable, se font **sous verrou** dans
- *    {@see InventoryItemRepository::equip()} — voir son docblock.
+ * 4. la possession, la seule vérification qui dépend d'un état mutable, se fait **sous
+ *    verrou** dans {@see InventoryItemRepository::equip()} — qui échange plutôt que de
+ *    refuser un emplacement déjà occupé par un autre objet, voir son docblock.
  */
 final readonly class EquipItemHandler
 {

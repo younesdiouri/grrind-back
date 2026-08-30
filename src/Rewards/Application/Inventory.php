@@ -33,6 +33,10 @@ final readonly class Inventory
      * `$obtainedAt` est la date **du fait qui a produit le tirage** — celle du sport pour un
      * drop de séance, l'instant du combat pour un drop de combat — jamais celle de l'appel,
      * même règle que partout ailleurs sur ce module.
+     *
+     * Si le joueur possède déjà `$itemKey`, `$lootRollId` et `$obtainedAt` n'écrasent rien :
+     * voir le docblock d'{@see InventoryItem} pour pourquoi la provenance
+     * reste celle de la toute première acquisition.
      */
     public function grant(Uuid $userId, string $itemKey, Uuid $lootRollId, DateTimeImmutable $obtainedAt): InventoryItem
     {

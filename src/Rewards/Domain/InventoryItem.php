@@ -40,11 +40,14 @@ use Symfony\Component\Uid\Uuid;
  * d'audit plutôt que de recopier `origin`/`causeId` : consulter l'historique complet d'un
  * exemplaire, c'est relire ce tirage-là.
  *
- * Une ligne peut recevoir plusieurs tirages du même objet au fil du temps —
- * {@see grantOneMore()} augmente `$quantity` sans en garder l'historique complet ; `$lootRollId`
- * et `$obtainedAt` glissent alors vers le tirage **le plus récent**. Ce n'est pas une perte
- * d'information : chaque tirage individuel reste entier dans sa propre ligne `LootRoll`,
- * cette classe ne fait que dire lequel a produit le dernier exemplaire.
+ * **`$lootRollId` et `$obtainedAt` figent la *première* acquisition, jamais la dernière.**
+ * Une ligne peut recevoir plusieurs tirages du même objet au fil du temps — {@see
+ * grantOneMore()} augmente `$quantity` sans y toucher. « Date d'obtention », pour un joueur,
+ * veut dire la première fois qu'il a eu l'objet : un objet gagné il y a trois mois qui
+ * retombe aujourd'hui ne date pas d'aujourd'hui, et écraser la provenance à chaque doublon
+ * ferait perdre cette réponse sans qu'aucune autre ligne ne la garde. Ce n'est pas une perte
+ * d'information pour autant : l'historique complet de chaque tirage individuel, y compris
+ * ceux qui n'ont fait qu'incrémenter cette ligne, reste entier dans sa propre `LootRoll`.
  *
  * ## Pas de clé étrangère
  *
@@ -93,11 +96,11 @@ class InventoryItem
     #[ORM\Column(length: 16, nullable: true, enumType: EquipmentSlot::class)]
     private ?EquipmentSlot $slot = null;
 
-    /** Le tirage le plus récent à avoir produit un exemplaire — voir le docblock de la classe. */
+    /** Le tirage qui a produit le tout premier exemplaire — voir le docblock de la classe. */
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $lootRollId;
 
-    /** La date du tirage le plus récent, jamais celle de l'écriture — même geste que partout ailleurs. */
+    /** La date de la première acquisition, jamais celle de l'écriture — même geste que partout ailleurs. */
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $obtainedAt;
 
@@ -121,12 +124,14 @@ class InventoryItem
      * Un tirage supplémentaire du même objet, pour ce même joueur. Toujours `+1` : un tirage
      * ne rend jamais plus d'un exemplaire du même objet à la fois, voir le docblock de
      * {@see LootRollOutcome}.
+     *
+     * Ne touche ni `$lootRollId` ni `$obtainedAt` — voir le docblock de la classe : la
+     * provenance reste celle de la première acquisition, jamais celle du doublon qui vient
+     * d'arriver.
      */
-    public function grantOneMore(Uuid $lootRollId, DateTimeImmutable $obtainedAt): void
+    public function grantOneMore(): void
     {
         ++$this->quantity;
-        $this->lootRollId = $lootRollId;
-        $this->obtainedAt = $obtainedAt;
     }
 
     /**

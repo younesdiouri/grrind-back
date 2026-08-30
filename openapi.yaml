@@ -956,7 +956,6 @@ components:
             - 'https://grrind.app/problems/item-not-owned'
             - 'https://grrind.app/problems/equipment-slot-unknown'
             - 'https://grrind.app/problems/equipment-slot-incompatible'
-            - 'https://grrind.app/problems/equipment-slot-occupied'
         title:
           type: string
           example: Conflict

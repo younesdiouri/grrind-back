@@ -76,6 +76,29 @@ final class ItemModifiersTest extends ApiTestCase
     }
 
     /**
+     * Le pendant du #30 côté moteur : `PUT /api/inventory/equipment/{slot}` échange plutôt
+     * que de refuser (voir `InventoryItemRepository::equip()`), et une fois l'échange fait,
+     * `ModifierResolver` ne doit plus jamais rien voir de l'ancien occupant — sans quoi un
+     * joueur qui change de bottes garderait le bonus des deux paires à la fois.
+     */
+    public function testSwappingEquipmentOnlyContributesTheNewItemsModifiers(): void
+    {
+        $userId = Uuid::v7();
+        self::equip($userId, 'WORN_RUNNING_SHOES', EquipmentSlot::Feet);
+        self::equip($userId, 'STORMCALLERS_BOOTS', EquipmentSlot::Feet);
+
+        $modifiers = self::itemModifiers()->modifiersOf($userId, new DateTimeImmutable());
+
+        self::assertEquals(
+            [
+                new Modifier(ModifierType::XpMultiplier, 18, ModifierSource::Item, Discipline::Running),
+                new Modifier(ModifierType::MobilityBonus, 4200, ModifierSource::Item),
+            ],
+            $modifiers,
+        );
+    }
+
+    /**
      * Voir le docblock d'`ItemModifiers` : ce paramètre est délibérément ignoré, un objet
      * équipé n'a pas de fenêtre de validité contrairement à un bonus de guilde.
      */
