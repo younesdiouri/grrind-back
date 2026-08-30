@@ -163,6 +163,45 @@ final class LootRollerTest extends TestCase
     }
 
     /**
+     * Un `LOOT_LUCK` scopé sur une discipline ne s'applique qu'aux séances de cette
+     * discipline — voir « La portée par discipline compte ici » dans le docblock de
+     * {@see LootRoller}. Une séance de course profite de bottes de course ; une séance de
+     * natation n'en profite pas, exactement comme `XP_MULTIPLIER`.
+     */
+    public function testAScopedLootLuckOnlyMovesTheDistributionOfItsOwnDiscipline(): void
+    {
+        $roller = self::rollerOf(floorPercent: 0, capPercent: 200);
+        $tables = self::tablesOf([self::workout('TIER_ONE', [], 0, 1)], []);
+        $scoped = [self::lootLuck(200, Discipline::Running)];
+
+        $matching = $roller->rollForWorkout($tables, Discipline::Running, 30, 1, $scoped, self::randomizer());
+        self::assertNotNull($matching);
+        self::assertSame(200, $matching->effectiveLootLuckPercent);
+
+        $other = $roller->rollForWorkout($tables, Discipline::Swimming, 30, 1, $scoped, self::randomizer());
+        self::assertNotNull($other);
+        self::assertSame(0, $other->effectiveLootLuckPercent);
+    }
+
+    /**
+     * Un combat n'a lieu dans aucune discipline : un `LOOT_LUCK` scopé n'a rien à quoi se
+     * comparer, il est donc écarté plutôt que traité comme global — l'inverse du choix du
+     * #224 pour `FighterFactory`, et pour une raison différente, voir le docblock de
+     * {@see LootRoller}.
+     */
+    public function testAScopedLootLuckNeverAppliesToAnAdversaryRoll(): void
+    {
+        $roller = self::rollerOf(floorPercent: 0, capPercent: 200);
+        $tables = self::tablesOf([], [self::adversary('SAND_JACKAL')]);
+        $scoped = [self::lootLuck(200, Discipline::Running)];
+
+        $outcome = $roller->rollForAdversary($tables, 'SAND_JACKAL', $scoped, self::randomizer());
+
+        self::assertNotNull($outcome);
+        self::assertSame(0, $outcome->effectiveLootLuckPercent);
+    }
+
+    /**
      * Deux sources de `LOOT_LUCK` actives à la fois composent par somme — même choix et
      * même raison que {@see \App\Combat\Application\FighterFactory::sumOf()}.
      */
@@ -318,9 +357,21 @@ final class LootRollerTest extends TestCase
         ];
     }
 
-    private static function lootLuck(int $value): Modifier
+    /**
+     * @return array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}
+     */
+    private static function adversary(string $key): array
     {
-        return new Modifier(ModifierType::LootLuck, $value, ModifierSource::Item);
+        return [
+            'key' => $key,
+            'coins' => ['minimum' => 2, 'maximum' => 8],
+            'entries' => [['weight' => 80], ['item' => 'ITEM', 'weight' => 20]],
+        ];
+    }
+
+    private static function lootLuck(int $value, ?Discipline $discipline = null): Modifier
+    {
+        return new Modifier(ModifierType::LootLuck, $value, ModifierSource::Item, $discipline);
     }
 
     private static function rollerOf(int $floorPercent = 0, int $capPercent = 200): LootRoller

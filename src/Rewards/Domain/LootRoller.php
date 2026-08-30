@@ -58,9 +58,8 @@ use Random\Randomizer;
  * `LOOT_LUCK` est déjà résolu en `list<Modifier>` par l'appelant — {@see
  * \App\Shared\Application\ModifierResolver}, comme partout — et cette classe en est
  * l'unique consommateur, voir le docblock de {@see ModifierType}. La composition de
- * plusieurs sources est la **somme**, même choix et même raison qu'{@see
- * \App\Combat\Application\FighterFactory::sumOf()} : chaque contribution reste vraie
- * isolément, la composition ne dépend pas de l'ordre dans lequel le resolver les a rendus.
+ * plusieurs sources est la **somme** : chaque contribution reste vraie isolément, la
+ * composition ne dépend pas de l'ordre dans lequel le resolver les a rendus.
  *
  * La somme est ensuite ramenée dans les bornes de {@see LootLuckRules} — jamais appliquée
  * brute — puis sert à recalculer le poids de chaque entrée **à objet** d'une table :
@@ -71,6 +70,27 @@ use Random\Randomizer;
  * jet pondéré est joué sur les poids ainsi recalculés — jamais un second tirage, jamais un
  * tirage de plus par palier de chance : c'est la distribution qui change de forme, pas le
  * nombre de fois qu'on l'interroge.
+ *
+ * ## La portée par discipline compte ici — et c'est le contraire du choix du #224
+ *
+ * **Ceci n'est pas `FighterFactory::sumOf()`, même si ça y ressemble.** Là-bas, la
+ * discipline de `Modifier` est ignorée par construction : les neuf types de combat se
+ * consomment hors de tout sport, un combat n'a lieu « dans » aucune discipline, et un objet
+ * qui porterait une discipline sur l'un de ces types serait une erreur de configuration —
+ * traitée comme globale, voir le docblock de {@see \App\Combat\Application\FighterFactory}.
+ *
+ * `LOOT_LUCK` est différent : il se consomme *aussi* sur une séance, qui a une discipline
+ * bien réelle. Un objet « +30 % de chance de loot, seulement en course » doit se taire sur
+ * une séance de natation — {@see rollForWorkout()} filtre donc chaque `LOOT_LUCK` par
+ * {@see Modifier::appliesTo()}, même précédent qu'`XpCalculator` pour `XP_MULTIPLIER`.
+ *
+ * `rollForAdversary()`, lui, n'a **aucune** discipline à comparer — un combat n'a lieu dans
+ * aucun sport, exactement comme pour `FighterFactory`. Mais la conclusion en est l'inverse :
+ * là où `FighterFactory` traite une discipline posée sur un type qui n'en accepte aucune
+ * comme une erreur qu'on ignore, un `LOOT_LUCK` scopé sur un adversaire porte une portée
+ * *légitime* dont la condition n'est simplement pas remplie — aucune discipline ne
+ * s'affronte au corps à corps. Il est donc **écarté**, jamais compté comme global : seul un
+ * `LOOT_LUCK` sans discipline (`null`) s'applique à un tirage d'adversaire.
  */
 final readonly class LootRoller
 {
@@ -92,7 +112,9 @@ final readonly class LootRoller
             return null;
         }
 
-        return $this->roll($table->key, $tables->version, $table->table, $modifiers, $randomizer);
+        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckForDiscipline($modifiers, $discipline));
+
+        return $this->roll($table->key, $tables->version, $table->table, $effectiveLootLuckPercent, $randomizer);
     }
 
     /**
@@ -108,7 +130,9 @@ final readonly class LootRoller
             return null;
         }
 
-        return $this->roll($adversaryKey, $tables->version, $table, $modifiers, $randomizer);
+        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckGlobalOnly($modifiers));
+
+        return $this->roll($adversaryKey, $tables->version, $table, $effectiveLootLuckPercent, $randomizer);
     }
 
     /**
@@ -137,13 +161,8 @@ final readonly class LootRoller
         return $best;
     }
 
-    /**
-     * @param list<Modifier> $modifiers
-     */
-    private function roll(string $tableKey, int $tableVersion, LootTable $table, array $modifiers, Randomizer $randomizer): LootRollOutcome
+    private function roll(string $tableKey, int $tableVersion, LootTable $table, int $effectiveLootLuckPercent, Randomizer $randomizer): LootRollOutcome
     {
-        $effectiveLootLuckPercent = $this->luck->clamp(self::sumOf($modifiers, ModifierType::LootLuck));
-
         $weights = array_map(
             static fn (LootEntry $entry): int => null === $entry->itemKey
                 ? $entry->weight
@@ -194,17 +213,40 @@ final readonly class LootRoller
     }
 
     /**
-     * La composition retenue pour plusieurs `LOOT_LUCK` actifs à la fois : la somme — voir
-     * le docblock de la classe.
+     * La somme des `LOOT_LUCK` qui s'appliquent à une séance de cette discipline — global ou
+     * scopé sur elle, voir {@see Modifier::appliesTo()}. Un `LOOT_LUCK` scopé sur une autre
+     * discipline ne compte pas : voir « La portée par discipline compte ici » dans le
+     * docblock de la classe pour pourquoi cette méthode n'est *pas*
+     * `FighterFactory::sumOf()`.
      *
      * @param list<Modifier> $modifiers
      */
-    private static function sumOf(array $modifiers, ModifierType $type): int
+    private static function lootLuckForDiscipline(array $modifiers, Discipline $discipline): int
     {
         $total = 0;
 
         foreach ($modifiers as $modifier) {
-            if ($modifier->type === $type) {
+            if ($modifier->appliesTo(ModifierType::LootLuck, $discipline)) {
+                $total += $modifier->value;
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * La somme des `LOOT_LUCK` globaux — aucune discipline ne s'affronte au corps à corps,
+     * donc un `LOOT_LUCK` scopé sur une discipline est écarté plutôt que compté comme
+     * global : voir « La portée par discipline compte ici » dans le docblock de la classe.
+     *
+     * @param list<Modifier> $modifiers
+     */
+    private static function lootLuckGlobalOnly(array $modifiers): int
+    {
+        $total = 0;
+
+        foreach ($modifiers as $modifier) {
+            if (ModifierType::LootLuck === $modifier->type && null === $modifier->discipline) {
                 $total += $modifier->value;
             }
         }
