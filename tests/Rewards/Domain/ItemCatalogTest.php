@@ -127,4 +127,37 @@ final class ItemCatalogTest extends TestCase
             ]],
         ]);
     }
+
+    /**
+     * Le refus ajouté au #29 : `FighterFactory` traite les neuf types de combat comme
+     * globaux, une discipline sur l'un d'eux mentirait sur ce que le moteur fait réellement —
+     * voir le docblock de la classe. `STRENGTH_BONUS` porte le refus, n'importe lequel des
+     * neuf ferait l'affaire.
+     */
+    public function testRefuseUneDisciplineSurUnModificateurDeCombat(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('IRON_GAUNTLETS');
+
+        new ItemCatalog([
+            ['key' => 'IRON_GAUNTLETS', 'rarity' => 'COMMON', 'slot' => 'HANDS', 'price_coins' => 1, 'modifiers' => [
+                ['type' => 'STRENGTH_BONUS', 'value' => 350, 'discipline' => 'RUNNING'],
+            ]],
+        ]);
+    }
+
+    /**
+     * Le pendant positif : les neuf types de combat restent parfaitement valides tant
+     * qu'aucune discipline ne les accompagne — c'est déjà ce que livre `items.yaml`.
+     */
+    public function testAccepteUnModificateurDeCombatSansDiscipline(): void
+    {
+        $catalog = new ItemCatalog([
+            ['key' => 'IRON_GAUNTLETS', 'rarity' => 'COMMON', 'slot' => 'HANDS', 'price_coins' => 1, 'modifiers' => [
+                ['type' => 'STRENGTH_BONUS', 'value' => 350],
+            ]],
+        ]);
+
+        self::assertNull($catalog->find('IRON_GAUNTLETS')?->modifiers[0]->discipline);
+    }
 }

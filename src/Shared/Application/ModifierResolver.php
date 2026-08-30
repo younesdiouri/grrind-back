@@ -24,10 +24,12 @@ use Symfony\Component\Uid\Uuid;
  * animé, le futur `LootRoller` ne lira que `LOOT_LUCK`. Un resolver qui trancherait pour
  * eux les obligerait à défaire son travail.
  *
- * **Aujourd'hui, aucune source ne contribue** : les compétences arrivent au Lot 7, le
- * streak au Lot 5, les objets au Lot 6. Le resolver rend donc un ensemble vide, et c'est
- * délibérément le branchement — pas le contenu — qui est éprouvé au Lot 3. C'est le seul
- * moment où on peut le faire sans qu'un test de bonus le masque.
+ * **Aucune source ne contribuait au Lot 3** : le resolver rendait délibérément un ensemble
+ * vide, pour que ce soit le branchement — pas le contenu — qui s'éprouve à ce moment-là, sans
+ * qu'un test de bonus le masque. `Rewards` a été le premier module à y écrire pour de vrai
+ * (#29, {@see \App\Rewards\Application\ItemModifiers}, objets équipés) ; les compétences
+ * (Lot 7), le streak et la ligue (Lot 5) restent à brancher, chacun par sa propre classe qui
+ * implémente {@see ModifierContributor} — rien de plus à changer ici quand ils arriveront.
  *
  * Il ne possède pas d'horloge non plus, et c'est le même refus (#190) : la date de la
  * séance traverse depuis l'appelant jusqu'aux contributeurs sans que personne en chemin

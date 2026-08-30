@@ -953,6 +953,9 @@ components:
             - 'https://grrind.app/problems/enemy-key-unknown'
             - 'https://grrind.app/problems/enemy-level-too-low'
             - 'https://grrind.app/problems/insufficient-coin-balance'
+            - 'https://grrind.app/problems/item-not-owned'
+            - 'https://grrind.app/problems/equipment-slot-unknown'
+            - 'https://grrind.app/problems/equipment-slot-incompatible'
         title:
           type: string
           example: Conflict
