@@ -7,7 +7,12 @@ namespace App\Combat\Application;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\Enemy;
 use App\Combat\Domain\Fighter;
+use App\Shared\Application\ModifierResolver;
 use App\Shared\Application\PlayerProgression;
+use App\Shared\Domain\Modifier\Modifier;
+use App\Shared\Domain\Modifier\ModifierType;
+use DateTimeImmutable;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * La traduction caractéristique → combattant, tranchée au #210 (`Mobility` au #218) :
@@ -36,13 +41,57 @@ use App\Shared\Application\PlayerProgression;
  * ne replafonne rien et n'a pas à le faire — voir le docblock de {@see Fighter}, qui ne
  * garantit lui-même que la non-négativité, pas les plafonds de `CombatRules`.
  *
- * ## Aucun port : `PlayerProgression` entre déjà par la porte de `Shared`
+ * ## Le vocabulaire des modificateurs s'ouvre au combat (#224)
+ *
+ * `Combat` devient le cinquième consommateur de {@see ModifierResolver} — voir le docblock
+ * de {@see ModifierType} pour pourquoi ni un port `EquippedStats` ni un mécanisme parallèle
+ * n'était la bonne réponse. **L'ordre est le contrat**, et il est testé :
+ *
+ * 1. un bonus de caractéristique pure (`*_BONUS` sur les quatre caractéristiques) s'ajoute
+ *    au total lu du snapshot, **avant** la dérivation par les coefficients de `CombatRules` ;
+ * 2. la dérivation elle-même, inchangée ;
+ * 3. un bonus de stat directe (`HP_BONUS`, `DAMAGE_BONUS`, `MITIGATION_BONUS`,
+ *    `EXTRA_TURN_BONUS`, `DODGE_BONUS`) s'ajoute au résultat de la dérivation ;
+ * 4. **puis seulement** les trois plafonds de `CombatRules`. Un objet ne franchit jamais un
+ *    plafond — à 1000 ‰ un combattant devient invulnérable ou ne rend jamais la main, et la
+ *    boucle ne se termine plus sur ses propres mérites (voir `CombatRules`).
+ *
+ * **Composition de plusieurs modificateurs du même type : la somme.** Deux objets « +200
+ * Strength », ou un objet et une future compétence sur le même type, s'additionnent — même
+ * choix et même raison qu'{@see \App\Progression\Domain\XpCalculator} pour `XP_MULTIPLIER` :
+ * chaque contribution reste vraie isolément, et la composition ne dépend pas de l'ordre dans
+ * lequel le resolver les a rendus. {@see sumOf()} porte ce choix.
+ *
+ * **La portée par discipline de `Modifier` ne s'applique pas ici, et c'est délibéré.** Un
+ * combat n'a lieu « dans » aucune discipline — contrairement à une séance de sport, il n'y a
+ * pas de sport en cours dont un modificateur scopé pourrait dépendre. `sumOf()` somme donc
+ * sur le seul {@see ModifierType}, sans regarder {@see Modifier::$discipline} : un objet qui
+ * porterait par erreur une discipline sur un de ces neuf types serait traité comme global,
+ * jamais comme silencieusement ignoré.
+ *
+ * **Le plancher de `Fighter` se pose ici, pas dans son constructeur.** Un bonus négatif —
+ * une malédiction, plus tard — ne doit pas pouvoir produire un combattant sous les planchers
+ * de {@see Fighter} : `max(1, …)` pour les points de vie, `max(0, …)` pour le reste, avant
+ * la construction. Compter sur l'exception de `Fighter` reviendrait à laisser une malédiction
+ * assez forte faire échouer un combat au lieu de simplement l'affaiblir.
+ *
+ * **`forEnemy()` ne lit aucun modificateur.** Un ennemi du catalogue n'a ni équipement ni
+ * compétences — voir plus bas.
+ *
+ * **`$occurredAt` est l'instant de la requête, jamais celui d'un sport.** Contrairement à
+ * `ModifierContributor::modifiersOf()` appelé pour un workout, un combat *a lieu* à
+ * l'instant où il est joué — même raison que {@see \App\Combat\Domain\Battle::$foughtAt}
+ * (voir son docblock). C'est {@see FightBattleHandler}, seul
+ * détenteur de l'horloge sur ce chemin, qui la passe ici.
+ *
+ * ## Aucun port supplémentaire : `PlayerProgression` et `ModifierResolver` entrent déjà par `Shared`
  *
  * `App\Shared\Application\PlayerProgressions` rend, en batch et indexé par UUID, exactement ce
  * dont cette factory a besoin — le niveau (pas utilisé ici), l'`AttributeGains` des quatre
  * caractéristiques et la `vitality` bonifiée. Écrire un huitième port irait contre la règle n°0 :
  * cette classe **reçoit** une `PlayerProgression` déjà résolue, elle ne va rien chercher — pas
- * de repository, pas de base, pas de dépendance à `Progression`.
+ * de repository, pas de base, pas de dépendance à `Progression`. `ModifierResolver` est le même
+ * geste : un service de `Shared` déjà branché ailleurs (`GrantXpHandler`), pas un nouveau port.
  *
  * ## Arithmétique entière, sans exception
  *
@@ -59,27 +108,47 @@ final readonly class FighterFactory
 
     public function __construct(
         private CombatRules $rules,
+        private ModifierResolver $modifiers,
     ) {
     }
 
-    public function forPlayer(PlayerProgression $progression): Fighter
+    /**
+     * @param Uuid              $playerId   pour interroger {@see ModifierResolver} — `PlayerProgression` ne le porte pas
+     * @param DateTimeImmutable $occurredAt l'instant du combat, jamais celui d'un sport — voir le docblock de la classe
+     */
+    public function forPlayer(PlayerProgression $progression, Uuid $playerId, DateTimeImmutable $occurredAt): Fighter
     {
+        $modifiers = $this->modifiers->of($playerId, $occurredAt);
         $attributes = $progression->attributes;
 
+        // Étape 1 du contrat d'ordre : le bonus de caractéristique s'ajoute au total lu du
+        // snapshot avant toute dérivation — voir le docblock de la classe.
+        $strength = max(0, $attributes->strength + self::sumOf($modifiers, ModifierType::StrengthBonus));
+        $endurance = max(0, $attributes->endurance + self::sumOf($modifiers, ModifierType::EnduranceBonus));
+        $mobility = max(0, $attributes->mobility + self::sumOf($modifiers, ModifierType::MobilityBonus));
+        $dexterity = max(0, $attributes->dexterity + self::sumOf($modifiers, ModifierType::DexterityBonus));
+        // Jamais bonifiée par un modificateur — voir le docblock de `ModifierType`.
+        $vitality = max(0, $progression->vitality);
+
         return new Fighter(
-            hp: $this->rules->baseHp + self::scale(max(0, $progression->vitality), $this->rules->hpPer1000Vitality),
-            damage: $this->rules->baseDamage + self::scale(max(0, $attributes->strength), $this->rules->damagePer1000Strength),
+            // Étapes 2 à 4 : la dérivation, puis le bonus de stat directe, puis — pour les
+            // trois stats plafonnées — le plafond de `CombatRules`. Le `max(0, …)` (`max(1, …)`
+            // pour les PV) pose le plancher de `Fighter` ici plutôt que de compter sur son
+            // exception : un bonus négatif affaiblit un combattant, il ne fait pas échouer le
+            // combat.
+            hp: max(1, $this->rules->baseHp + self::scale($vitality, $this->rules->hpPer1000Vitality) + self::sumOf($modifiers, ModifierType::HpBonus)),
+            damage: max(0, $this->rules->baseDamage + self::scale($strength, $this->rules->damagePer1000Strength) + self::sumOf($modifiers, ModifierType::DamageBonus)),
             mitigationPermille: min(
                 $this->rules->mitigationCapPermille,
-                self::scale(max(0, $attributes->endurance), $this->rules->mitigationPermillePer1000Endurance),
+                max(0, self::scale($endurance, $this->rules->mitigationPermillePer1000Endurance) + self::sumOf($modifiers, ModifierType::MitigationBonus)),
             ),
             extraTurnPermille: min(
                 $this->rules->extraTurnCapPermille,
-                self::scale(max(0, $attributes->dexterity), $this->rules->extraTurnPermillePer1000Dexterity),
+                max(0, self::scale($dexterity, $this->rules->extraTurnPermillePer1000Dexterity) + self::sumOf($modifiers, ModifierType::ExtraTurnBonus)),
             ),
             dodgePermille: min(
                 $this->rules->dodgeCapPermille,
-                self::scale(max(0, $attributes->mobility), $this->rules->dodgePermillePer1000Mobility),
+                max(0, self::scale($mobility, $this->rules->dodgePermillePer1000Mobility) + self::sumOf($modifiers, ModifierType::DodgeBonus)),
             ),
         );
     }
@@ -92,10 +161,34 @@ final readonly class FighterFactory
      * pas par cette méthode ni par `CombatSection`, qui ne borne les trois champs que par le
      * bas — un ennemi entre dans la même boucle par la même porte qu'un joueur, il ne doit
      * pas échapper à l'invariant qui la garde.
+     *
+     * **Ne lit aucun modificateur (#224), et ce n'est pas une asymétrie à corriger.** Un
+     * ennemi du catalogue n'a ni équipement ni compétences ; seul `forPlayer()` a une raison
+     * d'interroger {@see ModifierResolver}.
      */
     public function forEnemy(Enemy $enemy): Fighter
     {
         return new Fighter($enemy->hp, $enemy->damage, $enemy->mitigationPermille, $enemy->extraTurnPermille, $enemy->dodgePermille);
+    }
+
+    /**
+     * La composition retenue pour plusieurs modificateurs du même type : la somme — voir le
+     * docblock de la classe pour pourquoi, et pourquoi {@see Modifier::$discipline} n'entre
+     * pas en ligne de compte ici.
+     *
+     * @param list<Modifier> $modifiers
+     */
+    private static function sumOf(array $modifiers, ModifierType $type): int
+    {
+        $total = 0;
+
+        foreach ($modifiers as $modifier) {
+            if ($modifier->type === $type) {
+                $total += $modifier->value;
+            }
+        }
+
+        return $total;
     }
 
     private static function scale(int $total, int $permille): int

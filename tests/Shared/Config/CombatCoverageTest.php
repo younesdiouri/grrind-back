@@ -12,13 +12,16 @@ use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\Enemy;
 use App\Combat\Domain\EnemyCatalog;
+use App\Shared\Application\ModifierResolver;
 use App\Shared\Application\PlayerProgression;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\VitalityBreakdown;
+use DateTimeImmutable;
 use Random\Engine\Xoshiro256StarStar;
 use Random\Randomizer;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * La table livrée, celle de `config/game/v1/combat.yaml`, contre ce que le domaine exige
@@ -93,7 +96,7 @@ final class CombatCoverageTest extends KernelTestCase
         $simulator = self::shippedSimulator();
         $catalog = self::shippedCatalog();
 
-        $player = $factory->forPlayer(PlayerProgression::untouched());
+        $player = $factory->forPlayer(PlayerProgression::untouched(), Uuid::v7(), new DateTimeImmutable());
         $enemy = $factory->forEnemy($catalog->forLevel(1));
 
         foreach (['fraiche-1', 'fraiche-2', 'fraiche-3', 'fraiche-4', 'fraiche-5'] as $seed) {
@@ -140,7 +143,7 @@ final class CombatCoverageTest extends KernelTestCase
             vitalityBreakdown: new VitalityBreakdown(0, 1, 0),
         );
 
-        $player = $factory->forPlayer($veteran);
+        $player = $factory->forPlayer($veteran, Uuid::v7(), new DateTimeImmutable());
         $enemy = $factory->forEnemy($catalog->forLevel(50));
 
         $results = [];
@@ -220,7 +223,7 @@ final class CombatCoverageTest extends KernelTestCase
             vitalityBreakdown: new VitalityBreakdown(0, 1, 0),
         );
 
-        $player = $factory->forPlayer($challenger);
+        $player = $factory->forPlayer($challenger, Uuid::v7(), new DateTimeImmutable());
         $enemy = $factory->forEnemy($tier);
 
         $outcome = $simulator->fight($player, $enemy, self::randomizer($seed));
@@ -277,7 +280,16 @@ final class CombatCoverageTest extends KernelTestCase
 
     private static function shippedFactory(): FighterFactory
     {
-        return new FighterFactory(self::shippedRules());
+        self::bootKernel();
+        $container = self::getContainer();
+
+        // Le vrai `ModifierResolver` du conteneur : aucun contributeur ne branche encore
+        // de modificateur (#224), donc il rend un ensemble vide, exactement ce que ce
+        // fichier de combat pur doit voir.
+        $modifiers = $container->get(ModifierResolver::class);
+        self::assertInstanceOf(ModifierResolver::class, $modifiers);
+
+        return new FighterFactory(self::shippedRules(), $modifiers);
     }
 
     private static function shippedSimulator(): BattleSimulator
