@@ -244,6 +244,11 @@ services:
     # `SessionDrops` pour pourquoi ce n'est pas la même interface que `SessionRewards`.
     App\Shared\Application\SessionDrops: '@App\Rewards\Infrastructure\Drop\WorkoutSessionDrops'
 
+    # Le même câblage, côté combat (#227) : `Combat` clôt le combat, `Rewards` tire
+    # l'objet et les pièces sur une victoire. Voir le docblock de `BattleDrops` pour
+    # pourquoi ce n'est pas la même interface que `SessionDrops`.
+    App\Shared\Application\BattleDrops: '@App\Rewards\Infrastructure\Drop\AdversaryBattleDrops'
+
     # Le registre des appareils (#149) : `$targetEnvironment` vient du réglage
     # `PUSH_TARGET_ENVIRONMENT` (voir `.env`), résolu par le processeur `enum:` de
     # Symfony — jamais de `%kernel.environment%`, qui décrit le serveur et non le canal

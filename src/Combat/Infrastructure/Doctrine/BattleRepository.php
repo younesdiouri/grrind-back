@@ -77,4 +77,21 @@ class BattleRepository extends ServiceEntityRepository
     {
         $this->getEntityManager()->flush();
     }
+
+    /**
+     * Ce qui rend le tirage de loot atomique avec l'écriture du combat (#227) : même geste
+     * que {@see \App\Training\Infrastructure\Doctrine\WorkoutRepository::transactional()},
+     * pour la même raison — un combat gagné dont le loot n'est pas écrit est une perte
+     * silencieuse, un loot écrit sans son combat est un objet sans provenance.
+     *
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    public function transactional(callable $work): mixed
+    {
+        return $this->getEntityManager()->wrapInTransaction(static fn (): mixed => $work());
+    }
 }

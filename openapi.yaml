@@ -11,7 +11,7 @@ paths:
       operationId: get_combat_enemies_list
       responses:
         '200':
-          description: 'Le catalogue entier — ennemis ordinaires et boss, dans cet ordre, chacun avec son nom traduit et son niveau minimum.'
+          description: "Le combattant de l'appelant, puis le catalogue entier — ennemis ordinaires et boss, dans cet ordre, chacun avec son nom traduit et son niveau minimum."
           content:
             application/json:
               schema:
@@ -2275,8 +2275,37 @@ components:
             - VICTORY
             - DEFEAT
       type: object
+    BattleReward:
+      description: "Ce qu'une victoire a rapporté (#227) — persisté sur la ligne du combat, jamais\nrejoué depuis la graine : le jour où `loot.yaml` est rééquilibré, rejouer un\nvieux tirage sous les tables courantes rendrait un butin différent de celui que\nle joueur a vu tomber.\n\n**Vide pour une défaite, ou une victoire tranchée par `max_turns` sans KO** —\n`loot: []` et `coins` à gain nul, jamais des clés absentes : une récompense de\nconsolation ferait du combat perdu la stratégie optimale, puisqu'il est plus\nrapide à jouer qu'à gagner.\n\nMême forme, mêmes clés, dans le même ordre que `loot`/`coins` sur\n`RewardSummary` — les objets d'abord, les pièces ensuite — pour que le client\nréutilise le composant qu'il a déjà écrit.\n"
+      required:
+        - loot
+        - coins
+      properties:
+        loot:
+          description: "Vide pour une défaite, ou si l'adversaire n'a pas de table dédiée."
+          type: array
+          items:
+            $ref: '#/components/schemas/DroppedItem'
+        coins:
+          required:
+            - gained
+            - before
+            - after
+          properties:
+            gained:
+              description: 'Peut valoir zéro : défaite, ou adversaire sans table dédiée.'
+              type: integer
+              example: 8
+            before:
+              type: integer
+              example: 40
+            after:
+              type: integer
+              example: 48
+          type: object
+      type: object
     Battle:
-      description: "Un combat PvE joué et jugé — ce que rendent `POST /api/battles` et\n`GET /api/battles/{id}`, à l'identique.\n\n**L'ordre des champs est l'ordre de l'animation**, et c'est un contrat, pas une\nconvention d'écriture — même règle que `RewardSummary`.\n\n**`rewards` est présent et vide dès maintenant.** Aucune récompense en V1, mais\nil y en aura une : la déclarer plus tard obligerait un client déjà déployé à la\ntraiter comme facultative pour toujours — même argument que `loot`, `streak` et\n`unlockableNodes` sur le `RewardSummary`.\n"
+      description: "Un combat PvE joué et jugé — ce que rendent `POST /api/battles` et\n`GET /api/battles/{id}`, à l'identique.\n\n**L'ordre des champs est l'ordre de l'animation**, et c'est un contrat, pas une\nconvention d'écriture — même règle que `RewardSummary`.\n"
       required:
         - id
         - result
@@ -2313,19 +2342,17 @@ components:
           items:
             $ref: '#/components/schemas/BattleEvent'
         rewards:
-          description: "Lot 6 : toujours vide aujourd'hui — voir la description de la classe."
-          type: array
-          items:
-            type: object
+          $ref: '#/components/schemas/BattleReward'
       type: object
     BattleSummary:
-      description: "Une ligne de `GET /api/battles` (#220) — **jamais la timeline**. `Battle` peut\ncompter deux cents événements (`max_turns`) ; vingt résumés par page restent\nlégers, et le client va chercher `GET /api/battles/{id}` au moment où il choisit\nun combat précis à rejouer.\n\n`result` est **toujours** `VICTORY` ou `DEFEAT`, y compris pour un combat conclu\npar `max_turns` sans KO — voir la description de `Battle.result`. C'est ce qui\npermet à la liste d'être colorée ligne par ligne sans aucun troisième état à\ndessiner.\n"
+      description: "Une ligne de `GET /api/battles` (#220) — **jamais la timeline**. `Battle` peut\ncompter deux cents événements (`max_turns`) ; vingt résumés par page restent\nlégers, et le client va chercher `GET /api/battles/{id}` au moment où il choisit\nun combat précis à rejouer.\n\n`result` est **toujours** `VICTORY` ou `DEFEAT`, y compris pour un combat conclu\npar `max_turns` sans KO — voir la description de `Battle.result`. C'est ce qui\npermet à la liste d'être colorée ligne par ligne sans aucun troisième état à\ndessiner.\n\n`rewards` rend `Battle.rewards` à l'identique (#227) : c'est une ligne déjà\nécrite, rien à recalculer pour l'afficher dans la liste.\n"
       required:
         - id
         - result
         - enemy
         - turns
         - foughtAt
+        - rewards
       properties:
         id:
           type: string
@@ -2354,6 +2381,8 @@ components:
         foughtAt:
           type: string
           format: date-time
+        rewards:
+          $ref: '#/components/schemas/BattleReward'
       type: object
     BattlePage:
       description: "Une page d'historique, **dans l'ordre du combat** : `foughtAt` décroissant, puis\nl'identifiant pour départager deux combats livrés à la même seconde.\n\n`nextCursor` est une **chaîne opaque** — le client la renvoie telle quelle. `null`\nsignifie la fin ; il n'y a pas de total, un défilement infini n'en a aucun usage.\n"
@@ -2416,10 +2445,13 @@ components:
           example: 9
       type: object
     EnemyCatalog:
-      description: "Le catalogue entier rendu par `GET /api/enemies` — niché sous `enemies`, jamais un\ntableau nu à la racine, même convention que `WorkoutPage` et `TitleBoard` : c'est ce\nqui laisse la place à un champ frère plus tard sans casser un client déjà déployé.\nEnnemis ordinaires puis boss, dans l'ordre de déclaration de chaque liste.\n"
+      description: "Le catalogue entier rendu par `GET /api/enemies` — niché sous `enemies`, jamais un\ntableau nu à la racine, même convention que `WorkoutPage` et `TitleBoard` : c'est ce\nqui laisse la place à un champ frère plus tard sans casser un client déjà déployé.\nEnnemis ordinaires puis boss, dans l'ordre de déclaration de chaque liste.\n\n**`player` précède `enemies` (#227) : c'est le combattant de l'appelant,\nmodificateurs équipés compris** — le seul endroit de l'API où leur effet se lit\navant de s'engager dans un combat. `GET /api/progression` continue de rendre le\nsocle nu du ledger ; c'est délibéré.\n"
       required:
+        - player
         - enemies
       properties:
+        player:
+          $ref: '#/components/schemas/BattleFighter'
         enemies:
           type: array
           items:

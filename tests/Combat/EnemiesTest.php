@@ -15,8 +15,8 @@ final class EnemiesTest extends ApiTestCase
 {
     /**
      * Niché sous `enemies`, jamais un tableau nu à la racine — voir le docblock
-     * d'`EnemyCatalogResource`. Un seul champ aujourd'hui, mais c'est l'enveloppe qui laisse
-     * la place à un champ frère plus tard sans rien casser.
+     * d'`EnemyCatalogResource`. `player` précède `enemies` depuis le #227 : c'est
+     * l'enveloppe qui laisse la place à un champ frère plus tard sans rien casser.
      */
     public function testTheResponseIsAnObjectNestingTheListUnderEnemies(): void
     {
@@ -24,11 +24,28 @@ final class EnemiesTest extends ApiTestCase
 
         $payload = self::decode($this->get('/api/enemies', $bob->headers));
 
-        self::assertSame(['enemies'], array_keys($payload));
+        self::assertSame(['player', 'enemies'], array_keys($payload));
 
         $entries = $payload['enemies'];
         self::assertIsArray($entries);
         self::assertNotEmpty($entries);
+    }
+
+    /**
+     * Le combattant du joueur (#227), même forme qu'un combattant de `Battle` — c'est le
+     * seul endroit de l'API où l'effet des objets équipés se lit avant de s'engager, voir le
+     * docblock d'`EnemiesController`.
+     */
+    public function testThePlayerCarriesTheirOwnFighterStats(): void
+    {
+        $bob = $this->openAccount();
+
+        $payload = self::decode($this->get('/api/enemies', $bob->headers));
+
+        $player = $payload['player'];
+        self::assertIsArray($player);
+        self::assertSame(['hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'], array_keys($player));
+        self::assertGreaterThan(0, $player['hp'], 'Un compte neuf reçoit le socle nu, jamais un combattant mort — voir le docblock de `FighterFactory`.');
     }
 
     /**

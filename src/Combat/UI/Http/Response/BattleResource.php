@@ -15,11 +15,12 @@ use DateTimeInterface;
  * d'écriture — même règle que {@see \App\Training\UI\Http\Response\RewardSummaryResource}.
  * {@see \App\Tests\Combat\UI\Http\Response\BattleResourcePayloadTest} fige cet ordre.
  *
- * **`rewards` est présent et vide dès maintenant.** Aucune récompense en V1 — voir le
- * docblock de {@see \App\Combat\Application\FightBattleHandler} — mais il y en aura une.
- * Le déclarer plus tard forcerait tout client déjà déployé à le traiter comme optionnel
- * pour toujours ; même argument que `loot`, `streak` et `unlockableNodes` sur le
- * `RewardSummary`.
+ * **`rewards` vient directement de `Battle::$reward` (#227), jamais recalculé ici.** La
+ * ligne porte déjà `{loot: [...], coins: {gained, before, after}}` — voir le docblock de
+ * `Battle` pour pourquoi c'est persisté plutôt que rejoué depuis la graine. Une défaite ou
+ * une victoire tranchée par `max_turns` sans KO portent la forme vide de
+ * `App\Shared\Application\BattleDrop::none()`, jamais une clé absente — même argument que
+ * `loot` sur le `RewardSummary`.
  *
  * **Le nom de l'ennemi se traduit depuis la clé du snapshot, jamais depuis
  * `EnemyCatalog`.** Un combat déjà joué est un fait écrit : sa lecture ne doit rien à l'état
@@ -68,7 +69,7 @@ final readonly class BattleResource
                 FighterResource::from($enemySnapshot['fighter'])->toArray(),
             ),
             'events' => BattleEventResource::listOf($this->battle->timeline()),
-            'rewards' => [],
+            'rewards' => $this->battle->reward(),
         ];
     }
 }

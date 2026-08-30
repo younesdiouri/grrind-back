@@ -111,10 +111,12 @@ enemies:
 # nommant sa clé dans le corps de `POST /api/battles`, et reste affrontable au-delà de son
 # palier — on y retourne quand on est plus fort, voir le docblock d'`EnemyCatalog`.
 #
-# Ce qu'elle ne décide pas : aucune limite de tentatives, aucune récompense particulière —
-# le ticket #219 laisse volontairement la question du farm à celui qui apportera une
-# récompense au combat. Pas de phase, pas de mécanique spéciale : un `Fighter` de plus dans
-# la même boucle que `BattleSimulator` connaît déjà.
+# Ce qu'elle ne décide pas : aucune limite de tentatives. Le #227 a apporté la récompense
+# que le #219 laissait volontairement en suspens — un boss donne par sa propre table dans
+# `loot.yaml`, comme n'importe quel adversaire — et n'a rien borné du farm pour autant : voir
+# le docblock de `App\Combat\Application\FightBattleHandler` pour la décision et le ticket de
+# dette #228. Pas de phase, pas de mécanique spéciale : un `Fighter` de plus dans la même
+# boucle que `BattleSimulator` connaît déjà.
 #
 # Un palier par boss, choisi pour recouper un niveau déjà couvert par `enemies:` ci-dessus
 # — c'est ce qui permet à `CombatCoverageTest` de réutiliser la même table de XP de

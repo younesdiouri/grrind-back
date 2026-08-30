@@ -32,11 +32,27 @@ final class BattleSummaryResourcePayloadTest extends TestCase
     {
         $payload = self::resource()->toArray();
 
-        self::assertSame(['id', 'result', 'enemy', 'turns', 'foughtAt'], array_keys($payload));
+        self::assertSame(['id', 'result', 'enemy', 'turns', 'foughtAt', 'rewards'], array_keys($payload));
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
         self::assertSame(['key', 'name'], array_keys($enemy));
+    }
+
+    /** `rewards` rend `Battle::$reward` à l'identique de `BattleResource` (#227). */
+    public function testRewardsIsRenderedAsGiven(): void
+    {
+        $reward = [
+            'loot' => [['key' => 'WORN_RUNNING_SHOES']],
+            'coins' => ['gained' => 8, 'before' => 40, 'after' => 48],
+        ];
+
+        $battle = self::battleAgainst('SAND_JACKAL', $reward);
+
+        self::assertSame(
+            $reward,
+            BattleSummaryResource::from($battle, new EnemyTranslator(self::stubTranslator()))->toArray()['rewards'],
+        );
     }
 
     /**
@@ -84,9 +100,13 @@ final class BattleSummaryResourcePayloadTest extends TestCase
         return BattleSummaryResource::from(self::battleAgainst('SAND_JACKAL'), new EnemyTranslator(self::stubTranslator()));
     }
 
-    private static function battleAgainst(string $enemyKey): Battle
+    /**
+     * @param ?array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}} $reward
+     */
+    private static function battleAgainst(string $enemyKey, ?array $reward = null): Battle
     {
         return Battle::conclude(
+            Uuid::v7(),
             Uuid::v7(),
             new AttributeGains(10, 20, 30, 40),
             500,
@@ -98,6 +118,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
                 [new BattleStarted(150, 120), new BattleFinished(BattleResult::Victory)],
                 2,
             ),
+            $reward ?? ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
@@ -107,6 +128,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
     private static function battleConcludedByMaxTurns(BattleResult $result): Battle
     {
         return Battle::conclude(
+            Uuid::v7(),
             Uuid::v7(),
             new AttributeGains(10, 20, 30, 40),
             500,
@@ -120,6 +142,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
                 // config. Aucun KO ne s'est produit : c'est le ratio de PV qui a tranché.
                 200,
             ),
+            ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),

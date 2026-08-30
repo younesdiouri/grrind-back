@@ -21,6 +21,10 @@ use DateTimeInterface;
  * exactement la même correction, pour la même raison, que sur {@see BattleResource} : un
  * combat déjà joué est un fait écrit, il ne doit rien à un fichier de config qui continue de
  * bouger. Ne pas la défaire ici par commodité.
+ *
+ * **`rewards` rend `Battle::$reward` à l'identique de `BattleResource`** (#227) : c'est une
+ * ligne déjà écrite, il n'y a rien à recalculer, et le client n'a pas à ouvrir
+ * `GET /api/battles/{id}` pour savoir ce qu'un combat de la liste a rapporté.
  */
 final readonly class BattleSummaryResource
 {
@@ -51,6 +55,7 @@ final readonly class BattleSummaryResource
             ],
             'turns' => $this->battle->turns(),
             'foughtAt' => $this->battle->foughtAt()->format(DateTimeInterface::ATOM),
+            'rewards' => $this->battle->reward(),
         ];
     }
 }

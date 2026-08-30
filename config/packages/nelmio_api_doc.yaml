@@ -1377,6 +1377,36 @@ when@dev:
                             actor: { type: string, enum: [PLAYER, ENEMY], description: "`EXTRA_TURN` seulement." }
                             result: { type: string, enum: [VICTORY, DEFEAT], description: "`BATTLE_FINISHED` seulement." }
 
+                    BattleReward:
+                        type: object
+                        description: |
+                            Ce qu'une victoire a rapporté (#227) — persisté sur la ligne du combat, jamais
+                            rejoué depuis la graine : le jour où `loot.yaml` est rééquilibré, rejouer un
+                            vieux tirage sous les tables courantes rendrait un butin différent de celui que
+                            le joueur a vu tomber.
+
+                            **Vide pour une défaite, ou une victoire tranchée par `max_turns` sans KO** —
+                            `loot: []` et `coins` à gain nul, jamais des clés absentes : une récompense de
+                            consolation ferait du combat perdu la stratégie optimale, puisqu'il est plus
+                            rapide à jouer qu'à gagner.
+
+                            Même forme, mêmes clés, dans le même ordre que `loot`/`coins` sur
+                            `RewardSummary` — les objets d'abord, les pièces ensuite — pour que le client
+                            réutilise le composant qu'il a déjà écrit.
+                        required: [loot, coins]
+                        properties:
+                            loot:
+                                type: array
+                                description: "Vide pour une défaite, ou si l'adversaire n'a pas de table dédiée."
+                                items: { $ref: '#/components/schemas/DroppedItem' }
+                            coins:
+                                type: object
+                                required: [gained, before, after]
+                                properties:
+                                    gained: { type: integer, example: 8, description: "Peut valoir zéro : défaite, ou adversaire sans table dédiée." }
+                                    before: { type: integer, example: 40 }
+                                    after: { type: integer, example: 48 }
+
                     Battle:
                         type: object
                         description: |
@@ -1385,11 +1415,6 @@ when@dev:
 
                             **L'ordre des champs est l'ordre de l'animation**, et c'est un contrat, pas une
                             convention d'écriture — même règle que `RewardSummary`.
-
-                            **`rewards` est présent et vide dès maintenant.** Aucune récompense en V1, mais
-                            il y en aura une : la déclarer plus tard obligerait un client déjà déployé à la
-                            traiter comme facultative pour toujours — même argument que `loot`, `streak` et
-                            `unlockableNodes` sur le `RewardSummary`.
                         required: [id, result, turns, foughtAt, player, enemy, events, rewards]
                         properties:
                             id: { type: string, format: uuid }
@@ -1408,10 +1433,7 @@ when@dev:
                                 type: array
                                 description: "La timeline complète, dans l'ordre de l'animation."
                                 items: { $ref: '#/components/schemas/BattleEvent' }
-                            rewards:
-                                type: array
-                                description: 'Lot 6 : toujours vide aujourd''hui — voir la description de la classe.'
-                                items: { type: object }
+                            rewards: { $ref: '#/components/schemas/BattleReward' }
 
                     BattleSummary:
                         type: object
@@ -1425,7 +1447,10 @@ when@dev:
                             par `max_turns` sans KO — voir la description de `Battle.result`. C'est ce qui
                             permet à la liste d'être colorée ligne par ligne sans aucun troisième état à
                             dessiner.
-                        required: [id, result, enemy, turns, foughtAt]
+
+                            `rewards` rend `Battle.rewards` à l'identique (#227) : c'est une ligne déjà
+                            écrite, rien à recalculer pour l'afficher dans la liste.
+                        required: [id, result, enemy, turns, foughtAt, rewards]
                         properties:
                             id: { type: string, format: uuid }
                             result:
@@ -1444,6 +1469,7 @@ when@dev:
                                     name: { type: string, example: 'Chacal des sables' }
                             turns: { type: integer, example: 7 }
                             foughtAt: { type: string, format: date-time }
+                            rewards: { $ref: '#/components/schemas/BattleReward' }
 
                     BattlePage:
                         type: object
@@ -1510,8 +1536,14 @@ when@dev:
                             tableau nu à la racine, même convention que `WorkoutPage` et `TitleBoard` : c'est ce
                             qui laisse la place à un champ frère plus tard sans casser un client déjà déployé.
                             Ennemis ordinaires puis boss, dans l'ordre de déclaration de chaque liste.
-                        required: [enemies]
+
+                            **`player` précède `enemies` (#227) : c'est le combattant de l'appelant,
+                            modificateurs équipés compris** — le seul endroit de l'API où leur effet se lit
+                            avant de s'engager dans un combat. `GET /api/progression` continue de rendre le
+                            socle nu du ledger ; c'est délibéré.
+                        required: [player, enemies]
                         properties:
+                            player: { $ref: '#/components/schemas/BattleFighter' }
                             enemies:
                                 type: array
                                 items: { $ref: '#/components/schemas/Enemy' }

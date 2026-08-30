@@ -6,6 +6,7 @@ namespace App\Combat\UI\Http\Response;
 
 use App\Combat\Domain\Enemy;
 use App\Combat\Domain\EnemyCatalog;
+use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 
 /**
@@ -21,6 +22,12 @@ use App\Combat\Infrastructure\Translation\EnemyTranslator;
  *
  * Ennemis ordinaires puis boss, dans l'ordre de déclaration de chaque liste — même ordre que
  * {@see EnemiesController} composait avant que cette classe existe.
+ *
+ * **`player` précède `enemies` (#227) : le joueur compare avant de choisir.** C'est le seul
+ * endroit de l'API où l'effet des objets équipés se lit **avant** de s'engager — voir le
+ * docblock d'`EnemiesController` — donc ses propres chiffres doivent être en face de la
+ * liste, pas après. Modificateurs équipés compris, exactement le combattant que
+ * `POST /api/battles` dériverait pour un combat livré à cet instant.
  */
 final readonly class EnemyCatalogResource
 {
@@ -28,13 +35,21 @@ final readonly class EnemyCatalogResource
      * @param list<EnemyResource> $enemies
      */
     private function __construct(
+        public FighterResource $player,
         public array $enemies,
     ) {
     }
 
-    public static function from(EnemyCatalog $catalog, EnemyTranslator $translator): self
+    public static function from(EnemyCatalog $catalog, EnemyTranslator $translator, Fighter $player): self
     {
         return new self(
+            FighterResource::from([
+                'hp' => $player->hp,
+                'damage' => $player->damage,
+                'mitigationPermille' => $player->mitigationPermille,
+                'extraTurnPermille' => $player->extraTurnPermille,
+                'dodgePermille' => $player->dodgePermille,
+            ]),
             array_map(
                 static fn (Enemy $enemy): EnemyResource => EnemyResource::from($enemy, $translator),
                 [...$catalog->all(), ...$catalog->bosses()],
@@ -43,11 +58,12 @@ final readonly class EnemyCatalogResource
     }
 
     /**
-     * @return array{enemies: list<array<string, mixed>>}
+     * @return array{player: array<string, mixed>, enemies: list<array<string, mixed>>}
      */
     public function toArray(): array
     {
         return [
+            'player' => $this->player->toArray(),
             'enemies' => array_map(static fn (EnemyResource $enemy): array => $enemy->toArray(), $this->enemies),
         ];
     }

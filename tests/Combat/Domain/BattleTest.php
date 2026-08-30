@@ -136,13 +136,62 @@ final class BattleTest extends TestCase
         self::assertEquals($foughtAt, $battle->foughtAt());
     }
 
+    /**
+     * `$id` est fourni par l'appelant depuis le #227 — voir le docblock de la classe pour
+     * pourquoi — et non généré ici : la ligne porte exactement celui qu'on lui a donné.
+     */
+    public function testTheIdIsTheOneGivenByTheCaller(): void
+    {
+        $id = Uuid::v7();
+
+        $battle = self::battleOf(id: $id);
+
+        self::assertSame($id->toRfc4122(), $battle->id()->toRfc4122());
+    }
+
+    /**
+     * Le reward est porté tel quel, voir « `$reward` est persisté sur la ligne » dans le
+     * docblock de la classe : aucune transformation, aucun recalcul.
+     */
+    public function testTheRewardIsCarriedAsGiven(): void
+    {
+        $reward = [
+            'loot' => [['key' => 'WORN_RUNNING_SHOES']],
+            'coins' => ['gained' => 8, 'before' => 40, 'after' => 48],
+        ];
+
+        $battle = self::battleOf(reward: $reward);
+
+        self::assertSame($reward, $battle->reward());
+    }
+
+    /**
+     * La forme vide, voir `App\Shared\Application\BattleDrop::none()` : `loot` vide, `coins`
+     * à gain nul mais un solde réel — jamais des clés absentes.
+     */
+    public function testAnEmptyRewardIsStillTheFullShape(): void
+    {
+        $battle = self::battleOf();
+
+        self::assertSame(
+            ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
+            $battle->reward(),
+        );
+    }
+
+    /**
+     * @param ?array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}} $reward
+     */
     private static function battleOf(
+        ?Uuid $id = null,
         ?BattleOutcome $outcome = null,
+        ?array $reward = null,
         string $seed = "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x30\x31\x32",
         string $rulesetVersion = 'v1-000000000000',
         ?DateTimeImmutable $foughtAt = null,
     ): Battle {
         return Battle::conclude(
+            $id ?? Uuid::v7(),
             Uuid::v7(),
             new AttributeGains(10, 20, 30, 40),
             500,
@@ -150,6 +199,7 @@ final class BattleTest extends TestCase
             new Enemy('SAND_JACKAL', 1, 120, 10, 50, 40, 20),
             new Fighter(120, 10, 50, 40, 20),
             $outcome ?? new BattleOutcome(BattleResult::Victory, [new BattleStarted(150, 120), new BattleFinished(BattleResult::Victory)], 1),
+            $reward ?? ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
             $seed,
             $rulesetVersion,
             $foughtAt ?? new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
