@@ -73,8 +73,23 @@ final class BattlesTest extends ApiTestCase
         self::assertSame('BATTLE_FINISHED', $last['type']);
         self::assertSame($body['result'], $last['result']);
 
-        // Aucune récompense en V1 : présente et vide, jamais absente.
-        self::assertSame([], $body['rewards']);
+        // Toujours la forme complète, victoire ou défaite — voir le docblock de
+        // `App\Shared\Application\BattleDrop::none()` : jamais une clé absente.
+        $rewards = $body['rewards'];
+        self::assertIsArray($rewards);
+        self::assertIsArray($rewards['loot']);
+        $coins = $rewards['coins'];
+        self::assertIsArray($coins);
+        self::assertArrayHasKey('gained', $coins);
+        self::assertArrayHasKey('before', $coins);
+        self::assertArrayHasKey('after', $coins);
+
+        // Seule une victoire rapporte — voir le docblock de `FightBattleHandler`.
+        if ('DEFEAT' === $body['result']) {
+            self::assertSame([], $rewards['loot']);
+            self::assertSame(0, $coins['gained']);
+            self::assertSame($coins['before'], $coins['after']);
+        }
     }
 
     /**
@@ -184,6 +199,7 @@ final class BattlesTest extends ApiTestCase
         self::assertInstanceOf(BattleRepository::class, $repository);
 
         $battle = Battle::conclude(
+            Uuid::v7(),
             $bob->id,
             new AttributeGains(0, 0, 0, 0),
             0,
@@ -195,6 +211,7 @@ final class BattlesTest extends ApiTestCase
                 [new BattleStarted(140, 120), new BattleFinished(BattleResult::Victory)],
                 1,
             ),
+            ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable(),

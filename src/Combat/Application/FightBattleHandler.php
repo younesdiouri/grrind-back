@@ -5,19 +5,25 @@ declare(strict_types=1);
 namespace App\Combat\Application;
 
 use App\Combat\Domain\Battle;
+use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\Enemy;
 use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Domain\Exception\EnemyKeyUnknown;
 use App\Combat\Domain\Exception\EnemyLevelTooLow;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
+use App\Shared\Application\BattleDrop;
+use App\Shared\Application\BattleDrops;
+use App\Shared\Application\DroppedItem;
 use App\Shared\Application\PlayerProgressions;
 use Psr\Clock\ClockInterface;
 use Random\Engine\Xoshiro256StarStar;
 use Random\Randomizer;
+use Symfony\Component\Uid\Uuid;
 
 /**
- * Un combat PvE, de bout en bout : lire le joueur, choisir l'ennemi, jouer, écrire la ligne.
+ * Un combat PvE, de bout en bout : lire le joueur, choisir l'ennemi, jouer, écrire la ligne
+ * et sa récompense (#227).
  *
  * ## Le pipeline, dans l'ordre
  *
@@ -32,14 +38,32 @@ use Random\Randomizer;
  * 3. `random_bytes(32)` tire la graine — jamais un hash d'une chaîne, voir le docblock de
  *    {@see Battle} pour le piège que ça a coûté au #209 ;
  * 4. {@see BattleSimulator::fight()} joue le combat, pur, sur les deux combattants et le
- *    `Randomizer` grainé ;
- * 5. {@see Battle::conclude()} écrit la ligne, jamais mutée après.
+ *    `Randomizer` grainé — tout ce qui précède est du calcul, rien de tout ça n'a besoin
+ *    d'une transaction ouverte ;
+ * 5. **sous une seule transaction** — voir « Le tirage, dans la même transaction que
+ *    l'écriture » plus bas — {@see BattleDrops::rollFor()} tire la récompense, puis
+ *    {@see Battle::conclude()} écrit la ligne, reward compris, jamais mutée après.
  *
  * **`$this->clock->now()` n'est appelée qu'une fois** (#224), au tout début, et sert à la
  * fois de date pour {@see \App\Shared\Application\ModifierResolver} — via `FighterFactory`
- * — et de `$foughtAt` : un combat a lieu à l'instant de la requête, contrairement à un
- * workout, et les deux usages doivent parler du même instant plutôt que de deux appels
- * d'horloge qui pourraient diverger d'une milliseconde.
+ * puis via `BattleDrops` pour `LOOT_LUCK` — et de `$foughtAt` : un combat a lieu à l'instant
+ * de la requête, contrairement à un workout, et les trois usages doivent parler du même
+ * instant plutôt que de plusieurs appels d'horloge qui pourraient diverger d'une
+ * milliseconde.
+ *
+ * ## Le tirage, dans la même transaction que l'écriture (#227)
+ *
+ * Le geste reproduit est celui de `ImportWorkoutsHandler` et `GrantXpHandler`, pas un
+ * troisième inventé pour l'occasion : {@see BattleRepository::transactional()} ouvre la
+ * transaction, et chaque écriture de `Rewards` sous elle (`LootRoll`, `Inventory`,
+ * `CoinLedger`) rouvre son propre `wrapInTransaction` — DBAL en fait un point de sauvegarde,
+ * jamais une seconde transaction réelle. Un combat gagné dont le loot n'est pas écrit serait
+ * une perte silencieuse ; un loot écrit sans son combat, un objet sans provenance.
+ *
+ * `$id` est tiré **avant** d'ouvrir la transaction, parce que {@see BattleDrops::rollFor()}
+ * en a besoin comme `causeId` de son tirage avant que la ligne `Battle` existe — voir
+ * « `$id` est fourni par l'appelant » dans le docblock de `Battle` pour pourquoi c'est ici,
+ * et pas dans le constructeur de `Battle`, que ça se décide.
  *
  * ## Le choix de l'adversaire (#219)
  *
@@ -50,17 +74,24 @@ use Random\Randomizer;
  * `forLevel()` l'aurait choisi tout seul — fait alors office de niveau minimum, exactement
  * comme le `minimum_level` d'un boss.
  *
- * **Effet de bord assumé : un joueur peut réaffronter un ennemi d'un palier inférieur au
- * sien.** Sans conséquence tant qu'un combat ne rapporte rien — aucune récompense n'existe
- * encore, voir plus bas — et la question du farm se repose entièrement le jour où un
- * combat rapportera quelque chose ; elle appartient à ce ticket-là, pas au #219.
+ * ## La récompense d'une victoire, et rien ne borne le farm en V1 (#227)
  *
- * ## Aucune récompense
+ * **Seule une victoire rapporte.** `BattleResult::Victory === $outcome->result` est calculé
+ * une fois ici et traverse en booléen jusqu'à {@see BattleDrops::rollFor()} — voir son
+ * docblock pour pourquoi jamais `BattleResult` lui-même. Une défaite, ou une victoire
+ * tranchée par `max_turns` sans KO, ne rapportent ni objet ni pièce : une récompense de
+ * consolation ferait du combat perdu la stratégie optimale, puisqu'il est plus rapide à
+ * jouer qu'à gagner.
  *
- * Pas d'XP, pas de loot, pas d'événement dans l'outbox — voir le ticket #211. L'XP est un
- * ledger alimenté par le sport ; en créditer pour un combat que le joueur regarde casserait
- * la prémisse du produit. La récompense viendra par le `LootRoller` audité du Lot 6, pas
- * par une addition ici.
+ * **Rien ne borne le farm en V1, et c'est une décision, pas un oubli.** Pas de cooldown,
+ * pas de première-victoire-seulement, pas de plafond quotidien, pas de jeton de combat : un
+ * joueur peut rejouer le même adversaire en boucle et empiler les pièces — y compris un
+ * ennemi d'un palier très inférieur au sien, effet de bord du #219 resté sans conséquence
+ * tant qu'un combat ne rapportait rien, et qui en a une maintenant. C'est assumé pour la
+ * phase de dev (voir `CLAUDE.md`) : personne ne joue encore, aucune économie n'est calibrée,
+ * et choisir un garde-fou maintenant reviendrait à équilibrer contre une intuition plutôt
+ * que contre des chiffres. Le ticket de dette #228 le posera, sur des chiffres, avant le
+ * premier joueur réel.
  */
 final readonly class FightBattleHandler
 {
@@ -70,6 +101,7 @@ final readonly class FightBattleHandler
         private EnemyCatalog $enemies,
         private BattleSimulator $simulator,
         private BattleRepository $battles,
+        private BattleDrops $drops,
         private string $rulesetVersion,
         private ClockInterface $clock,
     ) {
@@ -101,23 +133,46 @@ final readonly class FightBattleHandler
 
         $outcome = $this->simulator->fight($player, $enemyFighter, $randomizer);
 
-        $battle = Battle::conclude(
-            $command->playerId,
-            $progression->attributes,
-            $progression->vitality,
+        // Tiré avant la transaction — voir « Le tirage, dans la même transaction que
+        // l'écriture » dans le docblock de la classe pour pourquoi `BattleDrops` en a
+        // besoin avant que la ligne existe.
+        $id = Uuid::v7();
+        $victory = BattleResult::Victory === $outcome->result;
+
+        return $this->battles->transactional(function () use (
+            $id,
+            $command,
+            $progression,
             $player,
             $enemy,
             $enemyFighter,
             $outcome,
+            $victory,
             $seed,
-            $this->rulesetVersion,
             $now,
-        );
+        ): Battle {
+            $drop = $this->drops->rollFor($command->playerId, $enemy->key, $victory, $id, $now);
 
-        $this->battles->add($battle);
-        $this->battles->commit();
+            $battle = Battle::conclude(
+                $id,
+                $command->playerId,
+                $progression->attributes,
+                $progression->vitality,
+                $player,
+                $enemy,
+                $enemyFighter,
+                $outcome,
+                self::rewardToArray($drop),
+                $seed,
+                $this->rulesetVersion,
+                $now,
+            );
 
-        return $battle;
+            $this->battles->add($battle);
+            $this->battles->commit();
+
+            return $battle;
+        });
     }
 
     /**
@@ -140,5 +195,25 @@ final readonly class FightBattleHandler
         }
 
         return $enemy;
+    }
+
+    /**
+     * La forme persistée sur `Battle::$reward` — voir son docblock. Les objets d'abord,
+     * déjà sérialisés par `Rewards` via {@see DroppedItem::toArray()}, puis les pièces en
+     * `{gained, before, after}` : le même ordre et les mêmes clés que `RewardSummary` rend
+     * déjà pour un drop de séance, pour que le client réutilise le composant qu'il a écrit.
+     *
+     * @return array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}
+     */
+    private static function rewardToArray(BattleDrop $drop): array
+    {
+        return [
+            'loot' => array_map(static fn (DroppedItem $item): array => $item->toArray(), $drop->items),
+            'coins' => [
+                'gained' => $drop->coinsGained,
+                'before' => $drop->coinsBefore,
+                'after' => $drop->coinsAfter,
+            ],
+        ];
     }
 }

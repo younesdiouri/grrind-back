@@ -69,6 +69,36 @@ use Symfony\Component\Uid\Uuid;
  * précisément pour ça que le format retenu identifie chaque champ par son **nom** plutôt que
  * par sa position. Seul l'ordre des **éléments de la liste** `$timeline` compte — c'est lui
  * l'ordre de l'animation — et celui-là, PostgreSQL le préserve.
+ *
+ * ## `$reward` est persisté sur la ligne, jamais rejoué depuis la graine (#227)
+ *
+ * Même raisonnement, exactement, que pour `$timeline` : le jour où `loot.yaml` est
+ * rééquilibré, rejouer une vieille graine de tirage sous les tables courantes rendrait un
+ * **autre** butin que celui que le joueur a vu tomber. `$reward` est donc écrit une fois, à
+ * la construction, sous la forme `{loot: [...], coins: {gained, before, after}}` — les
+ * mêmes clés, dans le même ordre, que `RewardSummary` rend déjà pour un drop de séance, pour
+ * que le client réutilise le composant qu'il a écrit. Une défaite ou une victoire tranchée
+ * par `max_turns` sans KO portent `{loot: [], coins: {gained: 0, before: X, after: X}}` —
+ * jamais une clé absente, voir le docblock de `App\Shared\Application\BattleDrop` pour
+ * pourquoi le solde voyage même à gain nul.
+ *
+ * Le tableau qui remplit cette colonne est déjà entièrement sérialisé quand il arrive ici —
+ * {@see \App\Shared\Application\DroppedItem::toArray()}, appelé par
+ * {@see \App\Combat\Application\FightBattleHandler} — jamais un objet `BattleDrop`
+ * lui-même : le domaine de `Combat` ne dépend que de `Shared\Domain`, jamais de
+ * `Shared\Application`, même limite que partout ailleurs dans ce module.
+ *
+ * ## `$id` est fourni par l'appelant, et c'est une exception à la règle du module (#227)
+ *
+ * Chaque autre agrégat de ce dépôt (`Workout`, `XpTransaction`, `LootRoll`…) génère son
+ * `Uuid::v7()` dans son propre constructeur ; celui-ci le recevait ainsi jusqu'au #227.
+ * Le tirage de `$reward` a besoin de l'identifiant de **cette** ligne avant qu'elle
+ * existe — {@see \App\Rewards\Domain\LootRoll::$causeId} le porte, exactement comme il
+ * porte l'identifiant du workout pour un drop de séance — et `Battle` ne peut être construit
+ * qu'une seule fois, avec sa récompense déjà connue. `FightBattleHandler` tire donc l'`Uuid`
+ * en premier et le fait entrer par la signature plutôt que de rouvrir cette classe à une
+ * seconde construction ou à une mutation après coup, ce que sa règle « jamais mutée après »
+ * refuse par ailleurs.
  */
 #[ORM\Entity(repositoryClass: BattleRepository::class)]
 #[ORM\Table(name: 'combat_battle')]
@@ -118,6 +148,16 @@ class Battle
     #[ORM\Column(type: Types::JSONB)]
     private array $timeline;
 
+    /**
+     * Ce qu'une victoire a rapporté — voir « `$reward` est persisté sur la ligne » dans le
+     * docblock de la classe. Vide (`loot: []`, `coins` à gain nul) pour une défaite ou un
+     * combat sans table éligible, jamais absent.
+     *
+     * @var array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}
+     */
+    #[ORM\Column(type: Types::JSONB)]
+    private array $reward;
+
     /** 64 caractères hexadécimaux : voir le docblock de la classe pour ce choix. */
     #[ORM\Column(length: 64)]
     private string $seed;
@@ -143,12 +183,15 @@ class Battle
     /**
      * @param array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}} $playerSnapshot
      * @param array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}                                                                                    $enemySnapshot
+     * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}                                                                                                                      $reward
      */
     private function __construct(
+        Uuid $id,
         Uuid $playerId,
         array $playerSnapshot,
         array $enemySnapshot,
         BattleOutcome $outcome,
+        array $reward,
         string $seed,
         string $rulesetVersion,
         DateTimeImmutable $foughtAt,
@@ -157,12 +200,13 @@ class Battle
             throw new InvalidArgumentException(\sprintf('La graine d\'un combat doit faire %d octets, %d reçus.', self::SEED_LENGTH_BYTES, \strlen($seed)));
         }
 
-        $this->id = Uuid::v7();
+        $this->id = $id;
         $this->playerId = $playerId;
         $this->playerSnapshot = $playerSnapshot;
         $this->enemySnapshot = $enemySnapshot;
         $this->result = $outcome->result;
         $this->timeline = array_map(self::eventToArray(...), $outcome->timeline);
+        $this->reward = $reward;
         $this->seed = bin2hex($seed);
         $this->rulesetVersion = $rulesetVersion;
         $this->turns = $outcome->turns;
@@ -172,11 +216,20 @@ class Battle
     /**
      * Le seul point de construction — voir le docblock de la classe : jamais mutée après.
      *
+     * `$id` est fourni par l'appelant, jamais généré ici — voir « `$id` est fourni par
+     * l'appelant » dans le docblock de la classe pour pourquoi.
+     *
      * `$seed` est la graine **brute**, telle que tirée par `random_bytes(32)` dans
      * {@see \App\Combat\Application\FightBattleHandler} — pas encore convertie en
      * hexadécimal, ce que fait cette classe.
+     *
+     * `$reward` est déjà entièrement sérialisé par l'appelant — voir « `$reward` est
+     * persisté sur la ligne » dans le docblock de la classe.
+     *
+     * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}} $reward
      */
     public static function conclude(
+        Uuid $id,
         Uuid $playerId,
         AttributeGains $playerAttributes,
         int $playerVitality,
@@ -184,15 +237,18 @@ class Battle
         Enemy $enemy,
         Fighter $enemyFighter,
         BattleOutcome $outcome,
+        array $reward,
         string $seed,
         string $rulesetVersion,
         DateTimeImmutable $foughtAt,
     ): self {
         return new self(
+            $id,
             $playerId,
             self::playerSnapshotOf($playerAttributes, $playerVitality, $playerFighter),
             self::enemySnapshotOf($enemy, $enemyFighter),
             $outcome,
+            $reward,
             $seed,
             $rulesetVersion,
             $foughtAt,
@@ -236,6 +292,17 @@ class Battle
     public function timeline(): array
     {
         return $this->timeline;
+    }
+
+    /**
+     * Vide pour une défaite ou un combat sans table éligible — voir le docblock de la
+     * classe pour pourquoi ce n'est jamais rejoué depuis `$seed`.
+     *
+     * @return array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}
+     */
+    public function reward(): array
+    {
+        return $this->reward;
     }
 
     /** 64 caractères hexadécimaux — voir le docblock de la classe. */

@@ -77,12 +77,28 @@ final class BattleResourcePayloadTest extends TestCase
     }
 
     /**
-     * Aucune récompense en V1 : présente et vide, jamais absente — même argument que `loot`,
-     * `streak` et `unlockableNodes` sur le `RewardSummary`.
+     * Une défaite ou un combat sans table éligible porte la forme vide — jamais une clé
+     * absente — voir le docblock de `App\Shared\Application\BattleDrop::none()`.
      */
-    public function testRewardsIsPresentAndEmpty(): void
+    public function testAnEmptyRewardIsStillTheFullShape(): void
     {
-        self::assertSame([], self::resource()->toArray()['rewards']);
+        self::assertSame(
+            ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
+            self::resource()->toArray()['rewards'],
+        );
+    }
+
+    /** `rewards` vient de `Battle::$reward` tel quel, jamais recalculé par la ressource. */
+    public function testANonEmptyRewardIsRenderedAsGiven(): void
+    {
+        $reward = [
+            'loot' => [['key' => 'WORN_RUNNING_SHOES']],
+            'coins' => ['gained' => 8, 'before' => 40, 'after' => 48],
+        ];
+
+        $battle = self::battleAgainst('SAND_JACKAL', $reward);
+
+        self::assertSame($reward, BattleResource::from($battle, new EnemyTranslator(self::stubTranslator()))->toArray()['rewards']);
     }
 
     /** Le nom vient du traducteur, jamais de la clé brute stockée dans le snapshot. */
@@ -119,9 +135,13 @@ final class BattleResourcePayloadTest extends TestCase
         return BattleResource::from(self::battleAgainst('SAND_JACKAL'), new EnemyTranslator(self::stubTranslator()));
     }
 
-    private static function battleAgainst(string $enemyKey): Battle
+    /**
+     * @param ?array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}} $reward
+     */
+    private static function battleAgainst(string $enemyKey, ?array $reward = null): Battle
     {
         return Battle::conclude(
+            Uuid::v7(),
             Uuid::v7(),
             new AttributeGains(10, 20, 30, 40),
             500,
@@ -139,6 +159,7 @@ final class BattleResourcePayloadTest extends TestCase
                 ],
                 2,
             ),
+            $reward ?? ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),

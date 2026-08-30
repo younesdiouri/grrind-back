@@ -14,6 +14,7 @@ use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
 use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeImmutable;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * De quoi écrire un combat directement en base, un `foughtAt` choisi par l'appelant compris —
@@ -30,17 +31,22 @@ use DateTimeImmutable;
  */
 trait Battles
 {
+    /**
+     * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}} $reward
+     */
     protected function recordBattle(
         Account $account,
         DateTimeImmutable $foughtAt,
         BattleResult $result = BattleResult::Victory,
         int $turns = 3,
         string $enemyKey = 'SAND_JACKAL',
+        array $reward = ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
     ): string {
         $repository = self::getContainer()->get(BattleRepository::class);
         self::assertInstanceOf(BattleRepository::class, $repository);
 
         $battle = Battle::conclude(
+            Uuid::v7(),
             $account->id,
             new AttributeGains(0, 0, 0, 0),
             0,
@@ -52,6 +58,7 @@ trait Battles
                 [new BattleStarted(140, 120), new BattleFinished($result)],
                 $turns,
             ),
+            $reward,
             random_bytes(32),
             'v1-000000000000',
             $foughtAt,

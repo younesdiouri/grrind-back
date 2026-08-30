@@ -193,11 +193,28 @@ final class ListBattlesTest extends ApiTestCase
         $battle = $this->history($bob)['battles'][0];
         self::assertIsArray($battle);
 
-        self::assertSame(['id', 'result', 'enemy', 'turns', 'foughtAt'], array_keys($battle));
+        self::assertSame(['id', 'result', 'enemy', 'turns', 'foughtAt', 'rewards'], array_keys($battle));
 
         $enemy = $battle['enemy'];
         self::assertIsArray($enemy);
         self::assertSame(['key', 'name'], array_keys($enemy));
+    }
+
+    /**
+     * `rewards` rend `Battle.rewards` à l'identique de `POST /api/battles` (#227) — c'est
+     * une ligne déjà écrite, il n'y a rien à recalculer pour l'afficher dans la liste.
+     */
+    public function testRewardsIsRenderedAsRecorded(): void
+    {
+        $bob = $this->openAccount();
+        $reward = ['loot' => [['key' => 'WORN_RUNNING_SHOES']], 'coins' => ['gained' => 8, 'before' => 40, 'after' => 48]];
+        $this->recordBattle($bob, new DateTimeImmutable('2026-07-15T08:00:00+00:00'), reward: $reward);
+
+        $battle = $this->history($bob)['battles'][0];
+        self::assertIsArray($battle);
+        // `assertEquals`, pas `assertSame` : PostgreSQL réordonne les clés d'un objet JSONB
+        // au stockage — voir le docblock de `Battle`.
+        self::assertEquals($reward, $battle['rewards']);
     }
 
     /**

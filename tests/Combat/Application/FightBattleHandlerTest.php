@@ -141,12 +141,14 @@ final class FightBattleHandlerTest extends KernelTestCase
 
             $battle = Battle::conclude(
                 Uuid::v7(),
+                Uuid::v7(),
                 $progression->attributes,
                 $progression->vitality,
                 $player,
                 $enemy,
                 $enemyFighter,
                 $outcome,
+                ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
                 $seed,
                 $this->rulesetVersion,
                 $now,
