@@ -1096,10 +1096,10 @@ when@dev:
                     CoinHistoryPage:
                         type: object
                         description: |
-                            `GET /api/inventory/coins` : le solde, et une page de mouvements **dans l'ordre du
-                            ledger** — `id` décroissant, pas `occurredAt` comme `XpHistoryPage`. Un import peut
-                            créditer une vieille date après une plus récente ; l'`id`, un UUID v7, naît lui
-                            strictement dans l'ordre d'écriture, voir le docblock de
+                            `GET /api/inventory/coins` : le solde, et une page de mouvements dans l'ordre du
+                            fait — `occurredAt` décroissant, puis l'identifiant pour départager, même tri
+                            qu'`XpHistoryPage` et `BattlePage`. Une pièce créditée par un vieux workout se
+                            range à la date de ce workout, pas à celle de l'écriture — voir le docblock de
                             `CoinTransactionRepository::history()`.
                         required: [balance, transactions, nextCursor]
                         properties:

@@ -27,11 +27,11 @@ use Symfony\Component\Uid\Uuid;
  *
  * **Le solde n'est pas une colonne.** Il n'y a pas de projection façon
  * `progression_snapshot` en v1 : la ligne d'index `idx_rewards_coin_transaction_user_id`
- * sur `(user_id, id)` existe pour que la somme reste une lecture d'index — voir
- * {@see CoinTransactionRepository::balanceOf()}. Un
- * cache s'ajoutera le jour où on mesurera qu'il manque, et il sera reconstructible par
- * cette même somme — exactement le rapport que `progression_snapshot` entretient avec
- * `xp_transaction`.
+ * sur `(user_id, occurred_at, id)` sert `user_id` en tête pour que la somme de
+ * {@see CoinTransactionRepository::balanceOf()} filtre par index plutôt que de balayer la
+ * table entière. Un cache s'ajoutera le jour où on mesurera qu'il manque, et il sera
+ * reconstructible par cette même somme — exactement le rapport que `progression_snapshot`
+ * entretient avec `xp_transaction`.
  *
  * **Pas de clé étrangère**, ni vers le compte ni vers ce qui a causé l'écriture : même
  * choix et mêmes raisons que sur `LootRoll` — `Rewards` ne connaît ni `Identity`, ni
@@ -39,16 +39,16 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: CoinTransactionRepository::class)]
 #[ORM\Table(name: 'rewards_coin_transaction')]
-// Le solde d'un joueur est `SUM(amount) WHERE user_id = ?` : cet index est ce qui garde
-// cette somme une lecture d'index plutôt qu'un balayage de la table entière. `id` plutôt
-// que `occurred_at` en seconde colonne, comme `idx_xp_transaction_user_id` — la somme ne
-// trie pas. Cette même colonne sert aussi l'historique paginé de `GET /api/inventory/coins`
-// (#30) : contrairement au ledger d'XP, qui trie par la date du fait, un relevé de pièces
-// trie par l'ordre du ledger lui-même — voir le docblock de
-// `CoinTransactionRepository::history()` pour pourquoi c'est la bonne règle ici, et
-// pourquoi elle n'a réclamé aucun second index.
-
-#[ORM\Index(name: 'idx_rewards_coin_transaction_user_id', columns: ['user_id', 'id'])]
+// `(user_id, occurred_at, id)`, remplace le `(user_id, id)` du #225 — même correction que
+// `Version20260829160000` sur `idx_combat_battle_player` : le tri de
+// `GET /api/inventory/coins` (#30) porte sur la date du **fait**, jamais sur l'ordre
+// d'écriture, voir le docblock de `CoinTransactionRepository::history()`. Un import qui
+// remonte un workout vieux de dix jours doit ranger sa pièce dix jours en arrière, à côté
+// de la ligne d'XP du même workout — deux écrans qui trieraient différemment le même
+// import ne se recouperaient plus. `user_id` en tête sert toujours `balanceOf()` : la
+// somme n'a besoin que de filtrer par joueur, les deux colonnes suivantes ne lui coûtent
+// rien.
+#[ORM\Index(name: 'idx_rewards_coin_transaction_user_id', columns: ['user_id', 'occurred_at', 'id'])]
 class CoinTransaction
 {
     #[ORM\Id]

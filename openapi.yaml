@@ -2031,7 +2031,7 @@ components:
           format: date-time
       type: object
     CoinHistoryPage:
-      description: "`GET /api/inventory/coins` : le solde, et une page de mouvements **dans l'ordre du\nledger** — `id` décroissant, pas `occurredAt` comme `XpHistoryPage`. Un import peut\ncréditer une vieille date après une plus récente ; l'`id`, un UUID v7, naît lui\nstrictement dans l'ordre d'écriture, voir le docblock de\n`CoinTransactionRepository::history()`.\n"
+      description: "`GET /api/inventory/coins` : le solde, et une page de mouvements dans l'ordre du\nfait — `occurredAt` décroissant, puis l'identifiant pour départager, même tri\nqu'`XpHistoryPage` et `BattlePage`. Une pièce créditée par un vieux workout se\nrange à la date de ce workout, pas à celle de l'écriture — voir le docblock de\n`CoinTransactionRepository::history()`.\n"
       required:
         - balance
         - transactions

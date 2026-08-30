@@ -13,11 +13,9 @@ use App\Shared\UI\Http\Cursor;
  * et qu'{@see \App\Combat\Application\ListBattlesHandler} : une ligne de plus que demandé est
  * lue à chaque appel, et si elle existe, il y a une suite.
  *
- * **Le curseur suivant porte `occurredAt`, alors que le tri ne le regarde pas.** `Cursor`
- * est la forme partagée par les trois historiques — voir son docblock — et rester dessus
- * plutôt que d'en écrire une seconde vaut de porter un champ inutilisé ici : il reste
- * opaque, le client ne le lit jamais, seul `CoinTransactionRepository::history()` décode
- * `$cursor->id`, voir son docblock pour pourquoi c'est bien lui qui décide de l'ordre.
+ * Même curseur que les deux autres historiques — {@see Cursor} — et pour la même raison :
+ * `(occurredAt, id)` est le couple que `CoinTransactionRepository::history()` compare pour
+ * départager deux écritures de la même date, voir son docblock.
  */
 final readonly class ListCoinHistoryHandler
 {

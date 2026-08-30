@@ -114,18 +114,24 @@ class CoinTransactionRepository extends ServiceEntityRepository
 
     /**
      * L'historique d'un joueur pour `GET /api/inventory/coins` (#30), dans **l'ordre du
-     * ledger** — `id` décroissant — et pas dans celui du fait comme
-     * {@see \App\Progression\Infrastructure\Doctrine\XpTransactionRepository::history()}.
+     * fait** — `(occurredAt, id)`, tous les deux décroissants — le même geste que
+     * {@see \App\Progression\Infrastructure\Doctrine\XpTransactionRepository::history()} et
+     * qu'{@see \App\Combat\Infrastructure\Doctrine\BattleRepository::history()}.
      *
-     * Ce n'est pas la même règle par oubli : `occurredAt` peut reculer d'un import qui
-     * remonte de vieux workouts (voir son docblock sur {@see CoinTransaction}), alors que
-     * `id`, un UUID v7, naît strictement dans l'ordre d'écriture. Un relevé de pièces répond
-     * à « qu'est-ce qui est tombé dans ma bourse, et dans quel ordre je l'ai vu tomber » —
-     * l'ordre du ledger, pas celui du sport. `idx_rewards_coin_transaction_user_id` sur
-     * `(user_id, id)`, posé au #225 pour la seule somme du solde, sert donc déjà ce tri sans
-     * qu'un second index soit nécessaire — la classe anticipait un index dédié le jour où un
-     * historique paginé existerait ; ce jour est venu, et le tri retenu se trouve être celui
-     * que l'index déjà en place sait servir.
+     * **Pas l'ordre d'écriture, et ce n'est pas cosmétique.** Une pièce créditée par un
+     * workout vieux de dix jours doit se ranger dix jours en arrière, à côté de la ligne
+     * d'XP du même workout — sans quoi `GET /api/progression/history` et
+     * `GET /api/inventory/coins` montreraient le même import dans deux ordres différents, et
+     * plus moyen de les rapprocher. C'est exactement ce que dater une écriture par le fait
+     * plutôt que par l'insertion (voir le docblock d'{@see CoinTransaction}) existe pour
+     * permettre ; trier sur `id` l'aurait défait pour ce seul écran.
+     *
+     * `idx_rewards_coin_transaction_user_id` porte désormais `(user_id, occurred_at, id)` —
+     * voir son docblock sur {@see CoinTransaction} — pour que ce tri n'oblige jamais Postgres
+     * à trier à la volée, même correction que sur `idx_combat_battle_player` au #220.
+     *
+     * La comparaison lexicographique s'écrit à la main pour la même raison que sur les
+     * workouts et les combats : DQL n'a pas d'équivalent portable à `(a, b) < (x, y)`.
      *
      * `$take` est volontairement plus grand que la limite demandée — même geste qu'au ledger
      * d'XP : une ligne de plus dit s'il existe une page suivante, sans jamais la rendre.
@@ -137,12 +143,14 @@ class CoinTransactionRepository extends ServiceEntityRepository
         $builder = $this->createQueryBuilder('t')
             ->where('t.userId = :userId')
             ->setParameter('userId', $query->userId, UuidType::NAME)
-            ->orderBy('t.id', 'DESC')
+            ->orderBy('t.occurredAt', 'DESC')
+            ->addOrderBy('t.id', 'DESC')
             ->setMaxResults($take);
 
         if (null !== $query->cursor) {
             $builder
-                ->andWhere('t.id < :cursorId')
+                ->andWhere('t.occurredAt < :cursorAt OR (t.occurredAt = :cursorAt AND t.id < :cursorId)')
+                ->setParameter('cursorAt', $query->cursor->at)
                 ->setParameter('cursorId', $query->cursor->id, UuidType::NAME);
         }
 

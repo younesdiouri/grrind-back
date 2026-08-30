@@ -24,10 +24,11 @@ use Symfony\Component\Uid\Uuid;
  * `GET /api/battles`/`GET /api/battles/{id}` — parce que celui-ci sert un écran qui se
  * défile, quand `GET /api/inventory` répond juste « combien j'ai ».
  *
- * **Le tri est celui du ledger, pas celui du sport — voir le docblock de
- * {@see \App\Rewards\Infrastructure\Doctrine\CoinTransactionRepository::history()}.** C'est
- * la seule différence avec `GET /api/battles` et `GET /api/progression/history`, qui trient
- * tous deux sur la date du fait ; le curseur et l'enveloppe restent la même forme, voir
+ * **Le tri est celui du fait, exactement comme `GET /api/battles` et
+ * `GET /api/progression/history`** — voir le docblock de
+ * {@see \App\Rewards\Infrastructure\Doctrine\CoinTransactionRepository::history()} pour
+ * pourquoi une pièce créditée par un vieux workout doit se ranger à la date de ce workout,
+ * pas à celle de l'écriture. Le curseur et l'enveloppe restent la même forme, voir
  * {@see Cursor}.
  *
  * Aucun filtre, même raisonnement qu'à `BattleHistoryQuery` : aucun écran n'en réclame.

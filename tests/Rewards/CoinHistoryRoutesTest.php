@@ -6,6 +6,7 @@ namespace App\Tests\Rewards;
 
 use App\Rewards\Application\CoinLedger;
 use App\Rewards\Domain\CoinReason;
+use App\Shared\UI\Http\Cursor;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use DateTimeImmutable;
@@ -17,12 +18,12 @@ use Symfony\Component\Uid\Uuid;
  * `GET /api/inventory/coins` (#30) — le solde et le détail des mouvements, paginé au
  * curseur dans la forme de `GET /api/battles` et `GET /api/progression/history`.
  *
- * **Le tri est celui du ledger — l'ordre d'écriture — pas celui du fait.** C'est la
- * décision documentée sur `CoinTransactionRepository::history()`, et c'est ce que
- * {@see testEntriesComeInLedgerOrderNotFactOrder()} prouve : des écritures créditées dans
- * le désordre de leur `occurredAt` — exactement le cas d'un import qui remonte plusieurs
- * jours d'un coup — ressortent dans l'ordre où elles ont été écrites, pas dans celui du
- * sport.
+ * **Le tri est celui du fait — `occurredAt` — pas celui de l'écriture.** Une pièce créditée
+ * par un vieux workout doit se ranger à la date de ce workout, exactement comme le ledger
+ * d'XP et l'historique des combats : voir le docblock de
+ * `CoinTransactionRepository::history()`. {@see testEntriesComeInFactOrderNotWriteOrder()}
+ * le prouve en créditant dans le désordre de la date — le cas d'un import qui remonte
+ * plusieurs jours d'un coup.
  */
 final class CoinHistoryRoutesTest extends ApiTestCase
 {
@@ -48,22 +49,25 @@ final class CoinHistoryRoutesTest extends ApiTestCase
 
     /**
      * **Le cœur du ticket.** Trois écritures créditées dans l'ordre inverse de leur date —
-     * un import qui remonte du plus récent au plus ancien produirait exactement ce lot.
-     * L'historique les rend dans l'ordre où elles ont été *écrites*, jamais dans celui de
-     * `occurredAt`.
+     * exactement ce que produirait un import qui remonte du plus récent workout au plus
+     * ancien. L'historique les rend dans l'ordre de `occurredAt`, jamais dans celui où elles
+     * ont été écrites.
      */
-    public function testEntriesComeInLedgerOrderNotFactOrder(): void
+    public function testEntriesComeInFactOrderNotWriteOrder(): void
     {
         $bob = $this->openAccount();
 
-        $writtenFirst = $this->credit($bob->id, CoinReason::WorkoutDrop, 5, new DateTimeImmutable('2026-08-01T08:00:00+00:00'));
-        $writtenSecond = $this->credit($bob->id, CoinReason::WorkoutDrop, 5, new DateTimeImmutable('2026-08-15T08:00:00+00:00'));
-        $writtenThird = $this->credit($bob->id, CoinReason::WorkoutDrop, 5, new DateTimeImmutable('2026-07-01T08:00:00+00:00'));
+        $mostRecentFact = $this->credit($bob->id, CoinReason::WorkoutDrop, 5, new DateTimeImmutable('2026-08-15T08:00:00+00:00'));
+        $middleFact = $this->credit($bob->id, CoinReason::WorkoutDrop, 5, new DateTimeImmutable('2026-08-08T08:00:00+00:00'));
+        $oldestFact = $this->credit($bob->id, CoinReason::WorkoutDrop, 5, new DateTimeImmutable('2026-08-01T08:00:00+00:00'));
 
+        // Écrites du fait le plus récent au plus ancien : l'inverse de ce qu'un import
+        // produirait. Si le tri suivait l'ordre d'écriture, cette liste sortirait telle
+        // quelle plutôt que dans l'ordre attendu ci-dessous.
         self::assertSame(
-            [$writtenThird, $writtenSecond, $writtenFirst],
+            [$mostRecentFact, $middleFact, $oldestFact],
             $this->idsOf($this->history($bob)),
-            'Le plus récemment écrit vient en premier, quelle que soit la date du fait.',
+            'Le fait le plus récent vient en premier, quel que soit l\'ordre d\'écriture.',
         );
     }
 
@@ -71,37 +75,74 @@ final class CoinHistoryRoutesTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
-        $written = [];
-        for ($i = 0; $i < 5; ++$i) {
-            $written[] = $this->credit($bob->id, CoinReason::WorkoutDrop, 1, new DateTimeImmutable());
+        $all = [];
+        for ($day = 5; $day >= 1; --$day) {
+            $all[] = $this->credit($bob->id, CoinReason::WorkoutDrop, 1, new DateTimeImmutable(\sprintf('2026-07-0%dT08:00:00+00:00', $day)));
         }
-        // Le plus récemment écrit vient en premier.
-        $expected = array_reverse($written);
 
         $firstPage = $this->history($bob, ['limit' => 2]);
-        self::assertSame(\array_slice($expected, 0, 2), $this->idsOf($firstPage));
+        self::assertSame(\array_slice($all, 0, 2), $this->idsOf($firstPage));
         self::assertIsString($firstPage['nextCursor']);
 
+        // Un mouvement livré pendant le défilement ne décale rien : il se range à sa date et
+        // n'a aucun effet sur les pages déjà servies.
+        $intercale = $this->credit($bob->id, CoinReason::WorkoutDrop, 1, new DateTimeImmutable('2026-06-01T08:00:00+00:00'));
+
         $secondPage = $this->history($bob, ['limit' => 2, 'cursor' => $firstPage['nextCursor']]);
-        self::assertSame(\array_slice($expected, 2, 2), $this->idsOf($secondPage));
+        self::assertSame(\array_slice($all, 2, 2), $this->idsOf($secondPage));
         self::assertIsString($secondPage['nextCursor']);
 
         $lastPage = $this->history($bob, ['limit' => 2, 'cursor' => $secondPage['nextCursor']]);
-        self::assertSame(\array_slice($expected, 4, 1), $this->idsOf($lastPage));
+        self::assertSame([$all[4], $intercale], $this->idsOf($lastPage));
         self::assertNull($lastPage['nextCursor']);
     }
 
-    public function testAnAccountNeverSeesAnothersHistory(): void
+    /**
+     * **Le cas que le curseur composite existe pour couvrir.** Deux mouvements crédités à la
+     * même seconde ne doivent être ni rendus deux fois ni sautés — un curseur qui ne
+     * porterait que la date s'arrêterait entre les deux sans savoir lequel il a déjà servi.
+     */
+    public function testTwoTransactionsAtTheSameSecondAreNeitherRepeatedNorSkipped(): void
+    {
+        $bob = $this->openAccount();
+        $sameSecond = new DateTimeImmutable('2026-07-15T08:30:00+00:00');
+
+        $this->credit($bob->id, CoinReason::WorkoutDrop, 1, $sameSecond);
+        $this->credit($bob->id, CoinReason::WorkoutDrop, 1, $sameSecond);
+        $this->credit($bob->id, CoinReason::WorkoutDrop, 1, $sameSecond);
+
+        $seen = [];
+        $cursor = null;
+
+        do {
+            $page = $this->history($bob, null === $cursor ? ['limit' => 1] : ['limit' => 1, 'cursor' => $cursor]);
+            $seen = [...$seen, ...$this->idsOf($page)];
+            $cursor = $page['nextCursor'];
+        } while (null !== $cursor);
+
+        self::assertCount(3, $seen);
+        self::assertSame($seen, array_unique($seen), 'Aucun mouvement ne doit être rendu deux fois.');
+    }
+
+    public function testAnAccountNeverSeesAnothersHistoryEvenByForcingTheCursor(): void
     {
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
         $bob = $this->openAccount();
 
-        $this->credit($alice->id, CoinReason::WorkoutDrop, 999, new DateTimeImmutable());
-        $bobsTransaction = $this->credit($bob->id, CoinReason::WorkoutDrop, 5, new DateTimeImmutable());
+        $aliceOccurredAt = new DateTimeImmutable('2026-07-16T08:00:00+00:00');
+        $alicesTransaction = $this->credit($alice->id, CoinReason::WorkoutDrop, 999, $aliceOccurredAt);
+        $earlier = $this->credit($bob->id, CoinReason::WorkoutDrop, 5, new DateTimeImmutable('2026-07-15T08:00:00+00:00'));
+        $later = $this->credit($bob->id, CoinReason::WorkoutDrop, 3, new DateTimeImmutable('2026-07-17T08:00:00+00:00'));
 
         $body = $this->history($bob);
-        self::assertSame(5, $body['balance']);
-        self::assertSame([$bobsTransaction], $this->idsOf($body));
+        self::assertSame(8, $body['balance']);
+        self::assertSame([$later, $earlier], $this->idsOf($body));
+
+        // Le curseur d'Alice, rejoué par Bob : la position se lit sur le mouvement de Bob
+        // dont la date précède celle d'Alice — jamais sur celui d'Alice, qui n'apparaît à
+        // aucun moment dans la page de Bob.
+        $forgedCursor = Cursor::of($aliceOccurredAt, Uuid::fromString($alicesTransaction))->encoded();
+        self::assertSame([$earlier], $this->idsOf($this->history($bob, ['cursor' => $forgedCursor])));
     }
 
     public function testRefusesALimitBeyondTheCeiling(): void
