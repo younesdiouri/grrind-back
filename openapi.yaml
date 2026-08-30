@@ -952,6 +952,7 @@ components:
             - 'https://grrind.app/problems/battle-not-found'
             - 'https://grrind.app/problems/enemy-key-unknown'
             - 'https://grrind.app/problems/enemy-level-too-low'
+            - 'https://grrind.app/problems/insufficient-coin-balance'
         title:
           type: string
           example: Conflict

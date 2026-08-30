@@ -252,6 +252,12 @@ when@dev:
                                     # `GET /api/enemies`, il n'y a rien à protéger.
                                     - https://grrind.app/problems/enemy-key-unknown
                                     - https://grrind.app/problems/enemy-level-too-low
+                                    # Le ledger de pièces (#225). Inatteignable par une route à ce
+                                    # ticket — aucune n'écrit encore de ligne négative — mais listé
+                                    # dès maintenant : c'est le type que la boutique du Lot 6b émettra
+                                    # sur son premier refus d'achat, pas une nouveauté à introduire à
+                                    # ce moment-là.
+                                    - https://grrind.app/problems/insufficient-coin-balance
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }
