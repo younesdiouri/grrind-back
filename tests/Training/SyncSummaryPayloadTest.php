@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Training;
 
+use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\XpLine;
 use App\Shared\Domain\Activity\AttributeGains;
@@ -50,7 +51,7 @@ final class SyncSummaryPayloadTest extends TestCase
         self::assertIsArray($payload['imported']);
         self::assertIsArray($payload['imported'][0]);
         self::assertSame(
-            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'streak', 'unlockableNodes', 'rulesetVersion'],
+            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'streak', 'unlockableNodes', 'rulesetVersion'],
             array_keys($payload['imported'][0]),
         );
     }
@@ -153,25 +154,29 @@ final class SyncSummaryPayloadTest extends TestCase
             new DateTimeImmutable('2026-08-12T19:00:00+00:00'),
         );
 
-        return new SessionCompletion($workout, new SessionReward(
-            xpAwarded: $awarded,
-            breakdown: [new XpLine('BASE', $awarded)],
-            levelBefore: $level,
-            xpIntoLevelBefore: 0,
-            xpToNextLevelBefore: 100,
-            level: $level,
-            totalXp: $totalXpBefore + $awarded,
-            xpIntoLevel: 0,
-            xpToNextLevel: 100,
-            levelsReached: [],
-            skillPointsGranted: 0,
-            titlesUnlocked: [],
-            attributeGains: new AttributeGains($awarded, 0, 0, 0),
-            attributesBefore: new AttributeGains($totalXpBefore, 0, 0, 0),
-            attributesAfter: new AttributeGains($totalXpBefore + $awarded, 0, 0, 0),
-            vitalityBefore: 0,
-            vitalityAfter: 0,
-            rulesetVersion: 'v1-abcdef',
-        ));
+        return new SessionCompletion(
+            $workout,
+            new SessionReward(
+                xpAwarded: $awarded,
+                breakdown: [new XpLine('BASE', $awarded)],
+                levelBefore: $level,
+                xpIntoLevelBefore: 0,
+                xpToNextLevelBefore: 100,
+                level: $level,
+                totalXp: $totalXpBefore + $awarded,
+                xpIntoLevel: 0,
+                xpToNextLevel: 100,
+                levelsReached: [],
+                skillPointsGranted: 0,
+                titlesUnlocked: [],
+                attributeGains: new AttributeGains($awarded, 0, 0, 0),
+                attributesBefore: new AttributeGains($totalXpBefore, 0, 0, 0),
+                attributesAfter: new AttributeGains($totalXpBefore + $awarded, 0, 0, 0),
+                vitalityBefore: 0,
+                vitalityAfter: 0,
+                rulesetVersion: 'v1-abcdef',
+            ),
+            SessionDrop::none(0),
+        );
     }
 }

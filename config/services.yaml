@@ -239,6 +239,11 @@ services:
     # complétion — sans lui, une séance se fermerait sans rapporter un point.
     App\Shared\Application\SessionRewards: '@App\Progression\Infrastructure\Reward\LedgerSessionRewards'
 
+    # Le jumeau du précédent pour le loot (#226) : `Training` clôt la séance, `Rewards`
+    # tire l'objet et les pièces, et aucun des deux ne nomme l'autre. Voir le docblock de
+    # `SessionDrops` pour pourquoi ce n'est pas la même interface que `SessionRewards`.
+    App\Shared\Application\SessionDrops: '@App\Rewards\Infrastructure\Drop\WorkoutSessionDrops'
+
     # Le registre des appareils (#149) : `$targetEnvironment` vient du réglage
     # `PUSH_TARGET_ENVIRONMENT` (voir `.env`), résolu par le processeur `enum:` de
     # Symfony — jamais de `%kernel.environment%`, qui décrit le serveur et non le canal

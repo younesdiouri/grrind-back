@@ -996,6 +996,45 @@ when@dev:
                             before: { type: integer, example: 5000 }
                             after: { type: integer, example: 5108 }
 
+                    # ————— Rewards (#226) —————————————————————————————————————————————————
+                    DroppedItemModifier:
+                        type: object
+                        description: "Un effet porté par un objet tombé — même vocabulaire que `ModifierType`, jamais un mécanisme parallèle."
+                        required: [type, value, discipline]
+                        properties:
+                            type:
+                                type: string
+                                enum: [XP_MULTIPLIER, LOOT_LUCK, STREAK_SHIELD, UNLOCK_SESSION_TYPE, STRENGTH_BONUS, ENDURANCE_BONUS, MOBILITY_BONUS, DEXTERITY_BONUS, HP_BONUS, DAMAGE_BONUS, MITIGATION_BONUS, EXTRA_TURN_BONUS, DODGE_BONUS]
+                            value:
+                                type: integer
+                                example: 5
+                                description: "Un entier dont l'unité dépend de `type` — un pourcentage pour `XP_MULTIPLIER`, des points d'XP répartis pour un bonus de caractéristique. Jamais un flottant sur une valeur de jeu."
+                            discipline:
+                                nullable: true
+                                allOf: [{ $ref: '#/components/schemas/Discipline' }]
+                                description: "`null` = l'effet s'applique partout. Une valeur = seulement à cette discipline."
+
+                    DroppedItem:
+                        type: object
+                        description: |
+                            Un objet tombé d'un tirage (#226), de quoi l'afficher **sans requête
+                            supplémentaire** — même geste qu'un titre dans `PlayerTitle`.
+                        required: [key, name, rarity, slot, modifiers, priceCoins]
+                        properties:
+                            key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
+                            name: { type: string, example: "Chaussures de course usées", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
+                            rarity:
+                                type: string
+                                enum: [COMMON, UNCOMMON, RARE, EPIC, LEGENDARY]
+                            slot:
+                                type: string
+                                enum: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                            modifiers:
+                                type: array
+                                description: "Dans l'ordre du catalogue."
+                                items: { $ref: '#/components/schemas/DroppedItemModifier' }
+                            priceCoins: { type: integer, example: 30, description: "En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue." }
+
                     RewardSummary:
                         type: object
                         description: |
@@ -1004,8 +1043,9 @@ when@dev:
 
                             **L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en
                             bas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq
-                            jauges de caractéristiques montent**, le niveau bascule, le titre tombe, puis le
-                            loot et la série. Un champ déplacé change la mise en scène.
+                            jauges de caractéristiques montent**, le niveau bascule, le titre tombe, le loot
+                            se révèle, **puis** les pièces tombent dedans. Un champ déplacé change la mise
+                            en scène.
 
                             `attributes` se place entre `xp` et `level`, et nulle part ailleurs : les
                             caractéristiques sont la conséquence directe de l'XP qui vient de tomber, le
@@ -1013,13 +1053,24 @@ when@dev:
                             répartition qui l'alimente.
 
                             **Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de
-                            jouer l'animation — d'où le palier donné avant *et* après, et les titres déjà
-                            traduits. `attributes` suit la même règle, Vitality comprise.
+                            jouer l'animation — d'où le palier donné avant *et* après, les titres déjà
+                            traduits, et `loot` qui porte de quoi afficher chaque objet sans recharger le
+                            catalogue. `attributes` suit la même règle, Vitality comprise.
 
-                            `loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5
-                            et 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la
+                            **`coins` se place entre `loot` et `streak`, jamais ailleurs** — même geste que
+                            les jauges de caractéristiques et le palier de niveau, `{gained, before, after}`,
+                            et pour la même raison : une bourse qui repartirait du solde final ne s'anime
+                            pas. `before`/`after` sont lus sur le solde réel du joueur, jamais reconstitués
+                            depuis `gained`.
+
+                            **Une séance sans tirage** — non créditée, ou sans table éligible — porte
+                            `loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime
+                            la même séquence dans tous les cas.
+
+                            `streak` et `unlockableNodes` restent **présents et vides** jusqu'aux Lots 5 et
+                            7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la
                             rendre optionnelle pour toujours.
-                        required: [session, xp, attributes, level, titlesUnlocked, loot, streak, unlockableNodes, rulesetVersion]
+                        required: [session, xp, attributes, level, titlesUnlocked, loot, coins, streak, unlockableNodes, rulesetVersion]
                         properties:
                             session: { $ref: '#/components/schemas/Workout' }
                             xp:
@@ -1104,7 +1155,18 @@ when@dev:
                                 type: array
                                 description: "Vide le plus souvent — un titre est un événement rare, c'est ce qui en fait un."
                                 items: { $ref: '#/components/schemas/PlayerTitle' }
-                            loot: { type: array, description: 'Lot 6 : toujours vide aujourd''hui.', items: { type: object } }
+                            loot:
+                                type: array
+                                description: "Ce qui est tombé de cette séance (#226). Vide le plus souvent — voir le docblock de `LootRoller` — et jamais absent : une séance non créditée ou sans table éligible porte `[]`."
+                                items: { $ref: '#/components/schemas/DroppedItem' }
+                            coins:
+                                type: object
+                                description: "Entre `loot` et `streak` : le loot se révèle, puis les pièces tombent dedans (#226)."
+                                required: [gained, before, after]
+                                properties:
+                                    gained: { type: integer, example: 12, description: "Peut valoir zéro : aucune table éligible, ou séance non créditée." }
+                                    before: { type: integer, example: 40 }
+                                    after: { type: integer, example: 52 }
                             streak: { type: object, nullable: true, description: 'Lot 5 : toujours `null` aujourd''hui.' }
                             unlockableNodes: { type: array, description: 'Lot 7 : toujours vide aujourd''hui.', items: { type: object } }
                             rulesetVersion:

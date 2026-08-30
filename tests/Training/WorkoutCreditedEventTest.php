@@ -158,7 +158,9 @@ final class WorkoutCreditedEventTest extends ApiTestCase
     public function testAFailureMidBatchLeavesNoCreditedEvent(): void
     {
         $bob = $this->openAccount();
-        ProgrammableModifiers::failAfter(1);
+        // Deux résolutions par workout crédité depuis le #226 — voir le commentaire de
+        // même valeur dans `ImportTransactionTest`.
+        ProgrammableModifiers::failAfter(2);
 
         $response = $this->import($bob, [
             self::candidate(externalId: 'HK-AVANT', startedAt: '2026-08-03T07:00:00+00:00'),

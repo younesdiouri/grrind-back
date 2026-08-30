@@ -1738,8 +1738,88 @@ components:
           type: integer
           example: 5108
       type: object
+    DroppedItemModifier:
+      description: 'Un effet porté par un objet tombé — même vocabulaire que `ModifierType`, jamais un mécanisme parallèle.'
+      required:
+        - type
+        - value
+        - discipline
+      properties:
+        type:
+          type: string
+          enum:
+            - XP_MULTIPLIER
+            - LOOT_LUCK
+            - STREAK_SHIELD
+            - UNLOCK_SESSION_TYPE
+            - STRENGTH_BONUS
+            - ENDURANCE_BONUS
+            - MOBILITY_BONUS
+            - DEXTERITY_BONUS
+            - HP_BONUS
+            - DAMAGE_BONUS
+            - MITIGATION_BONUS
+            - EXTRA_TURN_BONUS
+            - DODGE_BONUS
+        value:
+          description: "Un entier dont l'unité dépend de `type` — un pourcentage pour `XP_MULTIPLIER`, des points d'XP répartis pour un bonus de caractéristique. Jamais un flottant sur une valeur de jeu."
+          type: integer
+          example: 5
+        discipline:
+          description: "`null` = l'effet s'applique partout. Une valeur = seulement à cette discipline."
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/Discipline'
+      type: object
+    DroppedItem:
+      description: "Un objet tombé d'un tirage (#226), de quoi l'afficher **sans requête\nsupplémentaire** — même geste qu'un titre dans `PlayerTitle`.\n"
+      required:
+        - key
+        - name
+        - rarity
+        - slot
+        - modifiers
+        - priceCoins
+      properties:
+        key:
+          description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire."
+          type: string
+          example: WORN_RUNNING_SHOES
+        name:
+          description: 'Déjà traduit dans la langue du joueur — rien à recharger côté client.'
+          type: string
+          example: 'Chaussures de course usées'
+        rarity:
+          type: string
+          enum:
+            - COMMON
+            - UNCOMMON
+            - RARE
+            - EPIC
+            - LEGENDARY
+        slot:
+          type: string
+          enum:
+            - HEAD
+            - CHEST
+            - HANDS
+            - LEGS
+            - FEET
+            - ACCESSORY
+            - WEAPON
+        modifiers:
+          description: "Dans l'ordre du catalogue."
+          type: array
+          items:
+            $ref: '#/components/schemas/DroppedItemModifier'
+        priceCoins:
+          description: "En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue."
+          type: integer
+          example: 30
+      type: object
     RewardSummary:
-      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq\njauges de caractéristiques montent**, le niveau bascule, le titre tombe, puis le\nloot et la série. Un champ déplacé change la mise en scène.\n\n`attributes` se place entre `xp` et `level`, et nulle part ailleurs : les\ncaractéristiques sont la conséquence directe de l'XP qui vient de tomber, le\nniveau celui du **total** qu'elles composent — il vient donc après la\nrépartition qui l'alimente.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, et les titres déjà\ntraduits. `attributes` suit la même règle, Vitality comprise.\n\n`loot`, `streak` et `unlockableNodes` sont **présents et vides** jusqu'aux Lots 6, 5\net 7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
+      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq\njauges de caractéristiques montent**, le niveau bascule, le titre tombe, le loot\nse révèle, **puis** les pièces tombent dedans. Un champ déplacé change la mise\nen scène.\n\n`attributes` se place entre `xp` et `level`, et nulle part ailleurs : les\ncaractéristiques sont la conséquence directe de l'XP qui vient de tomber, le\nniveau celui du **total** qu'elles composent — il vient donc après la\nrépartition qui l'alimente.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, les titres déjà\ntraduits, et `loot` qui porte de quoi afficher chaque objet sans recharger le\ncatalogue. `attributes` suit la même règle, Vitality comprise.\n\n**`coins` se place entre `loot` et `streak`, jamais ailleurs** — même geste que\nles jauges de caractéristiques et le palier de niveau, `{gained, before, after}`,\net pour la même raison : une bourse qui repartirait du solde final ne s'anime\npas. `before`/`after` sont lus sur le solde réel du joueur, jamais reconstitués\ndepuis `gained`.\n\n**Une séance sans tirage** — non créditée, ou sans table éligible — porte\n`loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime\nla même séquence dans tous les cas.\n\n`streak` et `unlockableNodes` restent **présents et vides** jusqu'aux Lots 5 et\n7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
       required:
         - session
         - xp
@@ -1747,6 +1827,7 @@ components:
         - level
         - titlesUnlocked
         - loot
+        - coins
         - streak
         - unlockableNodes
         - rulesetVersion
@@ -1855,10 +1936,28 @@ components:
           items:
             $ref: '#/components/schemas/PlayerTitle'
         loot:
-          description: "Lot 6 : toujours vide aujourd'hui."
+          description: 'Ce qui est tombé de cette séance (#226). Vide le plus souvent — voir le docblock de `LootRoller` — et jamais absent : une séance non créditée ou sans table éligible porte `[]`.'
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/DroppedItem'
+        coins:
+          description: 'Entre `loot` et `streak` : le loot se révèle, puis les pièces tombent dedans (#226).'
+          required:
+            - gained
+            - before
+            - after
+          properties:
+            gained:
+              description: 'Peut valoir zéro : aucune table éligible, ou séance non créditée.'
+              type: integer
+              example: 12
+            before:
+              type: integer
+              example: 40
+            after:
+              type: integer
+              example: 52
+          type: object
         streak:
           description: "Lot 5 : toujours `null` aujourd'hui."
           type: object

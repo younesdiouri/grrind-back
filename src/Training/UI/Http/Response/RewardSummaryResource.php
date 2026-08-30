@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Training\UI\Http\Response;
 
+use App\Shared\Application\DroppedItem;
 use App\Shared\Application\PlayerTitle;
+use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\XpLine;
 use App\Training\Application\SessionCompletion;
@@ -20,9 +22,10 @@ use App\Training\Application\SessionCompletion;
  *
  * **L'ordre des champs est l'ordre de l'animation.** Le client le joue de haut en bas : la
  * séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq jauges de
- * caractéristiques montent**, le niveau bascule, le titre tombe, puis le loot et la série.
- * Ce n'est pas une convention d'écriture, c'est le contrat : un champ déplacé change la
- * mise en scène, et c'est le schéma le plus coûteux à casser du produit.
+ * caractéristiques montent**, le niveau bascule, le titre tombe, le loot se révèle, les
+ * pièces tombent dedans, puis la série. Ce n'est pas une convention d'écriture, c'est le
+ * contrat : un champ déplacé change la mise en scène, et c'est le schéma le plus coûteux à
+ * casser du produit.
  *
  * **`attributes` (#162) se place entre `xp` et `level`, et nulle part ailleurs.** Les
  * caractéristiques sont la conséquence directe de l'XP qui vient de tomber — les faire
@@ -42,10 +45,28 @@ use App\Training\Application\SessionCompletion;
  * docblock d'`App\Shared\Domain\Activity\Vitality` pour pourquoi elle peut bouger sans que
  * cette séance lui ait rien crédité.
  *
- * **`loot`, `streak` et `unlockableNodes` sont présents et vides.** Le loot arrive au Lot 6,
- * la série au Lot 5, les arbres au Lot 7. Les ajouter plus tard obligerait le client déjà
- * déployé à traiter des champs qui apparaissent, donc à les rendre optionnels pour toujours ;
- * les déclarer maintenant coûte trois clés et fige la forme.
+ * **`loot` se remplit depuis le #226, `coins` l'accompagne ; `streak` et `unlockableNodes`
+ * restent présents et vides.** La série arrive au Lot 5, les arbres au Lot 7 : les ajouter
+ * plus tard obligerait le client déjà déployé à traiter des champs qui apparaissent, donc à
+ * les rendre optionnels pour toujours ; les déclarer maintenant coûte deux clés et fige la
+ * forme.
+ *
+ * **`coins` se place entre `loot` et `streak`, jamais ailleurs.** Même geste que les jauges
+ * de caractéristiques et le palier de niveau — `{gained, before, after}` — et la même
+ * raison : une bourse qui repartirait du solde final ne s'anime pas. L'ordre dit la mise en
+ * scène : le loot se révèle, **puis** les pièces tombent dedans. `before`/`after` viennent
+ * du solde réel lu par `Rewards` ({@see SessionDrop} pour le détail), jamais recomposés
+ * depuis `gained` — sur un import de dix workouts, la bourse s'anime dix fois d'affilée, et
+ * une reconstruction diverge du vrai solde au premier écart sans que personne ne le voie.
+ *
+ * **Une séance sans tirage porte `loot: []` et `coins` à gain nul, jamais des clés
+ * absentes** — voir {@see SessionDrop::none()} : le client anime la même séquence dans
+ * tous les cas, qu'un objet soit tombé ou non.
+ *
+ * **`loot` porte de quoi afficher chaque objet sans requête supplémentaire** — clé, nom
+ * déjà traduit, rareté, emplacement, modificateurs, prix — même geste qu'un seul
+ * aller-retour pour {@see PlayerTitle}. Voir le docblock de {@see DroppedItem} pour
+ * pourquoi ce n'est ni l'`Item` du catalogue ni une entité `Rewards`.
  *
  * **`xp.reason` (#167) explique un zéro qui n'est pas une punition.** Une marche est bien
  * *ici* — dans `imported`, pas dans `skipped` : elle est écrite, visible, animée — mais ne
@@ -59,6 +80,7 @@ final readonly class RewardSummaryResource
     private function __construct(
         public WorkoutResource $session,
         public SessionReward $reward,
+        public SessionDrop $drop,
     ) {
     }
 
@@ -67,6 +89,7 @@ final readonly class RewardSummaryResource
         return new self(
             WorkoutResource::from($completion->session),
             $completion->reward,
+            $completion->drop,
         );
     }
 
@@ -143,7 +166,12 @@ final readonly class RewardSummaryResource
                 static fn (PlayerTitle $title): array => $title->toArray(),
                 $this->reward->titlesUnlocked,
             ),
-            'loot' => [],
+            'loot' => array_map(
+                static fn (DroppedItem $item): array => $item->toArray(),
+                $this->drop->items,
+            ),
+            // Entre `loot` et `streak`, jamais ailleurs — voir le docblock de la classe.
+            'coins' => self::gauge($this->drop->coinsGained, $this->drop->coinsBefore, $this->drop->coinsAfter),
             'streak' => null,
             'unlockableNodes' => [],
             // Sous quel équilibrage ces montants ont été accordés. Le client l'affiche dans
