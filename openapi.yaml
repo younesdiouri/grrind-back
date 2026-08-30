@@ -755,6 +755,113 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/inventory:
+    get:
+      tags:
+        - Récompenses
+      operationId: get_rewards_inventory_show
+      responses:
+        '200':
+          description: 'Le sac, la doublure équipée par emplacement, et le solde de pièces.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  '/api/inventory/equipment/{slot}':
+    put:
+      tags:
+        - Récompenses
+      operationId: put_rewards_inventory_equip
+      parameters:
+        -
+          name: slot
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EquipItemRequest'
+      responses:
+        '200':
+          description: "L'inventaire, après échange : l'objet est en place, l'ancien occupant de l'emplacement — s'il y en avait un — est retourné au sac."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: "Emplacement inconnu (`equipment-slot-unknown`), objet non possédé (`item-not-owned`), ou objet incompatible avec l'emplacement demandé (`equipment-slot-incompatible`)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+    delete:
+      tags:
+        - Récompenses
+      operationId: delete_rewards_inventory_unequip
+      parameters:
+        -
+          name: slot
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "L'inventaire, l'emplacement vidé. Le vider alors qu'il l'était déjà rend la même réponse."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: 'Emplacement inconnu (`equipment-slot-unknown`).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /api/inventory/coins:
+    get:
+      tags:
+        - Récompenses
+      operationId: get_rewards_coin_history
+      parameters:
+        -
+          name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+            minimum: 1
+      responses:
+        '200':
+          description: 'Le solde, et une page de mouvements du plus récent au plus ancien.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoinHistoryPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /api/daily-activity:
     put:
       tags:
@@ -1818,6 +1925,128 @@ components:
           type: integer
           example: 30
       type: object
+    InventoryLine:
+      description: "Un objet possédé (#30) — la même forme que `DroppedItem`, une seule clé de plus :\n`quantity`. Ce n'est pas une troisième forme d'objet, c'est la même, augmentée d'un\nfait qu'un tirage n'a jamais eu à porter — un objet qui tombe en crée ou en\nincrémente une, il n'en a jamais une à afficher lui-même.\n"
+      type: object
+      allOf:
+        -
+          $ref: '#/components/schemas/DroppedItem'
+        -
+          required:
+            - quantity
+          properties:
+            quantity:
+              description: "Le nombre d'exemplaires possédés — pas de vente ni de rebut en v1, il ne redescend jamais."
+              type: integer
+              example: 1
+          type: object
+    Inventory:
+      description: "`GET /api/inventory`, et ce que `PUT`/`DELETE /api/inventory/equipment/{slot}`\nrendent après une mutation, pour un seul aller-retour — le sac, la doublure\néquipée par emplacement, la bourse.\n\n`equipment` porte toujours les sept emplacements d'`EquipmentSlot`, `null` pour\nceux qui sont vides — jamais une clé absente, qui forcerait le client à distinguer\n« pas encore chargé » de « rien ici ». `items` porte tout ce que le joueur possède,\néquipé compris : ce n'est pas une donnée à recouper contre `equipment`, c'est la\nmême ligne, vue sous un autre angle.\n"
+      required:
+        - coins
+        - equipment
+        - items
+      properties:
+        coins:
+          description: "Le solde de la bourse — cet écran lui appartient autant qu'au sac."
+          type: integer
+        equipment:
+          required:
+            - HEAD
+            - CHEST
+            - HANDS
+            - LEGS
+            - FEET
+            - ACCESSORY
+            - WEAPON
+          properties:
+            HEAD:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/InventoryLine'
+            CHEST:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/InventoryLine'
+            HANDS:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/InventoryLine'
+            LEGS:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/InventoryLine'
+            FEET:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/InventoryLine'
+            ACCESSORY:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/InventoryLine'
+            WEAPON:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/InventoryLine'
+          type: object
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryLine'
+      type: object
+    CoinTransaction:
+      description: "Une écriture au ledger de pièces (#30) — le pendant, en beaucoup plus simple, de\n`XpTransaction` : `amount` **est** l'écriture, il n'y a ni breakdown ni répartition\nà recomposer.\n"
+      required:
+        - id
+        - sourceId
+        - reason
+        - amount
+        - occurredAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceId:
+          description: "Ce qui a produit l'écriture — l'identifiant du workout ou du combat. Le nom du ledger, pas celui d'une séance."
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum:
+            - WORKOUT_DROP
+            - BATTLE_DROP
+        amount:
+          description: "Signé. Aucune ligne négative n'existe encore en v1 — la garde s'applique malgré tout à tout appel, quel que soit le signe."
+          type: integer
+        occurredAt:
+          description: "L'instant du fait — la date du sport ou du combat, pas celle de l'écriture."
+          type: string
+          format: date-time
+      type: object
+    CoinHistoryPage:
+      description: "`GET /api/inventory/coins` : le solde, et une page de mouvements dans l'ordre du\nfait — `occurredAt` décroissant, puis l'identifiant pour départager, même tri\nqu'`XpHistoryPage` et `BattlePage`. Une pièce créditée par un vieux workout se\nrange à la date de ce workout, pas à celle de l'écriture — voir le docblock de\n`CoinTransactionRepository::history()`.\n"
+      required:
+        - balance
+        - transactions
+        - nextCursor
+      properties:
+        balance:
+          type: integer
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoinTransaction'
+        nextCursor:
+          type: string
+          nullable: true
+      type: object
     RewardSummary:
       description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq\njauges de caractéristiques montent**, le niveau bascule, le titre tombe, le loot\nse révèle, **puis** les pièces tombent dedans. Un champ déplacé change la mise\nen scène.\n\n`attributes` se place entre `xp` et `level`, et nulle part ailleurs : les\ncaractéristiques sont la conséquence directe de l'XP qui vient de tomber, le\nniveau celui du **total** qu'elles composent — il vient donc après la\nrépartition qui l'alimente.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, les titres déjà\ntraduits, et `loot` qui porte de quoi afficher chaque objet sans recharger le\ncatalogue. `attributes` suit la même règle, Vitality comprise.\n\n**`coins` se place entre `loot` et `streak`, jamais ailleurs** — même geste que\nles jauges de caractéristiques et le palier de niveau, `{gained, before, after}`,\net pour la même raison : une bourse qui repartirait du solde final ne s'anime\npas. `before`/`after` sont lus sur le solde réel du joueur, jamais reconstitués\ndepuis `gained`.\n\n**Une séance sans tirage** — non créditée, ou sans table éligible — porte\n`loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime\nla même séquence dans tous les cas.\n\n`streak` et `unlockableNodes` restent **présents et vides** jusqu'aux Lots 5 et\n7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
       required:
@@ -2653,6 +2882,24 @@ components:
           default: null
           maxLength: 64
       type: object
+    EquipItemRequest:
+      properties:
+        itemKey:
+          type: string
+          default: ''
+      type: object
+    CoinHistoryQuery:
+      properties:
+        cursor:
+          type: string
+          nullable: true
+          default: null
+        limit:
+          type: integer
+          default: 20
+          maximum: 50
+          minimum: 1
+      type: object
     WorkoutSource:
       type: string
       enum:
@@ -2848,6 +3095,8 @@ tags:
     name: Profil
   -
     name: Progression
+  -
+    name: Récompenses
   -
     name: Entraînement
 

@@ -154,6 +154,23 @@ class InventoryItemRepository extends ServiceEntityRepository
         return $this->findOneBy(['userId' => $userId, 'itemKey' => $itemKey]);
     }
 
+    /**
+     * Tout ce qu'un joueur possède, équipé ou dans le sac — le sac de `GET /api/inventory`
+     * (#30). Contrairement à {@see equippedByPlayer()}, aucun filtre sur `slot` : c'est la
+     * ligne d'inventaire elle-même qui dit, par sa propre valeur, si l'objet est porté.
+     *
+     * Triée par clé d'objet plutôt que par `id` : l'ordre d'obtention n'a aucune importance
+     * pour un sac, et une clé de catalogue est un ordre stable qui ne dépend d'aucune
+     * horloge — contrairement à `obtainedAt`, où deux tirages simultanés se départageraient
+     * arbitrairement.
+     *
+     * @return list<InventoryItem>
+     */
+    public function ownedByPlayer(Uuid $userId): array
+    {
+        return $this->findBy(['userId' => $userId], ['itemKey' => 'ASC']);
+    }
+
     public function equippedIn(Uuid $userId, EquipmentSlot $slot): ?InventoryItem
     {
         return $this->findOneBy(['userId' => $userId, 'slot' => $slot]);
