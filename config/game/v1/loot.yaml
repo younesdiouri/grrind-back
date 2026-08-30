@@ -1,8 +1,17 @@
-# Les tables de tirage (#27) : deux origines, deux jeux de tables. Comme `items.yaml` et
-# `combat.yaml`, ce fichier est de la donnée, lue et validée à la compilation du conteneur
-# par App\Rewards\Infrastructure\Config\LootSection, et il entre dans le `rulesetVersion`.
+# Les tables de tirage (#27), consommées par App\Rewards\Domain\LootRoller (#28). Comme
+# `items.yaml` et `combat.yaml`, ce fichier est de la donnée, lue et validée à la
+# compilation du conteneur par App\Rewards\Infrastructure\Config\LootSection, et il entre
+# dans le `rulesetVersion`.
 #
-# Aucun tirage ici (#28) : ce ticket pose les tables, il ne les consomme pas.
+# ————— `loot_luck`, le plancher et le plafond du LOOT_LUCK effectif ————————————————————
+#
+# `LootRoller` déplace les poids d'une table vers ses objets selon le LOOT_LUCK composé du
+# joueur, jamais l'entrée « rien » — voir son docblock. `floor_percent` et `cap_percent`
+# bornent ce total composé : le plancher à zéro garantit qu'aucun poids ne descend sous ce
+# qui est déclaré ci-dessous, le plafond empêche qu'un empilement d'objets ne transforme une
+# table en distributeur — voir le docblock d'`App\Rewards\Domain\LootLuckRules` pour les
+# deux raisons en détail. `200` est la valeur livrée, sans prétention d'équilibrage, même
+# réserve que le reste de ce fichier.
 #
 # ————— `version`, indépendante du `rulesetVersion` global ————————————————————————————————
 #
@@ -42,6 +51,10 @@
 # au-dessus du catalogue d'ennemis dans `combat.yaml` : ces poids se patchent ici sans
 # migration, en incrémentant `version`.
 version: 1
+
+loot_luck:
+    floor_percent: 0
+    cap_percent: 200
 
 workout:
     - key: STARTER_SESSION_DROP

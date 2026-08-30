@@ -46,7 +46,13 @@ enum ModifierType: string
     /** Un pourcentage entier appliqué au socle d'XP d'une séance. Consommé par `XpCalculator`. */
     case XpMultiplier = 'XP_MULTIPLIER';
 
-    /** Améliore les tirages de loot (#28). */
+    /**
+     * Un pourcentage entier qui déplace les poids d'une table de tirage vers ses objets,
+     * jamais le nombre de tirages : `20` vaut « +20 % sur le poids de chaque entrée à
+     * objet », l'entrée « rien » restant inchangée — voir le docblock de
+     * {@see \App\Rewards\Domain\LootRoller} (#28) pour la formule, le plancher et le
+     * plafond de composition. Consommé par `LootRoller` seul.
+     */
     case LootLuck = 'LOOT_LUCK';
 
     /** Absorbe un jour manqué sans rompre la série (#25). */
