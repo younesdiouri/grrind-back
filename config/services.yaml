@@ -172,6 +172,14 @@ services:
             $enemies: '%game.combat.enemies%'
             $bosses: '%game.combat.bosses%'
 
+    # Le plancher et le plafond du LOOT_LUCK effectif (#28) — voir le docblock de
+    # `LootLuckRules` pour ce que chacun garantit. `LootRoller` les reçoit par ce service,
+    # jamais des constantes de classe : c'est de l'équilibrage.
+    App\Rewards\Domain\LootLuckRules:
+        arguments:
+            $floorPercent: '%game.loot.loot_luck.floor_percent%'
+            $capPercent: '%game.loot.loot_luck.cap_percent%'
+
     App\Progression\Domain\DiminishingReturns:
         arguments:
             $brackets: '%game.xp.diminishing_returns%'

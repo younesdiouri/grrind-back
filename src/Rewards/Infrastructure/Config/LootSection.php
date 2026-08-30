@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rewards\Infrastructure\Config;
 
+use App\Rewards\Domain\LootLuckRules;
 use App\Rewards\Domain\LootTables;
 use App\Shared\Infrastructure\Config\GameBalanceSection;
 use InvalidArgumentException;
@@ -16,7 +17,9 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
  * adversaire.
  *
  * `version` est la version des tables, indépendante du `rulesetVersion` global — voir le
- * docblock de {@see LootTables}.
+ * docblock de {@see LootTables}. `loot_luck` porte le plancher et le plafond du `LOOT_LUCK`
+ * effectif appliqué par `App\Rewards\Domain\LootRoller` (#28) — voir le docblock de
+ * {@see LootLuckRules} pour ce qu'ils garantissent chacun.
  *
  * **Ce que cette section ne peut pas valider.** Elle ne voit que ce fichier :
  * `GameBalanceLoader` valide chaque fichier indépendamment des autres, donc une clé
@@ -44,6 +47,13 @@ final class LootSection implements GameBalanceSection
         $tree->getRootNode()
             ->children()
                 ->integerNode('version')->isRequired()->min(1)->end()
+                ->arrayNode('loot_luck')
+                    ->isRequired()
+                    ->children()
+                        ->integerNode('floor_percent')->isRequired()->min(0)->end()
+                        ->integerNode('cap_percent')->isRequired()->min(0)->end()
+                    ->end()
+                ->end()
                 ->arrayNode('workout')
                     ->isRequired()
                     ->requiresAtLeastOneElement()
@@ -84,6 +94,7 @@ final class LootSection implements GameBalanceSection
                     /**
                      * @var array{
                      *     version: int,
+                     *     loot_luck: array{floor_percent: int, cap_percent: int},
                      *     workout: list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>,
                      *     adversary: list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>,
                      * } $values les nœuds ci-dessus ont déjà fait ce travail
@@ -102,6 +113,7 @@ final class LootSection implements GameBalanceSection
                         );
 
                         new LootTables($values['version'], $values['workout'], $values['adversary'], $referencedItems, $declaredAdversaries, []);
+                        new LootLuckRules($values['loot_luck']['floor_percent'], $values['loot_luck']['cap_percent']);
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);
                     }
