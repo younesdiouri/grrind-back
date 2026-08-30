@@ -1,0 +1,119 @@
+# Le catalogue d'objets (#27). Comme `combat.yaml`, ce fichier est de la donnée, pas de la
+# configuration Symfony : il est lu et validé à la compilation du conteneur par
+# App\Rewards\Infrastructure\Config\ItemsSection, et il entre dans le `rulesetVersion`. Une
+# clé inconnue — rareté, emplacement, type de modificateur — fait échouer le démarrage.
+#
+# Aucune ligne de base et aucun tirage ici (#28), aucun inventaire (#29) : ce ticket pose le
+# catalogue entier, prix compris, pour que les tickets suivants du lot n'aient jamais à le
+# rouvrir pour y ajouter un champ qu'on savait devoir y mettre.
+#
+# ————— Le prix, avant la boutique ——————————————————————————————————————————————————————
+#
+# `price_coins` existe alors que la boutique n'arrive qu'au Lot 6b : un montant de pièces
+# qui ne s'adosse à aucun prix ne s'équilibre pas, il se devine. Le poser maintenant donne
+# aux pièces une échelle dès le premier drop (#28), avant même qu'on puisse en dépenser.
+#
+# ————— Les modificateurs : un seul vocabulaire, jamais un mécanisme parallèle ——————————
+#
+# `type` se valide contre `App\Shared\Domain\Modifier\ModifierType::tryFrom()`, pas contre
+# une liste recopiée ici — voir `ItemsSection` et `ItemModifier`. Deux familles y entrent,
+# aujourd'hui et demain :
+#
+#   - les types déjà ouverts (`XP_MULTIPLIER`, `LOOT_LUCK`, `STREAK_SHIELD`,
+#     `UNLOCK_SESSION_TYPE`) — les seuls que ce fichier utilise, voir plus bas ;
+#   - les caractéristiques pures et les stats de combat directes que le #224 ouvrira dans
+#     `ModifierType`. Ce ticket-ci ne les anticipe pas : les ajouter ici avant que l'enum les
+#     porte ferait échouer le démarrage pour rien.
+#
+# **L'unité d'un bonus de caractéristique sera le point d'XP réparti, pas un point abstrait.**
+# Les caractéristiques d'`attributes.yaml` sont des totaux cumulés, et `combat.yaml` les
+# consomme par milliers (`damage_per_1000_strength: 6`) : un objet à « +5 Strength » ne
+# donnerait rigoureusement rien, `intdiv(5 * 6, 1000) == 0`. Le jour où le #224 ouvre ces
+# types, écrire une valeur ici se compte en centaines ou en milliers, jamais en unités.
+#
+# `discipline`, sur un modificateur, est facultatif — absente vaut global, une valeur vaut
+# « seulement pour cette discipline », comme `Modifier::$discipline`. C'est ce qui permet
+# des bottes de course qui ne servent à rien en natation, voir le docblock de `Modifier`.
+#
+# ————— Réserve ————————————————————————————————————————————————————————————————————————
+#
+# Dix objets, une progression de prix et de puissance qui suit les paliers d'ennemis de
+# `combat.yaml`, sans aucune prétention d'équilibrage : personne n'a encore joué à ce jeu,
+# même réserve que la note au-dessus du catalogue d'ennemis dans `combat.yaml`. Ces valeurs
+# se patchent ici sans migration, c'est tout l'intérêt d'un fichier de config.
+items:
+    - key: WORN_RUNNING_SHOES
+      rarity: COMMON
+      slot: FEET
+      price_coins: 30
+      modifiers:
+          - { type: XP_MULTIPLIER, value: 5, discipline: RUNNING }
+
+    - key: IRON_GAUNTLETS
+      rarity: COMMON
+      slot: HANDS
+      price_coins: 30
+      modifiers:
+          - { type: XP_MULTIPLIER, value: 5, discipline: STRENGTH }
+
+    - key: TRAVELERS_CLOAK
+      rarity: UNCOMMON
+      slot: CHEST
+      price_coins: 80
+      modifiers:
+          - { type: XP_MULTIPLIER, value: 8 }
+
+    - key: LUCKY_RABBIT_CHARM
+      rarity: UNCOMMON
+      slot: ACCESSORY
+      price_coins: 90
+      modifiers:
+          - { type: LOOT_LUCK, value: 10 }
+
+    - key: TEMPERED_HEADBAND
+      rarity: RARE
+      slot: HEAD
+      price_coins: 180
+      modifiers:
+          - { type: XP_MULTIPLIER, value: 12 }
+
+    - key: SWIFT_TRAIL_LEGGINGS
+      rarity: RARE
+      slot: LEGS
+      price_coins: 180
+      modifiers:
+          - { type: XP_MULTIPLIER, value: 10, discipline: HIKING }
+          - { type: LOOT_LUCK, value: 5 }
+
+    - key: EMBER_OF_THE_ANCESTORS
+      rarity: RARE
+      slot: ACCESSORY
+      price_coins: 220
+      modifiers:
+          # Une charge : voir le docblock de `ModifierType::StreakShield`. Le futur
+          # contributeur de `Rewards` (#29) décidera comment plusieurs charges portées
+          # à la fois se composent ; ce catalogue ne pose qu'un objet à une charge.
+          - { type: STREAK_SHIELD, value: 1 }
+
+    - key: OBSIDIAN_WARBLADE
+      rarity: EPIC
+      slot: WEAPON
+      price_coins: 450
+      modifiers:
+          - { type: XP_MULTIPLIER, value: 15, discipline: STRENGTH }
+          - { type: LOOT_LUCK, value: 10 }
+
+    - key: STORMCALLERS_BOOTS
+      rarity: EPIC
+      slot: FEET
+      price_coins: 450
+      modifiers:
+          - { type: XP_MULTIPLIER, value: 18, discipline: RUNNING }
+
+    - key: CROWN_OF_THE_TIRELESS
+      rarity: LEGENDARY
+      slot: HEAD
+      price_coins: 900
+      modifiers:
+          - { type: XP_MULTIPLIER, value: 20 }
+          - { type: LOOT_LUCK, value: 20 }

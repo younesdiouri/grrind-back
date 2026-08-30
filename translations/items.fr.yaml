@@ -1,0 +1,15 @@
+# Les noms des objets du catalogue. Une entrée `<clé>.name` par objet de
+# `config/game/v1/items.yaml` — la clé en minuscules, comme `ItemTranslator` la cherche. Un
+# test de couverture refuse un catalogue incomplet, sinon le repli du traducteur enverrait
+# la clé brute au joueur, en silence.
+
+worn_running_shoes.name: Baskets usées
+iron_gauntlets.name: Gantelets de fer
+travelers_cloak.name: Cape du voyageur
+lucky_rabbit_charm.name: Grigri du lapin porte-bonheur
+tempered_headband.name: Bandeau trempé
+swift_trail_leggings.name: Jambières de sentier véloce
+ember_of_the_ancestors.name: Braise des ancêtres
+obsidian_warblade.name: Lame de guerre d'obsidienne
+stormcallers_boots.name: Bottes de l'invocateur de tempête
+crown_of_the_tireless.name: Couronne de l'infatigable

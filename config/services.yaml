@@ -151,6 +151,27 @@ services:
             $enemies: '%game.combat.enemies%'
             $bosses: '%game.combat.bosses%'
 
+    # Le catalogue d'objets (#27), d'un bloc pour la même raison que le barème de titres :
+    # une liste, et son ordre de déclaration doit survivre au conteneur compilé.
+    App\Rewards\Domain\ItemCatalog:
+        arguments:
+            $items: '%game.items.items%'
+
+    # Les tables de tirage (#27). `$items`, `$enemies` et `$bosses` sont les paramètres
+    # bruts de trois fichiers différents — voir le docblock de `LootTables` pour pourquoi
+    # c'est ici, à la construction réelle du service, que le catalogue d'objets et le
+    # catalogue d'ennemis se croisent avec les tables, jamais dans `LootSection` : Deptrac
+    # interdit à `Rewards` d'importer quoi que ce soit de `Combat`, et ces tableaux ne sont
+    # que de la donnée, jamais un objet de leur domaine.
+    App\Rewards\Domain\LootTables:
+        arguments:
+            $version: '%game.loot.version%'
+            $workout: '%game.loot.workout%'
+            $adversary: '%game.loot.adversary%'
+            $items: '%game.items.items%'
+            $enemies: '%game.combat.enemies%'
+            $bosses: '%game.combat.bosses%'
+
     App\Progression\Domain\DiminishingReturns:
         arguments:
             $brackets: '%game.xp.diminishing_returns%'
