@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rewards\Infrastructure\Doctrine;
 
+use App\Rewards\Application\ListCoinHistory;
 use App\Rewards\Domain\CoinReason;
 use App\Rewards\Domain\CoinTransaction;
 use App\Rewards\Domain\Exception\InsufficientCoinBalance;
@@ -109,5 +110,45 @@ class CoinTransactionRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         return (int) $total;
+    }
+
+    /**
+     * L'historique d'un joueur pour `GET /api/inventory/coins` (#30), dans **l'ordre du
+     * ledger** — `id` décroissant — et pas dans celui du fait comme
+     * {@see \App\Progression\Infrastructure\Doctrine\XpTransactionRepository::history()}.
+     *
+     * Ce n'est pas la même règle par oubli : `occurredAt` peut reculer d'un import qui
+     * remonte de vieux workouts (voir son docblock sur {@see CoinTransaction}), alors que
+     * `id`, un UUID v7, naît strictement dans l'ordre d'écriture. Un relevé de pièces répond
+     * à « qu'est-ce qui est tombé dans ma bourse, et dans quel ordre je l'ai vu tomber » —
+     * l'ordre du ledger, pas celui du sport. `idx_rewards_coin_transaction_user_id` sur
+     * `(user_id, id)`, posé au #225 pour la seule somme du solde, sert donc déjà ce tri sans
+     * qu'un second index soit nécessaire — la classe anticipait un index dédié le jour où un
+     * historique paginé existerait ; ce jour est venu, et le tri retenu se trouve être celui
+     * que l'index déjà en place sait servir.
+     *
+     * `$take` est volontairement plus grand que la limite demandée — même geste qu'au ledger
+     * d'XP : une ligne de plus dit s'il existe une page suivante, sans jamais la rendre.
+     *
+     * @return list<CoinTransaction>
+     */
+    public function history(ListCoinHistory $query, int $take): array
+    {
+        $builder = $this->createQueryBuilder('t')
+            ->where('t.userId = :userId')
+            ->setParameter('userId', $query->userId, UuidType::NAME)
+            ->orderBy('t.id', 'DESC')
+            ->setMaxResults($take);
+
+        if (null !== $query->cursor) {
+            $builder
+                ->andWhere('t.id < :cursorId')
+                ->setParameter('cursorId', $query->cursor->id, UuidType::NAME);
+        }
+
+        /** @var list<CoinTransaction> $transactions */
+        $transactions = $builder->getQuery()->getResult();
+
+        return $transactions;
     }
 }

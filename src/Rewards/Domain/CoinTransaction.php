@@ -42,8 +42,12 @@ use Symfony\Component\Uid\Uuid;
 // Le solde d'un joueur est `SUM(amount) WHERE user_id = ?` : cet index est ce qui garde
 // cette somme une lecture d'index plutôt qu'un balayage de la table entière. `id` plutôt
 // que `occurred_at` en seconde colonne, comme `idx_xp_transaction_user_id` — la somme ne
-// trie pas, et un futur historique paginé (hors de ce ticket) aura son propre index dédié
-// s'il en a besoin, exactement comme au ledger d'XP.
+// trie pas. Cette même colonne sert aussi l'historique paginé de `GET /api/inventory/coins`
+// (#30) : contrairement au ledger d'XP, qui trie par la date du fait, un relevé de pièces
+// trie par l'ordre du ledger lui-même — voir le docblock de
+// `CoinTransactionRepository::history()` pour pourquoi c'est la bonne règle ici, et
+// pourquoi elle n'a réclamé aucun second index.
+
 #[ORM\Index(name: 'idx_rewards_coin_transaction_user_id', columns: ['user_id', 'id'])]
 class CoinTransaction
 {

@@ -258,13 +258,10 @@ when@dev:
                                     # sur son premier refus d'achat, pas une nouveauté à introduire à
                                     # ce moment-là.
                                     - https://grrind.app/problems/insufficient-coin-balance
-                                    # L'inventaire et l'équipement (#29). Inatteignables par une route à ce
-                                    # ticket — aucune n'existe encore, voir #30 — mais listés dès maintenant,
-                                    # même geste qu'`insufficient-coin-balance` ci-dessus : ce sont les
-                                    # types que la future route émettra sur ses trois refus, pas une
-                                    # nouveauté à introduire à ce moment-là. Un emplacement déjà occupé par
-                                    # un autre objet n'en fait pas partie : `PUT /api/inventory/equipment/{slot}`
-                                    # échange plutôt que de refuser, voir le docblock d'`InventoryItemRepository::equip()`.
+                                    # L'inventaire et l'équipement (#29, #30). Les trois refus de
+                                    # `PUT`/`DELETE /api/inventory/equipment/{slot}`. Un emplacement déjà
+                                    # occupé par un autre objet n'en fait pas partie : `PUT` échange plutôt
+                                    # que de refuser, voir le docblock d'`InventoryItemRepository::equip()`.
                                     - https://grrind.app/problems/item-not-owned
                                     - https://grrind.app/problems/equipment-slot-unknown
                                     - https://grrind.app/problems/equipment-slot-incompatible
@@ -1034,6 +1031,83 @@ when@dev:
                                 description: "Dans l'ordre du catalogue."
                                 items: { $ref: '#/components/schemas/DroppedItemModifier' }
                             priceCoins: { type: integer, example: 30, description: "En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue." }
+
+                    InventoryLine:
+                        type: object
+                        description: |
+                            Un objet possédé (#30) — la même forme que `DroppedItem`, une seule clé de plus :
+                            `quantity`. Ce n'est pas une troisième forme d'objet, c'est la même, augmentée d'un
+                            fait qu'un tirage n'a jamais eu à porter — un objet qui tombe en crée ou en
+                            incrémente une, il n'en a jamais une à afficher lui-même.
+                        allOf:
+                            - $ref: '#/components/schemas/DroppedItem'
+                            - type: object
+                              required: [quantity]
+                              properties:
+                                  quantity: { type: integer, example: 1, description: "Le nombre d'exemplaires possédés — pas de vente ni de rebut en v1, il ne redescend jamais." }
+
+                    Inventory:
+                        type: object
+                        description: |
+                            `GET /api/inventory`, et ce que `PUT`/`DELETE /api/inventory/equipment/{slot}`
+                            rendent après une mutation, pour un seul aller-retour — le sac, la doublure
+                            équipée par emplacement, la bourse.
+
+                            `equipment` porte toujours les sept emplacements d'`EquipmentSlot`, `null` pour
+                            ceux qui sont vides — jamais une clé absente, qui forcerait le client à distinguer
+                            « pas encore chargé » de « rien ici ». `items` porte tout ce que le joueur possède,
+                            équipé compris : ce n'est pas une donnée à recouper contre `equipment`, c'est la
+                            même ligne, vue sous un autre angle.
+                        required: [coins, equipment, items]
+                        properties:
+                            coins: { type: integer, description: "Le solde de la bourse — cet écran lui appartient autant qu'au sac." }
+                            equipment:
+                                type: object
+                                required: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                                properties:
+                                    HEAD: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
+                                    CHEST: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
+                                    HANDS: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
+                                    LEGS: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
+                                    FEET: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
+                                    ACCESSORY: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
+                                    WEAPON: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
+                            items:
+                                type: array
+                                items: { $ref: '#/components/schemas/InventoryLine' }
+
+                    CoinTransaction:
+                        type: object
+                        description: |
+                            Une écriture au ledger de pièces (#30) — le pendant, en beaucoup plus simple, de
+                            `XpTransaction` : `amount` **est** l'écriture, il n'y a ni breakdown ni répartition
+                            à recomposer.
+                        required: [id, sourceId, reason, amount, occurredAt]
+                        properties:
+                            id: { type: string, format: uuid }
+                            sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant du workout ou du combat. Le nom du ledger, pas celui d'une séance." }
+                            reason: { type: string, enum: [WORKOUT_DROP, BATTLE_DROP] }
+                            amount: { type: integer, description: "Signé. Aucune ligne négative n'existe encore en v1 — la garde s'applique malgré tout à tout appel, quel que soit le signe." }
+                            occurredAt:
+                                type: string
+                                format: date-time
+                                description: "L'instant du fait — la date du sport ou du combat, pas celle de l'écriture."
+
+                    CoinHistoryPage:
+                        type: object
+                        description: |
+                            `GET /api/inventory/coins` : le solde, et une page de mouvements **dans l'ordre du
+                            ledger** — `id` décroissant, pas `occurredAt` comme `XpHistoryPage`. Un import peut
+                            créditer une vieille date après une plus récente ; l'`id`, un UUID v7, naît lui
+                            strictement dans l'ordre d'écriture, voir le docblock de
+                            `CoinTransactionRepository::history()`.
+                        required: [balance, transactions, nextCursor]
+                        properties:
+                            balance: { type: integer }
+                            transactions:
+                                type: array
+                                items: { $ref: '#/components/schemas/CoinTransaction' }
+                            nextCursor: { type: string, nullable: true }
 
                     RewardSummary:
                         type: object
