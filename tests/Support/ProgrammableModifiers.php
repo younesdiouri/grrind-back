@@ -87,9 +87,14 @@ final class ProgrammableModifiers implements ModifierContributor
      * la source d'une écriture est l'identifiant du workout, tiré par `Workout::record()`, et
      * aucun test ne peut le choisir pour le faire entrer en collision.
      *
-     * Ce seam-là plutôt qu'un autre parce qu'il est déjà celui des tests, qu'il est appelé
-     * **une fois par workout et dans la transaction**, et qu'il n'ajoute rien au code de
-     * production.
+     * Ce seam-là plutôt qu'un autre parce qu'il est déjà celui des tests, qu'il est dans la
+     * transaction, et qu'il n'ajoute rien au code de production.
+     *
+     * **Deux appels par workout crédité depuis le #226**, et non un seul : `SessionRewards`
+     * résout les modificateurs pour l'XP, `SessionDrops` les résout à nouveau pour
+     * `LOOT_LUCK` — deux matières, deux résolutions, voir le docblock de `SessionDrops`.
+     * `$successes` compte donc des **appels**, pas des workouts ; un test qui veut faire
+     * échouer le lot après le premier workout entièrement traité programme `failAfter(2)`.
      */
     public static function failAfter(int $successes): void
     {

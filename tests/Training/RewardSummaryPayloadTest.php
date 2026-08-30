@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Training;
 
+use App\Shared\Application\DroppedItem;
+use App\Shared\Application\DroppedItemModifier;
 use App\Shared\Application\PlayerTitle;
+use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\XpLine;
 use App\Shared\Domain\Activity\AttributeGains;
@@ -33,10 +36,21 @@ final class RewardSummaryPayloadTest extends TestCase
         $payload = self::summary()->toArray();
 
         self::assertSame(
-            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'streak', 'unlockableNodes', 'rulesetVersion'],
+            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'streak', 'unlockableNodes', 'rulesetVersion'],
             array_keys($payload),
             'Un champ déplacé change la mise en scène. Si c\'est voulu, le client doit être prévenu avant.',
         );
+
+        // Le loot se révèle, puis les pièces tombent dedans (#226) : `coins` entre `loot`
+        // et `streak`, jamais ailleurs.
+        $coins = $payload['coins'];
+        self::assertIsArray($coins);
+        self::assertSame(['gained', 'before', 'after'], array_keys($coins));
+
+        $loot = $payload['loot'];
+        self::assertIsArray($loot);
+        self::assertIsArray($loot[0]);
+        self::assertSame(['key', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins'], array_keys($loot[0]));
 
         // `attributes` entre `xp` et `level`, jamais ailleurs (#162) : les caractéristiques
         // sont la conséquence directe de l'XP qui vient de tomber, le niveau celle du total
@@ -93,16 +107,27 @@ final class RewardSummaryPayloadTest extends TestCase
     }
 
     /**
-     * Trois clés présentes et vides jusqu'aux Lots 5, 6 et 7. Les ajouter plus tard
+     * Deux clés présentes et vides jusqu'aux Lots 5 et 7. Les ajouter plus tard
      * obligerait un client déjà déployé à les traiter comme optionnelles pour toujours.
      */
     public function testTheFutureFieldsAreDeclaredEmptyAndNotAbsent(): void
     {
         $payload = self::summary()->toArray();
 
-        self::assertSame([], $payload['loot']);
         self::assertNull($payload['streak']);
         self::assertSame([], $payload['unlockableNodes']);
+    }
+
+    /**
+     * Une séance sans tirage (aucune table éligible, ou non créditée) porte `loot: []` et
+     * un `coins` à gain nul — jamais des clés absentes, voir {@see SessionDrop::none()}.
+     */
+    public function testANoDropRewardCarriesTheEmptyFormNotAnAbsentKey(): void
+    {
+        $payload = self::summary(SessionDrop::none(40))->toArray();
+
+        self::assertSame([], $payload['loot']);
+        self::assertSame(['gained' => 0, 'before' => 40, 'after' => 40], $payload['coins']);
     }
 
     /**
@@ -121,7 +146,7 @@ final class RewardSummaryPayloadTest extends TestCase
         );
     }
 
-    private static function summary(): RewardSummaryResource
+    private static function summary(?SessionDrop $drop = null): RewardSummaryResource
     {
         $workout = Workout::record(
             Uuid::v7(),
@@ -164,6 +189,20 @@ final class RewardSummaryPayloadTest extends TestCase
             rulesetVersion: 'v1-abcdef',
         );
 
-        return RewardSummaryResource::from(new SessionCompletion($workout, $reward));
+        $drop ??= new SessionDrop(
+            [new DroppedItem(
+                'WORN_RUNNING_SHOES',
+                'Chaussures de course usées',
+                'COMMON',
+                'FEET',
+                [new DroppedItemModifier('XP_MULTIPLIER', 5, 'RUNNING')],
+                30,
+            )],
+            coinsGained: 12,
+            coinsBefore: 40,
+            coinsAfter: 52,
+        );
+
+        return RewardSummaryResource::from(new SessionCompletion($workout, $reward, $drop));
     }
 }

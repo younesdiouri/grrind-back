@@ -208,7 +208,10 @@ final class ImportTransactionTest extends ApiTestCase
     public function testAFailureMidBatchLeavesNeitherWorkoutNorXpNorEvent(): void
     {
         $bob = $this->openAccount();
-        ProgrammableModifiers::failAfter(1);
+        // Deux résolutions par workout crédité depuis le #226 — le crédit d'XP, puis le
+        // tirage de loot — donc deux succès laissent le premier workout entièrement fait
+        // avant que le troisième appel, au début du second workout, ne fasse tout échouer.
+        ProgrammableModifiers::failAfter(2);
 
         $response = $this->import($bob, [
             self::candidate(externalId: 'HK-AVANT', startedAt: '2026-08-03T07:00:00+00:00'),

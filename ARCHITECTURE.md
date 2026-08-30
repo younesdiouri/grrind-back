@@ -81,13 +81,15 @@ L'événement quand le destinataire peut attendre et n'a rien à répondre. Le p
 réponse est nécessaire tout de suite — le fuseau du joueur ne peut pas arriver en différé,
 sinon un changement de fuseau suivi d'une séance compterait sur l'ancien.
 
-Un port se justifie **un par un** dans son docblock. Il y en a huit en tout, et c'est
+Un port se justifie **un par un** dans son docblock. Il y en a neuf en tout, et c'est
 volontaire : `PlayerTimezones`, `PlayerTitles`, `SessionRewards` (par lequel `Training`
 crédite l'XP sans connaître `Progression` — appelé **une fois par workout** d'un lot),
-`SocialProfileResolver` (aucun test ne peut appeler Google), `ModifierContributor`, et les
-trois derniers venus, `PlayerProfiles`, `PlayerProgressions` et `ActiveEnergyWindows` (#165)
-— par lequel `Progression` lit l'énergie active que `Training` a reçue, sans jamais importer
-`DailyActivity`.
+`SocialProfileResolver` (aucun test ne peut appeler Google), `ModifierContributor`, les
+trois `PlayerProfiles`, `PlayerProgressions` et `ActiveEnergyWindows` (#165) — par lequel
+`Progression` lit l'énergie active que `Training` a reçue, sans jamais importer
+`DailyActivity` — et le dernier venu, `SessionDrops` (#226), le jumeau de `SessionRewards`
+pour le loot : même place dans la transaction, même raison de ne pas se fusionner avec lui
+— voir son docblock.
 
 Ces trois-là sont **batch par construction** — leur signature prend une liste d'identifiants,
 pas un identifiant — et c'est la seule chose qui les distingue vraiment des autres. La liste
@@ -257,40 +259,58 @@ flowchart TB
     calc --> ledger["écrire l'<b>XpTransaction</b><br/><i>montant + rulesetVersion + détail ligne à ligne</i>"]
     ledger --> snap["reprojeter le <b>snapshot</b><br/><i>sur SUM(ledger), jamais un +=</i>"]
     snap --> titles["évaluer les <b>titres</b><br/><i>après l'écriture : la séance qui vient<br/>d'être créditée compte pour son titre</i>"]
-    titles --> loot["tirer le <b>loot</b> · mettre à jour le <b>streak</b>"]
-    loot --> obx["écrire les événements dans l'<b>outbox</b>"]
+    titles --> loot["tirer le <b>loot</b><br/><i>table éligible la plus exigeante,<br/>une graine par workout</i>"]
+    loot --> streak["mettre à jour le <b>streak</b>"]
+    streak --> obx["écrire les événements dans l'<b>outbox</b>"]
     obx --> done(["COMMIT → RewardSummary"])
 
     classDef todo stroke-dasharray:4 4,opacity:0.5
-    class loot todo
+    class streak todo
 ```
 
 **Ce qui existe aujourd'hui**, c'est tout sauf la case en pointillés, et c'est branché sur
 l'import : `ImportWorkoutsHandler` ouvre la transaction, écrit chaque workout, appelle
-`GrantXpHandler` par le port `SessionRewards`, et rend le `SyncSummary`. Ce bloc-là est **répété
-une fois par workout crédité**, dans l'ordre chronologique — le verrou n'est pris qu'au premier.
+`GrantXpHandler` par le port `SessionRewards` puis `LootRoller` par le port `SessionDrops`
+(#226), et rend le `SyncSummary`. Ce bloc-là est **répété une fois par workout crédité**,
+dans l'ordre chronologique — le verrou n'est pris qu'au premier.
 
 **Le port, et pourquoi il en faut un.** Deptrac interdit à `Training` d'importer
-`Progression`, et l'événement de domaine — l'autre chemin autorisé — se consomme *après*
-le COMMIT, alors que le crédit doit être annulé si la suite échoue et que la réponse doit
-le porter. `SessionRewards` vit donc dans `Shared`, `Progression` l'implémente,
-`Training` ne connaît que l'interface. Le loot (Lot 6) et le streak (Lot 5) ajouteront
-chacun le leur, entre le crédit et l'outbox.
+`Progression` ou `Rewards`, et l'événement de domaine — l'autre chemin autorisé — se
+consomme *après* le COMMIT, alors qu'un crédit ou un tirage doit être annulé si la suite
+échoue et que la réponse doit le porter. `SessionRewards` et `SessionDrops` vivent donc
+dans `Shared`, `Progression` et `Rewards` les implémentent chacun le sien, `Training` ne
+connaît que les interfaces. Le streak (Lot 5) ajoutera le sien de la même façon, entre le
+loot et l'outbox.
 
 ```mermaid
 flowchart LR
     ts["<b>Training</b><br/>ImportWorkoutsHandler<br/><i>possède la transaction</i>"]
     port{{"<b>Shared</b><br/>SessionRewards<br/><i>le contrat</i>"}}
     pg["<b>Progression</b><br/>LedgerSessionRewards<br/>→ GrantXpHandler"]
+    dport{{"<b>Shared</b><br/>SessionDrops<br/><i>le contrat jumeau</i>"}}
+    rw["<b>Rewards</b><br/>WorkoutSessionDrops<br/>→ LootRoller"]
 
     ts -->|"creditFor(WorkoutImported)"| port
     port -.->|implémenté par| pg
     pg -->|SessionReward| ts
+    ts -->|"rollFor(WorkoutImported, SessionReward)"| dport
+    dport -.->|implémenté par| rw
+    rw -->|SessionDrop| ts
 ```
 
 **Le verrou est posé par l'implémentation, à l'intérieur de la transaction de `Training`.**
 Le `wrapInTransaction` de `GrantXpHandler` n'en rouvre pas une seconde : DBAL en fait un
-point de sauvegarde, le verrou de ligne court jusqu'au COMMIT extérieur.
+point de sauvegarde, le verrou de ligne court jusqu'au COMMIT extérieur. `WorkoutSessionDrops`
+n'a rien à verrouiller de son côté — le solde de pièces et l'inventaire s'écrivent sous leur
+propre verrou consultatif, voir le docblock de `CoinTransactionRepository` — mais reste dans
+la même transaction, donc défait par le même ROLLBACK.
+
+**`SessionDrops` reçoit le `SessionReward` que `SessionRewards` vient de rendre**, pas un
+second appel ni un DTO parallèle : c'est de lui que vient le niveau qui ouvre les tables
+(celui d'après ce crédit) et le verdict « créditée ou non » — une discipline qui ne crédite
+pas d'XP par conception (la marche, #167) ne fait tomber ni objet ni pièce, et
+`WorkoutSessionDrops` le lit sur `$reward->reason` plutôt que de reposer la question à
+`Progression`, que Deptrac lui interdirait de toute façon d'importer.
 
 **Une discipline peut ne rien créditer du tout (#167).** `WALKING` — la marche, qui n'alimente
 que Vitality selon le document de game design — s'arrête avant ce schéma en entier :
@@ -311,9 +331,12 @@ une synchronisation de dix séances aussi simple à animer qu'une seule. `totals
 timeline — « +847 XP · niveau 10 → 15 » — et n'en est jamais la source : il est dérivé de la
 liste, et vaut `null` quand rien n'a été crédité.
 
-`loot`, `streak` et `unlockableNodes` sont présents et vides jusqu'aux Lots 6, 5 et 7 : une clé
-qui apparaîtrait plus tard obligerait un client déjà déployé à la rendre optionnelle pour
-toujours.
+`loot` et `coins` se remplissent depuis le #226 ; `streak` et `unlockableNodes` restent présents
+et vides jusqu'aux Lots 5 et 7 : une clé qui apparaîtrait plus tard obligerait un client déjà
+déployé à la rendre optionnelle pour toujours. `coins` se place entre `loot` et `streak` — le
+loot se révèle, puis les pièces tombent dedans — et porte le même geste `{gained, before, after}`
+que les jauges de caractéristiques et le palier de niveau, pour la même raison : une bourse qui
+repartirait du solde final ne s'anime pas.
 
 Le palier de départ y est donné **en entier** — `before`, `xpIntoLevelBefore`,
 `xpToNextLevelBefore` — et pas seulement son numéro. Le client place la barre, puis la
@@ -337,7 +360,9 @@ niveaux à franchir, ce qui est un cas normal (#79).
                     "totalXp": 145, "xpIntoLevel": 45, "xpToNextLevel": 115,
                     "skillPointsGranted": 1 },
       "titlesUnlocked": [ /* PlayerTitle, déjà traduit — rien à recharger */ ],
-      "loot": [], "streak": null, "unlockableNodes": [],
+      "loot": [ /* DroppedItem : clé, nom traduit, rareté, emplacement, modificateurs, prix — vide si rien n'est tombé */ ],
+      "coins": { "gained": 12, "before": 40, "after": 52 },   // avant/après lus sur le solde réel, jamais `before + gained`
+      "streak": null, "unlockableNodes": [],
       "rulesetVersion": "…"
     }
     // … un par workout crédité, dans l'ordre chronologique

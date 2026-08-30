@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Training\Application;
 
+use App\Shared\Application\SessionDrops;
 use App\Shared\Application\SessionRewards;
 use App\Shared\Domain\Activity\ActivityTypeMap;
 use App\Shared\Domain\Activity\Discipline;
@@ -70,6 +71,7 @@ final readonly class ImportWorkoutsHandler
         private ActivityTypeMap $activityTypes,
         private WorkoutRules $rules,
         private SessionRewards $rewards,
+        private SessionDrops $drops,
         // `event.bus` explicitement (#155) : `WorkoutImported` est un `DomainEvent`, il
         // part sur le bus qui tolère l'absence d'abonné. Sans `#[Target]`, l'autowiring
         // par nom de paramètre est déprécié en 8.1 et retomberait de toute façon sur
@@ -283,7 +285,12 @@ final readonly class ImportWorkoutsHandler
             }
 
             $fact = $this->factOf($workout);
-            $imported[] = new SessionCompletion($workout, $this->rewards->creditFor($fact));
+            $reward = $this->rewards->creditFor($fact);
+            // Le loot après l'XP et les titres, avant l'outbox — l'ordre de
+            // `ARCHITECTURE.md`. `$reward` porte déjà le niveau d'après ce crédit et le
+            // verdict « créditée ou non » : voir le docblock de `SessionDrops` pour
+            // pourquoi cette classe ne repose aucune de ces deux questions.
+            $imported[] = new SessionCompletion($workout, $reward, $this->drops->rollFor($fact, $reward));
 
             // Publié dans la transaction : le transport Doctrine écrit dans
             // `messenger_messages` sur la même connexion, donc l'événement partage le COMMIT.
