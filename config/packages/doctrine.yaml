@@ -58,6 +58,16 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Combat/Domain'
                 prefix: 'App\Combat\Domain'
                 alias: Combat
+            # Pas encore d'entité : `Item`, `ItemCatalog` et les tables de tirage sont des
+            # objets de domaine purs, chargés depuis `items.yaml`/`loot.yaml`, jamais
+            # persistés (#27). Déclaré dès maintenant — même règle que Deptrac — pour que
+            # l'inventaire (#29) n'ait rien d'autre à câbler ici.
+            Rewards:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Rewards/Domain'
+                prefix: 'App\Rewards\Domain'
+                alias: Rewards
 
 when@test:
     doctrine:

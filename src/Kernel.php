@@ -11,6 +11,8 @@ use App\Progression\Infrastructure\Config\AttributeSplitSection;
 use App\Progression\Infrastructure\Config\LevelsSection;
 use App\Progression\Infrastructure\Config\TitlesSection;
 use App\Progression\Infrastructure\Config\XpSection;
+use App\Rewards\Infrastructure\Config\ItemsSection;
+use App\Rewards\Infrastructure\Config\LootSection;
 use App\Shared\Infrastructure\Config\GameBalancePass;
 use App\Training\Infrastructure\Config\ActivityTypesSection;
 use App\Training\Infrastructure\Config\TrainingSection;
@@ -44,6 +46,8 @@ class Kernel extends BaseKernel
             new CommunitySection(),
             new NotificationsSection(),
             new CombatSection(),
+            new ItemsSection(),
+            new LootSection(),
         ));
     }
 }
