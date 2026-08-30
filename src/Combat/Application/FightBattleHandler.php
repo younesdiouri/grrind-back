@@ -23,16 +23,23 @@ use Random\Randomizer;
  *
  * 1. {@see PlayerProgressions} rend la progression du joueur — batch par construction, un
  *    seul élément ici, voir son docblock pour pourquoi ce port et pas un huitième ;
- * 2. {@see FighterFactory} dérive le combattant du joueur ; l'ennemi vient soit de
+ * 2. {@see FighterFactory} dérive le combattant du joueur, modificateurs équipés compris
+ *    depuis #224 — voir son docblock pour l'ordre exact ; l'ennemi vient soit de
  *    {@see EnemyCatalog::forLevel()} — le serveur choisit, comportement inchangé depuis le
  *    #212 — soit de {@see chosen()} quand `$command->enemyKey` est renseigné (#219) ; dans
  *    les deux cas {@see FighterFactory::forEnemy()} le traduit ensuite, même porte que le
- *    joueur, voir le docblock de la factory ;
+ *    joueur, mais sans consulter aucun modificateur — voir le docblock de la factory ;
  * 3. `random_bytes(32)` tire la graine — jamais un hash d'une chaîne, voir le docblock de
  *    {@see Battle} pour le piège que ça a coûté au #209 ;
  * 4. {@see BattleSimulator::fight()} joue le combat, pur, sur les deux combattants et le
  *    `Randomizer` grainé ;
  * 5. {@see Battle::conclude()} écrit la ligne, jamais mutée après.
+ *
+ * **`$this->clock->now()` n'est appelée qu'une fois** (#224), au tout début, et sert à la
+ * fois de date pour {@see \App\Shared\Application\ModifierResolver} — via `FighterFactory`
+ * — et de `$foughtAt` : un combat a lieu à l'instant de la requête, contrairement à un
+ * workout, et les deux usages doivent parler du même instant plutôt que de deux appels
+ * d'horloge qui pourraient diverger d'une milliseconde.
  *
  * ## Le choix de l'adversaire (#219)
  *
@@ -70,10 +77,15 @@ final readonly class FightBattleHandler
 
     public function __invoke(FightBattle $command): Battle
     {
+        // Un seul appel d'horloge, réutilisé pour le resolver de modificateurs et pour
+        // `$foughtAt` : les deux doivent parler du même instant, celui de cette requête —
+        // voir le docblock de `FighterFactory` et celui de `Battle::$foughtAt`.
+        $now = $this->clock->now();
+
         $progressions = $this->progressions->of([$command->playerId]);
         $progression = $progressions[$command->playerId->toRfc4122()];
 
-        $player = $this->fighters->forPlayer($progression);
+        $player = $this->fighters->forPlayer($progression, $command->playerId, $now);
 
         // Aucune ligne n'est encore écrite à ce stade : un refus ici — clé inconnue,
         // niveau insuffisant — ne laisse aucune trace, voir le docblock de la classe.
@@ -99,7 +111,7 @@ final readonly class FightBattleHandler
             $outcome,
             $seed,
             $this->rulesetVersion,
-            $this->clock->now(),
+            $now,
         );
 
         $this->battles->add($battle);

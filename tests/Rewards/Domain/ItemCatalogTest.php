@@ -101,13 +101,18 @@ final class ItemCatalogTest extends TestCase
         ]);
     }
 
+    /**
+     * `STRENGTH_BONUS` a servi ici jusqu'au #224 : c'est exactement le type que ce ticket
+     * ouvre, la preuve qu'il ne l'était pas encore ne tient plus. `BOGUS_TYPE` reprend le
+     * même rôle — n'importe quelle chaîne que `ModifierType::tryFrom()` ne connaît pas.
+     */
     public function testRefuseUnTypeDeModificateurInconnu(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
         new ItemCatalog([
             ['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'price_coins' => 1, 'modifiers' => [
-                ['type' => 'STRENGTH_BONUS', 'value' => 500],
+                ['type' => 'BOGUS_TYPE', 'value' => 500],
             ]],
         ]);
     }

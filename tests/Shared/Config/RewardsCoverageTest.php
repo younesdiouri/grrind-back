@@ -4,11 +4,23 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared\Config;
 
+use App\Combat\Application\FighterFactory;
+use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\EnemyCatalog;
+use App\Combat\Domain\Fighter;
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Domain\LootTables;
+use App\Shared\Application\ModifierContributor;
+use App\Shared\Application\ModifierResolver;
+use App\Shared\Application\PlayerProgression;
+use App\Shared\Domain\Modifier\Modifier;
+use App\Shared\Domain\Modifier\ModifierSource;
+use App\Shared\Domain\Modifier\ModifierType;
+use DateTimeImmutable;
+use LogicException;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Les tables livrées, celles de `config/game/v1/items.yaml` et `config/game/v1/loot.yaml`,
@@ -25,6 +37,20 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 final class RewardsCoverageTest extends KernelTestCase
 {
+    /**
+     * Les quatre types dont la dérivation peut retomber à zéro sur un total trop petit —
+     * voir le docblock d'`items.yaml`. Les cinq stats de combat directes n'y sont pas :
+     * elles n'ont pas de coefficient à traverser.
+     *
+     * @var list<ModifierType>
+     */
+    private const array CHARACTERISTIC_BONUS_TYPES = [
+        ModifierType::StrengthBonus,
+        ModifierType::EnduranceBonus,
+        ModifierType::MobilityBonus,
+        ModifierType::DexterityBonus,
+    ];
+
     public function testLeCatalogueDObjetsLivreConstruitSansErreur(): void
     {
         $catalog = self::shippedCatalog();
@@ -67,6 +93,43 @@ final class RewardsCoverageTest extends KernelTestCase
 
         self::assertSame(1, $container->getParameter('game.loot.version'));
         self::assertIsString($container->getParameter('game.ruleset_version'));
+    }
+
+    /**
+     * Le piège relevé en revue de la PR #232 : un `STRENGTH_BONUS` de 100 dérive à zéro
+     * dégât (`intdiv(100 × 6, 1000) == 0`) — un objet qui n'apporte rigoureusement rien au
+     * joueur, alors que le client affichera son intitulé sans qu'il ne change jamais un
+     * combat. Voir le docblock de `FighterFactory` pour l'ordre de la dérivation, et celui
+     * d'`items.yaml` pour pourquoi le seuil réel n'est pas figé là-bas mais prouvé ici.
+     *
+     * Chaque objet livré qui porte un bonus de caractéristique pure (`STRENGTH_BONUS`,
+     * `ENDURANCE_BONUS`, `MOBILITY_BONUS`, `DEXTERITY_BONUS`) doit, équipé seul sur un
+     * compte neuf, changer d'au moins un point la stat de combat qu'il dérive — celle de la
+     * table du docblock de `FighterFactory`. Les stats de combat directes n'ont pas besoin
+     * de cette garantie : elles n'ont pas de dérivation à rater, leur valeur est déjà
+     * l'effet final.
+     */
+    public function testChaqueBonusDeCaracteristiquePureLivreChangeLeFighterDUnCompteNeuf(): void
+    {
+        $catalog = self::shippedCatalog();
+
+        foreach ($catalog->all() as $item) {
+            foreach ($item->modifiers as $modifier) {
+                if (!\in_array($modifier->type, self::CHARACTERISTIC_BONUS_TYPES, true)) {
+                    continue;
+                }
+
+                $baseline = self::shippedFighterFactory()->forPlayer(PlayerProgression::untouched(), Uuid::v7(), new DateTimeImmutable());
+                $equipped = self::shippedFighterFactory([new Modifier($modifier->type, $modifier->value, ModifierSource::Item, $modifier->discipline)])
+                    ->forPlayer(PlayerProgression::untouched(), Uuid::v7(), new DateTimeImmutable());
+
+                self::assertNotSame(
+                    self::derivedStatOf($baseline, $modifier->type),
+                    self::derivedStatOf($equipped, $modifier->type),
+                    \sprintf('"%s" porte un %s qui dérive à zéro sur un compte neuf — voir le docblock d\'items.yaml.', $item->key, $modifier->type->value),
+                );
+            }
+        }
     }
 
     private static function shippedCatalog(): ItemCatalog
@@ -131,5 +194,64 @@ final class RewardsCoverageTest extends KernelTestCase
         self::assertIsInt($value);
 
         return $value;
+    }
+
+    /**
+     * Une `FighterFactory` construite sur les vraies règles de `combat.yaml`, avec un
+     * resolver qui force les modificateurs passés — jamais un vrai contributeur, aucun
+     * n'existe encore (#224) — même geste que `FighterFactoryTest`.
+     *
+     * @param list<Modifier> $modifiers
+     */
+    private static function shippedFighterFactory(array $modifiers = []): FighterFactory
+    {
+        self::bootKernel();
+        $container = self::getContainer();
+
+        $rules = new CombatRules(
+            self::intParameter($container, 'game.combat.fighter.base_hp'),
+            self::intParameter($container, 'game.combat.fighter.hp_per_1000_vitality'),
+            self::intParameter($container, 'game.combat.fighter.base_damage'),
+            self::intParameter($container, 'game.combat.fighter.damage_per_1000_strength'),
+            self::intParameter($container, 'game.combat.fighter.mitigation_permille_per_1000_endurance'),
+            self::intParameter($container, 'game.combat.fighter.mitigation_cap_permille'),
+            self::intParameter($container, 'game.combat.fighter.extra_turn_permille_per_1000_dexterity'),
+            self::intParameter($container, 'game.combat.fighter.extra_turn_cap_permille'),
+            self::intParameter($container, 'game.combat.fighter.dodge_permille_per_1000_mobility'),
+            self::intParameter($container, 'game.combat.fighter.dodge_cap_permille'),
+            self::intParameter($container, 'game.combat.fighter.minimum_damage'),
+            self::intParameter($container, 'game.combat.fighter.max_turns'),
+        );
+
+        return new FighterFactory($rules, new ModifierResolver([
+            new class($modifiers) implements ModifierContributor {
+                /**
+                 * @param list<Modifier> $modifiers
+                 */
+                public function __construct(private array $modifiers)
+                {
+                }
+
+                public function modifiersOf(Uuid $userId, DateTimeImmutable $occurredAt): array
+                {
+                    return $this->modifiers;
+                }
+            },
+        ]));
+    }
+
+    /**
+     * La stat de `Fighter` que dérive chaque type de caractéristique pure — la même table
+     * que le docblock de `FighterFactory`.
+     */
+    private static function derivedStatOf(Fighter $fighter, ModifierType $type): int
+    {
+        return match ($type) {
+            ModifierType::StrengthBonus => $fighter->damage,
+            ModifierType::EnduranceBonus => $fighter->mitigationPermille,
+            ModifierType::MobilityBonus => $fighter->dodgePermille,
+            ModifierType::DexterityBonus => $fighter->extraTurnPermille,
+            default => throw new LogicException(\sprintf('"%s" n\'est pas un bonus de caractéristique pure.', $type->value)),
+        };
     }
 }

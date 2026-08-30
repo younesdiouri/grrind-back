@@ -17,23 +17,33 @@
 #
 # `type` se valide contre `App\Shared\Domain\Modifier\ModifierType::tryFrom()`, pas contre
 # une liste recopiée ici — voir `ItemsSection` et `ItemModifier`. Deux familles y entrent,
-# aujourd'hui et demain :
+# depuis le #224 :
 #
-#   - les types déjà ouverts (`XP_MULTIPLIER`, `LOOT_LUCK`, `STREAK_SHIELD`,
-#     `UNLOCK_SESSION_TYPE`) — les seuls que ce fichier utilise, voir plus bas ;
-#   - les caractéristiques pures et les stats de combat directes que le #224 ouvrira dans
-#     `ModifierType`. Ce ticket-ci ne les anticipe pas : les ajouter ici avant que l'enum les
-#     porte ferait échouer le démarrage pour rien.
+#   - les quatre types de la V1 (`XP_MULTIPLIER`, `LOOT_LUCK`, `STREAK_SHIELD`,
+#     `UNLOCK_SESSION_TYPE`) ;
+#   - les caractéristiques pures et les stats de combat directes ouvertes au #224
+#     (`STRENGTH_BONUS`, `ENDURANCE_BONUS`, `MOBILITY_BONUS`, `DEXTERITY_BONUS`, `HP_BONUS`,
+#     `DAMAGE_BONUS`, `MITIGATION_BONUS`, `EXTRA_TURN_BONUS`, `DODGE_BONUS`), consommées par
+#     `FighterFactory` — voir son docblock pour l'ordre exact de la dérivation.
 #
-# **L'unité d'un bonus de caractéristique sera le point d'XP réparti, pas un point abstrait.**
+# **L'unité d'un bonus de caractéristique est le point d'XP réparti, pas un point abstrait.**
 # Les caractéristiques d'`attributes.yaml` sont des totaux cumulés, et `combat.yaml` les
 # consomme par milliers (`damage_per_1000_strength: 6`) : un objet à « +5 Strength » ne
-# donnerait rigoureusement rien, `intdiv(5 * 6, 1000) == 0`. Le jour où le #224 ouvre ces
-# types, écrire une valeur ici se compte en centaines ou en milliers, jamais en unités.
+# donnerait rigoureusement rien, `intdiv(5 * 6, 1000) == 0`. « Des centaines » ne suffit pas
+# comme consigne : un `STRENGTH_BONUS` de 100 dérive *encore* à zéro dégât, l'erreur commise
+# à la livraison de ce fichier avant d'être relevée en revue de la PR #232. Le seuil réel
+# dépend du coefficient de la caractéristique visée dans `combat.yaml` (`valeur × coefficient
+# ÷ 1000 ≥ 1`), donc il ne se fige pas ici — il se prouve :
+# `RewardsCoverageTest::testChaqueBonusDeCaracteristiquePureLivreChangeLeFighterDUnCompteNeuf()`
+# fait échouer `make test` pour tout objet livré dont le bonus de caractéristique dérive à
+# zéro sur un compte neuf. Les valeurs se repatchent ici sans migration ; cette règle-là ne
+# se repatche pas.
 #
 # `discipline`, sur un modificateur, est facultatif — absente vaut global, une valeur vaut
 # « seulement pour cette discipline », comme `Modifier::$discipline`. C'est ce qui permet
 # des bottes de course qui ne servent à rien en natation, voir le docblock de `Modifier`.
+# Aucun des neuf types de combat ci-dessus n'en porte : un combat n'a lieu « dans » aucune
+# discipline, et `FighterFactory` ignore ce champ pour eux — voir son docblock.
 #
 # ————— Réserve ————————————————————————————————————————————————————————————————————————
 #
@@ -48,6 +58,9 @@ items:
       price_coins: 30
       modifiers:
           - { type: XP_MULTIPLIER, value: 5, discipline: RUNNING }
+          # Une chaussure ne rend pas plus fort, elle rend plus agile — Mobility, pas Strength.
+          # 1000 × dodge_permille_per_1000_mobility (10) ÷ 1000 = 10 ‰ d'esquive.
+          - { type: MOBILITY_BONUS, value: 1000 }
 
     - key: IRON_GAUNTLETS
       rarity: COMMON
@@ -55,6 +68,8 @@ items:
       price_coins: 30
       modifiers:
           - { type: XP_MULTIPLIER, value: 5, discipline: STRENGTH }
+          # 350 × damage_per_1000_strength (6) ÷ 1000 = 2 dégâts (12,5 % du socle de 16).
+          - { type: STRENGTH_BONUS, value: 350 }
 
     - key: TRAVELERS_CLOAK
       rarity: UNCOMMON
@@ -62,6 +77,9 @@ items:
       price_coins: 80
       modifiers:
           - { type: XP_MULTIPLIER, value: 8 }
+          # Encaisse le froid et la fatigue de la route — Endurance, pas des PV directs.
+          # 1200 × mitigation_permille_per_1000_endurance (15) ÷ 1000 = 18 ‰ de mitigation.
+          - { type: ENDURANCE_BONUS, value: 1200 }
 
     - key: LUCKY_RABBIT_CHARM
       rarity: UNCOMMON
@@ -69,6 +87,10 @@ items:
       price_coins: 90
       modifiers:
           - { type: LOOT_LUCK, value: 10 }
+          # La chance ne s'arrête pas au loot : un porte-bonheur fait aussi éviter le coup.
+          # Direct, donc déjà l'effet final — même ordre de grandeur que l'Endurance de
+          # `TRAVELERS_CLOAK` ci-dessus, à rareté égale.
+          - { type: DODGE_BONUS, value: 18 }
 
     - key: TEMPERED_HEADBAND
       rarity: RARE
@@ -76,6 +98,8 @@ items:
       price_coins: 180
       modifiers:
           - { type: XP_MULTIPLIER, value: 12 }
+          # 2400 × extra_turn_permille_per_1000_dexterity (12) ÷ 1000 = 28 ‰ de tour supplémentaire.
+          - { type: DEXTERITY_BONUS, value: 2400 }
 
     - key: SWIFT_TRAIL_LEGGINGS
       rarity: RARE
@@ -84,6 +108,10 @@ items:
       modifiers:
           - { type: XP_MULTIPLIER, value: 10, discipline: HIKING }
           - { type: LOOT_LUCK, value: 5 }
+          # « Swift » : le réflexe pour rejouer un tour, direct plutôt que via Dexterity.
+          # Direct, donc déjà l'effet final — même ordre de grandeur que la Dexterity de
+          # `TEMPERED_HEADBAND` ci-dessus, à rareté égale.
+          - { type: EXTRA_TURN_BONUS, value: 28 }
 
     - key: EMBER_OF_THE_ANCESTORS
       rarity: RARE
@@ -94,6 +122,9 @@ items:
           # contributeur de `Rewards` (#29) décidera comment plusieurs charges portées
           # à la fois se composent ; ce catalogue ne pose qu'un objet à une charge.
           - { type: STREAK_SHIELD, value: 1 }
+          # La braise protège autant qu'elle porte chance — mitigation directe, même
+          # ordre de grandeur que les deux autres objets RARE ci-dessus.
+          - { type: MITIGATION_BONUS, value: 28 }
 
     - key: OBSIDIAN_WARBLADE
       rarity: EPIC
@@ -102,6 +133,9 @@ items:
       modifiers:
           - { type: XP_MULTIPLIER, value: 15, discipline: STRENGTH }
           - { type: LOOT_LUCK, value: 10 }
+          # Une lame ajoute du dégât brut, pas de la Strength — direct plutôt que dérivé.
+          # 4 dégâts (25 % du socle de 16) : notable sans décider seul du combat.
+          - { type: DAMAGE_BONUS, value: 4 }
 
     - key: STORMCALLERS_BOOTS
       rarity: EPIC
@@ -109,6 +143,8 @@ items:
       price_coins: 450
       modifiers:
           - { type: XP_MULTIPLIER, value: 18, discipline: RUNNING }
+          # 4200 × dodge_permille_per_1000_mobility (10) ÷ 1000 = 42 ‰ d'esquive.
+          - { type: MOBILITY_BONUS, value: 4200 }
 
     - key: CROWN_OF_THE_TIRELESS
       rarity: LEGENDARY
@@ -117,3 +153,8 @@ items:
       modifiers:
           - { type: XP_MULTIPLIER, value: 20 }
           - { type: LOOT_LUCK, value: 20 }
+          # « Tireless » : plus de points de vie, jamais via Vitality — voir le docblock
+          # de `ModifierType` pour pourquoi Vitality ne peut pas recevoir de modificateur.
+          # 40 PV (28,6 % du socle de 140) : le seul objet LEGENDARY du catalogue, notable
+          # sans être décisif à lui seul.
+          - { type: HP_BONUS, value: 40 }

@@ -132,7 +132,9 @@ final class FightBattleHandlerTest extends KernelTestCase
         $progression = PlayerProgression::untouched();
         $enemy = $enemies->forLevel($progression->level);
         $enemyFighter = $fighters->forEnemy($enemy);
-        $player = $fighters->forPlayer($progression);
+        // Le joueur de ce combat n'a pas de compte réel : aucun contributeur ne branche
+        // encore de modificateur (#224), donc l'UUID passé au resolver n'a pas d'incidence.
+        $player = $fighters->forPlayer($progression, Uuid::v7(), $now);
 
         $write = function () use ($simulator, $seed, $progression, $player, $enemy, $enemyFighter, $now): Battle {
             $outcome = $simulator->fight($player, $enemyFighter, new Randomizer(new Xoshiro256StarStar($seed)));
