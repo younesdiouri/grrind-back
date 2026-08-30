@@ -23,14 +23,48 @@ use InvalidArgumentException;
  * ## Ce que le schéma ne peut pas dire, et que ce constructeur dit à sa place
  *
  * `ItemsSection` ne borne que ce qu'un `TreeBuilder` sait borner par champ — un prix
- * négatif, une clé vide. Deux règles échappent à ça et vivent ici, même raison que
- * {@see \App\Combat\Domain\EnemyCatalog} : une clé d'objet dupliquée, et un modificateur
- * dont le type ou la discipline ne correspondent à rien de connu. `ModifierType::tryFrom()`
- * plutôt qu'une énumération recopiée dans le schéma : c'est ce qui laisse le #224 ouvrir de
- * nouveaux types sans toucher à cette classe, voir le docblock d'{@see ItemModifier}.
+ * négatif, une clé vide. Trois règles échappent à ça et vivent ici, même raison que
+ * {@see \App\Combat\Domain\EnemyCatalog} : une clé d'objet dupliquée, un modificateur dont le
+ * type ou la discipline ne correspondent à rien de connu, et — depuis le #29 — une discipline
+ * posée sur un type de combat. `ModifierType::tryFrom()` plutôt qu'une énumération recopiée
+ * dans le schéma : c'est ce qui laisse le #224 ouvrir de nouveaux types sans toucher à cette
+ * classe, voir le docblock d'{@see ItemModifier}.
+ *
+ * ## Une discipline sur un modificateur de combat se refuse au chargement (#29)
+ *
+ * `FighterFactory` traite les neuf types de combat ouverts au #224 (`STRENGTH_BONUS`,
+ * `ENDURANCE_BONUS`, `MOBILITY_BONUS`, `DEXTERITY_BONUS`, `HP_BONUS`, `DAMAGE_BONUS`,
+ * `MITIGATION_BONUS`, `EXTRA_TURN_BONUS`, `DODGE_BONUS`) comme globaux, sans jamais regarder
+ * {@see \App\Shared\Domain\Modifier\Modifier::$discipline} — voir son docblock : « un combat
+ * n'a lieu dans aucune discipline ». Écrire `{ type: STRENGTH_BONUS, value: 350, discipline:
+ * RUNNING }` dans `items.yaml` produirait donc un objet qui s'applique **partout**, alors que
+ * le fichier prétend le contraire de ce que le moteur fait. Une config qui ment se refuse au
+ * démarrage plutôt que de se documenter : voir {@see self::COMBAT_MODIFIER_TYPES} et le refus
+ * dans {@see modifiers()}.
  */
 final readonly class ItemCatalog
 {
+    /**
+     * Les neuf types de combat du #224 — voir le docblock de la classe pour pourquoi aucun
+     * n'accepte de discipline. Recopiée ici plutôt que déléguée à une méthode de
+     * `ModifierType` : le refus est une règle du catalogue, pas du vocabulaire partagé, et
+     * `ItemsSection`/`ItemCatalog` sont explicitement les deux classes que le ticket #29 en
+     * charge.
+     *
+     * @var list<ModifierType>
+     */
+    private const array COMBAT_MODIFIER_TYPES = [
+        ModifierType::StrengthBonus,
+        ModifierType::EnduranceBonus,
+        ModifierType::MobilityBonus,
+        ModifierType::DexterityBonus,
+        ModifierType::HpBonus,
+        ModifierType::DamageBonus,
+        ModifierType::MitigationBonus,
+        ModifierType::ExtraTurnBonus,
+        ModifierType::DodgeBonus,
+    ];
+
     /** @var array<string, Item> */
     private array $byKey;
 
@@ -106,6 +140,10 @@ final readonly class ItemCatalog
                 $discipline = isset($modifier['discipline'])
                     ? Discipline::tryFrom($modifier['discipline'])
                         ?? throw new InvalidArgumentException(\sprintf('"%s" porte un modificateur pour une discipline inconnue : "%s".', $itemKey, $modifier['discipline'])) : null;
+
+                if (null !== $discipline && \in_array($type, self::COMBAT_MODIFIER_TYPES, true)) {
+                    throw new InvalidArgumentException(\sprintf('"%s" porte un modificateur de combat "%s" avec une discipline ("%s") : un combat n\'a lieu dans aucune discipline, voir le docblock de FighterFactory.', $itemKey, $type->value, $discipline->value));
+                }
 
                 return new ItemModifier($type, $modifier['value'], $discipline);
             },

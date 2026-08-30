@@ -11,9 +11,13 @@ use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le seul contributeur de modificateurs de l'environnement de test, tant qu'aucun module
- * n'en accorde pour de vrai — le streak arrive au Lot 5, les objets au Lot 6, les
- * compétences au Lot 7.
+ * Le contributeur *programmable* de l'environnement de test, pour les sources qui n'accordent
+ * pas encore pour de vrai — le streak arrive au Lot 5, les compétences au Lot 7. `Rewards` a
+ * cessé d'en faire partie au #29 : `ItemModifiers` contribue désormais réellement, à partir de
+ * ce qu'un joueur a équipé. Les deux coexistent sans conflit dans `ModifierResolver` — un
+ * compte de test n'a rien équipé tant qu'un test ne le fait pas lui-même via l'inventaire
+ * réel, donc `ItemModifiers` y rend un ensemble vide, silencieusement, comme n'importe quel
+ * autre contributeur sans rien à dire.
  *
  * Il existe pour prouver le **branchement** : que le tag posé sur `ModifierContributor`
  * est bien celui qu'attend `ModifierResolver`, et que ce qu'un module accorde traverse
