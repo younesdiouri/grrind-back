@@ -150,6 +150,7 @@ final readonly class AdversaryBattleDrops implements BattleDrops
 
         return new DroppedItem(
             $item->key,
+            $item->kind->value,
             $this->translator->nameOf($item->key),
             $item->rarity->value,
             $slot->value,

@@ -1964,9 +1964,10 @@ components:
               $ref: '#/components/schemas/Discipline'
       type: object
     DroppedItem:
-      description: "Un objet tombé d'un tirage (#226), de quoi l'afficher **sans requête\nsupplémentaire** — même geste qu'un titre dans `PlayerTitle`.\n\n`slot` est nullable depuis le #230 : un coffre n'a pas d'emplacement.\nUn objet qui tombe d'un tirage — séance ou combat — en porte en\nrevanche toujours un, un coffre ne tombant jamais d'un tirage.\n"
+      description: "Un objet tombé d'un tirage (#226), de quoi l'afficher **sans requête\nsupplémentaire** — même geste qu'un titre dans `PlayerTitle`.\n\n`slot` est nullable depuis le #230 : un coffre n'a pas d'emplacement.\nUn objet qui tombe d'un tirage — séance ou combat — en porte en\nrevanche toujours un, un coffre ne tombant jamais d'un tirage.\n\n`kind` distingue un équipement d'un coffre explicitement (#230) :\n`slot === null` suffisait tant que le coffre était le seul objet sans\nemplacement, mais c'était une déduction à écrire côté client plutôt\nqu'une donnée du contrat — elle se serait tue en silence au premier\nobjet non équipable de plus.\n"
       required:
         - key
+        - kind
         - name
         - rarity
         - slot
@@ -1977,6 +1978,12 @@ components:
           description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire."
           type: string
           example: WORN_RUNNING_SHOES
+        kind:
+          description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
+          type: string
+          enum:
+            - EQUIPMENT
+            - CHEST
         name:
           description: 'Déjà traduit dans la langue du joueur — rien à recharger côté client.'
           type: string

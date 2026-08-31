@@ -99,6 +99,7 @@ final readonly class InventoryResource
 
         $dropped = new DroppedItem(
             $item->key,
+            $item->kind->value,
             $translator->nameOf($item->key),
             $item->rarity->value,
             $item->slot?->value,

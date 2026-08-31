@@ -21,7 +21,7 @@ use Symfony\Component\Uid\Uuid;
  * vrai tirage : ce qui se prouve ici est le contrat HTTP, pas le hasard du loot, déjà
  * couvert par `BattleLootTest` et `ImportLootTest`.
  *
- * @phpstan-type InventoryLine array{key: string, name: string, rarity: string, slot: string, modifiers: list<array<string, mixed>>, priceCoins: int, quantity: int}
+ * @phpstan-type InventoryLine array{key: string, kind: string, name: string, rarity: string, slot: string|null, modifiers: list<array<string, mixed>>, priceCoins: int, quantity: int}
  * @phpstan-type InventoryBody array{coins: int, equipment: array<string, InventoryLine|null>, items: list<InventoryLine>}
  */
 final class InventoryRoutesTest extends ApiTestCase
@@ -59,7 +59,7 @@ final class InventoryRoutesTest extends ApiTestCase
         $item = $items[0];
 
         self::assertSame(
-            ['key', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'quantity'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'quantity'],
             array_keys($item),
         );
         self::assertSame('WORN_RUNNING_SHOES', $item['key']);

@@ -30,7 +30,7 @@ use Symfony\Component\Uid\Uuid;
  * (`OBSIDIAN_WARBLADE`, `STORMCALLERS_BOOTS`, `CROWN_OF_THE_TIRELESS`, les trois EPIC ou
  * LEGENDARY) — voir `items.yaml`.
  *
- * @phpstan-type ShopLine array{key: string, name: string, rarity: string, slot: string, modifiers: list<array<string, mixed>>, priceCoins: int, affordable: bool, owned: bool, minimumLevel: int, unlocked: bool}
+ * @phpstan-type ShopLine array{key: string, kind: string, name: string, rarity: string, slot: string|null, modifiers: list<array<string, mixed>>, priceCoins: int, affordable: bool, owned: bool, minimumLevel: int, unlocked: bool}
  * @phpstan-type ShopBody array{coins: int, items: list<ShopLine>}
  * @phpstan-type InventoryBody array{coins: int, equipment: array<string, mixed>, items: list<array<string, mixed>>}
  */
@@ -61,7 +61,7 @@ final class ShopRoutesTest extends ApiTestCase
 
         $item = $body['items'][0];
         self::assertSame(
-            ['key', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
             array_keys($item),
         );
     }

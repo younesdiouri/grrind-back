@@ -152,6 +152,7 @@ final readonly class WorkoutSessionDrops implements SessionDrops
 
         return new DroppedItem(
             $item->key,
+            $item->kind->value,
             $this->translator->nameOf($item->key),
             $item->rarity->value,
             $slot->value,

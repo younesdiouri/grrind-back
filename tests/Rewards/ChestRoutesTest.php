@@ -50,6 +50,10 @@ final class ChestRoutesTest extends ApiTestCase
      * `GET /api/inventory` ne rendent la table qui alimente un coffre — un test le prouve
      * plutôt qu'un commentaire le promette : la forme exposée est exactement celle de tout
      * autre objet, rien de plus.
+     *
+     * **`kind` distingue explicitement un coffre, `slot === null` n'est qu'une conséquence.**
+     * L'app décide « Ouvrir » plutôt que « Équiper » sur `kind`, jamais sur l'absence d'une
+     * autre valeur — voir le docblock de `DroppedItem`, revu en relecture de la PR du #230.
      */
     public function testTheChestContentIsNeverRevealedBeforeOpening(): void
     {
@@ -58,17 +62,19 @@ final class ChestRoutesTest extends ApiTestCase
 
         $shopEntry = self::itemNamed($this->shop($bob)['items'], 'WOODEN_CHEST');
         self::assertSame(
-            ['key', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
             array_keys($shopEntry),
         );
+        self::assertSame('CHEST', $shopEntry['kind']);
         self::assertNull($shopEntry['slot']);
         self::assertSame([], $shopEntry['modifiers']);
 
         $inventoryEntry = self::itemNamed($this->inventory($bob)['items'], 'WOODEN_CHEST');
         self::assertSame(
-            ['key', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'quantity'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'quantity'],
             array_keys($inventoryEntry),
         );
+        self::assertSame('CHEST', $inventoryEntry['kind']);
         self::assertNull($inventoryEntry['slot']);
     }
 

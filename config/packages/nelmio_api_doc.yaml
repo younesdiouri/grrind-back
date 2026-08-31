@@ -1032,9 +1032,19 @@ when@dev:
                             `slot` est nullable depuis le #230 : un coffre n'a pas d'emplacement.
                             Un objet qui tombe d'un tirage — séance ou combat — en porte en
                             revanche toujours un, un coffre ne tombant jamais d'un tirage.
-                        required: [key, name, rarity, slot, modifiers, priceCoins]
+
+                            `kind` distingue un équipement d'un coffre explicitement (#230) :
+                            `slot === null` suffisait tant que le coffre était le seul objet sans
+                            emplacement, mais c'était une déduction à écrire côté client plutôt
+                            qu'une donnée du contrat — elle se serait tue en silence au premier
+                            objet non équipable de plus.
+                        required: [key, kind, name, rarity, slot, modifiers, priceCoins]
                         properties:
                             key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
+                            kind:
+                                type: string
+                                enum: [EQUIPMENT, CHEST]
+                                description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
                             name: { type: string, example: "Chaussures de course usées", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
                             rarity:
                                 type: string

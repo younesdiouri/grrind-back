@@ -70,6 +70,7 @@ final readonly class ChestOpenResource
     {
         return new DroppedItem(
             $item->key,
+            $item->kind->value,
             $translator->nameOf($item->key),
             $item->rarity->value,
             $item->slot?->value,
