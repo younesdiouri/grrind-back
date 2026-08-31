@@ -29,12 +29,42 @@ when@test:
                 path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: debug
 
+# ————— Pourquoi `fingers_crossed` reste, et pourquoi il a fallu `passthru_level` (#157) —————
+#
+# `fingers_crossed` **tamponne** tout ce qui est sous `action_level` et ne vide le tampon que si
+# une `ERROR` survient. Sans erreur, le tampon est jeté. C'est la bonne propriété et elle ne se
+# supprime pas en croyant simplifier : quand une erreur tombe, on récupère les cinquante
+# enregistrements **qui l'ont précédée** — le contexte, pas seulement le symptôme.
+#
+# Mais elle avait une conséquence que personne n'avait mesurée : **aucun journal délibéré du
+# projet n'atteignait la production.** Les appels au logger écrits à la main dans `src/` sont
+# tous en `info` ou `warning`, donc tous sous le seuil. Le `warning` « des appareils existent,
+# aucun dans l'environnement visé » est né au #149 pour rendre visible exactement la classe de
+# panne qui avait coûté une soirée — et il était muet là où il servait.
+#
+# `passthru_level` est le point d'extension prévu pour ça, documenté par le bundle
+# (`Configuration.php` : « level name or int value for messages to always flush »). Les
+# `warning` et au-dessus s'écrivent toujours ; le tampon garde son rôle pour tout le reste.
+# Une ligne, native, aucune classe à nous.
+#
+# **`warning` et pas `info`, délibérément.** Les `info` restants disent qu'une chose normale
+# s'est bien passée (« notification envoyée », « catégorie coupée ») : les écrire à chaque
+# requête est une décision de volume, pas de diagnostic, et elle se tranche séparément — par un
+# canal dédié sans `fingers_crossed`, sur le modèle de `deprecation` juste en dessous, qui prouve
+# que le montage à deux handlers fonctionne.
+#
+# **Ne pas promouvoir un `warning` en `error` pour contourner le seuil.** Ce serait mentir sur la
+# gravité pour gagner de la visibilité, et le premier à lire une alerte s'en apercevrait.
 when@prod:
     monolog:
         handlers:
             main:
                 type: fingers_crossed
                 action_level: error
+                # Voir le bloc ci-dessus : sans ça, les journaux de diagnostic du projet
+                # n'existent qu'en cas d'erreur concomitante — c'est-à-dire jamais quand on en a
+                # besoin.
+                passthru_level: warning
                 handler: nested
                 excluded_http_codes: [404, 405]
                 channels: ["!deprecation"]
