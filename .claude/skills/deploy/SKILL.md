@@ -71,19 +71,29 @@ serait arrêté pour de bon au bout d'une heure.
 
 ## Les six pièges
 
-**1. Une machine `app` arrêtée n'est plus normale, mais `flyctl` échoue pareil.**
-Avant le #188, `min_machines_running = 0` laissait le groupe `app` s'éteindre entre deux
-requêtes et `flyctl ssh console` échouait avec *app grrind-back has no started VMs* sans que
-rien ne soit cassé. Ce n'est plus le cas : `min_machines_running = 1` garde une machine `app`
-allumée, parce qu'un démarrage à froid mesuré à **21 s** dépassait du double le budget de 10 s
-du réveil HealthKit du client. Voir le commentaire de `fly.toml`. Si le message apparaît
-encore, la machine est tombée pour une vraie raison — regarder `flyctl logs` avant de la
-relancer, puis la relancer :
+**1. `min_machines_running` empêche d'arrêter, il ne démarre pas — donc `fly deploy` peut
+laisser l'`app` éteinte.** C'est le piège du #188, constaté au déploiement qui le fermait :
+`flyctl deploy` a rendu `Machine ... reached stopped state` pour le groupe `app` et l'a
+considéré comme *a good state*, puis fly-proxy l'a laissée arrêtée indéfiniment. Le seuil est
+appliqué au moment où le proxy **arrête** des machines ; il ne rallume jamais une machine déjà
+éteinte pour remonter au minimum. Il a fallu un `machine start` unique pour l'amorcer.
+
+**Après chaque `fly deploy`, vérifier l'état du groupe `app` et le démarrer s'il est arrêté.**
+Sans ce geste, le déploiement remet silencieusement le démarrage à froid de 21 s en place et
+rouvre le #188 sans que rien ne le signale — le déploiement, lui, s'est déclaré réussi.
 
 ```bash
-flyctl machine list -a grrind-back          # relever l'ID du groupe app
-flyctl machine start <ID> -a grrind-back
+flyctl status -a grrind-back                # `app` doit être `started`
+flyctl machine start <ID> -a grrind-back    # une seule fois ; ensuite le proxy ne l'arrête plus
 ```
+
+Une fois amorcée, elle tient : vérifié 12 minutes sans une seule requête, toujours `started`,
+et `/health` à 276 ms au réveil contre 21 s à froid.
+
+Le corollaire vaut aussi. Avant le #188, `flyctl ssh console` échouant avec *app grrind-back
+has no started VMs* était banal — le groupe s'éteignait entre deux requêtes. Ce n'est plus le
+cas : hors du cas ci-dessus, ce message veut dire que la machine est tombée pour une vraie
+raison, et `flyctl logs` se regarde avant de la relancer.
 
 **2. `make migrate-prod` ne marchera pas depuis un poste de dev.** La connexion directe à
 Supabase est **IPv6 uniquement**, et la cible du Makefile passe par la machine locale :
