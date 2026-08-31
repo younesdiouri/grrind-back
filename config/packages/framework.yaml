@@ -1,6 +1,35 @@
 framework:
     secret: '%env(APP_SECRET)%'
 
+    # ————— Un refus métier n'est pas un incident (#247) —————————————————————————————————
+    #
+    # `ErrorListener::resolveLogLevel()` journalise en `CRITICAL` tout ce qui n'implémente pas
+    # `HttpExceptionInterface`, quel que soit le statut rendu. Nos `DomainError` n'en
+    # implémentent pas — délibérément, voir leur docblock : « la traduction en statut HTTP
+    # appartient à la couche UI, jamais au domaine », et c'est `ProblemDetailsListener` qui la
+    # fait. Sans cette entrée, un code d'autorisation expiré, une guilde pleine ou un profil
+    # introuvable sortent donc au même niveau qu'une base de données disparue.
+    #
+    # Deux conséquences, et la seconde est la plus coûteuse : une alerte branchée sur `error`
+    # sonnerait sur des utilisateurs qui se trompent, et surtout chaque 4xx déclencherait le
+    # vidage du tampon de `fingers_crossed` (`monolog.yaml`, `action_level: error`) — cinquante
+    # enregistrements de contexte déversés en production à chaque refus banal.
+    #
+    # `resolveLogLevel()` teste `$throwable instanceof $class` : l'entrée sur la classe
+    # abstraite couvre les six catégories d'un coup, sans énumérer les sous-classes.
+    #
+    # **`log_level` seul, jamais `status_code`.** `ErrorListener::logKernelException()` tourne à
+    # la priorité 0, `ProblemDetailsListener` à -64 : Symfony passe donc en premier, et un
+    # `status_code` dans ce mapping lui ferait *remplacer* le throwable par une `HttpException`
+    # (`ErrorListener.php`, `$event->setThrowable()`). Notre listener ne verrait plus un
+    # `DomainError`, tomberait dans la branche `HttpExceptionInterface`, et rendrait un problème
+    # **sans le `type` en kebab-case** — le champ sur lequel le client branche ses messages, perdu
+    # en silence pour toute l'API. `log_level` ne touche pas au throwable, et c'est tout ce qu'on
+    # veut d'ici.
+    exceptions:
+        App\Shared\Domain\Exception\DomainError:
+            log_level: warning
+
     # L'API est stateless de bout en bout : tous les firewalls le sont ou n'en ont pas,
     # et rien ne lit la session. En mode worker FrankenPHP, un composant à état qui ne
     # sert à personne est un risque pour rien.
