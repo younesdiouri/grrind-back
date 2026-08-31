@@ -8,6 +8,7 @@ use App\Shared\Domain\Activity\WorkoutSource;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Doctrine\DBAL\Connection;
+use Psr\Clock\ClockInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -82,5 +83,31 @@ trait Workouts
         self::assertInstanceOf(Connection::class, $connection);
 
         return $connection;
+    }
+
+    /**
+     * Une séance datée relativement à l'instant du test, plutôt qu'en dur (#243).
+     *
+     * Les suites qui bornent leurs candidats contre la fenêtre d'antériorité de 30 jours
+     * dataient leurs séances en absolu, ce qui ne prévient de rien : une date littérale
+     * finit toujours par en sortir, silencieusement, le jour où `make test` tourne après
+     * elle. `Training` ne fige l'horloge d'aucun service — `GuildActivityNotifierTest`
+     * documente pourquoi `MockClock` reste exclu de la suite fonctionnelle (#169) : figer
+     * le temps d'un test qui traverse HTTP, Doctrine et Messenger est un chantier à lui
+     * seul. Ce n'est donc pas l'horloge qu'on fige ici, c'est la date qu'on calcule contre
+     * elle — même geste que le défaut de {@see self::recordWorkout()} au-dessus.
+     *
+     * Lue depuis le `ClockInterface` du conteneur plutôt que `new DateTimeImmutable()` :
+     * c'est l'horloge que la production consulte, et un seul appel évite que les cinq
+     * suites qui en ont besoin finissent par en écrire cinq copies divergentes.
+     */
+    protected static function daysAgo(int $days, string $time = '07:00:00'): DateTimeImmutable
+    {
+        $clock = self::getContainer()->get(ClockInterface::class);
+        self::assertInstanceOf(ClockInterface::class, $clock);
+
+        [$hour, $minute, $second] = array_map('intval', explode(':', $time));
+
+        return $clock->now()->modify(\sprintf('-%d days', $days))->setTime($hour, $minute, $second);
     }
 }

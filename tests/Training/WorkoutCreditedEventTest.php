@@ -106,12 +106,16 @@ final class WorkoutCreditedEventTest extends ApiTestCase
     public function testTheEventIsDatedByTheSport(): void
     {
         $bob = $this->openAccount();
-        $this->import($bob, [self::candidate(startedAt: '2026-08-01T06:30:00+00:00')]);
+        // Capturée une fois : c'est cette même valeur qu'on retrouve dans l'assertion, pas
+        // un second appel à `daysAgo()` qui pourrait tomber de l'autre côté d'un minuit —
+        // voir le docblock de `Workouts::daysAgo()` (#243).
+        $startedAt = self::daysAgo(5, '06:30:00');
+        $this->import($bob, [self::candidate(startedAt: $startedAt->format(DateTimeInterface::ATOM))]);
 
         $this->consumeTheOutbox();
         $event = WorkoutCreditedSpy::$received[0];
 
-        self::assertSame('2026-08-01T06:30:00+00:00', $event->occurredAt()->format(DateTimeInterface::ATOM));
+        self::assertSame($startedAt->format(DateTimeInterface::ATOM), $event->occurredAt()->format(DateTimeInterface::ATOM));
     }
 
     /**
@@ -163,8 +167,8 @@ final class WorkoutCreditedEventTest extends ApiTestCase
         ProgrammableModifiers::failAfter(2);
 
         $response = $this->import($bob, [
-            self::candidate(externalId: 'HK-AVANT', startedAt: '2026-08-03T07:00:00+00:00'),
-            self::candidate(externalId: 'HK-APRES', startedAt: '2026-08-04T07:00:00+00:00'),
+            self::candidate(externalId: 'HK-AVANT', startedAt: self::daysAgo(7)->format(DateTimeInterface::ATOM)),
+            self::candidate(externalId: 'HK-APRES', startedAt: self::daysAgo(6)->format(DateTimeInterface::ATOM)),
         ]);
 
         self::assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
@@ -248,9 +252,13 @@ final class WorkoutCreditedEventTest extends ApiTestCase
         ?int $daysAgo = null,
         int $durationSeconds = 1800,
     ): array {
-        $start = null !== $daysAgo
-            ? new DateTimeImmutable(\sprintf('-%d days', $daysAgo))->setTime(7, 0)
-            : new DateTimeImmutable($startedAt ?? '2026-08-05T07:00:00+00:00');
+        // Daté relativement à l'instant du test plutôt qu'en dur (#243) — voir le
+        // docblock de `Workouts::daysAgo()`.
+        $start = match (true) {
+            null !== $daysAgo => self::daysAgo($daysAgo),
+            null !== $startedAt => new DateTimeImmutable($startedAt),
+            default => self::daysAgo(5),
+        };
 
         return [
             'externalId' => $externalId,
