@@ -60,6 +60,32 @@ final class LootRollerTest extends TestCase
     }
 
     /**
+     * Le jumeau exact du test précédent, pour un coffre (#230) : `RewardsCoverageTest`
+     * garantit que ce cas n'arrive jamais en production, le roller doit tout de même s'en
+     * accommoder proprement.
+     */
+    public function testAChestWithoutADedicatedTableRollsNothing(): void
+    {
+        $roller = self::rollerOf();
+        $tables = self::chestTablesOf([], ['WOODEN_CHEST']);
+
+        $outcome = $roller->rollForChest($tables, 'WOODEN_CHEST', [], self::randomizer());
+
+        self::assertNull($outcome);
+    }
+
+    public function testTheSameSeedProducesAnIdenticalOutcomeForAChest(): void
+    {
+        $roller = self::rollerOf();
+        $tables = self::chestTablesOf([self::chest('WOODEN_CHEST')]);
+
+        $first = $roller->rollForChest($tables, 'WOODEN_CHEST', [], self::randomizer('même graine'));
+        $second = $roller->rollForChest($tables, 'WOODEN_CHEST', [], self::randomizer('même graine'));
+
+        self::assertEquals($first, $second);
+    }
+
+    /**
      * Les seuils de `loot.yaml` se recouvrent volontairement : une séance peut être
      * éligible à plusieurs tables à la fois. Le roller retient la plus exigeante — le
      * niveau minimal le plus haut, puis à égalité la durée minimale la plus haute — voir le
@@ -202,6 +228,34 @@ final class LootRollerTest extends TestCase
     }
 
     /**
+     * Un coffre ne s'ouvre dans aucune discipline, même raisonnement que pour un combat —
+     * voir le docblock de {@see LootRoller::rollForChest()}.
+     */
+    public function testAScopedLootLuckNeverAppliesToAChestRoll(): void
+    {
+        $roller = self::rollerOf(floorPercent: 0, capPercent: 200);
+        $tables = self::chestTablesOf([self::chest('WOODEN_CHEST')]);
+        $scoped = [self::lootLuck(200, Discipline::Running)];
+
+        $outcome = $roller->rollForChest($tables, 'WOODEN_CHEST', $scoped, self::randomizer());
+
+        self::assertNotNull($outcome);
+        self::assertSame(0, $outcome->effectiveLootLuckPercent);
+    }
+
+    /** Un `LOOT_LUCK` global, lui, s'applique bien à un coffre — même geste que sur un combat. */
+    public function testAGlobalLootLuckAppliesToAChestRoll(): void
+    {
+        $roller = self::rollerOf(floorPercent: 0, capPercent: 200);
+        $tables = self::chestTablesOf([self::chest('WOODEN_CHEST')]);
+
+        $outcome = $roller->rollForChest($tables, 'WOODEN_CHEST', [self::lootLuck(200)], self::randomizer());
+
+        self::assertNotNull($outcome);
+        self::assertSame(200, $outcome->effectiveLootLuckPercent);
+    }
+
+    /**
      * Deux sources de `LOOT_LUCK` actives à la fois composent par somme — même choix et
      * même raison que {@see \App\Combat\Application\FighterFactory::sumOf()}.
      */
@@ -335,7 +389,7 @@ final class LootRollerTest extends TestCase
             ...array_map(static fn (string $key): array => ['key' => $key], $adversaryKeysWithoutTable),
         ];
 
-        return new LootTables(1, $workout, $adversary, [['key' => 'ITEM']], $enemies, []);
+        return new LootTables(1, $workout, $adversary, [], [['key' => 'ITEM']], $enemies, []);
     }
 
     /**
@@ -367,6 +421,45 @@ final class LootRollerTest extends TestCase
             'coins' => ['minimum' => 2, 'maximum' => 8],
             'entries' => [['weight' => 80], ['item' => 'ITEM', 'weight' => 20]],
         ];
+    }
+
+    /**
+     * Même forme qu'{@see adversary()} — le coffre choisi *est* la condition, tout comme
+     * l'adversaire.
+     *
+     * @return array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}
+     */
+    private static function chest(string $key): array
+    {
+        return [
+            'key' => $key,
+            'coins' => ['minimum' => 2, 'maximum' => 8],
+            'entries' => [['weight' => 80], ['item' => 'ITEM', 'weight' => 20]],
+        ];
+    }
+
+    /**
+     * Le pendant de {@see tablesOf()} pour les coffres — `$items` porte `ITEM`
+     * (`EQUIPMENT`, le seul objet que ces tables font tomber) et chaque coffre concerné,
+     * marqué `kind: CHEST`.
+     *
+     * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $chest
+     * @param list<string>                                                                                                         $chestKeysWithoutTable clés de coffre du catalogue sans table dans `loot.yaml` — voir `testAChestWithoutADedicatedTableRollsNothing`
+     */
+    private static function chestTablesOf(array $chest, array $chestKeysWithoutTable = []): LootTables
+    {
+        $chestKeys = [
+            ...array_map(static fn (array $entry): string => $entry['key'], $chest),
+            ...$chestKeysWithoutTable,
+        ];
+
+        /** @var list<array{key: string, kind?: string}> $items */
+        $items = [
+            ['key' => 'ITEM'],
+            ...array_map(static fn (string $key): array => ['key' => $key, 'kind' => 'CHEST'], $chestKeys),
+        ];
+
+        return new LootTables(1, [], [], $chest, $items, [], []);
     }
 
     private static function lootLuck(int $value, ?Discipline $discipline = null): Modifier

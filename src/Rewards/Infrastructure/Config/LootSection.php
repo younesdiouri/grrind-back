@@ -13,8 +13,8 @@ use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
 /**
- * Le schéma de `config/game/v1/loot.yaml` — les tables de tirage, par séance et par
- * adversaire.
+ * Le schéma de `config/game/v1/loot.yaml` — les tables de tirage, par séance, par adversaire
+ * et par coffre (#230).
  *
  * `version` est la version des tables, indépendante du `rulesetVersion` global — voir le
  * docblock de {@see LootTables}. `loot_luck` porte le plancher et le plafond du `LOOT_LUCK`
@@ -88,6 +88,19 @@ final class LootSection implements GameBalanceSection
                         ->end()
                     ->end()
                 ->end()
+                // Une table par clé de coffre (#230), même forme qu'`adversary` : l'objet
+                // choisi *est* la condition, aucune éligibilité à écrire.
+                ->arrayNode('chest')
+                    ->isRequired()
+                    ->requiresAtLeastOneElement()
+                    ->arrayPrototype()
+                        ->children()
+                            ->scalarNode('key')->isRequired()->cannotBeEmpty()->end()
+                            ->append(self::coinsNode())
+                            ->append(self::entriesNode())
+                        ->end()
+                    ->end()
+                ->end()
             ->end()
             ->validate()
                 ->always(static function (array $values): array {
@@ -97,22 +110,38 @@ final class LootSection implements GameBalanceSection
                      *     loot_luck: array{floor_percent: int, cap_percent: int},
                      *     workout: list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>,
                      *     adversary: list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>,
+                     *     chest: list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>,
                      * } $values les nœuds ci-dessus ont déjà fait ce travail
                      */
                     try {
                         // Voir le docblock de la classe : l'univers des clés connues est
                         // tiré de ce fichier lui-même, faute de pouvoir lire les deux
-                        // autres depuis ici.
+                        // autres depuis ici. Les clés de coffre déclarées sont marquées
+                        // `kind: CHEST` pour que la vérification de `LootTables` — une table
+                        // de coffre doit désigner un coffre — passe sur ce que ce fichier
+                        // affirme, faute de pouvoir le confronter à `items.yaml`.
                         $referencedItems = array_map(
                             static fn (string $key): array => ['key' => $key],
-                            self::referencedItemKeys($values['workout'], $values['adversary']),
+                            self::referencedItemKeys($values['workout'], $values['adversary'], $values['chest']),
                         );
                         $declaredAdversaries = array_map(
                             static fn (array $entry): array => ['key' => $entry['key']],
                             $values['adversary'],
                         );
+                        $declaredChestItems = array_map(
+                            static fn (array $entry): array => ['key' => $entry['key'], 'kind' => 'CHEST'],
+                            $values['chest'],
+                        );
 
-                        new LootTables($values['version'], $values['workout'], $values['adversary'], $referencedItems, $declaredAdversaries, []);
+                        new LootTables(
+                            $values['version'],
+                            $values['workout'],
+                            $values['adversary'],
+                            $values['chest'],
+                            [...$referencedItems, ...$declaredChestItems],
+                            $declaredAdversaries,
+                            [],
+                        );
                         new LootLuckRules($values['loot_luck']['floor_percent'], $values['loot_luck']['cap_percent']);
                     } catch (InvalidArgumentException $incoherent) {
                         throw new InvalidConfigurationException($incoherent->getMessage(), previous: $incoherent);
@@ -166,14 +195,15 @@ final class LootSection implements GameBalanceSection
     /**
      * @param list<array{entries: list<array{item?: string}>}> $workout
      * @param list<array{entries: list<array{item?: string}>}> $adversary
+     * @param list<array{entries: list<array{item?: string}>}> $chest
      *
      * @return list<string>
      */
-    private static function referencedItemKeys(array $workout, array $adversary): array
+    private static function referencedItemKeys(array $workout, array $adversary, array $chest): array
     {
         $keys = [];
 
-        foreach ([...$workout, ...$adversary] as $table) {
+        foreach ([...$workout, ...$adversary, ...$chest] as $table) {
             foreach ($table['entries'] as $entry) {
                 if (isset($entry['item'])) {
                     $keys[$entry['item']] = true;

@@ -136,6 +136,35 @@ final readonly class LootRoller
     }
 
     /**
+     * Le jumeau exact de {@see rollForAdversary()} pour un coffre qu'on ouvre (#230) — même
+     * moteur, `null` quand le coffre n'a pas de table dédiée, même remarque sur ce cas
+     * (`RewardsCoverageTest` ne le rencontre jamais en production, mais `ItemCatalog` seul
+     * ne peut pas le garantir, voir son docblock).
+     *
+     * **`LOOT_LUCK` global uniquement, jamais scopé par discipline** — même raisonnement que
+     * pour `rollForAdversary()`, voir « La portée par discipline compte ici » dans le
+     * docblock de la classe : un coffre ne s'ouvre dans aucune discipline, tout comme un
+     * combat ne se joue dans aucune. Un `LOOT_LUCK` scopé porte une portée légitime dont la
+     * condition n'est simplement jamais remplie ici, donc écarté plutôt que compté comme
+     * global — {@see lootLuckGlobalOnly()} est la même méthode que `rollForAdversary()`
+     * appelle, pas une troisième variante qui aurait pu diverger.
+     *
+     * @param list<Modifier> $modifiers déjà résolus par l'appelant, voir le docblock de la classe
+     */
+    public function rollForChest(LootTables $tables, string $chestKey, array $modifiers, Randomizer $randomizer): ?LootRollOutcome
+    {
+        $table = $tables->forChest($chestKey);
+
+        if (null === $table) {
+            return null;
+        }
+
+        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckGlobalOnly($modifiers));
+
+        return $this->roll($chestKey, $tables->version, $table, $effectiveLootLuckPercent, $randomizer);
+    }
+
+    /**
      * La plus exigeante des tables éligibles — voir le docblock de la classe. `null` si
      * aucune ne l'est.
      *

@@ -24,6 +24,7 @@ final class LootTablesTest extends TestCase
             1,
             [self::workout('TIER_ONE', ['RUNNING'], 20, 5)],
             [],
+            [],
             [['key' => 'BOOTS']],
             [],
             [],
@@ -41,7 +42,7 @@ final class LootTablesTest extends TestCase
 
     public function testUneListeDeDisciplinesVideAccepteToutSport(): void
     {
-        $tables = new LootTables(1, [self::workout('ANY', [], 0, 1)], [], [['key' => 'BOOTS']], [], []);
+        $tables = new LootTables(1, [self::workout('ANY', [], 0, 1)], [], [], [['key' => 'BOOTS']], [], []);
 
         self::assertTrue($tables->workoutTables()[0]->isEligibleFor(Discipline::Swimming, 0, 1));
     }
@@ -51,7 +52,8 @@ final class LootTablesTest extends TestCase
         $tables = new LootTables(
             1,
             [],
-            [self::adversary('SAND_JACKAL', ['SHIELD'])],
+            [self::table('SAND_JACKAL', ['SHIELD'])],
+            [],
             [['key' => 'SHIELD']],
             [['key' => 'SAND_JACKAL']],
             [],
@@ -66,7 +68,7 @@ final class LootTablesTest extends TestCase
 
     public function testForAdversaryRendNullPourUneCleSansTable(): void
     {
-        $tables = new LootTables(1, [], [], [], [['key' => 'SAND_JACKAL']], []);
+        $tables = new LootTables(1, [], [], [], [], [['key' => 'SAND_JACKAL']], []);
 
         self::assertNull($tables->forAdversary('SAND_JACKAL'));
     }
@@ -75,7 +77,7 @@ final class LootTablesTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new LootTables(0, [self::workout('TIER_ONE', [], 0, 1)], [], [], [], []);
+        new LootTables(0, [self::workout('TIER_ONE', [], 0, 1)], [], [], [], [], []);
     }
 
     public function testRefuseDeuxTablesDeSeancePourLaMemeCle(): void
@@ -85,6 +87,7 @@ final class LootTablesTest extends TestCase
         new LootTables(
             1,
             [self::workout('TIER_ONE', [], 0, 1), self::workout('TIER_ONE', [], 0, 1)],
+            [],
             [],
             [['key' => 'BOOTS']],
             [],
@@ -96,7 +99,7 @@ final class LootTablesTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new LootTables(1, [], [self::adversary('GHOST_JACKAL', [])], [], [['key' => 'SAND_JACKAL']], []);
+        new LootTables(1, [], [self::table('GHOST_JACKAL', [])], [], [], [['key' => 'SAND_JACKAL']], []);
     }
 
     public function testRefuseDeuxTablesPourLeMemeAdversaire(): void
@@ -106,7 +109,8 @@ final class LootTablesTest extends TestCase
         new LootTables(
             1,
             [],
-            [self::adversary('SAND_JACKAL', []), self::adversary('SAND_JACKAL', [])],
+            [self::table('SAND_JACKAL', []), self::table('SAND_JACKAL', [])],
+            [],
             [],
             [['key' => 'SAND_JACKAL']],
             [],
@@ -117,7 +121,7 @@ final class LootTablesTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new LootTables(1, [], [self::adversary('SAND_JACKAL', ['GHOST_ITEM'])], [], [['key' => 'SAND_JACKAL']], []);
+        new LootTables(1, [], [self::table('SAND_JACKAL', ['GHOST_ITEM'])], [], [], [['key' => 'SAND_JACKAL']], []);
     }
 
     public function testRefuseUneSommeDePoidsNulle(): void
@@ -132,6 +136,7 @@ final class LootTablesTest extends TestCase
                 'coins' => ['minimum' => 2, 'maximum' => 8],
                 'entries' => [['weight' => 0]],
             ]],
+            [],
             [],
             [['key' => 'SAND_JACKAL']],
             [],
@@ -150,6 +155,7 @@ final class LootTablesTest extends TestCase
                 'coins' => ['minimum' => 2, 'maximum' => 8],
                 'entries' => [['item' => 'BOOTS', 'weight' => 10]],
             ]],
+            [],
             [['key' => 'BOOTS']],
             [['key' => 'SAND_JACKAL']],
             [],
@@ -169,7 +175,89 @@ final class LootTablesTest extends TestCase
                 'entries' => [['weight' => 100]],
             ]],
             [],
+            [],
             [['key' => 'SAND_JACKAL']],
+            [],
+        );
+    }
+
+    /**
+     * Le jumeau exact du test adversaire — même geste, une clé de coffre plutôt qu'une clé
+     * d'ennemi.
+     */
+    public function testForChestRendLaTableDeLaCleConnue(): void
+    {
+        $tables = new LootTables(
+            1,
+            [],
+            [],
+            [self::table('WOODEN_CHEST', ['BOOTS'])],
+            [['key' => 'BOOTS'], ['key' => 'WOODEN_CHEST', 'kind' => 'CHEST']],
+            [],
+            [],
+        );
+
+        $table = $tables->forChest('WOODEN_CHEST');
+
+        self::assertNotNull($table);
+        self::assertSame(2, $table->coins->minimum);
+        self::assertSame(8, $table->coins->maximum);
+    }
+
+    public function testForChestRendNullPourUneCleSansTable(): void
+    {
+        $tables = new LootTables(1, [], [], [], [['key' => 'WOODEN_CHEST', 'kind' => 'CHEST']], [], []);
+
+        self::assertNull($tables->forChest('WOODEN_CHEST'));
+    }
+
+    /** Une table de coffre pour une clé qui n'est pas un coffre du catalogue — même refus qu'une clé d'adversaire inconnue. */
+    public function testRefuseUneTableDeCoffrePourUneCleQuiNEstPasUnCoffre(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new LootTables(
+            1,
+            [],
+            [],
+            [self::table('IRON_GAUNTLETS', [])],
+            [['key' => 'IRON_GAUNTLETS']],
+            [],
+            [],
+        );
+    }
+
+    public function testRefuseDeuxTablesPourLeMemeCoffre(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new LootTables(
+            1,
+            [],
+            [],
+            [self::table('WOODEN_CHEST', []), self::table('WOODEN_CHEST', [])],
+            [['key' => 'WOODEN_CHEST', 'kind' => 'CHEST']],
+            [],
+            [],
+        );
+    }
+
+    /** Le cœur du #230 : une table de coffre ne peut pas contenir de coffre. */
+    public function testRefuseUneTableDeCoffreQuiContientUnCoffre(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('WOODEN_CHEST');
+
+        new LootTables(
+            1,
+            [],
+            [],
+            [self::table('WOODEN_CHEST', ['IRON_BOUND_CHEST'])],
+            [
+                ['key' => 'WOODEN_CHEST', 'kind' => 'CHEST'],
+                ['key' => 'IRON_BOUND_CHEST', 'kind' => 'CHEST'],
+            ],
+            [],
             [],
         );
     }
@@ -194,11 +282,14 @@ final class LootTablesTest extends TestCase
     }
 
     /**
+     * Une table à condition unique — l'adversaire ou le coffre choisi *est* la condition,
+     * même forme pour les deux origines.
+     *
      * @param list<string> $itemKeys
      *
      * @return array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}
      */
-    private static function adversary(string $key, array $itemKeys): array
+    private static function table(string $key, array $itemKeys): array
     {
         $entries = [['weight' => 80]];
 

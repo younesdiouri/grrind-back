@@ -9,6 +9,7 @@ use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Domain\Fighter;
 use App\Rewards\Domain\ItemCatalog;
+use App\Rewards\Domain\ItemKind;
 use App\Rewards\Domain\LootTables;
 use App\Shared\Application\ModifierContributor;
 use App\Shared\Application\ModifierResolver;
@@ -86,6 +87,28 @@ final class RewardsCoverageTest extends KernelTestCase
         }
     }
 
+    /**
+     * Le pendant du test précédent pour les coffres (#230) : un coffre sans table dédiée ne
+     * s'ouvrirait jamais sur rien de tirable — `OpenChestHandler` le refuserait par une
+     * `LogicException`, un bug de configuration que ce test attrape ici plutôt qu'à
+     * l'ouverture d'un joueur. Le pendant inverse — un `EQUIPMENT` qui aurait une table de
+     * coffre — n'a pas besoin de test dédié : `LootTables` le refuse déjà au chargement, voir
+     * `LootTablesTest::testRefuseUneTableDeCoffrePourUneCleQuiNEstPasUnCoffre()`.
+     */
+    public function testChaqueCoffreDuCatalogueALivreATableDeTirage(): void
+    {
+        $tables = self::shippedTables();
+        $catalog = self::shippedCatalog();
+
+        foreach ($catalog->all() as $item) {
+            if (ItemKind::Chest !== $item->kind) {
+                continue;
+            }
+
+            self::assertNotNull($tables->forChest($item->key), \sprintf('"%s" n\'a pas de table de tirage dans loot.yaml.', $item->key));
+        }
+    }
+
     public function testLaVersionDesTablesEstExposeeIndependammentDuRulesetVersion(): void
     {
         self::bootKernel();
@@ -155,7 +178,7 @@ final class RewardsCoverageTest extends KernelTestCase
         $items = $container->getParameter('game.items.items');
         self::assertIsArray($items);
 
-        /** @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         return new ItemCatalog($items);
     }
 
@@ -168,12 +191,14 @@ final class RewardsCoverageTest extends KernelTestCase
 
         $workout = $container->getParameter('game.loot.workout');
         $adversary = $container->getParameter('game.loot.adversary');
+        $chest = $container->getParameter('game.loot.chest');
         $items = $container->getParameter('game.items.items');
         $enemies = $container->getParameter('game.combat.enemies');
         $bosses = $container->getParameter('game.combat.bosses');
 
         self::assertIsArray($workout);
         self::assertIsArray($adversary);
+        self::assertIsArray($chest);
         self::assertIsArray($items);
         self::assertIsArray($enemies);
         self::assertIsArray($bosses);
@@ -181,11 +206,12 @@ final class RewardsCoverageTest extends KernelTestCase
         /**
          * @var list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout
          * @var list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
-         * @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}>                   $items
+         * @var list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $chest
+         * @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}>   $items
          * @var list<array{key: string}>                                                                                                                                                                                               $enemies
          * @var list<array{key: string}>                                                                                                                                                                                               $bosses
          */
-        return new LootTables($version, $workout, $adversary, $items, $enemies, $bosses);
+        return new LootTables($version, $workout, $adversary, $chest, $items, $enemies, $bosses);
     }
 
     private static function shippedEnemyCatalog(): EnemyCatalog
