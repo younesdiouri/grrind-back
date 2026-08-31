@@ -54,11 +54,15 @@ suffit, et deux sur la même outbox n'apportent qu'une concurrence dont personne
 `flyctl scale show -a grrind-back` est la seule source de vérité sur ce compte.
 
 Le groupe `worker` **tourne en permanence** (`[[restart]] policy = 'always'` scopé à
-`processes = ['worker']` dans `fly.toml`) : `min_machines_running = 0` du `[http_service]`
-ne s'applique qu'à `app`, `worker` n'a pas de `[http_service]` du tout. Ce n'est pas une
+`processes = ['worker']` dans `fly.toml`) : `min_machines_running` du `[http_service]` ne
+s'applique qu'à `app`, `worker` n'a pas de `[http_service]` du tout. Ce n'est pas une
 incohérence — `stale_window_minutes` et `announcement_delay_seconds` d'`AnnounceGuildActivity`
 sont calibrés pour un consommateur vivant, pas pour une consommation périodique. Voir le
 commentaire de `fly.toml` et le #153 pour l'arbitrage complet.
+
+**Depuis le #188, les deux groupes tournent en permanence**, pour deux raisons différentes :
+`worker` par `[[restart]] policy = 'always'`, `app` par `min_machines_running = 1`. Une machine
+`app` arrêtée n'est donc plus l'état normal — c'est le signe qu'il s'est passé quelque chose.
 
 `messenger:consume` sort avec le code 0 quand `--time-limit`/`--memory-limit` est atteint
 (comportement documenté par Symfony, pas un bug) : sans la section `[[restart]]`, la
@@ -67,11 +71,14 @@ serait arrêté pour de bon au bout d'une heure.
 
 ## Les six pièges
 
-**1. Les machines `app` sont arrêtées la plupart du temps ; `worker`, jamais.**
-`min_machines_running = 0` et `auto_stop_machines = 'stop'` ne visent que le groupe `app` :
-`flyctl ssh console` échoue avec *app grrind-back has no started VMs* si aucune machine
-`app` n'est démarrée — le `worker`, lui, est censé toujours l'être. Ce n'est **pas** un
-déploiement raté. Démarrer une machine `app` avant :
+**1. Une machine `app` arrêtée n'est plus normale, mais `flyctl` échoue pareil.**
+Avant le #188, `min_machines_running = 0` laissait le groupe `app` s'éteindre entre deux
+requêtes et `flyctl ssh console` échouait avec *app grrind-back has no started VMs* sans que
+rien ne soit cassé. Ce n'est plus le cas : `min_machines_running = 1` garde une machine `app`
+allumée, parce qu'un démarrage à froid mesuré à **21 s** dépassait du double le budget de 10 s
+du réveil HealthKit du client. Voir le commentaire de `fly.toml`. Si le message apparaît
+encore, la machine est tombée pour une vraie raison — regarder `flyctl logs` avant de la
+relancer, puis la relancer :
 
 ```bash
 flyctl machine list -a grrind-back          # relever l'ID du groupe app
@@ -130,16 +137,17 @@ l'utilisateur le demande, ça mérite un ticket, pas une ligne glissée en passa
 
 ## Ce que ça coûte
 
-**La seule ligne qui tourne en permanence est le `worker`.** `app` s'arrête tout seul entre deux
-requêtes (`min_machines_running = 0`) et ne coûte que le temps où il sert ; les machines
-arrêtées ne se facturent qu'au stockage de leur système de fichiers. En environnement de dev,
-la facture Fly *est* donc le worker allumé 24 h/24 — et c'est pour ça que le second était du
-gaspillage pur, pas un détail.
+**Deux `shared-cpu-1x` de 512 Mo tournent en permanence depuis le #188**, une par groupe : le
+`worker` (#153) et l'`app` (#188). La facture Fly de cet environnement de dev *est* ce couple —
+c'est pour ça que le second worker était du gaspillage pur, pas un détail, et c'est la même
+grille qui rend le passage de `app` à une machine toujours allumée négligeable : le doublement
+porte sur une base déjà minuscule, et il achète l'import qui arrive quand la séance a lieu.
 
-Ce qui reste comme leviers, par ordre décroissant de gain et croissant de risque : le nombre de
-machines toujours allumées (fait), leur taille (512 MB aujourd'hui, alors que
-`messenger:consume` s'auto-limite à 128 MB côté PHP), puis la fréquence de consommation — mais
-celle-là a été tranchée au #153 et la rouvrir défait un arbitrage, elle ne l'optimise pas.
+Ce qui reste comme leviers, par ordre décroissant de gain et croissant de risque : la taille des
+machines (512 MB aujourd'hui, alors que `messenger:consume` s'auto-limite à 128 MB côté PHP),
+puis la fréquence de consommation — mais celle-là a été tranchée au #153 et la rouvrir défait un
+arbitrage, elle ne l'optimise pas. **Le nombre de machines allumées, lui, n'est plus un levier** :
+les deux le sont pour une raison écrite, et les remettre à zéro rouvre le #153 ou le #188.
 
 ## Le test de fumée
 

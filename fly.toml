@@ -38,8 +38,21 @@ primary_region = 'cdg'
   # Ne vaut que pour le groupe `app` (cf. `processes` juste en dessous) : `worker` n'a pas
   # de `[http_service]`, donc `auto_stop_machines` ne s'y applique jamais — il tourne en
   # permanence, voir `[[restart]]` plus bas. Ce n'est pas une incohérence à corriger : le
-  # web reste élastique sur le trafic HTTP, le worker ne l'est délibérément pas.
-  min_machines_running = 0
+  # web reste élastique au-delà de la première machine, le worker ne l'est pas du tout.
+  #
+  # Décision du #188, et ce `1` ne se remet pas à `0` pour économiser. Mesure du 2026-08-31,
+  # image en cours, `cdg`, trois `machine stop` suivis d'un `POST /api/auth/login` :
+  # **21,9 / 21,0 / 21,3 s** jusqu'au premier octet, contre 52 à 208 ms machine déjà allumée.
+  # Le réveil HealthKit du client abandonne à 10 s sans rejeu (`importTimeoutMsFor('background')`
+  # dans `grrind-app`), parce que le chien de garde iOS borne toute la fenêtre du réveil à 25 s.
+  # Un démarrage à froid ne dépasse donc pas ce budget de temps en temps : il le dépasse du
+  # double, à chaque fois. La séance est bien importée, mais seulement à la prochaine ouverture
+  # de l'app — c'est-à-dire jamais au moment où elle a lieu, ce qui est tout ce que le réveil
+  # en arrière-plan sert à offrir. Une `shared-cpu-1x` de 512 Mo allumée en permanence est le
+  # prix de cet instant ; le groupe `worker` en paie déjà une pour une raison du même ordre
+  # (#153). `auto_stop_machines` reste à `stop` : il ne vise plus que d'éventuelles machines
+  # au-delà de la première.
+  min_machines_running = 1
   processes = ['app']
 
 # `messenger:consume` sort avec le code 0 quand `--time-limit`/`--memory-limit` est atteint
