@@ -6,6 +6,8 @@ namespace App\Rewards\Application;
 
 use App\Rewards\Domain\Exception\ItemAlreadyOwned;
 use App\Rewards\Domain\InventoryItem;
+use App\Rewards\Domain\Item;
+use App\Rewards\Domain\ItemKind;
 use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
@@ -45,10 +47,10 @@ final readonly class Inventory
     }
 
     /**
-     * Achète un exemplaire de `$itemKey` (#229) — un {@see grant()} sans tirage, `lootRollId`
-     * à `null`, voir le docblock d'{@see InventoryItem} pour ce que `null` veut dire.
+     * Achète un exemplaire d'`$item` (#229) — un {@see grant()} sans tirage, `lootRollId` à
+     * `null`, voir le docblock d'{@see InventoryItem} pour ce que `null` veut dire.
      *
-     * **Refuse un objet déjà possédé, sans méthode dédiée sur le repository.** `grant()`
+     * **Refuse un `EQUIPMENT` déjà possédé, sans méthode dédiée sur le repository.** `grant()`
      * verrouille déjà, lit déjà la possession, écrit déjà — une méthode `purchase()` sur
      * {@see InventoryItemRepository} dupliquerait ces trois gestes pour une seule différence :
      * refuser plutôt que fusionner. Cette classe appelle donc `grant()` tel quel, sous le même
@@ -58,16 +60,23 @@ final readonly class Inventory
      * avec le reste si c'est le cas ; le ledger de pièces n'a pas encore été touché à ce
      * stade, voir son docblock pour l'ordre des deux verrous.
      *
-     * @throws ItemAlreadyOwned l'objet était déjà possédé avant cet achat
+     * **Un coffre échappe à ce refus (#230).** {@see ItemAlreadyOwned}
+     * se justifie par un unique emplacement qui n'accueillerait rien de plus — voir son
+     * docblock — un raisonnement qui ne tient pas pour un coffre, qui ne s'équipe jamais et
+     * s'empile au contraire pour de bon : chaque achat est une future ouverture de plus. La
+     * boutique étant le seul donneur (#230), c'est même la seule façon d'en posséder plus
+     * d'un. `$item->kind` tranche donc ici, jamais un drapeau supplémentaire au catalogue.
+     *
+     * @throws ItemAlreadyOwned `$item` est un `EQUIPMENT` déjà possédé avant cet achat
      */
-    public function purchase(Uuid $userId, string $itemKey, DateTimeImmutable $obtainedAt): InventoryItem
+    public function purchase(Uuid $userId, Item $item, DateTimeImmutable $obtainedAt): InventoryItem
     {
-        $item = $this->items->grant($userId, $itemKey, null, $obtainedAt);
+        $line = $this->items->grant($userId, $item->key, null, $obtainedAt);
 
-        if ($item->quantity() > 1) {
-            throw new ItemAlreadyOwned($itemKey);
+        if (ItemKind::Equipment === $item->kind && $line->quantity() > 1) {
+            throw new ItemAlreadyOwned($item->key);
         }
 
-        return $item;
+        return $line;
     }
 }

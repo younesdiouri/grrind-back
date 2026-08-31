@@ -25,12 +25,14 @@ use Symfony\Component\Uid\Uuid;
  * par un `if` dans une transaction. Même geste que {@see \App\Community\Domain\Risala} pour
  * `uniq_community_risala_open_turn`.
  *
- * ## `$quantity` ne redescend jamais dans ce ticket
+ * ## `$quantity` ne redescendait jamais avant le #230
  *
- * « Aucune vente, aucun rebut, aucun objet consommable » (#29) : la seule mutation de
- * `$quantity` est {@see grantOneMore()}, strictement additive. Le jour où une dépense existera
- * (boutique, Lot 6b), elle touchera une classe qui l'assume plutôt que de réutiliser
- * silencieusement celle-ci pour un geste qu'elle ne portait pas.
+ * « Aucune vente, aucun rebut, aucun objet consommable » (#29) : jusqu'au #230, la seule
+ * mutation de `$quantity` était {@see grantOneMore()}, strictement additive. **Un coffre
+ * qu'on ouvre est la première vraie dépense** : {@see consumeOne()} en est le pendant
+ * soustractif, sous la même garde que le reste de cette classe — appelée sous verrou par
+ * {@see InventoryItemRepository::consumeOne()}, jamais en dehors. La ligne n'est jamais
+ * supprimée à zéro : voir le docblock de cette méthode pour pourquoi.
  *
  * ## `$lootRollId` est la provenance, et rien d'autre ne la porte
  *
@@ -138,6 +140,29 @@ class InventoryItem
     public function grantOneMore(): void
     {
         ++$this->quantity;
+    }
+
+    /**
+     * Consomme un exemplaire — l'ouverture d'un coffre (#230), la première vraie dépense de
+     * `$quantity`, voir le docblock de la classe. Toujours `-1` : ouvrir consomme exactement
+     * l'exemplaire qu'on vient de choisir, jamais la pile entière.
+     *
+     * **La ligne est conservée à zéro plutôt que supprimée.** `$lootRollId` et `$obtainedAt`
+     * restent ceux de la première acquisition — la provenance ne s'efface pas parce que le
+     * sac est vide — et {@see InventoryItemRepository::ownedByPlayer()} filtre les lignes à
+     * zéro : un sac n'affiche pas ce qu'il ne contient plus, mais la table garde la trace.
+     *
+     * La garde — refuser une quantité déjà nulle — vit chez l'appelant
+     * ({@see InventoryItemRepository::consumeOne()}, `item-not-owned`), sous le même verrou
+     * que la lecture qui a établi la possession : `\assert()` ici est un filet de
+     * programmeur, jamais la vraie garde métier, même remarque que sur
+     * {@see \App\Rewards\Application\CoinLedger::spend()}.
+     */
+    public function consumeOne(): void
+    {
+        \assert($this->quantity > 0, 'consumeOne() sur une ligne déjà à zéro : la garde revient à InventoryItemRepository::consumeOne().');
+
+        --$this->quantity;
     }
 
     /**

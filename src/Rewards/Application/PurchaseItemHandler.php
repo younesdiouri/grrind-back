@@ -90,7 +90,7 @@ final readonly class PurchaseItemHandler
         $now = $this->clock->now();
 
         return $this->inventoryRepository->transactional(function () use ($item, $command, $now): PurchaseReceipt {
-            $line = $this->inventory->purchase($command->userId, $item->key, $now);
+            $line = $this->inventory->purchase($command->userId, $item, $now);
 
             $coinsBefore = $this->coins->balanceOf($command->userId);
             $this->coins->spend($command->userId, $line->id(), $item->priceCoins, $now);

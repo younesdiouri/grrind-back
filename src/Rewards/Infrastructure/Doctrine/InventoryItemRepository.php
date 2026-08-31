@@ -44,6 +44,13 @@ use Symfony\Component\Uid\Uuid;
  * l'occupant retourne dans le sac ({@see InventoryItem::unequip()}), il ne quitte
  * l'inventaire à aucun moment — voir {@see equip()} pour pourquoi deux `flush()` distincts.
  *
+ * ## `consumeOne()` (#230) : même geste que `equip()`, la garde avant l'écriture
+ *
+ * Ouvrir un coffre consomme un exemplaire sous le même verrou que le reste de la classe —
+ * voir le docblock d'{@see InventoryItem::consumeOne()}. La garde (`item-not-owned` sur une
+ * ligne absente ou déjà à zéro) est vérifiée ici, pas dans le domaine : même raison que pour
+ * `equip()`, une vérification faite avant le verrou pourrait être périmée au moment d'écrire.
+ *
  * @extends ServiceEntityRepository<InventoryItem>
  */
 class InventoryItemRepository extends ServiceEntityRepository
@@ -155,14 +162,42 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
-     * Ouvre la transaction unique d'un achat (#229). Ni `grant()` ni l'écriture du ledger de
-     * pièces n'ont d'agrégat racine qui l'ouvrirait pour elles — contrairement à `Battle` pour
-     * un combat, ou l'import pour un lot de workouts — donc c'est ce repository qui la porte :
-     * son verrou est celui que {@see \App\Rewards\Application\PurchaseItemHandler} doit
-     * prendre en premier, dans le même ordre que {@see \App\Rewards\Infrastructure\Drop\WorkoutSessionDrops}
-     * et {@see \App\Rewards\Infrastructure\Drop\AdversaryBattleDrops} — inventaire puis
-     * pièces, jamais l'inverse, sous peine d'interbloquer avec un import ou un combat
-     * concurrent qui prend les deux verrous dans ce même ordre.
+     * Consomme un exemplaire de `$itemKey`, sous verrou — l'ouverture d'un coffre (#230).
+     * Même charpente que {@see equip()} : verrouiller, lire la possession, décider, écrire —
+     * voir le docblock de la classe pour pourquoi la garde vit ici plutôt que dans
+     * {@see InventoryItem::consumeOne()}.
+     *
+     * @throws ItemNotOwned aucune ligne pour `$itemKey`, ou une quantité déjà nulle
+     */
+    public function consumeOne(Uuid $userId, string $itemKey): InventoryItem
+    {
+        return $this->getEntityManager()->wrapInTransaction(function () use ($userId, $itemKey): InventoryItem {
+            $this->lock($userId);
+
+            $owned = $this->ofPlayerAndItem($userId, $itemKey);
+
+            if (null === $owned || $owned->quantity() < 1) {
+                throw new ItemNotOwned($itemKey);
+            }
+
+            $owned->consumeOne();
+            $this->getEntityManager()->flush();
+
+            return $owned;
+        });
+    }
+
+    /**
+     * Ouvre la transaction unique d'un achat (#229) ou d'une ouverture de coffre (#230). Ni
+     * `grant()`/`consumeOne()` ni l'écriture du ledger de pièces n'ont d'agrégat racine qui
+     * l'ouvrirait pour elles — contrairement à `Battle` pour un combat, ou l'import pour un
+     * lot de workouts — donc c'est ce repository qui la porte : son verrou est celui que
+     * {@see \App\Rewards\Application\PurchaseItemHandler} et
+     * {@see \App\Rewards\Application\OpenChestHandler} doivent prendre en premier, dans le
+     * même ordre que {@see \App\Rewards\Infrastructure\Drop\WorkoutSessionDrops} et
+     * {@see \App\Rewards\Infrastructure\Drop\AdversaryBattleDrops} — inventaire puis pièces,
+     * jamais l'inverse, sous peine d'interbloquer avec un import ou un combat concurrent qui
+     * prend les deux verrous dans ce même ordre.
      *
      * @template T
      *
@@ -182,9 +217,16 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
-     * Tout ce qu'un joueur possède, équipé ou dans le sac — le sac de `GET /api/inventory`
-     * (#30). Contrairement à {@see equippedByPlayer()}, aucun filtre sur `slot` : c'est la
-     * ligne d'inventaire elle-même qui dit, par sa propre valeur, si l'objet est porté.
+     * Tout ce qu'un joueur possède *encore*, équipé ou dans le sac — le sac de
+     * `GET /api/inventory` (#30). Contrairement à {@see equippedByPlayer()}, aucun filtre sur
+     * `slot` : c'est la ligne d'inventaire elle-même qui dit, par sa propre valeur, si
+     * l'objet est porté.
+     *
+     * **`quantity > 0` depuis le #230.** Un coffre entièrement consommé garde sa ligne — voir
+     * le docblock d'{@see InventoryItem::consumeOne()} — mais un sac n'affiche pas ce qu'il
+     * ne contient plus : filtrer ici sert les deux lecteurs à la fois, ce sac et
+     * {@see \App\Rewards\Application\ShopOverviewProvider}, pour qui une ligne à zéro ne veut
+     * plus dire « possédé » — c'est ce qui rend un coffre rachetable une fois épuisé.
      *
      * Triée par clé d'objet plutôt que par `id` : l'ordre d'obtention n'a aucune importance
      * pour un sac, et une clé de catalogue est un ordre stable qui ne dépend d'aucune
@@ -195,7 +237,16 @@ class InventoryItemRepository extends ServiceEntityRepository
      */
     public function ownedByPlayer(Uuid $userId): array
     {
-        return $this->findBy(['userId' => $userId], ['itemKey' => 'ASC']);
+        /** @var list<InventoryItem> $items */
+        $items = $this->createQueryBuilder('i')
+            ->andWhere('i.userId = :userId')
+            ->andWhere('i.quantity > 0')
+            ->orderBy('i.itemKey', 'ASC')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->getQuery()
+            ->getResult();
+
+        return $items;
     }
 
     public function equippedIn(Uuid $userId, EquipmentSlot $slot): ?InventoryItem
