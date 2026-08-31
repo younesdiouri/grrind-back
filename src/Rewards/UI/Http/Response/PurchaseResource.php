@@ -16,6 +16,9 @@ use App\Shared\Application\DroppedItemModifier;
  * {@see DroppedItem} — ce qu'il a coûté, et le solde avant *et* après, comme un
  * `RewardSummary` porte ses deux paliers : la bourse se décrémente à l'écran sans que le
  * client recalcule quoi que ce soit.
+ *
+ * **`slot` peut être `null` depuis le #230** : un coffre s'achète comme n'importe quel objet
+ * de l'étal — voir le docblock de {@see DroppedItem}.
  */
 final readonly class PurchaseResource
 {
@@ -67,7 +70,7 @@ final readonly class PurchaseResource
             $item->key,
             $translator->nameOf($item->key),
             $item->rarity->value,
-            $item->slot->value,
+            $item->slot?->value,
             array_map(
                 static fn (ItemModifier $modifier): DroppedItemModifier => new DroppedItemModifier(
                     $modifier->type->value,

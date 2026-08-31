@@ -28,6 +28,11 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
  * une valeur même quand seul `minimum_level` a été écrit par erreur — c'est justement la
  * config qui ment qu'`ItemCatalog` refuse. `minimum_level` n'a lui aucun défaut : sa présence
  * ou son absence, pas seulement sa valeur, fait partie de ce que ce refus vérifie.
+ *
+ * `kind` (#230) est facultatif, sans défaut ici non plus : `ItemCatalog` le résout à
+ * `EQUIPMENT` en son absence, voir son docblock. `slot` **devient facultatif** pour la même
+ * raison — un coffre n'en pose pas — et sa présence ou son absence, croisée avec `kind`, est
+ * elle aussi une règle qui croise deux champs, donc vérifiée là-bas plutôt qu'ici.
  */
 final class ItemsSection implements GameBalanceSection
 {
@@ -49,7 +54,12 @@ final class ItemsSection implements GameBalanceSection
                         ->children()
                             ->scalarNode('key')->isRequired()->cannotBeEmpty()->end()
                             ->scalarNode('rarity')->isRequired()->cannotBeEmpty()->end()
-                            ->scalarNode('slot')->isRequired()->cannotBeEmpty()->end()
+                            // Facultatif depuis le #230 : un coffre n'en pose pas.
+                            // `ItemCatalog` vérifie sa présence contre `kind`.
+                            ->scalarNode('slot')->cannotBeEmpty()->end()
+                            // Facultatif — absent vaut `EQUIPMENT`, voir le docblock
+                            // d'`ItemCatalog`.
+                            ->scalarNode('kind')->cannotBeEmpty()->end()
                             // Refusé ici, pas dans `ItemCatalog` : c'est une borne de
                             // champ, pas une règle qui croise plusieurs valeurs.
                             ->integerNode('price_coins')->isRequired()->min(0)->end()
@@ -80,7 +90,7 @@ final class ItemsSection implements GameBalanceSection
                 ->always(static function (array $values): array {
                     /**
                      * @var array{
-                     *     items: list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}>,
+                     *     items: list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}>,
                      * } $values les nœuds ci-dessus ont déjà fait ce travail
                      */
                     try {

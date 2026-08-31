@@ -23,11 +23,12 @@ use InvalidArgumentException;
  * ## Ce que le schéma ne peut pas dire, et que ce constructeur dit à sa place
  *
  * `ItemsSection` ne borne que ce qu'un `TreeBuilder` sait borner par champ — un prix
- * négatif, une clé vide. Cinq règles échappent à ça et vivent ici, même raison que
+ * négatif, une clé vide. Plusieurs règles échappent à ça et vivent ici, même raison que
  * {@see \App\Combat\Domain\EnemyCatalog} : une clé d'objet dupliquée, un modificateur dont le
  * type ou la discipline ne correspondent à rien de connu, une discipline posée sur un type de
- * combat (#29), et — depuis le #229 — un `minimum_level` de boutique posé sans `available:
- * true`, et un objet EPIC ou LEGENDARY listé à l'étal. `ModifierType::tryFrom()` plutôt qu'une
+ * combat (#29), un `minimum_level` de boutique posé sans `available: true`, un objet EPIC ou
+ * LEGENDARY listé à l'étal (#229) — et depuis le #230, tout ce que `$kind` engage, voir « Un
+ * coffre est un objet, distingué par `kind` » plus bas. `ModifierType::tryFrom()` plutôt qu'une
  * énumération recopiée dans le schéma : c'est ce qui laisse le #224 ouvrir de nouveaux types
  * sans toucher à cette classe, voir le docblock d'{@see ItemModifier}.
  *
@@ -56,6 +57,23 @@ use InvalidArgumentException;
  *     s'achètent, le loot ne récompense plus rien. `items.yaml` n'en pose aucun aujourd'hui ;
  *     ce refus protège la décision plutôt que de compter sur ce qu'un futur contributeur se
  *     souvienne de la prose du fichier.
+ *
+ * ## Un coffre est un objet, distingué par `kind` (#230)
+ *
+ * `kind: EQUIPMENT | CHEST` — `EQUIPMENT` par défaut, absent des neuf objets livrés avant ce
+ * ticket. Un coffre est un tirage qu'on ouvre, pas un objet qu'on porte, et trois mensonges de
+ * config s'y refusent au démarrage, voir {@see slot()} et {@see modifiers()} :
+ *
+ *   - `slot` posé sur un coffre : un coffre n'a pas d'emplacement, en poser un mentirait ;
+ *   - `slot` absent d'un `EQUIPMENT` : c'est l'inverse, un équipement sans emplacement ne se
+ *     porterait nulle part ;
+ *   - un modificateur posé sur un coffre : un coffre ne s'équipe pas, il n'a rien à modifier.
+ *
+ * **Une table de coffre est exigée, mais pas ici.** `ItemsSection` ne voit que ce fichier —
+ * même limite que documentée sur `LootTables` pour `loot.yaml` — donc « un coffre doit avoir
+ * une table, un `EQUIPMENT` ne peut pas en avoir » se prouve à la construction réelle de
+ * {@see LootTables}, câblée par `services.yaml`, et par `RewardsCoverageTest` : le geste exact
+ * que `testChaqueAdversaireDuCatalogueALivreATableDeTirage()` fait déjà pour les adversaires.
  */
 final readonly class ItemCatalog
 {
@@ -84,7 +102,7 @@ final readonly class ItemCatalog
     private array $byKey;
 
     /**
-     * @param list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
+     * @param list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
@@ -102,8 +120,10 @@ final readonly class ItemCatalog
             $rarity = Rarity::tryFrom($entry['rarity'])
                 ?? throw new InvalidArgumentException(\sprintf('Rareté inconnue pour "%s" : "%s".', $entry['key'], $entry['rarity']));
 
-            $slot = EquipmentSlot::tryFrom($entry['slot'])
-                ?? throw new InvalidArgumentException(\sprintf('Emplacement d\'équipement inconnu pour "%s" : "%s".', $entry['key'], $entry['slot']));
+            $kind = ItemKind::tryFrom($entry['kind'] ?? ItemKind::Equipment->value)
+                ?? throw new InvalidArgumentException(\sprintf('Nature d\'objet inconnue pour "%s" : "%s".', $entry['key'], $entry['kind'] ?? ''));
+
+            $slot = self::slot($entry['key'], $kind, $entry['slot'] ?? null);
 
             $shop = self::shopListing($entry['key'], $rarity, $entry['shop'] ?? null);
 
@@ -112,7 +132,8 @@ final readonly class ItemCatalog
                 $rarity,
                 $slot,
                 $entry['price_coins'],
-                self::modifiers($entry['key'], $entry['modifiers']),
+                self::modifiers($entry['key'], $kind, $entry['modifiers']),
+                $kind,
                 $shop['available'],
                 $shop['minimumLevel'],
             );
@@ -157,12 +178,40 @@ final readonly class ItemCatalog
     }
 
     /**
+     * Résout et vérifie `slot` — voir « Un coffre est un objet » dans le docblock de la
+     * classe pour les deux refus.
+     */
+    private static function slot(string $itemKey, ItemKind $kind, ?string $slot): ?EquipmentSlot
+    {
+        if (ItemKind::Chest === $kind) {
+            if (null !== $slot) {
+                throw new InvalidArgumentException(\sprintf('"%s" est un coffre : un coffre n\'a pas d\'emplacement, "slot" doit être absent.', $itemKey));
+            }
+
+            return null;
+        }
+
+        if (null === $slot) {
+            throw new InvalidArgumentException(\sprintf('"%s" est un équipement : "slot" est obligatoire.', $itemKey));
+        }
+
+        return EquipmentSlot::tryFrom($slot)
+            ?? throw new InvalidArgumentException(\sprintf('Emplacement d\'équipement inconnu pour "%s" : "%s".', $itemKey, $slot));
+    }
+
+    /**
      * @param list<array{type: string, value: int, discipline?: string}> $modifiers
      *
      * @return list<ItemModifier>
      */
-    private static function modifiers(string $itemKey, array $modifiers): array
+    private static function modifiers(string $itemKey, ItemKind $kind, array $modifiers): array
     {
+        // Un coffre ne s'équipe pas — voir « Un coffre est un objet » dans le docblock de la
+        // classe pour le troisième mensonge de config que ce refus couvre.
+        if (ItemKind::Chest === $kind && [] !== $modifiers) {
+            throw new InvalidArgumentException(\sprintf('"%s" est un coffre : un coffre ne s\'équipe pas, il ne peut porter aucun modificateur.', $itemKey));
+        }
+
         return array_map(
             static function (array $modifier) use ($itemKey): ItemModifier {
                 $type = ModifierType::tryFrom($modifier['type'])

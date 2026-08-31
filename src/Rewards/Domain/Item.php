@@ -11,15 +11,25 @@ namespace App\Rewards\Domain;
 final readonly class Item
 {
     /**
-     * @param list<ItemModifier> $modifiers
+     * @param list<ItemModifier> $modifiers vide pour un coffre — {@see ItemCatalog} le refuse sinon
      */
     public function __construct(
         public string $key,
         public Rarity $rarity,
-        public EquipmentSlot $slot,
+        /**
+         * `null` pour un coffre (#230) — il ne se porte pas, il s'ouvre. `ItemCatalog` refuse
+         * un `EQUIPMENT` sans emplacement et un `CHEST` qui en poserait un, donc la nullité
+         * ici suit exactement `$kind` : jamais les deux à la fois, jamais ni l'un ni l'autre.
+         */
+        public ?EquipmentSlot $slot,
         /** En pièces — voir le docblock d'`items.yaml` pour pourquoi il a existé avant la boutique (#229). */
         public int $priceCoins,
         public array $modifiers,
+        /**
+         * `EQUIPMENT` par défaut (#230) : les neuf objets livrés avant ce ticket n'ont rien eu
+         * à déclarer pour le rester. Voir le docblock d'{@see ItemKind}.
+         */
+        public ItemKind $kind = ItemKind::Equipment,
         /**
          * `false` par défaut : la plupart des appels — les fixtures de test, un objet qui
          * tombe d'un tirage — n'ont jamais eu à parler de boutique. `ItemCatalog` est le seul

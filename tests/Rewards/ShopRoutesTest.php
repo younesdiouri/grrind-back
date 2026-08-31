@@ -23,9 +23,10 @@ use Symfony\Component\Uid\Uuid;
  * `GET /api/shop` et `POST /api/shop/purchases` (#229) — l'étal, et le seul geste qu'on peut y
  * faire.
  *
- * Le catalogue livré porte sept objets vendus (`WORN_RUNNING_SHOES`, `IRON_GAUNTLETS` — niveau
+ * Le catalogue livré porte neuf objets vendus (`WORN_RUNNING_SHOES`, `IRON_GAUNTLETS` — niveau
  * 1 —, `TRAVELERS_CLOAK`, `LUCKY_RABBIT_CHARM` — niveau 5 —, `TEMPERED_HEADBAND`,
- * `SWIFT_TRAIL_LEGGINGS`, `EMBER_OF_THE_ANCESTORS` — niveau 10) et trois hors étal
+ * `SWIFT_TRAIL_LEGGINGS`, `EMBER_OF_THE_ANCESTORS` — niveau 10 —, et les deux coffres du #230,
+ * `WOODEN_CHEST` — niveau 1 — et `IRON_BOUND_CHEST` — niveau 10) et trois hors étal
  * (`OBSIDIAN_WARBLADE`, `STORMCALLERS_BOOTS`, `CROWN_OF_THE_TIRELESS`, les trois EPIC ou
  * LEGENDARY) — voir `items.yaml`.
  *
@@ -42,7 +43,7 @@ final class ShopRoutesTest extends ApiTestCase
         $body = $this->shop($bob);
 
         self::assertSame(0, $body['coins']);
-        self::assertCount(7, $body['items'], 'Les EPIC et LEGENDARY ne sont jamais à l\'étal.');
+        self::assertCount(9, $body['items'], 'Les EPIC et LEGENDARY ne sont jamais à l\'étal.');
 
         foreach ($body['items'] as $item) {
             self::assertFalse($item['affordable'], (string) $item['key']);
@@ -237,6 +238,27 @@ final class ShopRoutesTest extends ApiTestCase
         $inventory = $this->inventory($bob);
         self::assertCount(1, $inventory['items']);
         self::assertSame(970, $inventory['coins']);
+    }
+
+    /**
+     * **Le coffre échappe au refus « déjà possédé » (#230).** `item-already-owned` se
+     * justifie par un unique emplacement qui n'accueillerait rien de plus — voir son
+     * docblock — un raisonnement qui ne tient pas pour un coffre : il s'empile, chaque achat
+     * est une future ouverture de plus. La boutique étant le seul donneur de coffre en v1,
+     * c'est même la seule façon d'en posséder plus d'un.
+     */
+    public function testAChestCanBePurchasedMoreThanOnce(): void
+    {
+        $bob = $this->openAccount();
+        $this->credit($bob->id, 1_000);
+
+        $this->purchase($bob, 'WOODEN_CHEST', 'premier-coffre');
+        $second = $this->purchase($bob, 'WOODEN_CHEST', 'second-coffre');
+
+        self::assertSame(Response::HTTP_CREATED, $second->getStatusCode(), (string) $second->getContent());
+
+        $quantities = array_column($this->inventory($bob)['items'], 'quantity', 'key');
+        self::assertSame(2, $quantities['WOODEN_CHEST']);
     }
 
     public function testPurchasingWithoutEnoughCoinsIsRefused(): void

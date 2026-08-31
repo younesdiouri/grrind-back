@@ -136,17 +136,25 @@ final readonly class WorkoutSessionDrops implements SessionDrops
     /**
      * Un objet du catalogue, tel que le client le reçoit — voir le docblock de
      * {@see DroppedItem} pour pourquoi `Shared` ne porte que des chaînes.
+     *
+     * **Exige un emplacement non nul.** Un coffre ne tombe jamais d'un tirage de séance —
+     * voir « Personne ne donne de coffre en dehors de la boutique » au #230 — donc `$item`
+     * ici est toujours un `EQUIPMENT` : un `slot` nul serait un bug de configuration, pas un
+     * cas à absorber en silence.
      */
     private function describe(string $itemKey): DroppedItem
     {
         $item = $this->catalog->find($itemKey)
             ?? throw new LogicException(\sprintf('"%s" est tombé d\'un tirage mais n\'existe plus dans le catalogue.', $itemKey));
 
+        $slot = $item->slot
+            ?? throw new LogicException(\sprintf('"%s" est tombé d\'un tirage de séance sans emplacement : un coffre ne devrait jamais y figurer, voir le docblock de LootTables.', $itemKey));
+
         return new DroppedItem(
             $item->key,
             $this->translator->nameOf($item->key),
             $item->rarity->value,
-            $item->slot->value,
+            $slot->value,
             array_map(
                 static fn (ItemModifier $modifier): DroppedItemModifier => new DroppedItemModifier(
                     $modifier->type->value,

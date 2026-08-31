@@ -74,6 +74,7 @@ final class EquippedItemsChangeTheXpBreakdownTest extends ApiTestCase
         $handler = new EquipItemHandler($repository, $catalog);
         $item = $catalog->find($itemKey);
         self::assertNotNull($item);
+        self::assertNotNull($item->slot);
         ($handler)(new EquipItem($userId, $itemKey, $item->slot->value));
     }
 

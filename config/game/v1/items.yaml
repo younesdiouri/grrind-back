@@ -31,9 +31,19 @@
 # `CROWN_OF_THE_TIRELESS` restent donc hors étal : ils ont un prix (pour l'affichage d'un
 # drop) mais jamais de bloc `shop:`.
 #
-# Ni rotation ni exemplaire multiple : l'étal entier se lit en un `GET`, sept objets, et un
-# objet déjà possédé ne se revend ni ne se rachète — voir `POST /api/shop/purchases` pour les
-# deux refus que ça pose (`item-already-owned`, jamais un champ « unique » sur le catalogue).
+# Ni rotation ni exemplaire multiple pour un `EQUIPMENT` : un objet qui s'équipe déjà possédé
+# ne se revend ni ne se rachète — voir `POST /api/shop/purchases` pour les deux refus que ça
+# pose (`item-already-owned`, jamais un champ « unique » sur le catalogue). Un coffre y
+# échappe (#230) : voir `kind:` ci-dessous.
+#
+# ————— `kind:` — un coffre est un objet, pas une table à part (#230) ————————————————————
+#
+# `kind: EQUIPMENT | CHEST`, absent vaut `EQUIPMENT` — les dix objets ci-dessus n'ont rien eu
+# à déclarer. Un coffre n'a pas d'emplacement (`slot` devient facultatif, et interdit sur un
+# coffre) et ne porte aucun modificateur : il ne s'équipe pas, il s'ouvre. Sa table de tirage
+# vit dans `chest:` de `loot.yaml`, une par clé de coffre — voir son docblock. Les deux
+# coffres livrés ici restent à l'étal (`shop:`) : c'est le seul donneur en v1, voir le
+# ticket #230 pour pourquoi les autres donneurs restent hors périmètre.
 #
 # ————— Les modificateurs : un seul vocabulaire, jamais un mécanisme parallèle ——————————
 #
@@ -69,10 +79,10 @@
 #
 # ————— Réserve ————————————————————————————————————————————————————————————————————————
 #
-# Dix objets, une progression de prix et de puissance qui suit les paliers d'ennemis de
-# `combat.yaml`, sans aucune prétention d'équilibrage : personne n'a encore joué à ce jeu,
-# même réserve que la note au-dessus du catalogue d'ennemis dans `combat.yaml`. Ces valeurs
-# se patchent ici sans migration, c'est tout l'intérêt d'un fichier de config.
+# Dix objets et deux coffres, une progression de prix et de puissance qui suit les paliers
+# d'ennemis de `combat.yaml`, sans aucune prétention d'équilibrage : personne n'a encore joué
+# à ce jeu, même réserve que la note au-dessus du catalogue d'ennemis dans `combat.yaml`. Ces
+# valeurs se patchent ici sans migration, c'est tout l'intérêt d'un fichier de config.
 items:
     - key: WORN_RUNNING_SHOES
       rarity: COMMON
@@ -187,3 +197,22 @@ items:
           # 40 PV (28,6 % du socle de 140) : le seul objet LEGENDARY du catalogue, notable
           # sans être décisif à lui seul.
           - { type: HP_BONUS, value: 40 }
+
+    # ————— Les coffres (#230) — voir `kind:` plus haut ——————————————————————————————————
+    #
+    # Ni `slot` ni `modifiers` : un coffre ne se porte pas. Leur table de tirage vit dans
+    # `chest:` de `loot.yaml`. `WOODEN_CHEST` (COMMUN) rend ce que rendrait déjà un tirage de
+    # séance débutant ; `IRON_BOUND_CHEST` (RARE) vise le palier suivant — même logique de
+    # progression que le reste du catalogue, aucune prétention d'équilibrage.
+
+    - key: WOODEN_CHEST
+      rarity: COMMON
+      kind: CHEST
+      price_coins: 50
+      shop: { available: true, minimum_level: 1 }
+
+    - key: IRON_BOUND_CHEST
+      rarity: RARE
+      kind: CHEST
+      price_coins: 160
+      shop: { available: true, minimum_level: 10 }

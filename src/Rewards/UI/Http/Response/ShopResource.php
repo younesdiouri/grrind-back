@@ -25,6 +25,12 @@ use App\Shared\Application\DroppedItemModifier;
  *
  * **Un objet verrouillé par le niveau reste dans la liste.** L'étal ne cache jamais ce que le
  * joueur ne peut pas encore acheter — `unlocked: false` le dit, plutôt que de l'omettre.
+ *
+ * **`slot` peut être `null` depuis le #230** : un coffre est un objet de l'étal comme un
+ * autre, distingué par `kind` côté catalogue mais pas encore exposé côté contrat — voir le
+ * docblock de {@see DroppedItem}. Le contenu d'un coffre n'apparaît jamais ici : cette
+ * ressource ne fait que traduire ce que le catalogue affirme (nom, rareté, prix), jamais ce
+ * qu'une table de tirage promet.
  */
 final readonly class ShopResource
 {
@@ -74,7 +80,7 @@ final readonly class ShopResource
             $item->key,
             $translator->nameOf($item->key),
             $item->rarity->value,
-            $item->slot->value,
+            $item->slot?->value,
             array_map(
                 static fn (ItemModifier $modifier): DroppedItemModifier => new DroppedItemModifier(
                     $modifier->type->value,
