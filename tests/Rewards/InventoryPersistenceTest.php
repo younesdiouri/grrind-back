@@ -75,6 +75,24 @@ final class InventoryPersistenceTest extends ApiTestCase
         self::assertEquals($firstObtainedAt, $stored->obtainedAt());
     }
 
+    /** `null` round-trip : la migration #229 rend `loot_roll_id` nullable pour un achat. */
+    public function testAPurchasedItemRoundTripsWithANullLootRollId(): void
+    {
+        $entityManager = self::entityManager();
+        $repository = self::repository();
+
+        $userId = Uuid::v7();
+        $obtainedAt = new DateTimeImmutable('2026-08-31T09:00:00+00:00');
+
+        $item = $repository->grant($userId, 'WORN_RUNNING_SHOES', null, $obtainedAt);
+        $entityManager->clear();
+
+        $reloaded = $repository->find($item->id());
+
+        self::assertInstanceOf(InventoryItem::class, $reloaded);
+        self::assertNull($reloaded->lootRollId());
+    }
+
     public function testEquippingAnOwnedItemPersistsTheSlot(): void
     {
         $entityManager = self::entityManager();

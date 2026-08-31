@@ -40,6 +40,12 @@ use Symfony\Component\Uid\Uuid;
  * d'audit plutôt que de recopier `origin`/`causeId` : consulter l'historique complet d'un
  * exemplaire, c'est relire ce tirage-là.
  *
+ * **`$lootRollId` est nullable depuis la boutique (#229).** `null` veut dire « acquis
+ * autrement qu'au tirage » — un achat, aujourd'hui la seule autre voie. Cette ligne ne perd
+ * rien pour autant : un achat n'a simplement aucun tirage à raconter, il a sa propre trace au
+ * ledger de pièces (`CoinTransaction::$sourceId` pointe vers cette ligne d'inventaire, pas
+ * l'inverse). Migration destructive assumée — voir son docblock.
+ *
  * **`$lootRollId` et `$obtainedAt` figent la *première* acquisition, jamais la dernière.**
  * Une ligne peut recevoir plusieurs tirages du même objet au fil du temps — {@see
  * grantOneMore()} augmente `$quantity` sans y toucher. « Date d'obtention », pour un joueur,
@@ -96,15 +102,15 @@ class InventoryItem
     #[ORM\Column(length: 16, nullable: true, enumType: EquipmentSlot::class)]
     private ?EquipmentSlot $slot = null;
 
-    /** Le tirage qui a produit le tout premier exemplaire — voir le docblock de la classe. */
-    #[ORM\Column(type: UuidType::NAME)]
-    private Uuid $lootRollId;
+    /** Le tirage qui a produit le tout premier exemplaire, ou `null` — voir le docblock de la classe. */
+    #[ORM\Column(type: UuidType::NAME, nullable: true)]
+    private ?Uuid $lootRollId;
 
     /** La date de la première acquisition, jamais celle de l'écriture — même geste que partout ailleurs. */
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $obtainedAt;
 
-    private function __construct(Uuid $userId, string $itemKey, int $quantity, Uuid $lootRollId, DateTimeImmutable $obtainedAt)
+    private function __construct(Uuid $userId, string $itemKey, int $quantity, ?Uuid $lootRollId, DateTimeImmutable $obtainedAt)
     {
         $this->id = Uuid::v7();
         $this->userId = $userId;
@@ -115,7 +121,7 @@ class InventoryItem
     }
 
     /** Le premier exemplaire d'un objet pour ce joueur — voir {@see grantOneMore()} pour les suivants. */
-    public static function firstGrant(Uuid $userId, string $itemKey, Uuid $lootRollId, DateTimeImmutable $obtainedAt): self
+    public static function firstGrant(Uuid $userId, string $itemKey, ?Uuid $lootRollId, DateTimeImmutable $obtainedAt): self
     {
         return new self($userId, $itemKey, 1, $lootRollId, $obtainedAt);
     }
@@ -177,7 +183,7 @@ class InventoryItem
         return $this->slot;
     }
 
-    public function lootRollId(): Uuid
+    public function lootRollId(): ?Uuid
     {
         return $this->lootRollId;
     }

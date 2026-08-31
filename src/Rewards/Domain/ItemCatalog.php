@@ -23,12 +23,13 @@ use InvalidArgumentException;
  * ## Ce que le schéma ne peut pas dire, et que ce constructeur dit à sa place
  *
  * `ItemsSection` ne borne que ce qu'un `TreeBuilder` sait borner par champ — un prix
- * négatif, une clé vide. Trois règles échappent à ça et vivent ici, même raison que
+ * négatif, une clé vide. Cinq règles échappent à ça et vivent ici, même raison que
  * {@see \App\Combat\Domain\EnemyCatalog} : une clé d'objet dupliquée, un modificateur dont le
- * type ou la discipline ne correspondent à rien de connu, et — depuis le #29 — une discipline
- * posée sur un type de combat. `ModifierType::tryFrom()` plutôt qu'une énumération recopiée
- * dans le schéma : c'est ce qui laisse le #224 ouvrir de nouveaux types sans toucher à cette
- * classe, voir le docblock d'{@see ItemModifier}.
+ * type ou la discipline ne correspondent à rien de connu, une discipline posée sur un type de
+ * combat (#29), et — depuis le #229 — un `minimum_level` de boutique posé sans `available:
+ * true`, et un objet EPIC ou LEGENDARY listé à l'étal. `ModifierType::tryFrom()` plutôt qu'une
+ * énumération recopiée dans le schéma : c'est ce qui laisse le #224 ouvrir de nouveaux types
+ * sans toucher à cette classe, voir le docblock d'{@see ItemModifier}.
  *
  * ## Une discipline sur un modificateur de combat se refuse au chargement (#29)
  *
@@ -41,6 +42,20 @@ use InvalidArgumentException;
  * le fichier prétend le contraire de ce que le moteur fait. Une config qui ment se refuse au
  * démarrage plutôt que de se documenter : voir {@see self::COMBAT_MODIFIER_TYPES} et le refus
  * dans {@see modifiers()}.
+ *
+ * ## La boutique lit `shop:`, et deux mensonges de config s'y refusent (#229)
+ *
+ * `shop: { available: true, minimum_level: N }` est facultatif — absent vaut « pas vendu »,
+ * voir `GET /api/shop`. Deux incohérences s'y refusent au démarrage plutôt qu'à l'exécution,
+ * voir {@see shopListing()} :
+ *
+ *   - un `minimum_level` posé alors que `available` n'est pas `true` : un verrou de niveau
+ *     pour un objet qui prétend ne pas être vendu ne veut rien dire ;
+ *   - un objet EPIC ou LEGENDARY listé à l'étal : ces deux raretés ne se vendent jamais — un
+ *     objet qui s'achète n'est plus une récompense de tirage, et si les meilleurs objets
+ *     s'achètent, le loot ne récompense plus rien. `items.yaml` n'en pose aucun aujourd'hui ;
+ *     ce refus protège la décision plutôt que de compter sur ce qu'un futur contributeur se
+ *     souvienne de la prose du fichier.
  */
 final readonly class ItemCatalog
 {
@@ -69,7 +84,7 @@ final readonly class ItemCatalog
     private array $byKey;
 
     /**
-     * @param list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items
+     * @param list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
@@ -90,12 +105,16 @@ final readonly class ItemCatalog
             $slot = EquipmentSlot::tryFrom($entry['slot'])
                 ?? throw new InvalidArgumentException(\sprintf('Emplacement d\'équipement inconnu pour "%s" : "%s".', $entry['key'], $entry['slot']));
 
+            $shop = self::shopListing($entry['key'], $rarity, $entry['shop'] ?? null);
+
             $item = new Item(
                 $entry['key'],
                 $rarity,
                 $slot,
                 $entry['price_coins'],
                 self::modifiers($entry['key'], $entry['modifiers']),
+                $shop['available'],
+                $shop['minimumLevel'],
             );
 
             if (isset($byKey[$item->key])) {
@@ -126,6 +145,18 @@ final readonly class ItemCatalog
     }
 
     /**
+     * L'étal de `GET /api/shop` (#229) : les objets dont `shop.available` vaut `true`, dans
+     * l'ordre de déclaration — même geste que {@see all()}, un sous-ensemble plutôt qu'un tri
+     * qui recomposerait un ordre.
+     *
+     * @return list<Item>
+     */
+    public function shopItems(): array
+    {
+        return array_values(array_filter($this->byKey, static fn (Item $item): bool => $item->shopAvailable));
+    }
+
+    /**
      * @param list<array{type: string, value: int, discipline?: string}> $modifiers
      *
      * @return list<ItemModifier>
@@ -149,5 +180,29 @@ final readonly class ItemCatalog
             },
             $modifiers,
         );
+    }
+
+    /**
+     * Résout et vérifie le bloc `shop:` d'une entrée — voir « La boutique lit `shop:` » dans
+     * le docblock de la classe pour les deux refus.
+     *
+     * @param array{available?: bool, minimum_level?: int}|null $shop
+     *
+     * @return array{available: bool, minimumLevel: int}
+     */
+    private static function shopListing(string $itemKey, Rarity $rarity, ?array $shop): array
+    {
+        $available = $shop['available'] ?? false;
+        $minimumLevel = $shop['minimum_level'] ?? null;
+
+        if (null !== $minimumLevel && !$available) {
+            throw new InvalidArgumentException(\sprintf('"%s" porte un minimum_level de boutique sans être à l\'étal ("available: true" manquant) : une config qui ment se refuse au démarrage.', $itemKey));
+        }
+
+        if ($available && \in_array($rarity, [Rarity::Epic, Rarity::Legendary], true)) {
+            throw new InvalidArgumentException(\sprintf('"%s" est %s : les objets EPIC et LEGENDARY ne sont jamais vendus, voir le docblock de la classe.', $itemKey, $rarity->value));
+        }
+
+        return ['available' => $available, 'minimumLevel' => $minimumLevel ?? 1];
     }
 }

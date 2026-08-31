@@ -10,14 +10,15 @@ namespace App\Rewards\Domain;
  * crédite pour une raison qui n'est pas listée ici, et une valeur qu'aucun code n'écrit est
  * une porte qu'on finit par pousser.
  *
- * Deux valeurs à ce ticket (#225), les deux seules sources de pièces qui existent —
- * {@see LootRoller} tire pour un workout crédité ou un combat gagné, et
- * rien d'autre n'en produit encore. `PURCHASE` (une dépense, signée négativement) et
- * `CHEST` viendront avec le Lot 6b, sans migration : `reason` est déjà une colonne assez
- * large pour les recevoir, seule cette classe changera.
+ * Trois valeurs : {@see LootRoller} tire pour un workout crédité ou un combat gagné
+ * (`WORKOUT_DROP`, `BATTLE_DROP`, #225), et la boutique dépense (`PURCHASE`, #229) — la
+ * première raison qui écrit une ligne négative, voir {@see \App\Rewards\Application\CoinLedger::spend()}.
+ * `CHEST` viendra avec le #230, sans migration : `reason` est déjà une colonne assez large
+ * pour le recevoir, seule cette classe changera.
  */
 enum CoinReason: string
 {
     case WorkoutDrop = 'WORKOUT_DROP';
     case BattleDrop = 'BATTLE_DROP';
+    case Purchase = 'PURCHASE';
 }

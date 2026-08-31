@@ -9,9 +9,31 @@
 #
 # ————— Le prix, avant la boutique ——————————————————————————————————————————————————————
 #
-# `price_coins` existe alors que la boutique n'arrive qu'au Lot 6b : un montant de pièces
-# qui ne s'adosse à aucun prix ne s'équilibre pas, il se devine. Le poser maintenant donne
-# aux pièces une échelle dès le premier drop (#28), avant même qu'on puisse en dépenser.
+# `price_coins` a existé un temps sans qu'aucune route ne le dépense (#27) : un montant de
+# pièces qui ne s'adosse à aucun prix ne s'équilibre pas, il se devine. Le poser tôt a donné
+# aux pièces une échelle dès le premier drop (#28), avant même qu'on puisse en dépenser — la
+# boutique (#229) referme la boucle, et n'a rien eu à ajouter ici : le prix reste sur l'objet,
+# où il était déjà. Un objet peut porter un prix sans être à l'étal, c'est même le cas normal :
+# les trois quarts du catalogue en portent un depuis le premier jour, `shop:` ci-dessous ne
+# vend que les sept premiers.
+#
+# ————— La boutique : `shop:` (#229) —————————————————————————————————————————————————————
+#
+# Facultatif, objet par objet — absent vaut « pas vendu ». `{ available: true, minimum_level:
+# N }` : `minimum_level` suit le palier de la rareté (COMMON/UNCOMMON → même rythme que
+# `enemies:` de `combat.yaml`, RARE → le palier suivant), pas une valeur libre. Un
+# `minimum_level` posé sans `available: true` est une config qui ment, refusée au démarrage
+# par `ItemCatalog`.
+#
+# **Aucun objet EPIC ou LEGENDARY n'entre dans `shop:`, et `ItemCatalog` le refuse s'il en
+# arrivait un.** Un objet qui s'achète n'est plus une récompense de tirage — voir le docblock
+# de la classe pour la règle complète. `OBSIDIAN_WARBLADE`, `STORMCALLERS_BOOTS` et
+# `CROWN_OF_THE_TIRELESS` restent donc hors étal : ils ont un prix (pour l'affichage d'un
+# drop) mais jamais de bloc `shop:`.
+#
+# Ni rotation ni exemplaire multiple : l'étal entier se lit en un `GET`, sept objets, et un
+# objet déjà possédé ne se revend ni ne se rachète — voir `POST /api/shop/purchases` pour les
+# deux refus que ça pose (`item-already-owned`, jamais un champ « unique » sur le catalogue).
 #
 # ————— Les modificateurs : un seul vocabulaire, jamais un mécanisme parallèle ——————————
 #
@@ -56,6 +78,7 @@ items:
       rarity: COMMON
       slot: FEET
       price_coins: 30
+      shop: { available: true, minimum_level: 1 }
       modifiers:
           - { type: XP_MULTIPLIER, value: 5, discipline: RUNNING }
           # Une chaussure ne rend pas plus fort, elle rend plus agile — Mobility, pas Strength.
@@ -66,6 +89,7 @@ items:
       rarity: COMMON
       slot: HANDS
       price_coins: 30
+      shop: { available: true, minimum_level: 1 }
       modifiers:
           - { type: XP_MULTIPLIER, value: 5, discipline: STRENGTH }
           # 350 × damage_per_1000_strength (6) ÷ 1000 = 2 dégâts (12,5 % du socle de 16).
@@ -75,6 +99,7 @@ items:
       rarity: UNCOMMON
       slot: CHEST
       price_coins: 80
+      shop: { available: true, minimum_level: 5 }
       modifiers:
           - { type: XP_MULTIPLIER, value: 8 }
           # Encaisse le froid et la fatigue de la route — Endurance, pas des PV directs.
@@ -85,6 +110,7 @@ items:
       rarity: UNCOMMON
       slot: ACCESSORY
       price_coins: 90
+      shop: { available: true, minimum_level: 5 }
       modifiers:
           - { type: LOOT_LUCK, value: 10 }
           # La chance ne s'arrête pas au loot : un porte-bonheur fait aussi éviter le coup.
@@ -96,6 +122,7 @@ items:
       rarity: RARE
       slot: HEAD
       price_coins: 180
+      shop: { available: true, minimum_level: 10 }
       modifiers:
           - { type: XP_MULTIPLIER, value: 12 }
           # 2400 × extra_turn_permille_per_1000_dexterity (12) ÷ 1000 = 28 ‰ de tour supplémentaire.
@@ -105,6 +132,7 @@ items:
       rarity: RARE
       slot: LEGS
       price_coins: 180
+      shop: { available: true, minimum_level: 10 }
       modifiers:
           - { type: XP_MULTIPLIER, value: 10, discipline: HIKING }
           - { type: LOOT_LUCK, value: 5 }
@@ -117,6 +145,7 @@ items:
       rarity: RARE
       slot: ACCESSORY
       price_coins: 220
+      shop: { available: true, minimum_level: 10 }
       modifiers:
           # Une charge : voir le docblock de `ModifierType::StreakShield`. Le futur
           # contributeur de `Rewards` (#29) décidera comment plusieurs charges portées

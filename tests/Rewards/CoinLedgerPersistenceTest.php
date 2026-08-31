@@ -150,6 +150,43 @@ final class CoinLedgerPersistenceTest extends ApiTestCase
         self::assertSame(42, $ledger->balanceOf($userId));
     }
 
+    /**
+     * `spend()` (#229) écrit la première ligne négative que ce ledger ait jamais vue en
+     * dehors d'un test — le premier vrai consommateur de la garde de
+     * {@see CoinTransactionRepository::record()}, voir son docblock.
+     */
+    public function testCoinLedgerSpendWritesANegativePurchaseLine(): void
+    {
+        $ledger = new CoinLedger(self::repository());
+
+        $userId = Uuid::v7();
+        $now = new DateTimeImmutable('2026-08-31T09:00:00+00:00');
+        $sourceId = Uuid::v7();
+
+        $ledger->credit($userId, CoinReason::WorkoutDrop, Uuid::v7(), 100, $now);
+        $ledger->spend($userId, $sourceId, 30, $now);
+
+        self::assertSame(70, $ledger->balanceOf($userId));
+    }
+
+    public function testCoinLedgerSpendIsRefusedIfItWouldCrossZero(): void
+    {
+        $ledger = new CoinLedger(self::repository());
+
+        $userId = Uuid::v7();
+        $now = new DateTimeImmutable('2026-08-31T09:00:00+00:00');
+
+        $ledger->credit($userId, CoinReason::WorkoutDrop, Uuid::v7(), 10, $now);
+
+        $this->expectException(InsufficientCoinBalance::class);
+
+        try {
+            $ledger->spend($userId, Uuid::v7(), 11, $now);
+        } finally {
+            self::assertSame(10, $ledger->balanceOf($userId));
+        }
+    }
+
     private static function reload(CoinTransactionRepository $repository, CoinTransaction $transaction): CoinTransaction
     {
         $reloaded = $repository->find($transaction->id());

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rewards\Application;
 
+use App\Rewards\Domain\Exception\ItemAlreadyOwned;
 use App\Rewards\Domain\InventoryItem;
 use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
 use DateTimeImmutable;
@@ -41,5 +42,32 @@ final readonly class Inventory
     public function grant(Uuid $userId, string $itemKey, Uuid $lootRollId, DateTimeImmutable $obtainedAt): InventoryItem
     {
         return $this->items->grant($userId, $itemKey, $lootRollId, $obtainedAt);
+    }
+
+    /**
+     * Achète un exemplaire de `$itemKey` (#229) — un {@see grant()} sans tirage, `lootRollId`
+     * à `null`, voir le docblock d'{@see InventoryItem} pour ce que `null` veut dire.
+     *
+     * **Refuse un objet déjà possédé, sans méthode dédiée sur le repository.** `grant()`
+     * verrouille déjà, lit déjà la possession, écrit déjà — une méthode `purchase()` sur
+     * {@see InventoryItemRepository} dupliquerait ces trois gestes pour une seule différence :
+     * refuser plutôt que fusionner. Cette classe appelle donc `grant()` tel quel, sous le même
+     * verrou, et lit la quantité qui en ressort : `1` est un objet neuf, tout le reste ne peut
+     * venir que d'une ligne déjà là *avant* cet appel — un tirage passé, ou un achat
+     * précédent. La transaction ouverte par {@see PurchaseItemHandler} annule cette écriture
+     * avec le reste si c'est le cas ; le ledger de pièces n'a pas encore été touché à ce
+     * stade, voir son docblock pour l'ordre des deux verrous.
+     *
+     * @throws ItemAlreadyOwned l'objet était déjà possédé avant cet achat
+     */
+    public function purchase(Uuid $userId, string $itemKey, DateTimeImmutable $obtainedAt): InventoryItem
+    {
+        $item = $this->items->grant($userId, $itemKey, null, $obtainedAt);
+
+        if ($item->quantity() > 1) {
+            throw new ItemAlreadyOwned($itemKey);
+        }
+
+        return $item;
     }
 }
