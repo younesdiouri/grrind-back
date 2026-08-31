@@ -126,10 +126,11 @@ couche entre la commande et ce qu'elle fait. Il tourne donc sur l'hôte, et c'es
 
 Le skill **`deploy`** (`.claude/skills/deploy/SKILL.md`) porte les deux commandes exactes —
 `flyctl deploy`, puis les migrations par `flyctl ssh console` — et surtout les pièges qui
-ont déjà coûté du temps : les machines s'arrêtent toutes seules (`min_machines_running = 0`),
-et **`make migrate-prod` ne peut pas joindre Supabase depuis un poste de dev** parce que la
-connexion directe y est IPv6 uniquement. C'est pour ça que la migration part d'une machine
-Fly plutôt que de la machine locale.
+ont déjà coûté du temps : **`make migrate-prod` ne peut pas joindre Supabase depuis un poste
+de dev** parce que la connexion directe y est IPv6 uniquement. C'est pour ça que la migration
+part d'une machine Fly plutôt que de la machine locale. Les deux groupes de machines tournent
+en permanence — le `worker` depuis le #153, le web depuis le #188 — donc une machine arrêtée
+n'est plus l'état par défaut, c'est un incident.
 
 Un déploiement n'est pas fini tant qu'une requête réelle n'a pas répondu, et le test de
 fumée doit vérifier **un refus autant qu'un succès** : les décisions les plus coûteuses du
