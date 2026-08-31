@@ -862,6 +862,53 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/shop:
+    get:
+      tags:
+        - Récompenses
+      operationId: get_rewards_shop_show
+      responses:
+        '200':
+          description: "L'étal — les EPIC et LEGENDARY n'y figurent jamais, voir le docblock d'ItemCatalog — avec ce que le joueur en sait et le solde de sa bourse. Un objet verrouillé par le niveau reste visible."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shop'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/shop/purchases:
+    post:
+      tags:
+        - Récompenses
+      operationId: post_rewards_shop_purchase
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseItemRequest'
+      responses:
+        '201':
+          description: "L'achat est écrit : l'objet, ce qu'il a coûté, le solde de pièces avant et après."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Purchase'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: 'Clé inconnue ou objet hors étal (`item-not-purchasable`), niveau insuffisant (`shop-level-too-low`), objet déjà possédé (`item-already-owned`), ou solde insuffisant (`insufficient-coin-balance`).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   /api/daily-activity:
     put:
       tags:
@@ -1063,6 +1110,9 @@ components:
             - 'https://grrind.app/problems/item-not-owned'
             - 'https://grrind.app/problems/equipment-slot-unknown'
             - 'https://grrind.app/problems/equipment-slot-incompatible'
+            - 'https://grrind.app/problems/item-not-purchasable'
+            - 'https://grrind.app/problems/item-already-owned'
+            - 'https://grrind.app/problems/shop-level-too-low'
         title:
           type: string
           example: Conflict
@@ -2001,6 +2051,67 @@ components:
           items:
             $ref: '#/components/schemas/InventoryLine'
       type: object
+    ShopListing:
+      description: "Un objet de l'étal (#229) — la même forme que `DroppedItem`, avec ce qu'un joueur\nprécis en sait en plus. `owned` s'appuie sur la même règle que l'achat lui-même :\nsans revente ni consommable, un objet déjà possédé ne redevient jamais achetable.\n"
+      type: object
+      allOf:
+        -
+          $ref: '#/components/schemas/DroppedItem'
+        -
+          required:
+            - affordable
+            - owned
+            - minimumLevel
+            - unlocked
+          properties:
+            affordable:
+              description: 'Le solde actuel du joueur couvre `priceCoins`.'
+              type: boolean
+            owned:
+              description: "Déjà possédé — l'achat serait refusé (`item-already-owned`)."
+              type: boolean
+            minimumLevel:
+              description: "Le niveau qui débloque l'achat — `shop.minimum_level` dans `items.yaml`."
+              type: integer
+              example: 5
+            unlocked:
+              description: "Le joueur a atteint `minimumLevel`. Un objet verrouillé reste dans la liste : un étal qui cache ce qu'on ne peut pas encore acheter ne donne envie de rien."
+              type: boolean
+          type: object
+    Shop:
+      description: "`GET /api/shop` : l'étal entier — un objet par entrée d'`items.yaml` dont\n`shop.available` vaut `true`. Les EPIC et LEGENDARY n'y figurent jamais, voir le\ndocblock d'`ItemCatalog`. Le solde de pièces l'accompagne, comme sur `GET\n/api/inventory` : le même écran de bourse, il n'a pas à faire un second appel\npour savoir s'il peut payer.\n"
+      required:
+        - coins
+        - items
+      properties:
+        coins:
+          description: "Le solde de la bourse — cet écran lui appartient autant qu'au sac."
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShopListing'
+      type: object
+    Purchase:
+      description: "`POST /api/shop/purchases` : l'objet acheté, ce qu'il a coûté, et le solde de\npièces avant *et* après — même geste qu'un `RewardSummary` avec ses deux paliers,\npour que la bourse se décrémente à l'écran sans que le client recalcule quoi que\nce soit.\n"
+      required:
+        - item
+        - spentCoins
+        - coinsBefore
+        - coinsAfter
+      properties:
+        item:
+          $ref: '#/components/schemas/DroppedItem'
+        spentCoins:
+          type: integer
+          example: 30
+        coinsBefore:
+          type: integer
+          example: 120
+        coinsAfter:
+          type: integer
+          example: 90
+      type: object
     CoinTransaction:
       description: "Une écriture au ledger de pièces (#30) — le pendant, en beaucoup plus simple, de\n`XpTransaction` : `amount` **est** l'écriture, il n'y a ni breakdown ni répartition\nà recomposer.\n"
       required:
@@ -2014,7 +2125,7 @@ components:
           type: string
           format: uuid
         sourceId:
-          description: "Ce qui a produit l'écriture — l'identifiant du workout ou du combat. Le nom du ledger, pas celui d'une séance."
+          description: "Ce qui a produit l'écriture — l'identifiant du workout, du combat, ou de la ligne d'inventaire achetée pour un `PURCHASE`."
           type: string
           format: uuid
         reason:
@@ -2022,8 +2133,9 @@ components:
           enum:
             - WORKOUT_DROP
             - BATTLE_DROP
+            - PURCHASE
         amount:
-          description: "Signé. Aucune ligne négative n'existe encore en v1 — la garde s'applique malgré tout à tout appel, quel que soit le signe."
+          description: "Signé — négatif pour `PURCHASE` (#229), positif pour les deux autres raisons. Un solde ne passe jamais sous zéro, quel que soit le signe de l'écriture qui le tenterait."
           type: integer
         occurredAt:
           description: "L'instant du fait — la date du sport ou du combat, pas celle de l'écriture."
@@ -2899,6 +3011,12 @@ components:
           default: 20
           maximum: 50
           minimum: 1
+      type: object
+    PurchaseItemRequest:
+      properties:
+        itemKey:
+          type: string
+          default: ''
       type: object
     WorkoutSource:
       type: string

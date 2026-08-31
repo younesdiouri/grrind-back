@@ -57,8 +57,14 @@ class InventoryItemRepository extends ServiceEntityRepository
      * Crédite un exemplaire de `$itemKey`, sous verrou pour éviter que deux tirages
      * concurrents du même objet — deux appareils qui synchronisent en même temps — ne créent
      * chacun leur propre ligne au lieu d'incrémenter la même.
+     *
+     * `$lootRollId` est nullable depuis la boutique (#229) : `null` = acquis autrement qu'au
+     * tirage, voir le docblock d'{@see InventoryItem}. C'est aussi le chemin qu'emprunte un
+     * achat — voir {@see \App\Rewards\Application\Inventory::purchase()} pour pourquoi ce
+     * n'est pas une seconde méthode qui refuserait un objet déjà possédé plutôt que de
+     * fusionner : elle réutilise ce verrou et cette écriture tels quels.
      */
-    public function grant(Uuid $userId, string $itemKey, Uuid $lootRollId, DateTimeImmutable $obtainedAt): InventoryItem
+    public function grant(Uuid $userId, string $itemKey, ?Uuid $lootRollId, DateTimeImmutable $obtainedAt): InventoryItem
     {
         return $this->getEntityManager()->wrapInTransaction(function () use ($userId, $itemKey, $lootRollId, $obtainedAt): InventoryItem {
             $this->lock($userId);
@@ -146,6 +152,27 @@ class InventoryItemRepository extends ServiceEntityRepository
             $occupant->unequip();
             $this->getEntityManager()->flush();
         });
+    }
+
+    /**
+     * Ouvre la transaction unique d'un achat (#229). Ni `grant()` ni l'écriture du ledger de
+     * pièces n'ont d'agrégat racine qui l'ouvrirait pour elles — contrairement à `Battle` pour
+     * un combat, ou l'import pour un lot de workouts — donc c'est ce repository qui la porte :
+     * son verrou est celui que {@see \App\Rewards\Application\PurchaseItemHandler} doit
+     * prendre en premier, dans le même ordre que {@see \App\Rewards\Infrastructure\Drop\WorkoutSessionDrops}
+     * et {@see \App\Rewards\Infrastructure\Drop\AdversaryBattleDrops} — inventaire puis
+     * pièces, jamais l'inverse, sous peine d'interbloquer avec un import ou un combat
+     * concurrent qui prend les deux verrous dans ce même ordre.
+     *
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    public function transactional(callable $work): mixed
+    {
+        return $this->getEntityManager()->wrapInTransaction(static fn (): mixed => $work());
     }
 
     /** `findOneBy()` plutôt qu'une requête à la main : une ligne se cherche déjà par ces deux colonnes seules, voir l'unicité de la classe. */

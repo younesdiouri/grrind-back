@@ -32,14 +32,30 @@ final readonly class CoinLedger
      * Crédite un joueur pour un drop de séance ou de combat.
      *
      * `$amount` est strictement positif : un crédit qui retirerait des pièces n'en serait
-     * plus un, et la seule raison qui écrira demain un montant négatif — `PURCHASE`, au Lot
-     * 6b — passera par sa propre méthode plutôt que de détourner celle-ci.
+     * plus un — la dépense a sa propre méthode, {@see spend()}, plutôt que de détourner
+     * celle-ci avec un montant négatif.
      */
     public function credit(Uuid $userId, CoinReason $reason, Uuid $sourceId, int $amount, DateTimeImmutable $occurredAt): void
     {
         \assert($amount > 0, 'Un crédit de pièces doit être strictement positif — voir CoinReason.');
 
         $this->transactions->record($userId, $reason, $sourceId, $amount, $occurredAt);
+    }
+
+    /**
+     * Débite un joueur pour un achat (#229) — le pendant de {@see credit()}, jamais un
+     * détournement de sa méthode avec un montant négatif : `$amount` est strictement positif
+     * en entrée, c'est cette méthode qui écrit le signe négatif au ledger.
+     *
+     * Le garde-fou « un solde ne passe jamais sous zéro » de
+     * {@see CoinTransactionRepository::record()} est traversé tel quel, sous le même verrou :
+     * c'est son premier vrai consommateur, voir son docblock.
+     */
+    public function spend(Uuid $userId, Uuid $sourceId, int $amount, DateTimeImmutable $occurredAt): void
+    {
+        \assert($amount > 0, 'Une dépense de pièces doit être strictement positive — le signe négatif s\'écrit ici, pas chez l\'appelant.');
+
+        $this->transactions->record($userId, CoinReason::Purchase, $sourceId, -$amount, $occurredAt);
     }
 
     /** Le solde d'un joueur — voir le docblock de {@see CoinTransactionRepository::balanceOf()}. */

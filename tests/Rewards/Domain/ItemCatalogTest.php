@@ -160,4 +160,87 @@ final class ItemCatalogTest extends TestCase
 
         self::assertNull($catalog->find('IRON_GAUNTLETS')?->modifiers[0]->discipline);
     }
+
+    /** Absent du tout : l'objet a un prix, mais aucun bloc `shop:` — pas vendu (#229). */
+    public function testUnObjetSansBlocShopNEstPasVendu(): void
+    {
+        $catalog = new ItemCatalog([
+            ['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'price_coins' => 20, 'modifiers' => []],
+        ]);
+
+        $item = $catalog->find('CLOAK');
+        self::assertNotNull($item);
+        self::assertFalse($item->shopAvailable);
+        self::assertSame([], $catalog->shopItems());
+    }
+
+    public function testUnObjetAvailableEntreALEtalAvecSonMinimumLevel(): void
+    {
+        $catalog = new ItemCatalog([
+            ['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'price_coins' => 20, 'modifiers' => [], 'shop' => ['available' => true, 'minimum_level' => 5]],
+        ]);
+
+        $item = $catalog->find('CLOAK');
+        self::assertNotNull($item);
+        self::assertTrue($item->shopAvailable);
+        self::assertSame(5, $item->shopMinimumLevel);
+        self::assertSame(['CLOAK'], array_map(static fn ($item) => $item->key, $catalog->shopItems()));
+    }
+
+    /** Sans `minimum_level`, un objet à l'étal n'a aucun verrou de niveau : n'importe quel joueur inscrit satisfait `1`. */
+    public function testUnObjetAvailableSansMinimumLevelVautUn(): void
+    {
+        $catalog = new ItemCatalog([
+            ['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'price_coins' => 20, 'modifiers' => [], 'shop' => ['available' => true]],
+        ]);
+
+        self::assertSame(1, $catalog->find('CLOAK')?->shopMinimumLevel);
+    }
+
+    public function testShopItemsRendLEtalDansLOrdreDeDeclaration(): void
+    {
+        $catalog = new ItemCatalog([
+            ['key' => 'FIRST', 'rarity' => 'COMMON', 'slot' => 'FEET', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true]],
+            ['key' => 'HIDDEN', 'rarity' => 'COMMON', 'slot' => 'HANDS', 'price_coins' => 1, 'modifiers' => []],
+            ['key' => 'SECOND', 'rarity' => 'COMMON', 'slot' => 'HEAD', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true]],
+        ]);
+
+        self::assertSame(['FIRST', 'SECOND'], array_map(static fn ($item) => $item->key, $catalog->shopItems()));
+    }
+
+    /**
+     * Le refus du ticket #229 : un verrou de niveau pour un objet qui prétend ne pas être
+     * vendu ne veut rien dire — une config qui ment se refuse au démarrage.
+     */
+    public function testRefuseUnMinimumLevelSansAvailable(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new ItemCatalog([
+            ['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['minimum_level' => 5]],
+        ]);
+    }
+
+    /**
+     * L'autre refus du #229 : un objet qui s'achète n'est plus une récompense de tirage.
+     * `EPIC` porte le refus, `LEGENDARY` ferait aussi l'affaire.
+     */
+    public function testRefuseUnObjetEpicAVendre(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('CLOAK');
+
+        new ItemCatalog([
+            ['key' => 'CLOAK', 'rarity' => 'EPIC', 'slot' => 'CHEST', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true]],
+        ]);
+    }
+
+    public function testRefuseUnObjetLegendaryAVendre(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new ItemCatalog([
+            ['key' => 'CROWN', 'rarity' => 'LEGENDARY', 'slot' => 'HEAD', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true]],
+        ]);
+    }
 }

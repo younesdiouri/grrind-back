@@ -17,9 +17,22 @@ final readonly class Item
         public string $key,
         public Rarity $rarity,
         public EquipmentSlot $slot,
-        /** En pièces — voir le docblock d'`items.yaml` pour pourquoi il existe avant la boutique (Lot 6b). */
+        /** En pièces — voir le docblock d'`items.yaml` pour pourquoi il a existé avant la boutique (#229). */
         public int $priceCoins,
         public array $modifiers,
+        /**
+         * `false` par défaut : la plupart des appels — les fixtures de test, un objet qui
+         * tombe d'un tirage — n'ont jamais eu à parler de boutique. `ItemCatalog` est le seul
+         * qui la pose sciemment, depuis le bloc `shop:` d'`items.yaml` — voir son docblock
+         * pour les deux règles qu'il vérifie avant d'accepter `true`.
+         */
+        public bool $shopAvailable = false,
+        /**
+         * Sans effet si `$shopAvailable` est `false`. `1` par défaut — n'importe quel joueur
+         * inscrit satisfait ce plancher, un objet à l'étal sans `minimum_level` déclaré dans
+         * `items.yaml` n'a donc aucun verrou de niveau.
+         */
+        public int $shopMinimumLevel = 1,
     ) {
     }
 }

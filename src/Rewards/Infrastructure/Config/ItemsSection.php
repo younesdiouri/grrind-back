@@ -22,6 +22,12 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
  * `type` du modificateur reste un `scalarNode`, jamais une énumération figée dans ce
  * schéma : `ItemCatalog` le valide contre `ModifierType::tryFrom()`, seule façon pour le
  * #224 d'ouvrir des types de combat sans toucher à cette classe.
+ *
+ * `shop` (#229) est facultatif — absent du tout vaut « pas vendu », voir le docblock
+ * d'`ItemCatalog`. `available` a un défaut (`false`) parce que la boutique doit pouvoir lire
+ * une valeur même quand seul `minimum_level` a été écrit par erreur — c'est justement la
+ * config qui ment qu'`ItemCatalog` refuse. `minimum_level` n'a lui aucun défaut : sa présence
+ * ou son absence, pas seulement sa valeur, fait partie de ce que ce refus vérifie.
  */
 final class ItemsSection implements GameBalanceSection
 {
@@ -58,6 +64,14 @@ final class ItemsSection implements GameBalanceSection
                                     ->end()
                                 ->end()
                             ->end()
+                            // Facultatif — voir le docblock de la classe pour ce que
+                            // l'absence de chaque champ veut dire.
+                            ->arrayNode('shop')
+                                ->children()
+                                    ->booleanNode('available')->defaultFalse()->end()
+                                    ->integerNode('minimum_level')->min(1)->end()
+                                ->end()
+                            ->end()
                         ->end()
                     ->end()
                 ->end()
@@ -66,7 +80,7 @@ final class ItemsSection implements GameBalanceSection
                 ->always(static function (array $values): array {
                     /**
                      * @var array{
-                     *     items: list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}>,
+                     *     items: list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}>,
                      * } $values les nœuds ci-dessus ont déjà fait ce travail
                      */
                     try {

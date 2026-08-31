@@ -76,4 +76,15 @@ final class InventoryItemTest extends TestCase
 
         self::assertNull($item->slot());
     }
+
+    /**
+     * `null` = acquis autrement qu'au tirage (#229) — un achat, aujourd'hui la seule autre
+     * voie. Voir le docblock de la classe.
+     */
+    public function testFirstGrantAcceptsANullLootRollId(): void
+    {
+        $item = InventoryItem::firstGrant(Uuid::v7(), 'WORN_RUNNING_SHOES', null, new DateTimeImmutable());
+
+        self::assertNull($item->lootRollId());
+    }
 }

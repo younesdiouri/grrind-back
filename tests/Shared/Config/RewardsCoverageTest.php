@@ -132,6 +132,21 @@ final class RewardsCoverageTest extends KernelTestCase
         }
     }
 
+    /**
+     * `ItemsSection` ne borne `price_coins` qu'à `>= 0` (#27) : un objet gratuit reste une
+     * config valide pour un drop, mais vendre du vide n'a aucun sens à l'étal (#229). C'est
+     * une garantie qui croise le catalogue et la boutique — le genre que cette classe existe
+     * pour prouver, pas `ItemsSection` ni `ItemCatalog` isolément.
+     */
+    public function testChaqueObjetAVenteAUnPrixStrictementPositif(): void
+    {
+        $catalog = self::shippedCatalog();
+
+        foreach ($catalog->shopItems() as $item) {
+            self::assertGreaterThan(0, $item->priceCoins, \sprintf('"%s" est à l\'étal avec un prix nul ou négatif.', $item->key));
+        }
+    }
+
     private static function shippedCatalog(): ItemCatalog
     {
         self::bootKernel();
@@ -140,7 +155,7 @@ final class RewardsCoverageTest extends KernelTestCase
         $items = $container->getParameter('game.items.items');
         self::assertIsArray($items);
 
-        /** @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */
+        /** @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         return new ItemCatalog($items);
     }
 
@@ -166,7 +181,7 @@ final class RewardsCoverageTest extends KernelTestCase
         /**
          * @var list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout
          * @var list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
-         * @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}>                                                                        $items
+         * @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}>                   $items
          * @var list<array{key: string}>                                                                                                                                                                                               $enemies
          * @var list<array{key: string}>                                                                                                                                                                                               $bosses
          */

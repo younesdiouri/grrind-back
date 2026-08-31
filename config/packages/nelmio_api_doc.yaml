@@ -252,11 +252,9 @@ when@dev:
                                     # `GET /api/enemies`, il n'y a rien à protéger.
                                     - https://grrind.app/problems/enemy-key-unknown
                                     - https://grrind.app/problems/enemy-level-too-low
-                                    # Le ledger de pièces (#225). Inatteignable par une route à ce
-                                    # ticket — aucune n'écrit encore de ligne négative — mais listé
-                                    # dès maintenant : c'est le type que la boutique du Lot 6b émettra
-                                    # sur son premier refus d'achat, pas une nouveauté à introduire à
-                                    # ce moment-là.
+                                    # Le ledger de pièces (#225), et la boutique qui le dépense (#229) :
+                                    # son premier vrai consommateur, voir le docblock de
+                                    # `CoinTransactionRepository::record()`.
                                     - https://grrind.app/problems/insufficient-coin-balance
                                     # L'inventaire et l'équipement (#29, #30). Les trois refus de
                                     # `PUT`/`DELETE /api/inventory/equipment/{slot}`. Un emplacement déjà
@@ -265,6 +263,14 @@ when@dev:
                                     - https://grrind.app/problems/item-not-owned
                                     - https://grrind.app/problems/equipment-slot-unknown
                                     - https://grrind.app/problems/equipment-slot-incompatible
+                                    # La boutique (#229). Clé inconnue et objet hors étal partagent
+                                    # `item-not-purchasable` : un objet hors étal n'est pas une
+                                    # ressource qu'on cache, la question du 404 ne se pose pas plus
+                                    # qu'ailleurs dans ce module. `item-already-owned` est général —
+                                    # aucun drapeau « unique » au catalogue, voir son docblock.
+                                    - https://grrind.app/problems/item-not-purchasable
+                                    - https://grrind.app/problems/item-already-owned
+                                    - https://grrind.app/problems/shop-level-too-low
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }
@@ -1076,6 +1082,51 @@ when@dev:
                                 type: array
                                 items: { $ref: '#/components/schemas/InventoryLine' }
 
+                    ShopListing:
+                        type: object
+                        description: |
+                            Un objet de l'étal (#229) — la même forme que `DroppedItem`, avec ce qu'un joueur
+                            précis en sait en plus. `owned` s'appuie sur la même règle que l'achat lui-même :
+                            sans revente ni consommable, un objet déjà possédé ne redevient jamais achetable.
+                        allOf:
+                            - $ref: '#/components/schemas/DroppedItem'
+                            - type: object
+                              required: [affordable, owned, minimumLevel, unlocked]
+                              properties:
+                                  affordable: { type: boolean, description: "Le solde actuel du joueur couvre `priceCoins`." }
+                                  owned: { type: boolean, description: "Déjà possédé — l'achat serait refusé (`item-already-owned`)." }
+                                  minimumLevel: { type: integer, example: 5, description: "Le niveau qui débloque l'achat — `shop.minimum_level` dans `items.yaml`." }
+                                  unlocked: { type: boolean, description: "Le joueur a atteint `minimumLevel`. Un objet verrouillé reste dans la liste : un étal qui cache ce qu'on ne peut pas encore acheter ne donne envie de rien." }
+
+                    Shop:
+                        type: object
+                        description: |
+                            `GET /api/shop` : l'étal entier — un objet par entrée d'`items.yaml` dont
+                            `shop.available` vaut `true`. Les EPIC et LEGENDARY n'y figurent jamais, voir le
+                            docblock d'`ItemCatalog`. Le solde de pièces l'accompagne, comme sur `GET
+                            /api/inventory` : le même écran de bourse, il n'a pas à faire un second appel
+                            pour savoir s'il peut payer.
+                        required: [coins, items]
+                        properties:
+                            coins: { type: integer, description: "Le solde de la bourse — cet écran lui appartient autant qu'au sac." }
+                            items:
+                                type: array
+                                items: { $ref: '#/components/schemas/ShopListing' }
+
+                    Purchase:
+                        type: object
+                        description: |
+                            `POST /api/shop/purchases` : l'objet acheté, ce qu'il a coûté, et le solde de
+                            pièces avant *et* après — même geste qu'un `RewardSummary` avec ses deux paliers,
+                            pour que la bourse se décrémente à l'écran sans que le client recalcule quoi que
+                            ce soit.
+                        required: [item, spentCoins, coinsBefore, coinsAfter]
+                        properties:
+                            item: { $ref: '#/components/schemas/DroppedItem' }
+                            spentCoins: { type: integer, example: 30 }
+                            coinsBefore: { type: integer, example: 120 }
+                            coinsAfter: { type: integer, example: 90 }
+
                     CoinTransaction:
                         type: object
                         description: |
@@ -1085,9 +1136,9 @@ when@dev:
                         required: [id, sourceId, reason, amount, occurredAt]
                         properties:
                             id: { type: string, format: uuid }
-                            sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant du workout ou du combat. Le nom du ledger, pas celui d'une séance." }
-                            reason: { type: string, enum: [WORKOUT_DROP, BATTLE_DROP] }
-                            amount: { type: integer, description: "Signé. Aucune ligne négative n'existe encore en v1 — la garde s'applique malgré tout à tout appel, quel que soit le signe." }
+                            sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant du workout, du combat, ou de la ligne d'inventaire achetée pour un `PURCHASE`." }
+                            reason: { type: string, enum: [WORKOUT_DROP, BATTLE_DROP, PURCHASE] }
+                            amount: { type: integer, description: "Signé — négatif pour `PURCHASE` (#229), positif pour les deux autres raisons. Un solde ne passe jamais sous zéro, quel que soit le signe de l'écriture qui le tenterait." }
                             occurredAt:
                                 type: string
                                 format: date-time
