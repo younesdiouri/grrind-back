@@ -10,15 +10,17 @@ namespace App\Rewards\Domain;
  * crédite pour une raison qui n'est pas listée ici, et une valeur qu'aucun code n'écrit est
  * une porte qu'on finit par pousser.
  *
- * Trois valeurs : {@see LootRoller} tire pour un workout crédité ou un combat gagné
- * (`WORKOUT_DROP`, `BATTLE_DROP`, #225), et la boutique dépense (`PURCHASE`, #229) — la
- * première raison qui écrit une ligne négative, voir {@see \App\Rewards\Application\CoinLedger::spend()}.
- * `CHEST` viendra avec le #230, sans migration : `reason` est déjà une colonne assez large
- * pour le recevoir, seule cette classe changera.
+ * Quatre valeurs : {@see LootRoller} tire pour un workout crédité, un combat gagné ou un
+ * coffre ouvert (`WORKOUT_DROP`, `BATTLE_DROP`, `CHEST`, #225 et #230), et la boutique
+ * dépense (`PURCHASE`, #229) — la seule raison qui écrit une ligne négative, voir
+ * {@see \App\Rewards\Application\CoinLedger::spend()}. `CHEST` est arrivé sans migration au
+ * #230 : `reason` était déjà une colonne assez large pour le recevoir, seule cette classe a
+ * changé.
  */
 enum CoinReason: string
 {
     case WorkoutDrop = 'WORKOUT_DROP';
     case BattleDrop = 'BATTLE_DROP';
     case Purchase = 'PURCHASE';
+    case Chest = 'CHEST';
 }

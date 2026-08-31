@@ -7,14 +7,19 @@ namespace App\Rewards\UI\Http;
 use App\Rewards\Application\EquipItem;
 use App\Rewards\Application\EquipItemHandler;
 use App\Rewards\Application\InventoryOverviewProvider;
+use App\Rewards\Application\OpenChest;
+use App\Rewards\Application\OpenChestHandler;
 use App\Rewards\Application\UnequipItem;
 use App\Rewards\Application\UnequipItemHandler;
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Infrastructure\Translation\ItemTranslator;
 use App\Rewards\UI\Http\Request\EquipItemRequest;
+use App\Rewards\UI\Http\Response\ChestOpenResource;
 use App\Rewards\UI\Http\Response\InventoryResource;
+use App\Shared\UI\Http\Idempotent;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -46,6 +51,13 @@ use Symfony\Component\Uid\Uuid;
  * le docblock d'{@see \App\Rewards\Infrastructure\Doctrine\InventoryItemRepository::equip()}.
  * **`DELETE` est idempotent aussi** : vider un emplacement déjà vide n'est pas une erreur,
  * voir {@see \App\Rewards\Infrastructure\Doctrine\InventoryItemRepository::unequip()}.
+ *
+ * **`POST .../chests/{key}/open` (#230) rend le tirage, pas l'inventaire entier.** Contrairement
+ * à `PUT`/`DELETE /equipment/{slot}`, ce n'est pas un écran qui se recharge : c'est un drop,
+ * même forme que `SessionDrop`/`BattleDrop` — voir le docblock de
+ * {@see \App\Rewards\Application\ChestOpenReceipt}. `{key}` est, comme `{slot}`, une chaîne
+ * brute : une clé qui ne désigne aucun coffre possédé est une règle de jeu
+ * (`item-not-owned`), pas une ressource absente.
  */
 final readonly class InventoryController
 {
@@ -53,6 +65,7 @@ final readonly class InventoryController
         private InventoryOverviewProvider $overview,
         private EquipItemHandler $equipItem,
         private UnequipItemHandler $unequipItem,
+        private OpenChestHandler $openChest,
         private ItemCatalog $catalog,
         private ItemTranslator $translator,
     ) {
@@ -123,6 +136,36 @@ final readonly class InventoryController
         ($this->unequipItem)(new UnequipItem(Uuid::fromString($user->getUserIdentifier()), $slot));
 
         return $this->overviewResponse($user);
+    }
+
+    #[Route('/api/inventory/chests/{key}/open', name: 'rewards_inventory_open_chest', methods: ['POST'])]
+    #[Idempotent]
+    #[OA\Tag(name: 'Récompenses')]
+    #[OA\Parameter(ref: '#/components/parameters/IdempotencyKey')]
+    #[OA\Response(
+        response: 201,
+        description: 'Le coffre est ouvert : les objets tombés, les pièces, le solde avant et après. Le contenu ne se révèle jamais avant cet appel.',
+        content: new OA\JsonContent(ref: '#/components/schemas/ChestOpen'),
+    )]
+    #[OA\Response(response: 400, ref: '#/components/responses/BadRequest')]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
+    #[OA\Response(
+        response: 422,
+        description: 'Coffre inconnu ou non possédé (`item-not-owned`), ou objet possédé qui n\'est pas un coffre (`item-not-a-chest`).',
+        content: new OA\MediaType(
+            mediaType: 'application/problem+json',
+            schema: new OA\Schema(ref: '#/components/schemas/ProblemDetails'),
+        ),
+    )]
+    public function openChest(
+        #[CurrentUser]
+        UserInterface $user,
+        string $key,
+    ): JsonResponse {
+        $receipt = ($this->openChest)(new OpenChest(Uuid::fromString($user->getUserIdentifier()), $key));
+
+        return new JsonResponse(ChestOpenResource::from($receipt, $this->translator)->toArray(), Response::HTTP_CREATED);
     }
 
     private function overviewResponse(UserInterface $user): JsonResponse

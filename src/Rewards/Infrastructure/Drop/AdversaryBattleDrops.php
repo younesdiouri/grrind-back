@@ -137,18 +137,23 @@ final readonly class AdversaryBattleDrops implements BattleDrops
     /**
      * Un objet du catalogue, tel que le client le reçoit — voir le docblock de
      * {@see DroppedItem} pour pourquoi `Shared` ne porte que des chaînes. Même geste que
-     * {@see WorkoutSessionDrops::describe()}.
+     * {@see WorkoutSessionDrops::describe()}, y compris le refus d'un emplacement nul : un
+     * coffre ne tombe jamais d'un combat non plus.
      */
     private function describe(string $itemKey): DroppedItem
     {
         $item = $this->catalog->find($itemKey)
             ?? throw new LogicException(\sprintf('"%s" est tombé d\'un tirage mais n\'existe plus dans le catalogue.', $itemKey));
 
+        $slot = $item->slot
+            ?? throw new LogicException(\sprintf('"%s" est tombé d\'un tirage de combat sans emplacement : un coffre ne devrait jamais y figurer, voir le docblock de LootTables.', $itemKey));
+
         return new DroppedItem(
             $item->key,
+            $item->kind->value,
             $this->translator->nameOf($item->key),
             $item->rarity->value,
-            $item->slot->value,
+            $slot->value,
             array_map(
                 static fn (ItemModifier $modifier): DroppedItemModifier => new DroppedItemModifier(
                     $modifier->type->value,

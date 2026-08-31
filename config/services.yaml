@@ -157,9 +157,9 @@ services:
         arguments:
             $items: '%game.items.items%'
 
-    # Les tables de tirage (#27). `$items`, `$enemies` et `$bosses` sont les paramètres
-    # bruts de trois fichiers différents — voir le docblock de `LootTables` pour pourquoi
-    # c'est ici, à la construction réelle du service, que le catalogue d'objets et le
+    # Les tables de tirage (#27, coffres au #230). `$items`, `$enemies` et `$bosses` sont les
+    # paramètres bruts de trois fichiers différents — voir le docblock de `LootTables` pour
+    # pourquoi c'est ici, à la construction réelle du service, que le catalogue d'objets et le
     # catalogue d'ennemis se croisent avec les tables, jamais dans `LootSection` : Deptrac
     # interdit à `Rewards` d'importer quoi que ce soit de `Combat`, et ces tableaux ne sont
     # que de la donnée, jamais un objet de leur domaine.
@@ -168,6 +168,7 @@ services:
             $version: '%game.loot.version%'
             $workout: '%game.loot.workout%'
             $adversary: '%game.loot.adversary%'
+            $chest: '%game.loot.chest%'
             $items: '%game.items.items%'
             $enemies: '%game.combat.enemies%'
             $bosses: '%game.combat.bosses%'

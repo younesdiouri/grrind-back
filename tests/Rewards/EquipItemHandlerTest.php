@@ -85,6 +85,21 @@ final class EquipItemHandlerTest extends ApiTestCase
         (self::equip())(new EquipItem($userId, 'IRON_GAUNTLETS', 'HEAD'));
     }
 
+    /**
+     * Un coffre n'a aucun emplacement (#230) : `EquipItemHandler` le rend déjà incompatible,
+     * sans qu'il ait fallu écrire un refus de plus — voir le docblock
+     * d'`EquipmentSlotIncompatible`.
+     */
+    public function testEquippingAChestIsRefused(): void
+    {
+        $userId = Uuid::v7();
+        self::repository()->grant($userId, 'WOODEN_CHEST', Uuid::v7(), new DateTimeImmutable());
+
+        $this->expectException(EquipmentSlotIncompatible::class);
+
+        (self::equip())(new EquipItem($userId, 'WOODEN_CHEST', 'HANDS'));
+    }
+
     public function testUnequippingClearsTheSlot(): void
     {
         $userId = Uuid::v7();
@@ -126,7 +141,7 @@ final class EquipItemHandlerTest extends ApiTestCase
         $items = self::getContainer()->getParameter('game.items.items');
         self::assertIsArray($items);
 
-        /** @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */
         return new ItemCatalog($items);
     }
 }

@@ -6,6 +6,7 @@ namespace App\Tests\Rewards\Domain;
 
 use App\Rewards\Domain\EquipmentSlot;
 use App\Rewards\Domain\ItemCatalog;
+use App\Rewards\Domain\ItemKind;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\ModifierType;
 use InvalidArgumentException;
@@ -241,6 +242,73 @@ final class ItemCatalogTest extends TestCase
 
         new ItemCatalog([
             ['key' => 'CROWN', 'rarity' => 'LEGENDARY', 'slot' => 'HEAD', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true]],
+        ]);
+    }
+
+    /** Absent, `kind` vaut `EQUIPMENT` — les dix objets livrés avant le #230 n'ont rien eu à déclarer. */
+    public function testAbsentKindDefaultsToEquipment(): void
+    {
+        $catalog = new ItemCatalog([
+            ['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'price_coins' => 1, 'modifiers' => []],
+        ]);
+
+        self::assertSame(ItemKind::Equipment, $catalog->find('CLOAK')?->kind);
+    }
+
+    public function testAChestHasNoSlotAndNoModifiers(): void
+    {
+        $catalog = new ItemCatalog([
+            ['key' => 'TREASURE_CHEST', 'rarity' => 'COMMON', 'kind' => 'CHEST', 'price_coins' => 50, 'modifiers' => []],
+        ]);
+
+        $chest = $catalog->find('TREASURE_CHEST');
+        self::assertNotNull($chest);
+        self::assertSame(ItemKind::Chest, $chest->kind);
+        self::assertNull($chest->slot);
+        self::assertSame([], $chest->modifiers);
+    }
+
+    /** Un coffre n'a pas d'emplacement : en poser un mentirait — voir le docblock de la classe. */
+    public function testRefuseUnCoffreAvecUnEmplacement(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('TREASURE_CHEST');
+
+        new ItemCatalog([
+            ['key' => 'TREASURE_CHEST', 'rarity' => 'COMMON', 'kind' => 'CHEST', 'slot' => 'CHEST', 'price_coins' => 50, 'modifiers' => []],
+        ]);
+    }
+
+    /** Un `EQUIPMENT` sans emplacement ne se porterait nulle part. */
+    public function testRefuseUnEquipementSansEmplacement(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('CLOAK');
+
+        new ItemCatalog([
+            ['key' => 'CLOAK', 'rarity' => 'COMMON', 'price_coins' => 1, 'modifiers' => []],
+        ]);
+    }
+
+    /** Un coffre ne s'équipe pas : il ne peut porter aucun modificateur. */
+    public function testRefuseUnCoffreAvecUnModificateur(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('TREASURE_CHEST');
+
+        new ItemCatalog([
+            ['key' => 'TREASURE_CHEST', 'rarity' => 'COMMON', 'kind' => 'CHEST', 'price_coins' => 50, 'modifiers' => [
+                ['type' => 'LOOT_LUCK', 'value' => 10],
+            ]],
+        ]);
+    }
+
+    public function testRefuseUneNatureDObjetInconnue(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new ItemCatalog([
+            ['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'kind' => 'MYSTERY_BOX', 'price_coins' => 1, 'modifiers' => []],
         ]);
     }
 }

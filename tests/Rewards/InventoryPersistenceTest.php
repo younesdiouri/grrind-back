@@ -201,6 +201,68 @@ final class InventoryPersistenceTest extends ApiTestCase
         self::assertSame('IRON_GAUNTLETS', $worn[0]->itemKey());
     }
 
+    /** L'ouverture d'un coffre (#230), en base : `consumeOne()` décrémente sous verrou. */
+    public function testConsumingOneDecrementsTheQuantity(): void
+    {
+        $repository = self::repository();
+        $userId = Uuid::v7();
+
+        $repository->grant($userId, 'WOODEN_CHEST', Uuid::v7(), new DateTimeImmutable());
+        $repository->grant($userId, 'WOODEN_CHEST', Uuid::v7(), new DateTimeImmutable());
+
+        $consumed = $repository->consumeOne($userId, 'WOODEN_CHEST');
+
+        self::assertSame(1, $consumed->quantity());
+    }
+
+    public function testConsumingAnUnownedChestIsRefused(): void
+    {
+        $repository = self::repository();
+
+        $this->expectException(ItemNotOwned::class);
+
+        $repository->consumeOne(Uuid::v7(), 'WOODEN_CHEST');
+    }
+
+    /** Consommer le dernier exemplaire refuse toute consommation suivante — la ligne reste, mais à zéro. */
+    public function testConsumingTheLastExemplarRefusesTheNextOne(): void
+    {
+        $repository = self::repository();
+        $userId = Uuid::v7();
+
+        $repository->grant($userId, 'WOODEN_CHEST', Uuid::v7(), new DateTimeImmutable());
+        $repository->consumeOne($userId, 'WOODEN_CHEST');
+
+        $this->expectException(ItemNotOwned::class);
+
+        $repository->consumeOne($userId, 'WOODEN_CHEST');
+    }
+
+    /**
+     * **Le cœur du #230, en base.** Une ligne consommée à zéro reste en base — voir le
+     * docblock d'`InventoryItem::consumeOne()` — mais `ownedByPlayer()` ne la rend plus :
+     * un sac n'affiche pas ce qu'il ne contient plus.
+     */
+    public function testOwnedByPlayerHidesLinesAtZeroQuantity(): void
+    {
+        $repository = self::repository();
+        $userId = Uuid::v7();
+
+        $repository->grant($userId, 'WOODEN_CHEST', Uuid::v7(), new DateTimeImmutable());
+        $repository->grant($userId, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
+        $repository->consumeOne($userId, 'WOODEN_CHEST');
+
+        $owned = $repository->ownedByPlayer($userId);
+
+        self::assertCount(1, $owned);
+        self::assertSame('IRON_GAUNTLETS', $owned[0]->itemKey());
+
+        // La ligne existe toujours, à zéro — ce n'est pas une suppression déguisée.
+        $stillThere = $repository->ofPlayerAndItem($userId, 'WOODEN_CHEST');
+        self::assertInstanceOf(InventoryItem::class, $stillThere);
+        self::assertSame(0, $stillThere->quantity());
+    }
+
     private static function gauntlets(): Item
     {
         return new Item('IRON_GAUNTLETS', Rarity::Common, EquipmentSlot::Hands, 30, [

@@ -87,4 +87,32 @@ final class InventoryItemTest extends TestCase
 
         self::assertNull($item->lootRollId());
     }
+
+    /**
+     * La première vraie dépense de `$quantity` (#230) : ouvrir un coffre en consomme un,
+     * sans toucher à la provenance de la ligne — voir le docblock de la classe.
+     */
+    public function testConsumeOneDecrementsWithoutTouchingTheProvenance(): void
+    {
+        $rollId = Uuid::v7();
+        $obtainedAt = new DateTimeImmutable('2026-08-01T08:00:00+00:00');
+        $item = InventoryItem::firstGrant(Uuid::v7(), 'WOODEN_CHEST', $rollId, $obtainedAt);
+        $item->grantOneMore();
+
+        $item->consumeOne();
+
+        self::assertSame(1, $item->quantity());
+        self::assertTrue($rollId->equals($item->lootRollId()));
+        self::assertEquals($obtainedAt, $item->obtainedAt());
+    }
+
+    /** La ligne descend jusqu'à zéro sans être invalidée — voir le docblock de la classe pour pourquoi elle n'est jamais supprimée. */
+    public function testConsumeOneCanReachZero(): void
+    {
+        $item = InventoryItem::firstGrant(Uuid::v7(), 'WOODEN_CHEST', Uuid::v7(), new DateTimeImmutable());
+
+        $item->consumeOne();
+
+        self::assertSame(0, $item->quantity());
+    }
 }

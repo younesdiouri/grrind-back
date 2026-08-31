@@ -21,7 +21,7 @@
 # datent des choses différentes, un rééquilibrage de loot n'a aucune raison d'invalider
 # l'historique d'XP.
 #
-# ————— Deux origines ——————————————————————————————————————————————————————————————————
+# ————— Trois origines ——————————————————————————————————————————————————————————————————
 #
 # `workout` : une table par palier de séance, gardée par une éligibilité — discipline (liste
 # vide = toute discipline), durée minimale en minutes, niveau minimal. Plusieurs tables
@@ -31,6 +31,11 @@
 # `adversary` : une table par clé d'ennemi ou de boss de `combat.yaml` — l'adversaire choisi
 # *est* la condition, il n'y a donc pas d'éligibilité à écrire ici, même geste
 # qu'`EnemyCatalog` pour unifier ennemis et boss sous un seul vocabulaire.
+#
+# `chest` (#230) : une table par clé de coffre de `items.yaml` (`kind: CHEST`) — même geste
+# qu'`adversary`, le coffre choisi *est* la condition. Une table de coffre ne peut pas
+# contenir de coffre : refusé au chargement par `App\Rewards\Domain\LootTables`, voir son
+# docblock — un coffre s'achète à la boutique, il ne tombe jamais d'un tirage.
 #
 # ————— Chaque table ————————————————————————————————————————————————————————————————————
 #
@@ -160,3 +165,19 @@ adversary:
           - { item: CROWN_OF_THE_TIRELESS, weight: 35 }
           - { item: OBSIDIAN_WARBLADE, weight: 20 }
           - { item: STORMCALLERS_BOOTS, weight: 20 }
+
+chest:
+    - key: WOODEN_CHEST
+      coins: { minimum: 10, maximum: 25 }
+      entries:
+          - { weight: 55 }
+          - { item: WORN_RUNNING_SHOES, weight: 25 }
+          - { item: IRON_GAUNTLETS, weight: 20 }
+
+    - key: IRON_BOUND_CHEST
+      coins: { minimum: 40, maximum: 90 }
+      entries:
+          - { weight: 40 }
+          - { item: TEMPERED_HEADBAND, weight: 20 }
+          - { item: SWIFT_TRAIL_LEGGINGS, weight: 20 }
+          - { item: EMBER_OF_THE_ANCESTORS, weight: 20 }

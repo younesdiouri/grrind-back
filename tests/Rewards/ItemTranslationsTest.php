@@ -50,7 +50,7 @@ final class ItemTranslationsTest extends KernelTestCase
         $items = self::getContainer()->getParameter('game.items.items');
         self::assertIsArray($items);
 
-        /** @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */
         return new ItemCatalog($items);
     }
 }

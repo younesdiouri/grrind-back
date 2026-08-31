@@ -828,6 +828,39 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  '/api/inventory/chests/{key}/open':
+    post:
+      tags:
+        - Récompenses
+      operationId: post_rewards_inventory_open_chest
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+        -
+          name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: 'Le coffre est ouvert : les objets tombés, les pièces, le solde avant et après. Le contenu ne se révèle jamais avant cet appel.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChestOpen'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: "Coffre inconnu ou non possédé (`item-not-owned`), ou objet possédé qui n'est pas un coffre (`item-not-a-chest`)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   /api/inventory/coins:
     get:
       tags:
@@ -1113,6 +1146,7 @@ components:
             - 'https://grrind.app/problems/item-not-purchasable'
             - 'https://grrind.app/problems/item-already-owned'
             - 'https://grrind.app/problems/shop-level-too-low'
+            - 'https://grrind.app/problems/item-not-a-chest'
         title:
           type: string
           example: Conflict
@@ -1930,9 +1964,10 @@ components:
               $ref: '#/components/schemas/Discipline'
       type: object
     DroppedItem:
-      description: "Un objet tombé d'un tirage (#226), de quoi l'afficher **sans requête\nsupplémentaire** — même geste qu'un titre dans `PlayerTitle`.\n"
+      description: "Un objet tombé d'un tirage (#226), de quoi l'afficher **sans requête\nsupplémentaire** — même geste qu'un titre dans `PlayerTitle`.\n\n`slot` est nullable depuis le #230 : un coffre n'a pas d'emplacement.\nUn objet qui tombe d'un tirage — séance ou combat — en porte en\nrevanche toujours un, un coffre ne tombant jamais d'un tirage.\n\n`kind` distingue un équipement d'un coffre explicitement (#230) :\n`slot === null` suffisait tant que le coffre était le seul objet sans\nemplacement, mais c'était une déduction à écrire côté client plutôt\nqu'une donnée du contrat — elle se serait tue en silence au premier\nobjet non équipable de plus.\n"
       required:
         - key
+        - kind
         - name
         - rarity
         - slot
@@ -1943,6 +1978,12 @@ components:
           description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire."
           type: string
           example: WORN_RUNNING_SHOES
+        kind:
+          description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
+          type: string
+          enum:
+            - EQUIPMENT
+            - CHEST
         name:
           description: 'Déjà traduit dans la langue du joueur — rien à recharger côté client.'
           type: string
@@ -1956,7 +1997,9 @@ components:
             - EPIC
             - LEGENDARY
         slot:
+          description: "`null` pour un coffre (#230) — il ne se porte pas, il s'ouvre."
           type: string
+          nullable: true
           enum:
             - HEAD
             - CHEST
@@ -2111,6 +2154,29 @@ components:
         coinsAfter:
           type: integer
           example: 90
+      type: object
+    ChestOpen:
+      description: "`POST /api/inventory/chests/{key}/open` (#230) : ce que le coffre ouvert a\nrendu — même forme qu'un drop de séance ou de combat, parce que c'en est un.\nLe contenu ne se révèle jamais avant cet appel : ni `GET /api/inventory` ni\n`GET /api/shop` ne rendent la table qui l'alimente.\n"
+      required:
+        - items
+        - coins
+        - coinsBefore
+        - coinsAfter
+      properties:
+        items:
+          description: 'Vide le plus souvent — un tirage bredouille est un résultat à part entière.'
+          type: array
+          items:
+            $ref: '#/components/schemas/DroppedItem'
+        coins:
+          type: integer
+          example: 15
+        coinsBefore:
+          type: integer
+          example: 90
+        coinsAfter:
+          type: integer
+          example: 105
       type: object
     CoinTransaction:
       description: "Une écriture au ledger de pièces (#30) — le pendant, en beaucoup plus simple, de\n`XpTransaction` : `amount` **est** l'écriture, il n'y a ni breakdown ni répartition\nà recomposer.\n"

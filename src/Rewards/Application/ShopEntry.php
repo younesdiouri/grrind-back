@@ -16,7 +16,11 @@ final readonly class ShopEntry
         public Item $item,
         /** Le solde actuel du joueur couvre `$item->priceCoins`. */
         public bool $affordable,
-        /** Déjà possédé — l'achat serait refusé (`item-already-owned`), voir {@see Inventory::purchase()}. */
+        /**
+         * Déjà possédé — un `EQUIPMENT` verrait son achat refusé (`item-already-owned`), voir
+         * {@see Inventory::purchase()}. Un coffre reste achetable même à `true` (#230) : il
+         * s'empile, cette clé n'y est qu'informative.
+         */
         public bool $owned,
         /** Le joueur a atteint `$item->shopMinimumLevel`. */
         public bool $unlocked,

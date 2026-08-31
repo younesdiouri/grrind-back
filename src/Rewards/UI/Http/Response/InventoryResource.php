@@ -38,6 +38,11 @@ use LogicException;
  * {@see \App\Rewards\Application\CoinLedger::balanceOf()} au moment de la requête. Voir le
  * docblock de la classe pour pourquoi cet écran est autant celui de la bourse que celui du
  * sac.
+ *
+ * **`slot` peut être `null` depuis le #230** : un coffre possédé apparaît dans `items`
+ * comme n'importe quel objet, `slot` nul plutôt qu'absent — voir le docblock de
+ * {@see DroppedItem}. Il ne figure jamais dans `equipment` : rien ne l'y équipe, voir
+ * {@see \App\Rewards\Application\EquipItemHandler}.
  */
 final readonly class InventoryResource
 {
@@ -94,9 +99,10 @@ final readonly class InventoryResource
 
         $dropped = new DroppedItem(
             $item->key,
+            $item->kind->value,
             $translator->nameOf($item->key),
             $item->rarity->value,
-            $item->slot->value,
+            $item->slot?->value,
             array_map(
                 static fn (ItemModifier $modifier): DroppedItemModifier => new DroppedItemModifier(
                     $modifier->type->value,

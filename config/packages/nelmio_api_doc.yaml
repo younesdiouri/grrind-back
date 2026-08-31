@@ -271,6 +271,12 @@ when@dev:
                                     - https://grrind.app/problems/item-not-purchasable
                                     - https://grrind.app/problems/item-already-owned
                                     - https://grrind.app/problems/shop-level-too-low
+                                    # Les coffres (#230). `item-not-owned` est déjà listé
+                                    # ci-dessus — un coffre inconnu ou non possédé le porte tel
+                                    # quel, même refus que pour l'équipement. `item-not-a-chest`
+                                    # est le sien propre : l'objet existe et peut même être
+                                    # possédé, ce n'est simplement pas un coffre.
+                                    - https://grrind.app/problems/item-not-a-chest
                             title: { type: string, example: Conflict }
                             status: { type: integer, example: 409 }
                             detail: { type: string }
@@ -1022,16 +1028,32 @@ when@dev:
                         description: |
                             Un objet tombé d'un tirage (#226), de quoi l'afficher **sans requête
                             supplémentaire** — même geste qu'un titre dans `PlayerTitle`.
-                        required: [key, name, rarity, slot, modifiers, priceCoins]
+
+                            `slot` est nullable depuis le #230 : un coffre n'a pas d'emplacement.
+                            Un objet qui tombe d'un tirage — séance ou combat — en porte en
+                            revanche toujours un, un coffre ne tombant jamais d'un tirage.
+
+                            `kind` distingue un équipement d'un coffre explicitement (#230) :
+                            `slot === null` suffisait tant que le coffre était le seul objet sans
+                            emplacement, mais c'était une déduction à écrire côté client plutôt
+                            qu'une donnée du contrat — elle se serait tue en silence au premier
+                            objet non équipable de plus.
+                        required: [key, kind, name, rarity, slot, modifiers, priceCoins]
                         properties:
                             key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
+                            kind:
+                                type: string
+                                enum: [EQUIPMENT, CHEST]
+                                description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
                             name: { type: string, example: "Chaussures de course usées", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
                             rarity:
                                 type: string
                                 enum: [COMMON, UNCOMMON, RARE, EPIC, LEGENDARY]
                             slot:
                                 type: string
+                                nullable: true
                                 enum: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                                description: "`null` pour un coffre (#230) — il ne se porte pas, il s'ouvre."
                             modifiers:
                                 type: array
                                 description: "Dans l'ordre du catalogue."
@@ -1126,6 +1148,23 @@ when@dev:
                             spentCoins: { type: integer, example: 30 }
                             coinsBefore: { type: integer, example: 120 }
                             coinsAfter: { type: integer, example: 90 }
+
+                    ChestOpen:
+                        type: object
+                        description: |
+                            `POST /api/inventory/chests/{key}/open` (#230) : ce que le coffre ouvert a
+                            rendu — même forme qu'un drop de séance ou de combat, parce que c'en est un.
+                            Le contenu ne se révèle jamais avant cet appel : ni `GET /api/inventory` ni
+                            `GET /api/shop` ne rendent la table qui l'alimente.
+                        required: [items, coins, coinsBefore, coinsAfter]
+                        properties:
+                            items:
+                                type: array
+                                description: "Vide le plus souvent — un tirage bredouille est un résultat à part entière."
+                                items: { $ref: '#/components/schemas/DroppedItem' }
+                            coins: { type: integer, example: 15 }
+                            coinsBefore: { type: integer, example: 90 }
+                            coinsAfter: { type: integer, example: 105 }
 
                     CoinTransaction:
                         type: object
