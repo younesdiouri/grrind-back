@@ -57,9 +57,9 @@ final class ImportTransactionTest extends ApiTestCase
         $bob = $this->openAccount();
 
         $this->import($bob, [
-            self::candidate(externalId: 'HK-1', startedAt: '2026-08-03T07:00:00+00:00', durationSeconds: 1800),
-            self::candidate(externalId: 'HK-2', startedAt: '2026-08-04T07:00:00+00:00', durationSeconds: 1800),
-            self::candidate(externalId: 'HK-3', startedAt: '2026-08-05T07:00:00+00:00', durationSeconds: 1800),
+            self::candidate(externalId: 'HK-1', startedAt: self::daysAgo(7)->format(DateTimeInterface::ATOM), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-2', startedAt: self::daysAgo(6)->format(DateTimeInterface::ATOM), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-3', startedAt: self::daysAgo(5)->format(DateTimeInterface::ATOM), durationSeconds: 1800),
         ]);
 
         // Trois journées distinctes, donc aucun rendement décroissant : 30 chacune.
@@ -89,8 +89,8 @@ final class ImportTransactionTest extends ApiTestCase
         );
 
         $this->import($bob, [
-            self::candidate(externalId: 'HK-AVANT', startedAt: self::atSevenOClock('-10 days'), durationSeconds: 1800),
-            self::candidate(externalId: 'HK-APRES', startedAt: self::atSevenOClock('-1 day'), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-AVANT', startedAt: self::daysAgo(10)->format(DateTimeInterface::ATOM), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-APRES', startedAt: self::daysAgo(1)->format(DateTimeInterface::ATOM), durationSeconds: 1800),
         ]);
 
         // Deux journées distinctes, donc aucun rendement décroissant : 30 chacune, et
@@ -113,8 +113,8 @@ final class ImportTransactionTest extends ApiTestCase
         );
 
         $body = self::decode($this->import($bob, [
-            self::candidate(externalId: 'HK-AVANT', startedAt: self::atSevenOClock('-10 days'), durationSeconds: 1800),
-            self::candidate(externalId: 'HK-APRES', startedAt: self::atSevenOClock('-1 day'), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-AVANT', startedAt: self::daysAgo(10)->format(DateTimeInterface::ATOM), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-APRES', startedAt: self::daysAgo(1)->format(DateTimeInterface::ATOM), durationSeconds: 1800),
         ]));
 
         self::assertIsArray($body['imported']);
@@ -142,9 +142,9 @@ final class ImportTransactionTest extends ApiTestCase
         $bob = $this->openAccount();
 
         $this->import($bob, [
-            self::candidate(externalId: 'HK-MATIN', startedAt: '2026-08-05T06:00:00+00:00', durationSeconds: 3600),
-            self::candidate(externalId: 'HK-MIDI', startedAt: '2026-08-05T12:00:00+00:00', durationSeconds: 1800),
-            self::candidate(externalId: 'HK-SOIR', startedAt: '2026-08-05T18:00:00+00:00', durationSeconds: 1800),
+            self::candidate(externalId: 'HK-MATIN', startedAt: self::daysAgo(5, '06:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 3600),
+            self::candidate(externalId: 'HK-MIDI', startedAt: self::daysAgo(5, '12:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 1800),
+            self::candidate(externalId: 'HK-SOIR', startedAt: self::daysAgo(5, '18:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 1800),
         ]);
 
         // 60 sur la première heure, puis 18 et 9 sur les deux demi-heures des tranches
@@ -162,8 +162,8 @@ final class ImportTransactionTest extends ApiTestCase
         $bob = $this->openAccount();
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
 
-        $matin = self::candidate(externalId: 'HK-MATIN', startedAt: '2026-08-05T06:00:00+00:00', durationSeconds: 3600);
-        $soir = self::candidate(externalId: 'HK-SOIR', startedAt: '2026-08-05T18:00:00+00:00', durationSeconds: 1800);
+        $matin = self::candidate(externalId: 'HK-MATIN', startedAt: self::daysAgo(5, '06:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 3600);
+        $soir = self::candidate(externalId: 'HK-SOIR', startedAt: self::daysAgo(5, '18:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 1800);
 
         $this->import($bob, [$matin, $soir]);
         $this->import($alice, [$soir, $matin]);
@@ -181,9 +181,15 @@ final class ImportTransactionTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
+        // Capturées une fois : la journée attendue plus bas doit décrire exactement ce
+        // qu'on vient d'envoyer, pas un second appel à `daysAgo()` qui pourrait tomber de
+        // l'autre côté d'un minuit si le test s'exécutait à cheval sur deux jours.
+        $lundi = self::daysAgo(7);
+        $mardi = self::daysAgo(6);
+
         $this->import($bob, [
-            self::candidate(externalId: 'HK-LUNDI', startedAt: '2026-08-03T07:00:00+00:00', durationSeconds: 3600),
-            self::candidate(externalId: 'HK-MARDI', startedAt: '2026-08-04T07:00:00+00:00', durationSeconds: 3600),
+            self::candidate(externalId: 'HK-LUNDI', startedAt: $lundi->format(DateTimeInterface::ATOM), durationSeconds: 3600),
+            self::candidate(externalId: 'HK-MARDI', startedAt: $mardi->format(DateTimeInterface::ATOM), durationSeconds: 3600),
         ]);
 
         // Deux heures pleines à 60, sur deux journées : aucun rendement décroissant. Sur
@@ -194,7 +200,7 @@ final class ImportTransactionTest extends ApiTestCase
             "SELECT to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') FROM xp_transaction ORDER BY occurred_at",
         );
 
-        self::assertSame(['2026-08-03', '2026-08-04'], $days);
+        self::assertSame([$lundi->format('Y-m-d'), $mardi->format('Y-m-d')], $days);
     }
 
     /**
@@ -214,8 +220,8 @@ final class ImportTransactionTest extends ApiTestCase
         ProgrammableModifiers::failAfter(2);
 
         $response = $this->import($bob, [
-            self::candidate(externalId: 'HK-AVANT', startedAt: '2026-08-03T07:00:00+00:00'),
-            self::candidate(externalId: 'HK-APRES', startedAt: '2026-08-04T07:00:00+00:00'),
+            self::candidate(externalId: 'HK-AVANT', startedAt: self::daysAgo(7)->format(DateTimeInterface::ATOM)),
+            self::candidate(externalId: 'HK-APRES', startedAt: self::daysAgo(6)->format(DateTimeInterface::ATOM)),
         ]);
 
         self::assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
@@ -242,9 +248,9 @@ final class ImportTransactionTest extends ApiTestCase
         $bob = $this->openAccount();
 
         $this->import($bob, [
-            self::candidate(externalId: 'HK-1', startedAt: '2026-08-03T07:00:00+00:00'),
-            self::candidate(externalId: 'HK-2', startedAt: '2026-08-04T07:00:00+00:00'),
-            self::candidate(externalId: 'HK-CURLING', activityType: 'curling', startedAt: '2026-08-05T07:00:00+00:00'),
+            self::candidate(externalId: 'HK-1', startedAt: self::daysAgo(7)->format(DateTimeInterface::ATOM)),
+            self::candidate(externalId: 'HK-2', startedAt: self::daysAgo(6)->format(DateTimeInterface::ATOM)),
+            self::candidate(externalId: 'HK-CURLING', activityType: 'curling', startedAt: self::daysAgo(5)->format(DateTimeInterface::ATOM)),
         ]);
 
         self::assertSame(4, $this->outboxSize());
@@ -287,16 +293,6 @@ final class ImportTransactionTest extends ApiTestCase
     }
 
     /**
-     * Une date relative à l'exécution, posée à 7h. Les autres suites datent en dur, ce
-     * qu'elles peuvent se permettre ; celles du #190 comparent une séance à une fenêtre
-     * ouverte « il y a trois jours », donc leurs deux bornes doivent glisser ensemble.
-     */
-    private static function atSevenOClock(string $modifier): string
-    {
-        return new DateTimeImmutable($modifier)->setTime(7, 0)->format(DateTimeInterface::ATOM);
-    }
-
-    /**
      * @param mixed $imported une entrée de `imported`, telle que la réponse la rend
      *
      * @return list<string>
@@ -336,9 +332,13 @@ final class ImportTransactionTest extends ApiTestCase
     private static function candidate(
         string $externalId = 'HK-001',
         string $activityType = 'running',
-        string $startedAt = '2026-08-05T07:00:00+00:00',
+        ?string $startedAt = null,
         int $durationSeconds = 1800,
     ): array {
+        // Daté relativement à l'instant du test plutôt qu'en dur (#243) — voir le
+        // docblock de `Workouts::daysAgo()`.
+        $startedAt ??= self::daysAgo(5)->format(DateTimeInterface::ATOM);
+
         return [
             'externalId' => $externalId,
             'source' => 'APPLE_HEALTH',

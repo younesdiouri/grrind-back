@@ -153,8 +153,9 @@ final class ImportLootTest extends ApiTestCase
         }
 
         // La séance testée, 60 minutes — au-dessus du seuil de `TRAINED_SESSION_DROP`
-        // (45 minutes, niveau 5).
-        $body = self::decode($this->import($bob, [self::candidate(startedAt: '2026-08-11T07:00:00+00:00', endedAt: '2026-08-11T08:00:00+00:00')]));
+        // (45 minutes, niveau 5), et un jour distinct des quatre crédits ci-dessus.
+        $start = self::daysAgo(5);
+        $body = self::decode($this->import($bob, [self::candidate(startedAt: $start->format(DateTimeInterface::ATOM), endedAt: $start->modify('+60 minutes')->format(DateTimeInterface::ATOM))]));
 
         self::assertIsArray($body['imported']);
         $level = $body['imported'][0];
@@ -187,8 +188,10 @@ final class ImportLootTest extends ApiTestCase
         $bob = $this->openAccount();
         $alice = $this->openAccount('alice@grrind.app', 'Alice');
 
-        $matin = self::candidate(externalId: 'HK-MATIN', startedAt: '2026-08-05T06:00:00+00:00', endedAt: '2026-08-05T06:45:00+00:00');
-        $soir = self::candidate(externalId: 'HK-SOIR', startedAt: '2026-08-05T18:00:00+00:00', endedAt: '2026-08-05T18:45:00+00:00');
+        $matinAt = self::daysAgo(5, '06:00:00');
+        $soirAt = self::daysAgo(5, '18:00:00');
+        $matin = self::candidate(externalId: 'HK-MATIN', startedAt: $matinAt->format(DateTimeInterface::ATOM), endedAt: $matinAt->modify('+45 minutes')->format(DateTimeInterface::ATOM));
+        $soir = self::candidate(externalId: 'HK-SOIR', startedAt: $soirAt->format(DateTimeInterface::ATOM), endedAt: $soirAt->modify('+45 minutes')->format(DateTimeInterface::ATOM));
 
         $this->import($bob, [$matin, $soir]);
         $this->import($alice, [$soir, $matin]);
@@ -241,10 +244,13 @@ final class ImportLootTest extends ApiTestCase
     private static function candidate(
         string $externalId = 'HK-001',
         string $activityType = 'running',
-        string $startedAt = '2026-08-11T07:00:00+00:00',
+        ?string $startedAt = null,
         ?string $endedAt = null,
         int $durationSeconds = 2700,
     ): array {
+        // Daté relativement à l'instant du test plutôt qu'en dur (#243) — voir le
+        // docblock de `Workouts::daysAgo()`.
+        $startedAt ??= self::daysAgo(5)->format(DateTimeInterface::ATOM);
         $endedAt ??= new DateTimeImmutable($startedAt)
             ->modify(\sprintf('+%d seconds', $durationSeconds))
             ->format(DateTimeInterface::ATOM);

@@ -47,9 +47,9 @@ final class WorkoutImportedEventTest extends ApiTestCase
         self::assertSame(0, $this->outboxSize());
 
         $response = $this->import($bob, [
-            self::candidate(externalId: 'HK-1', startedAt: '2026-08-03T07:00:00+00:00'),
-            self::candidate(externalId: 'HK-2', startedAt: '2026-08-04T07:00:00+00:00'),
-            self::candidate(externalId: 'HK-3', startedAt: '2026-08-05T07:00:00+00:00'),
+            self::candidate(externalId: 'HK-1', startedAt: self::daysAgo(7)->format(DateTimeInterface::ATOM)),
+            self::candidate(externalId: 'HK-2', startedAt: self::daysAgo(6)->format(DateTimeInterface::ATOM)),
+            self::candidate(externalId: 'HK-3', startedAt: self::daysAgo(5)->format(DateTimeInterface::ATOM)),
         ]);
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
@@ -69,7 +69,7 @@ final class WorkoutImportedEventTest extends ApiTestCase
     public function testTheEventCarriesTheWholeFact(): void
     {
         $bob = $this->openAccount();
-        $this->import($bob, [self::candidate(activityType: 'cycling', startedAt: '2026-08-05T07:00:00+00:00')]);
+        $this->import($bob, [self::candidate(activityType: 'cycling', startedAt: self::daysAgo(5)->format(DateTimeInterface::ATOM))]);
 
         $this->consumeTheOutbox();
         self::assertCount(1, WorkoutImportedSpy::$received);
@@ -92,12 +92,15 @@ final class WorkoutImportedEventTest extends ApiTestCase
     public function testTheEventIsDatedByTheSportAndNotByTheImport(): void
     {
         $bob = $this->openAccount();
-        $this->import($bob, [self::candidate(startedAt: '2026-08-01T06:30:00+00:00')]);
+        // Capturée une fois : c'est cette même valeur qu'on retrouve dans l'assertion, pas
+        // un second appel à `daysAgo()` qui pourrait tomber de l'autre côté d'un minuit.
+        $startedAt = self::daysAgo(10, '06:30:00');
+        $this->import($bob, [self::candidate(startedAt: $startedAt->format(DateTimeInterface::ATOM))]);
 
         $this->consumeTheOutbox();
         $event = WorkoutImportedSpy::$received[0];
 
-        self::assertSame('2026-08-01T06:30:00+00:00', $event->occurredAt()->format(DateTimeInterface::ATOM));
+        self::assertSame($startedAt->format(DateTimeInterface::ATOM), $event->occurredAt()->format(DateTimeInterface::ATOM));
         self::assertEquals($event->startedAt, $event->occurredAt());
     }
 
@@ -226,8 +229,12 @@ final class WorkoutImportedEventTest extends ApiTestCase
     private static function candidate(
         string $externalId = 'HK-001',
         string $activityType = 'running',
-        string $startedAt = '2026-08-05T07:00:00+00:00',
+        ?string $startedAt = null,
     ): array {
+        // Daté relativement à l'instant du test plutôt qu'en dur (#243) — voir le
+        // docblock de `Workouts::daysAgo()`.
+        $startedAt ??= self::daysAgo(5)->format(DateTimeInterface::ATOM);
+
         return [
             'externalId' => $externalId,
             'source' => 'APPLE_HEALTH',

@@ -8,6 +8,8 @@ use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\Workouts;
+use DateTimeImmutable;
+use DateTimeInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -53,9 +55,10 @@ final class ImportWorkoutsTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
+        $start = self::daysAgo(5);
         $response = $this->import($bob, [self::candidate(
-            startedAt: '2026-08-11T07:00:00+00:00',
-            endedAt: '2026-08-11T07:45:00+00:00',
+            startedAt: $start->format(DateTimeInterface::ATOM),
+            endedAt: $start->modify('+45 minutes')->format(DateTimeInterface::ATOM),
         )]);
 
         $body = self::decode($response);
@@ -151,13 +154,15 @@ final class ImportWorkoutsTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
+        $matin = self::daysAgo(5);
+        $soir = self::daysAgo(5, '18:00:00');
         $response = $this->import($bob, [
-            self::candidate(startedAt: '2026-08-11T07:00:00+00:00', endedAt: '2026-08-11T07:45:00+00:00'),
+            self::candidate(startedAt: $matin->format(DateTimeInterface::ATOM), endedAt: $matin->modify('+45 minutes')->format(DateTimeInterface::ATOM)),
             self::candidate(
                 source: 'HEALTH_CONNECT',
                 activityType: 'EXERCISE_TYPE_RUNNING',
-                startedAt: '2026-08-11T18:00:00+00:00',
-                endedAt: '2026-08-11T18:45:00+00:00',
+                startedAt: $soir->format(DateTimeInterface::ATOM),
+                endedAt: $soir->modify('+45 minutes')->format(DateTimeInterface::ATOM),
             ),
         ]);
 
@@ -345,19 +350,23 @@ final class ImportWorkoutsTest extends ApiTestCase
         string $externalId = 'HK-001',
         string $source = 'APPLE_HEALTH',
         string $activityType = 'running',
-        string $startedAt = '2026-08-11T07:02:13+00:00',
-        string $endedAt = '2026-08-11T07:47:55+00:00',
+        ?string $startedAt = null,
+        ?string $endedAt = null,
         ?int $distanceMeters = null,
         ?int $calories = null,
         ?int $elevationGainMeters = null,
         ?int $averageHeartRate = null,
     ): array {
+        // Daté relativement à l'instant du test plutôt qu'en dur (#243) — voir le
+        // docblock de `Workouts::daysAgo()`.
+        $start = null !== $startedAt ? new DateTimeImmutable($startedAt) : self::daysAgo(5);
+
         return [
             'externalId' => $externalId,
             'source' => $source,
             'activityType' => $activityType,
-            'startedAt' => $startedAt,
-            'endedAt' => $endedAt,
+            'startedAt' => $start->format(DateTimeInterface::ATOM),
+            'endedAt' => $endedAt ?? $start->modify('+45 minutes')->format(DateTimeInterface::ATOM),
             'distanceMeters' => $distanceMeters,
             'calories' => $calories,
             'elevationGainMeters' => $elevationGainMeters,
