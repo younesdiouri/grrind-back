@@ -14,11 +14,14 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminRoute;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\CrudDto;
 use EasyCorp\Bundle\EasyAdminBundle\Exception\EntityRemoveException;
 use InvalidArgumentException;
 use LogicException;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
@@ -37,6 +40,50 @@ abstract class GameCrudController extends AbstractCrudController
     public function configureCrud(Crud $crud): Crud
     {
         return $crud->setPaginatorPageSize(30);
+    }
+
+    /** @param AdminContext<object> $context */
+    public function new(AdminContext $context): KeyValueStore|Response
+    {
+        try {
+            return parent::new($context);
+        } catch (BadRequestHttpException $exception) {
+            $crud = $context->getCrud();
+            \assert($crud instanceof CrudDto);
+            $form = $this->createNewForm($context->getEntity(), $crud->getNewFormOptions(), $context);
+            $form->handleRequest($context->getRequest());
+            $form->addError(new FormError($exception->getMessage()));
+            $this->addFlash('danger', $exception->getMessage());
+
+            return $this->configureResponseParameters(KeyValueStore::new([
+                'pageName' => Crud::PAGE_NEW,
+                'templateName' => 'crud/new',
+                'entity' => $context->getEntity(),
+                'new_form' => $form,
+            ]));
+        }
+    }
+
+    /** @param AdminContext<object> $context */
+    public function edit(AdminContext $context): KeyValueStore|Response
+    {
+        try {
+            return parent::edit($context);
+        } catch (BadRequestHttpException $exception) {
+            $crud = $context->getCrud();
+            \assert($crud instanceof CrudDto);
+            $form = $this->createEditForm($context->getEntity(), $crud->getEditFormOptions(), $context);
+            $form->handleRequest($context->getRequest());
+            $form->addError(new FormError($exception->getMessage()));
+            $this->addFlash('danger', $exception->getMessage());
+
+            return $this->configureResponseParameters(KeyValueStore::new([
+                'pageName' => Crud::PAGE_EDIT,
+                'templateName' => 'crud/edit',
+                'edit_form' => $form,
+                'entity' => $context->getEntity(),
+            ]));
+        }
     }
 
     public function persistEntity(EntityManagerInterface $entityManager, object $entityInstance): void

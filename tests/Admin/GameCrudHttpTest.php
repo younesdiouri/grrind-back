@@ -7,6 +7,7 @@ namespace App\Tests\Admin;
 use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLootTable;
+use App\Admin\Domain\GameRuleset;
 use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
 use App\Admin\Infrastructure\GameRulesetPublisher;
@@ -334,6 +335,35 @@ final class GameCrudHttpTest extends ApiTestCase
         } finally {
             unlink($path);
         }
+    }
+
+    public function testInvalidPublishedCandidateIsRenderedBackIntoItsAdminForm(): void
+    {
+        $this->loginAdmin('form-error-admin@grrind.app');
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+        $item = $manager->getRepository(GameItem::class)->findOneBy([]);
+        $ruleset = $manager->find(GameRuleset::class, 1);
+        self::assertInstanceOf(GameItem::class, $item);
+        self::assertInstanceOf(GameRuleset::class, $ruleset);
+        $price = $item->getPriceCoins();
+        $revision = $ruleset->revision();
+
+        $crawler = $this->client->request('GET', '/admin/item/'.$item->getId()->toRfc4122().'/edit');
+        $form = $crawler->filter('form[name="GameItem"]')->form();
+        $form->setValues(['GameItem[priceCoins]' => '-1']);
+        $crawler = $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertStringContainsString('le prix en pièces ne peut pas être négatif', $crawler->text());
+        self::assertSame('-1', $crawler->filter('input[name="GameItem[priceCoins]"]')->attr('value'));
+        $manager->clear();
+        $stored = $manager->find(GameItem::class, $item->getId());
+        $published = $manager->find(GameRuleset::class, 1);
+        self::assertInstanceOf(GameItem::class, $stored);
+        self::assertInstanceOf(GameRuleset::class, $published);
+        self::assertSame($price, $stored->getPriceCoins());
+        self::assertSame($revision, $published->revision());
     }
 
     private function delete(string $editUrl, string $deleteUrl): void
