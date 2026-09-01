@@ -1552,7 +1552,7 @@ components:
             -
               $ref: '#/components/schemas/PlayerTitle'
         notificationPreferences:
-          description: "Toutes les catégories connues, jamais seulement celles coupées (#132) — le\nclient lit l'état exact de chacune plutôt que de connaître le défaut. Clé =\nvaleur de `NotificationCategory`, valeur = activée.\n"
+          description: "Toutes les catégories vivantes, jamais seulement celles coupées (#255) — le\nclient lit l'état exact de chacune plutôt que de connaître le défaut. Clé =\nvaleur de `NotificationCategory`, valeur = activée. `SESSION_CREDITED` reste\naccepté au PATCH pour les écrans chargés avant le déploiement, mais est masqué\nici jusqu'à son retrait définitif.\n"
           type: object
           example:
             GUILD_ACTIVITY: true

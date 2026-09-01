@@ -23,11 +23,10 @@ final class MeTest extends ApiTestCase
         self::assertSame(self::EMAIL, $body['email']);
         self::assertSame('Bob', $body['displayName']);
         self::assertSame('Europe/Paris', $body['timezone']);
-        // Toutes activées à l'inscription (#132), et la liste grandit avec le catalogue :
-        // `UserResource` itère sur `NotificationCategory`, donc une catégorie ajoutée
-        // apparaît ici sans qu'on y touche — et c'est ce test qui le rappelle.
+        // Seules les catégories vivantes sont rendues : SESSION_CREDITED reste une valeur de
+        // PATCH pendant le rollout #255, mais ne laisse plus un interrupteur mort au client.
         self::assertSame(
-            ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true, 'SESSION_CREDITED' => true],
+            ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
             $body['notificationPreferences'],
             'Le défaut à l\'inscription est activé (#132).',
         );
@@ -109,7 +108,7 @@ final class MeTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
         self::assertSame(
-            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true, 'SESSION_CREDITED' => true],
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
             self::decode($response)['notificationPreferences'],
         );
     }
@@ -129,7 +128,7 @@ final class MeTest extends ApiTestCase
         $this->send('PATCH', '/api/me', ['displayName' => 'Bobby'], $headers);
 
         self::assertSame(
-            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true, 'SESSION_CREDITED' => true],
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
             self::decode($this->get('/api/me', $headers))['notificationPreferences'],
         );
     }
@@ -145,7 +144,7 @@ final class MeTest extends ApiTestCase
         ], $headers);
 
         self::assertSame(
-            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true, 'SESSION_CREDITED' => true],
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
             self::decode($this->get('/api/me', $headers))['notificationPreferences'],
         );
     }
@@ -159,6 +158,21 @@ final class MeTest extends ApiTestCase
         ], $this->authenticated());
 
         self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    }
+
+    public function testAcceptsTheHiddenSessionCreditedPreferenceFromAStaleScreen(): void
+    {
+        $response = $this->send('PATCH', '/api/me', [
+            'notificationPreferences' => [
+                ['category' => 'SESSION_CREDITED', 'enabled' => false],
+            ],
+        ], $this->authenticated());
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+        self::assertSame(
+            ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            self::decode($response)['notificationPreferences'],
+        );
     }
 
     /**

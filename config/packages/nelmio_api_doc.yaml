@@ -633,9 +633,11 @@ when@dev:
                             notificationPreferences:
                                 type: object
                                 description: |
-                                    Toutes les catégories connues, jamais seulement celles coupées (#132) — le
+                                    Toutes les catégories vivantes, jamais seulement celles coupées (#255) — le
                                     client lit l'état exact de chacune plutôt que de connaître le défaut. Clé =
-                                    valeur de `NotificationCategory`, valeur = activée.
+                                    valeur de `NotificationCategory`, valeur = activée. `SESSION_CREDITED` reste
+                                    accepté au PATCH pour les écrans chargés avant le déploiement, mais est masqué
+                                    ici jusqu'à son retrait définitif.
                                 additionalProperties: { type: boolean }
                                 example: { GUILD_ACTIVITY: true }
 

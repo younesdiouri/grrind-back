@@ -14,12 +14,9 @@ use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le pendant, pour l'auteur lui-même, de
- * {@see \App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository} (#252) : même
- * geste d'agrégation par fenêtre, même garde-fou contre une fenêtre abandonnée — voir son
- * docblock pour le détail de chaque décision, reproduites ici à l'identique parce que la
- * raison ne change pas d'un mot en passant du destinataire « guilde » au destinataire
- * « auteur ».
+ * Repository tombstone #255. Il est conservé avec son mapping afin que
+ * {@see \App\Shared\Application\AnnounceSessionCreditHandler} puisse refermer les fenêtres
+ * créées avant le déploiement ; aucun chemin nominal n'appelle plus `recordSession()`.
  *
  * @extends ServiceEntityRepository<PendingSessionCredit>
  */
@@ -39,13 +36,8 @@ class PendingSessionCreditRepository extends ServiceEntityRepository
     }
 
     /**
-     * Enregistre une séance créditée dans la fenêtre en attente de son auteur, et rend
-     * l'identifiant de **la fenêtre** quand une notification doit être programmée pour elle
-     * — c'est cette réponse qui décide, pour
-     * {@see \App\Shared\Application\SessionCreditedNotifier}, s'il faut dispatcher
-     * `AnnounceSessionCredit` (avec ce `windowId`) ou laisser une notification déjà en vol
-     * s'en charger. `null` si la séance a rejoint une fenêtre déjà ouverte et encore
-     * fraîche.
+     * Vestige de l'ancien producteur #252, gardé avec le repository pendant le rollout pour
+     * ne pas contracter l'entité ou son API avant #256. Aucun chemin nominal ne l'appelle.
      *
      * `INSERT ... ON CONFLICT DO NOTHING`, même geste que
      * `PendingGuildActivityRepository::recordSession()` — voir son docblock pour pourquoi le
@@ -100,9 +92,7 @@ class PendingSessionCreditRepository extends ServiceEntityRepository
 
     /**
      * La fenêtre en attente de ce joueur, si c'est encore **cette fenêtre-là** — `null`
-     * sinon, que la fenêtre ait déjà été refermée ({@see self::close()}) par une exécution
-     * précédente du même message, ou qu'une seconde fenêtre l'ait remplacée entre-temps
-     * (mode dégradé, voir {@see \App\Shared\Application\AnnounceSessionCredit}).
+     * sinon, que le tombeau l'ait déjà refermée ({@see self::close()}).
      *
      * Volontairement sans verrou, même remarque que
      * `PendingGuildActivityRepository::activityFor()` : cette lecture construit le contenu
@@ -120,9 +110,8 @@ class PendingSessionCreditRepository extends ServiceEntityRepository
     }
 
     /**
-     * Referme la fenêtre — appelée une fois que
-     * {@see \App\Shared\Application\AnnounceSessionCreditHandler} a fini d'essayer l'envoi,
-     * jamais avant : même geste que `PendingGuildActivityRepository::close()`.
+     * Referme idempotemment une fenêtre historique après son drainage par
+     * {@see \App\Shared\Application\AnnounceSessionCreditHandler}.
      */
     public function close(Uuid $playerId, Uuid $windowId): void
     {

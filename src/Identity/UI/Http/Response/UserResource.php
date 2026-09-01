@@ -67,9 +67,10 @@ final readonly class UserResource
     }
 
     /**
-     * Toutes les catégories, jamais seulement celles coupées : le client n'a pas à
-     * connaître le défaut (« activé ») pour afficher un interrupteur, il lit l'état
-     * exact de chacune.
+     * Toutes les catégories vivantes, jamais seulement celles coupées : le client n'a pas à
+     * connaître le défaut (« activé ») pour afficher un interrupteur, il lit l'état exact de
+     * chacune. SESSION_CREDITED reste acceptée au PATCH pendant le rollout #255 mais ne rend
+     * plus un interrupteur sans producteur.
      *
      * @return array<string, bool>
      */
@@ -78,6 +79,10 @@ final readonly class UserResource
         $preferences = [];
 
         foreach (NotificationCategory::cases() as $category) {
+            if (NotificationCategory::SessionCredited === $category) {
+                continue;
+            }
+
             $preferences[$category->value] = $user->notifiesOn($category);
         }
 
