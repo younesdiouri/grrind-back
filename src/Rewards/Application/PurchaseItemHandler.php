@@ -71,7 +71,7 @@ final readonly class PurchaseItemHandler
      */
     public function __invoke(PurchaseItem $command): PurchaseReceipt
     {
-        $item = $this->catalog->find($command->itemKey);
+        $item = $this->catalog->findAvailable($command->itemKey);
 
         if (null === $item || !$item->shopAvailable) {
             throw new ItemNotPurchasable($command->itemKey);

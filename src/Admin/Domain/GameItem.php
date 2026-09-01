@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Admin\Domain;
 
 use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\ORM\Mapping as ORM;
+use LogicException;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
@@ -14,6 +16,7 @@ use Symfony\Component\Uid\Uuid;
  * inventaires et les tirages audités les emploient comme identifiants historiques.
  */
 #[ORM\Entity]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'game_item')]
 #[ORM\UniqueConstraint(name: 'uniq_game_item_key', columns: ['item_key'])]
 class GameItem
@@ -185,7 +188,11 @@ class GameItem
 
     public function setImagePath(string $imagePath): void
     {
-        $this->imagePath = $imagePath;
+        // EasyAdmin soumet une chaîne vide quand on édite sans nouveau fichier : conserver
+        // l'URL publiée évite qu'un volume neuf transforme le placeholder en image cassée.
+        if ('' !== $imagePath) {
+            $this->imagePath = $imagePath;
+        }
     }
 
     /** @return array{fr: array{name: string}, en: array{name: string}} */
@@ -198,5 +205,13 @@ class GameItem
     public function setTranslations(array $translations): void
     {
         $this->translations = $translations;
+    }
+
+    #[ORM\PreUpdate]
+    public function refuseKeyRename(PreUpdateEventArgs $event): void
+    {
+        if ($event->hasChangedField('key')) {
+            throw new LogicException('La clé métier d’un item est immuable après sa création.');
+        }
     }
 }

@@ -17,6 +17,8 @@ primary_region = 'cdg'
   # Les images sont provisoirement locales : le volume est mono-machine et non répliqué.
   # Ne pas scaler `app` horizontalement avant la migration vers un stockage objet.
   GAME_IMAGES_DIR = '/data/game-images'
+  # Unique plage qui porte les headers déposés par fly-proxy dans le réseau privé.
+  TRUSTED_PROXIES = 'fdaa::/16,127.0.0.1,::1'
 
 [[mounts]]
   source = 'game_images'

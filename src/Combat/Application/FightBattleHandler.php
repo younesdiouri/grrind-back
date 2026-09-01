@@ -15,6 +15,7 @@ use App\Combat\Infrastructure\Doctrine\BattleRepository;
 use App\Shared\Application\BattleDrop;
 use App\Shared\Application\BattleDrops;
 use App\Shared\Application\DroppedItem;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerProgressions;
 use Psr\Clock\ClockInterface;
 use Random\Engine\Xoshiro256StarStar;
@@ -102,7 +103,7 @@ final readonly class FightBattleHandler
         private BattleSimulator $simulator,
         private BattleRepository $battles,
         private BattleDrops $drops,
-        private string $rulesetVersion,
+        private string|GameRulesets $rulesetVersion,
         private ClockInterface $clock,
     ) {
     }
@@ -164,7 +165,7 @@ final readonly class FightBattleHandler
                 $outcome,
                 self::rewardToArray($drop),
                 $seed,
-                $this->rulesetVersion,
+                $this->version(),
                 $now,
             );
 
@@ -173,6 +174,11 @@ final readonly class FightBattleHandler
 
             return $battle;
         });
+    }
+
+    private function version(): string
+    {
+        return \is_string($this->rulesetVersion) ? $this->rulesetVersion : $this->rulesetVersion->version();
     }
 
     /**
@@ -184,7 +190,7 @@ final readonly class FightBattleHandler
      */
     private function chosen(string $key, int $playerLevel): Enemy
     {
-        $enemy = $this->enemies->find($key) ?? $this->enemies->findBoss($key);
+        $enemy = $this->enemies->findAvailable($key) ?? $this->enemies->findAvailableBoss($key);
 
         if (null === $enemy) {
             throw new EnemyKeyUnknown($key);

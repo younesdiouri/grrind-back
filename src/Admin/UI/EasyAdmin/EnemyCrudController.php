@@ -8,7 +8,7 @@ use App\Admin\Domain\GameEnemy;
 use App\Admin\UI\Form\TranslationsType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 
@@ -31,6 +31,6 @@ final class EnemyCrudController extends GameCrudController
         yield IntegerField::new('mitigationPermille');
         yield IntegerField::new('extraTurnPermille');
         yield IntegerField::new('dodgePermille');
-        yield CollectionField::new('translations')->setEntryType(TranslationsType::class)->hideOnIndex();
+        yield Field::new('translations')->setFormType(TranslationsType::class)->hideOnIndex();
     }
 }

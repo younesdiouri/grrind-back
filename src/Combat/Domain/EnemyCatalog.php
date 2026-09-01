@@ -79,6 +79,10 @@ final class EnemyCatalog
 
     private ?GameRulesets $rulesets;
 
+    private ?self $historical = null;
+
+    private ?self $available = null;
+
     /**
      * @param list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}>         $enemies
      * @param list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses
@@ -181,6 +185,22 @@ final class EnemyCatalog
         return $this->byKey[$key] ?? null;
     }
 
+    /** Résolution d'un snapshot de combat historique. */
+    public function findHistorical(string $key): ?Enemy
+    {
+        return $this->find($key);
+    }
+
+    /** Choix explicite d'un ennemi jouable, donc actif. */
+    public function findAvailable(string $key): ?Enemy
+    {
+        if (null !== $this->rulesets) {
+            return $this->active()->find($key);
+        }
+
+        return $this->find($key);
+    }
+
     /** Le pendant de {@see find()} pour un boss — voir le docblock de la classe. */
     public function findBoss(string $key): ?Enemy
     {
@@ -189,6 +209,16 @@ final class EnemyCatalog
         }
 
         return $this->byBossKey[$key] ?? null;
+    }
+
+    /** Choix explicite d'un boss jouable, donc actif. */
+    public function findAvailableBoss(string $key): ?Enemy
+    {
+        if (null !== $this->rulesets) {
+            return $this->active()->findBoss($key);
+        }
+
+        return $this->findBoss($key);
     }
 
     /**
@@ -254,17 +284,23 @@ final class EnemyCatalog
 
     private function current(): self
     {
+        if (null !== $this->historical) {
+            return $this->historical;
+        }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
         /** @var array{combat: array{enemies: list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}>, bosses: list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}>}} $snapshot */
         /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */ $enemies = $snapshot['combat']['enemies'];
         /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses */ $bosses = $snapshot['combat']['bosses'];
 
-        return new self($enemies, $bosses);
+        return $this->historical = new self($enemies, $bosses);
     }
 
     private function active(): self
     {
+        if (null !== $this->available) {
+            return $this->available;
+        }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
         /** @var array{combat: array{enemies: list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}>, bosses: list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}>}} $snapshot */
@@ -273,7 +309,7 @@ final class EnemyCatalog
         /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}> $bosses */
         $bosses = $snapshot['combat']['bosses'];
 
-        return new self(
+        return $this->available = new self(
             array_values(array_filter($enemies, static fn (array $enemy): bool => $enemy['active'] ?? true)),
             array_values(array_filter($bosses, static fn (array $enemy): bool => $enemy['active'] ?? true)),
         );

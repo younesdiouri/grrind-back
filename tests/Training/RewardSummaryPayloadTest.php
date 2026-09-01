@@ -198,6 +198,7 @@ final class RewardSummaryPayloadTest extends TestCase
                 'FEET',
                 [new DroppedItemModifier('XP_MULTIPLIER', 5, 'RUNNING')],
                 30,
+                'https://api.grrind.test/game-images/placeholder.png',
             )],
             coinsGained: 12,
             coinsBefore: 40,

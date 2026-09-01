@@ -20,6 +20,10 @@ final class Version20260901182000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         $this->addSql('ALTER TABLE game_settings ADD COLUMN IF NOT EXISTS loot_version INT NOT NULL DEFAULT 1');
+        // La première ébauche de #260 publiait le marqueur transitoire `v1-seeded`.
+        // La même empreinte hybride que le seed immuable le remplace sans toucher au
+        // snapshot ni aux faits déjà écrits.
+        $this->addSql("UPDATE game_ruleset SET version = 'v1-64dbac7efb84' WHERE id = 1 AND version = 'v1-seeded'");
         if (false !== $this->connection->fetchOne('SELECT 1 FROM game_ruleset WHERE id = 1')) {
             return;
         }
@@ -49,7 +53,7 @@ final class Version20260901182000 extends AbstractMigration
         /** @var array{floor_percent: int, cap_percent: int} $luck */ $luck = $loot['loot_luck'];
         $this->insert('game_settings', ['id' => 1, 'fighter' => json_encode($fighter, JSON_THROW_ON_ERROR), 'loot_luck' => json_encode($luck, JSON_THROW_ON_ERROR), 'loot_version' => 1]);
         $snapshot = ['items' => $items, 'titles' => $titles, 'combat' => ['fighter' => $fighter, 'enemies' => $seed['enemies'], 'bosses' => $seed['bosses']], 'loot' => ['version' => 1, ...$loot]];
-        $this->insert('game_ruleset', ['id' => 1, 'revision' => 1, 'version' => 'v1-seeded', 'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR), 'published_at' => (new \DateTimeImmutable())->format('c')]);
+        $this->insert('game_ruleset', ['id' => 1, 'revision' => 1, 'version' => 'v1-64dbac7efb84', 'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR), 'published_at' => (new \DateTimeImmutable())->format('c')]);
     }
 
     public function down(Schema $schema): void

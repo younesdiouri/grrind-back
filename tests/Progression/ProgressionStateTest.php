@@ -62,7 +62,7 @@ final class ProgressionStateTest extends ApiTestCase
 
         // Sous quel équilibrage cet état a été projeté. Le client n'en fait rien ; un
         // rapport de bug, si.
-        self::assertSame(self::getContainer()->getParameter('game.ruleset_version'), $state['rulesetVersion']);
+        self::assertSame(self::getContainer()->get(\App\Shared\Application\GameRulesets::class)->version(), $state['rulesetVersion']);
     }
 
     public function testReadingTheStateDoesNotCreateTheProgressionRow(): void

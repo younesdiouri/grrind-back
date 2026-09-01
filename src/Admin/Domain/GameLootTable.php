@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Admin\Domain;
 
 use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\ORM\Mapping as ORM;
+use LogicException;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'game_loot_table')]
 #[ORM\UniqueConstraint(name: 'uniq_game_loot_table_kind_key', columns: ['table_kind', 'table_key'])]
 class GameLootTable
@@ -122,5 +125,13 @@ class GameLootTable
     public function setEntries(array $entries): void
     {
         $this->entries = $entries;
+    }
+
+    #[ORM\PreUpdate]
+    public function refuseIdentityRename(PreUpdateEventArgs $event): void
+    {
+        if ($event->hasChangedField('key') || $event->hasChangedField('kind')) {
+            throw new LogicException('Le couple nature et clé d’une table de loot est immuable après sa création.');
+        }
     }
 }

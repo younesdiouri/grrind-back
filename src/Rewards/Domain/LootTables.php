@@ -64,6 +64,8 @@ final class LootTables
 
     private ?GameRulesets $rulesets;
 
+    private ?self $currentTables = null;
+
     /**
      * @param list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
@@ -208,6 +210,9 @@ final class LootTables
 
     private function current(): self
     {
+        if (null !== $this->currentTables) {
+            return $this->currentTables;
+        }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
         /** @var array{loot: array{version: int, workout: list<array{active?: bool}>, adversary: list<array{active?: bool}>, chest: list<array{active?: bool}>}, items: list<array{key: string, kind?: string}>, combat: array{enemies: list<array{key: string}>, bosses: list<array{key: string}>}} $snapshot */
@@ -216,7 +221,7 @@ final class LootTables
         /** @var list<array{key: string}> $enemies */ $enemies = $snapshot['combat']['enemies'];
         /** @var list<array{key: string}> $bosses */ $bosses = $snapshot['combat']['bosses'];
 
-        return new self(
+        return $this->currentTables = new self(
             $loot['version'],
             array_values(array_filter($loot['workout'], static fn (array $table): bool => $table['active'] ?? true)),
             array_values(array_filter($loot['adversary'], static fn (array $table): bool => $table['active'] ?? true)),

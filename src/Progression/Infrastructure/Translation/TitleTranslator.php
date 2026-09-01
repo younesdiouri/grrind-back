@@ -7,8 +7,10 @@ namespace App\Progression\Infrastructure\Translation;
 use App\Progression\Domain\Title;
 use App\Progression\Domain\TitleProgress;
 use App\Progression\Domain\TitleRequirement;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerTitle;
 use DateTimeImmutable;
+use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -25,18 +27,20 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * aucun état de langue à porter, et deux joueurs servis par le même worker reçoivent chacun
  * la sienne.
  */
-final readonly class TitleTranslator
+final class TitleTranslator implements ResetInterface
 {
-    /** Le domaine de traduction, donc le nom des fichiers : `translations/titles.<locale>.yaml`. */
     public const string DOMAIN = 'titles';
 
-    public function __construct(private TranslatorInterface $translator)
+    /** @var array<string, array<string, array<string, string>>>|null */
+    private ?array $translations = null;
+
+    public function __construct(private readonly TranslatorInterface $translator, private readonly ?GameRulesets $rulesets = null)
     {
     }
 
     public function nameOf(Title $title): string
     {
-        return $this->translator->trans($title->id.'.name', domain: self::DOMAIN);
+        return $this->text($title->id, 'name');
     }
 
     /**
@@ -52,16 +56,12 @@ final readonly class TitleTranslator
     {
         $threshold = $title->condition->threshold;
 
-        return $this->translator->trans(
-            $title->id.'.hint',
-            [
-                '%threshold%' => $threshold,
-                '%hours%' => TitleRequirement::DisciplineSeconds === $title->condition->requirement
-                    ? intdiv($threshold, 3600)
-                    : $threshold,
-            ],
-            self::DOMAIN,
-        );
+        return strtr($this->text($title->id, 'hint'), [
+            '%threshold%' => (string) $threshold,
+            '%hours%' => (string) (TitleRequirement::DisciplineSeconds === $title->condition->requirement
+                ? intdiv($threshold, 3600)
+                : $threshold),
+        ]);
     }
 
     /** La forme que `GET /api/me` et `GET /api/titles` servent tous les deux. */
@@ -76,5 +76,47 @@ final readonly class TitleTranslator
             $progress->target,
             $progress->unit()->value,
         );
+    }
+
+    public function reset(): void
+    {
+        $this->translations = null;
+    }
+
+    private function text(string $key, string $field): string
+    {
+        if (null === $this->rulesets) {
+            return $this->translator->trans($key.'.'.$field, domain: self::DOMAIN);
+        }
+        $locale = substr($this->translator->getLocale(), 0, 2);
+        $translations = $this->translations();
+
+        return $translations[$key][$locale][$field]
+            ?? $translations[$key]['en'][$field]
+            ?? $translations[$key]['fr'][$field]
+            ?? $key;
+    }
+
+    /** @return array<string, array<string, array<string, string>>> */
+    private function translations(): array
+    {
+        if (null !== $this->translations) {
+            return $this->translations;
+        }
+        \assert(null !== $this->rulesets);
+        $snapshot = $this->rulesets->snapshot();
+        $translations = [];
+        $titles = $snapshot['titles'] ?? [];
+        \assert(\is_array($titles));
+        foreach ($titles as $title) {
+            \assert(\is_array($title));
+            \assert(\is_string($title['id']));
+            \assert(\is_array($title['translations'] ?? null));
+            /** @var array<string, array<string, string>> $entry */
+            $entry = $title['translations'];
+            $translations[$title['id']] = $entry;
+        }
+
+        return $this->translations = $translations;
     }
 }

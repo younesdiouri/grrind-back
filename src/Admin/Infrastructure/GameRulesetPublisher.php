@@ -29,8 +29,12 @@ use Throwable;
  */
 final readonly class GameRulesetPublisher
 {
-    /** @param array<string, mixed> $yamlGameplay */
-    public function __construct(private TagAwareCacheInterface $cache, private array $yamlGameplay = [])
+    /**
+     * L'empreinte des YAML restant est déjà calculée au boot avec leur validation. La
+     * conserver comme composant du hash hybride rend son schéma identique à celui de la
+     * migration, sans faire dépendre la publication d'un fichier disparu.
+     */
+    public function __construct(private TagAwareCacheInterface $cache, private string $yamlGameplayVersion)
     {
     }
 
@@ -58,7 +62,7 @@ final readonly class GameRulesetPublisher
         }
         self::validate($snapshot);
 
-        $canonical = json_encode(self::canonicalize(['yaml' => $this->yamlGameplay, 'database' => self::gameplay($snapshot)]), \JSON_THROW_ON_ERROR);
+        $canonical = json_encode(self::canonicalize(['yaml_version' => $this->yamlGameplayVersion, 'database' => self::gameplay($snapshot)]), \JSON_THROW_ON_ERROR);
         $ruleset->publish($snapshot, 'v1-'.substr(hash('sha256', $canonical), 0, 12));
         $manager->flush();
     }
@@ -132,7 +136,77 @@ final readonly class GameRulesetPublisher
         new CombatRules($fighter['base_hp'], $fighter['hp_per_1000_vitality'], $fighter['base_damage'], $fighter['damage_per_1000_strength'], $fighter['mitigation_permille_per_1000_endurance'], $fighter['mitigation_cap_permille'], $fighter['extra_turn_permille_per_1000_dexterity'], $fighter['extra_turn_cap_permille'], $fighter['dodge_permille_per_1000_mobility'], $fighter['dodge_cap_permille'], $fighter['minimum_damage'], $fighter['max_turns']);
         new EnemyCatalog($enemies, $bosses);
         new LootLuckRules($lootLuck['floor_percent'], $lootLuck['cap_percent']);
-        new LootTables(1, $workout, $adversary, $chest, $items, $enemies, $bosses);
+        self::validateActiveReferences($items, $enemies, $bosses, $workout, $adversary, $chest);
+        $lootVersion = $snapshot['loot']['version'];
+        \assert(\is_int($lootVersion));
+        new LootTables($lootVersion, $workout, $adversary, $chest, $items, $enemies, $bosses);
+    }
+
+    /**
+     * Une désactivation conserve les faits déjà écrits, mais ne doit jamais laisser un
+     * chemin actif produire une récompense ou une rencontre devenue inactive.
+     *
+     * @param list<array<string, mixed>> $items
+     * @param list<array<string, mixed>> $enemies
+     * @param list<array<string, mixed>> $bosses
+     * @param list<array<string, mixed>> $workout
+     * @param list<array<string, mixed>> $adversary
+     * @param list<array<string, mixed>> $chest
+     */
+    private static function validateActiveReferences(array $items, array $enemies, array $bosses, array $workout, array $adversary, array $chest): void
+    {
+        $activeItems = [];
+        $activeEnemies = [];
+        $activeChests = [];
+        foreach ($items as $item) {
+            \assert(\is_string($item['key'] ?? null));
+            if (($item['active'] ?? true) !== true) {
+                continue;
+            }
+            $activeItems[$item['key']] = true;
+            if ('CHEST' === ($item['kind'] ?? 'EQUIPMENT')) {
+                $activeChests[$item['key']] = true;
+            }
+        }
+        foreach ([...$enemies, ...$bosses] as $enemy) {
+            \assert(\is_string($enemy['key'] ?? null));
+            if (($enemy['active'] ?? true) === true) {
+                $activeEnemies[$enemy['key']] = true;
+            }
+        }
+        $activeTableKeys = ['adversary' => [], 'chest' => []];
+
+        foreach (['workout' => $workout, 'adversary' => $adversary, 'chest' => $chest] as $kind => $tables) {
+            foreach ($tables as $table) {
+                \assert(\is_string($table['key'] ?? null));
+                if (!($table['active'] ?? true)) {
+                    continue;
+                }
+                if ('adversary' === $kind || 'chest' === $kind) {
+                    $activeTableKeys[$kind][$table['key']] = true;
+                }
+                $entries = $table['entries'] ?? [];
+                \assert(\is_array($entries));
+                foreach ($entries as $entry) {
+                    \assert(\is_array($entry));
+                    $itemKey = $entry['item'] ?? null;
+                    \assert(null === $itemKey || \is_string($itemKey));
+                    if (null !== $itemKey && !isset($activeItems[$itemKey])) {
+                        throw new LogicException(\sprintf('La table active "%s" référence l’objet inactif "%s".', $table['key'], $itemKey));
+                    }
+                }
+            }
+        }
+        foreach ($activeEnemies as $key => $_) {
+            if (!isset($activeTableKeys['adversary'][$key])) {
+                throw new LogicException(\sprintf('L’adversaire actif "%s" doit avoir une table de tirage active.', $key));
+            }
+        }
+        foreach ($activeChests as $key => $_) {
+            if (!isset($activeTableKeys['chest'][$key])) {
+                throw new LogicException(\sprintf('Le coffre actif "%s" doit avoir une table de tirage active.', $key));
+            }
+        }
     }
 
     /**

@@ -104,6 +104,10 @@ final class ItemCatalog
 
     private ?GameRulesets $rulesets;
 
+    private ?self $historical = null;
+
+    private ?self $available = null;
+
     /**
      * @param list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
      *
@@ -171,6 +175,22 @@ final class ItemCatalog
         return $this->byKey[$key] ?? null;
     }
 
+    /** Résolution historique : un inventaire déjà écrit reste toujours affichable. */
+    public function findHistorical(string $key): ?Item
+    {
+        return $this->find($key);
+    }
+
+    /** Résolution pour une nouvelle opération de jeu : les objets inactifs sont exclus. */
+    public function findAvailable(string $key): ?Item
+    {
+        if (null !== $this->rulesets) {
+            return $this->active()->find($key);
+        }
+
+        return $this->find($key);
+    }
+
     /**
      * Le catalogue entier, dans l'ordre de déclaration — ce que le test de couverture des
      * traductions parcourt pour vérifier qu'aucun objet n'est livré sans nom, même geste
@@ -205,22 +225,28 @@ final class ItemCatalog
 
     private function current(): self
     {
+        if (null !== $this->historical) {
+            return $this->historical;
+        }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
 
-        return new self($items);
+        return $this->historical = new self($items);
     }
 
     private function active(): self
     {
+        if (null !== $this->available) {
+            return $this->available;
+        }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
         /** @var list<array{key: string, active?: bool, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
 
-        return new self(array_values(array_filter($items, static fn (array $item): bool => $item['active'] ?? true)));
+        return $this->available = new self(array_values(array_filter($items, static fn (array $item): bool => $item['active'] ?? true)));
     }
 
     /**

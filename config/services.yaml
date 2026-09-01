@@ -16,9 +16,6 @@ services:
             # Même source que lexik_jwt_authentication.token_ttl : la durée annoncée
             # au client ne peut pas diverger de celle réellement signée.
             int $accessTokenTtl: '%env(int:JWT_TTL)%'
-            # Le hash de l'équilibrage chargé. Il se stocke avec chaque transaction d'XP :
-            # c'est ce qui permet de rééquilibrer sans corrompre l'historique.
-            string $rulesetVersion: '%game.ruleset_version%'
             string $gameImageDirectory: '%env(resolve:GAME_IMAGES_DIR)%'
 
     App\:
@@ -29,7 +26,27 @@ services:
 
     App\Admin\Infrastructure\GameRulesetPublisher:
         arguments:
-            $yamlGameplay: '%game.yaml_gameplay%'
+            $yamlGameplayVersion: '%game.ruleset_version%'
+
+    App\Progression\Domain\XpCalculator:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
+    App\Combat\Application\FightBattleHandler:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
+    App\Training\UI\Http\ImportWorkoutsController:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
+    App\Progression\Application\ProgressionStateProvider:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
+    App\Progression\Infrastructure\Reward\LedgerSessionRewards:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
 
     # Sonde du #155 : `event.bus` n'est référencé nulle part par son id de service —
     # seulement par le type `MessageBusInterface` avec `#[Target]` — donc le compilateur
@@ -460,13 +477,10 @@ when@test:
         # désormais aussi, mais par injection de constructeur : ça ne rend pas la
         # déclaration publique inutile, `container->get()` continue d'exiger `public: true`
         # — même besoin que `GrantXpHandler` plus haut.
-        # `$rulesetVersion` répété : la redéclaration ci-dessous ne fusionne pas avec le
-        # bind global de `_defaults` plus haut, elle le remplace — même geste que
-        # `$expoDsn` sur `CheckExpoPushReceiptsHandler` plus haut.
         App\Combat\Application\FightBattleHandler:
             public: true
             arguments:
-                $rulesetVersion: '%game.ruleset_version%'
+                $rulesetVersion: '@App\Shared\Application\GameRulesets'
 
         App\Combat\Application\FighterFactory:
             public: true

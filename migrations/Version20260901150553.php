@@ -89,7 +89,7 @@ final class Version20260901150553 extends AbstractMigration
             'loot' => ['version' => 1, ...$loot],
         ];
         $this->insert('game_ruleset', [
-            'id' => 1, 'revision' => 1, 'version' => 'v1-seeded',
+            'id' => 1, 'revision' => 1, 'version' => 'v1-64dbac7efb84',
             'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR), 'published_at' => (new \DateTimeImmutable())->format('c'),
         ]);
 

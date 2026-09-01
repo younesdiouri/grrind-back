@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Admin\Domain;
 
 use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\ORM\Mapping as ORM;
+use LogicException;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'game_enemy')]
 #[ORM\UniqueConstraint(name: 'uniq_game_enemy_key', columns: ['enemy_key'])]
 class GameEnemy
@@ -152,5 +155,13 @@ class GameEnemy
     public function setTranslations(array $translations): void
     {
         $this->translations = $translations;
+    }
+
+    #[ORM\PreUpdate]
+    public function refuseKeyRename(PreUpdateEventArgs $event): void
+    {
+        if ($event->hasChangedField('key')) {
+            throw new LogicException('La clé métier d’un ennemi est immuable après sa création.');
+        }
     }
 }

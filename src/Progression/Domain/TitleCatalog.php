@@ -28,6 +28,10 @@ final class TitleCatalog
 
     private ?GameRulesets $rulesets;
 
+    private ?self $historical = null;
+
+    private ?self $available = null;
+
     /**
      * @param list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles
      *
@@ -86,6 +90,22 @@ final class TitleCatalog
         return $this->titles[$id] ?? null;
     }
 
+    /** Résolution historique d'un titre déjà acquis. */
+    public function findHistorical(string $id): ?Title
+    {
+        return $this->find($id);
+    }
+
+    /** Sélection d'un titre actif uniquement. */
+    public function findAvailable(string $id): ?Title
+    {
+        if (null !== $this->rulesets) {
+            return $this->active()->find($id);
+        }
+
+        return $this->find($id);
+    }
+
     /**
      * Le catalogue entier, situé pour ce joueur — c'est ce que rend `GET /api/titles`.
      *
@@ -116,7 +136,7 @@ final class TitleCatalog
     public function newlyUnlockedBy(PlayerRecord $record, array $alreadyUnlocked): array
     {
         if (null !== $this->rulesets) {
-            return $this->current()->newlyUnlockedBy($record, $alreadyUnlocked);
+            return $this->active()->newlyUnlockedBy($record, $alreadyUnlocked);
         }
 
         return array_values(array_filter(
@@ -141,7 +161,7 @@ final class TitleCatalog
     public function nextFor(PlayerRecord $record, array $alreadyUnlocked): ?TitleProgress
     {
         if (null !== $this->rulesets) {
-            return $this->current()->nextFor($record, $alreadyUnlocked);
+            return $this->active()->nextFor($record, $alreadyUnlocked);
         }
         $next = null;
 
@@ -162,22 +182,28 @@ final class TitleCatalog
 
     private function current(): self
     {
+        if (null !== $this->historical) {
+            return $this->historical;
+        }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
         /** @var list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */
         $titles = $snapshot['titles'];
 
-        return new self($titles);
+        return $this->historical = new self($titles);
     }
 
     private function active(): self
     {
+        if (null !== $this->available) {
+            return $this->available;
+        }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
         /** @var list<array{id: string, active?: bool, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */
         $titles = $snapshot['titles'];
 
-        return new self(array_values(array_filter($titles, static fn (array $title): bool => $title['active'] ?? true)));
+        return $this->available = new self(array_values(array_filter($titles, static fn (array $title): bool => $title['active'] ?? true)));
     }
 
     /**

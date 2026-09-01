@@ -14,6 +14,7 @@ use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerProgression;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Vitality;
@@ -60,7 +61,9 @@ final class FightBattleHandlerTest extends KernelTestCase
         self::assertInstanceOf(EntityManagerInterface::class, $entityManager);
         $this->entityManager = $entityManager;
 
-        $this->rulesetVersion = (string) $container->getParameter('game.ruleset_version');
+        $rulesets = $container->get(GameRulesets::class);
+        self::assertInstanceOf(GameRulesets::class, $rulesets);
+        $this->rulesetVersion = $rulesets->version();
 
         $connection = $this->entityManager->getConnection();
         self::assertInstanceOf(Connection::class, $connection);

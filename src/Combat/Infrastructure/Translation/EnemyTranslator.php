@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Combat\Infrastructure\Translation;
 
+use App\Shared\Application\GameRulesets;
+use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -26,12 +28,14 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * La locale n'est pas un paramètre : le traducteur lit celle de la requête, négociée sur
  * `Accept-Language`.
  */
-final readonly class EnemyTranslator
+final class EnemyTranslator implements ResetInterface
 {
-    /** Le domaine de traduction, donc le nom des fichiers : `translations/enemies.<locale>.yaml`. */
     public const string DOMAIN = 'enemies';
 
-    public function __construct(private TranslatorInterface $translator)
+    /** @var array<string, array<string, array{name: string}>>|null */
+    private ?array $translations = null;
+
+    public function __construct(private readonly TranslatorInterface $translator, private readonly ?GameRulesets $rulesets = null)
     {
     }
 
@@ -42,6 +46,49 @@ final readonly class EnemyTranslator
      */
     public function nameOf(string $key): string
     {
-        return $this->translator->trans(strtolower($key).'.name', domain: self::DOMAIN);
+        if (null === $this->rulesets) {
+            return $this->translator->trans(strtolower($key).'.name', domain: self::DOMAIN);
+        }
+        $locale = substr($this->translator->getLocale(), 0, 2);
+        $translations = $this->translations();
+
+        return $translations[$key][$locale]['name']
+            ?? $translations[$key]['en']['name']
+            ?? $translations[$key]['fr']['name']
+            // Une bataille historique peut référencer un ennemi retiré ; conserver la
+            // clé de traduction rend ce cas identifiable sans prétendre le traduire.
+            ?? strtolower($key).'.name';
+    }
+
+    public function reset(): void
+    {
+        $this->translations = null;
+    }
+
+    /** @return array<string, array<string, array{name: string}>> */
+    private function translations(): array
+    {
+        if (null !== $this->translations) {
+            return $this->translations;
+        }
+        \assert(null !== $this->rulesets);
+        $snapshot = $this->rulesets->snapshot();
+        $translations = [];
+        $combat = $snapshot['combat'] ?? [];
+        \assert(\is_array($combat));
+        foreach (['enemies', 'bosses'] as $kind) {
+            $enemies = $combat[$kind] ?? [];
+            \assert(\is_array($enemies));
+            foreach ($enemies as $enemy) {
+                \assert(\is_array($enemy));
+                \assert(\is_string($enemy['key']));
+                \assert(\is_array($enemy['translations'] ?? null));
+                /** @var array<string, array{name: string}> $entry */
+                $entry = $enemy['translations'];
+                $translations[$enemy['key']] = $entry;
+            }
+        }
+
+        return $this->translations = $translations;
     }
 }
