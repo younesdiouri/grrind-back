@@ -5,8 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Admin;
 
 use App\Identity\Domain\Role;
+use App\Identity\Domain\User;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
+use App\Identity\UI\Console\GrantAdminCommand;
+use App\Shared\Domain\Timezone;
 use App\Tests\Support\ApiTestCase;
+use DateTimeImmutable;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
@@ -58,6 +64,33 @@ final class AdminSecurityTest extends ApiTestCase
         $token = $csrf->getToken('logout')->getValue();
         $this->client->request('GET', '/admin/logout?_csrf_token='.$token);
         self::assertResponseRedirects('/admin/login');
+    }
+
+    public function testGrantAdminRefusesMissingAndPasswordlessAccountsThenRemainsIdempotent(): void
+    {
+        $users = self::getContainer()->get(UserRepository::class);
+        $command = new GrantAdminCommand($users);
+
+        $missing = new CommandTester($command);
+        $missing->execute(['email' => 'absent@grrind.app']);
+        self::assertSame(Command::FAILURE, $missing->getStatusCode());
+        self::assertStringContainsString('introuvable', $missing->getDisplay());
+
+        $social = User::register('social@grrind.app', 'Social', Timezone::utc(), new DateTimeImmutable());
+        $users->add($social);
+        $passwordless = new CommandTester($command);
+        $passwordless->execute(['email' => 'social@grrind.app']);
+        self::assertSame(Command::FAILURE, $passwordless->getStatusCode());
+        self::assertStringContainsString('mot de passe', $passwordless->getDisplay());
+
+        $this->openAccount('operator@grrind.app');
+        $first = new CommandTester($command);
+        $first->execute(['email' => 'operator@grrind.app']);
+        $second = new CommandTester($command);
+        $second->execute(['email' => 'operator@grrind.app']);
+        self::assertSame(Command::SUCCESS, $first->getStatusCode());
+        self::assertSame(Command::SUCCESS, $second->getStatusCode());
+        self::assertContains(Role::Admin->value, $users->ofEmail('operator@grrind.app')?->getRoles() ?? []);
     }
 
     private function login(string $email, string $password): void

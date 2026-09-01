@@ -30,7 +30,7 @@ use Symfony\Component\Uid\Uuid;
  * (`OBSIDIAN_WARBLADE`, `STORMCALLERS_BOOTS`, `CROWN_OF_THE_TIRELESS`, les trois EPIC ou
  * LEGENDARY) — voir `items.yaml`.
  *
- * @phpstan-type ShopLine array{key: string, kind: string, name: string, rarity: string, slot: string|null, modifiers: list<array<string, mixed>>, priceCoins: int, affordable: bool, owned: bool, minimumLevel: int, unlocked: bool}
+ * @phpstan-type ShopLine array{key: string, kind: string, name: string, rarity: string, slot: string|null, modifiers: list<array<string, mixed>>, priceCoins: int, imageUrl: string, affordable: bool, owned: bool, minimumLevel: int, unlocked: bool}
  * @phpstan-type ShopBody array{coins: int, items: list<ShopLine>}
  * @phpstan-type InventoryBody array{coins: int, equipment: array<string, mixed>, items: list<array<string, mixed>>}
  */
@@ -64,6 +64,21 @@ final class ShopRoutesTest extends ApiTestCase
             ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
             array_keys($item),
         );
+    }
+
+    public function testEveryCatalogImageIsAnAbsolutePublicUrl(): void
+    {
+        $bob = $this->openAccount();
+        $item = $this->shop($bob)['items'][0];
+        self::assertIsString($item['imageUrl']);
+        self::assertMatchesRegularExpression('#^https?://#', $item['imageUrl']);
+        $path = parse_url($item['imageUrl'], \PHP_URL_PATH);
+        self::assertIsString($path);
+
+        $this->client->request('GET', $path);
+
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'image/png');
     }
 
     public function testNoEpicOrLegendaryItemEverAppearsOnTheStall(): void
