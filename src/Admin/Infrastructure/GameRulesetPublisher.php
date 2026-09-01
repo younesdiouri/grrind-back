@@ -202,9 +202,19 @@ final readonly class GameRulesetPublisher
                 throw new LogicException(\sprintf('L’adversaire actif "%s" doit avoir une table de tirage active.', $key));
             }
         }
+        foreach ($activeTableKeys['adversary'] as $key => $_) {
+            if (!isset($activeEnemies[$key])) {
+                throw new LogicException(\sprintf('La table adversaire active "%s" doit référencer un adversaire actif.', $key));
+            }
+        }
         foreach ($activeChests as $key => $_) {
             if (!isset($activeTableKeys['chest'][$key])) {
                 throw new LogicException(\sprintf('Le coffre actif "%s" doit avoir une table de tirage active.', $key));
+            }
+        }
+        foreach ($activeTableKeys['chest'] as $key => $_) {
+            if (!isset($activeChests[$key])) {
+                throw new LogicException(\sprintf('La table coffre active "%s" doit référencer un coffre actif.', $key));
             }
         }
     }

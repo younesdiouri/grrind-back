@@ -7,6 +7,7 @@ namespace App\Admin\UI\EasyAdmin;
 use App\Admin\Domain\GameItem;
 use App\Admin\Infrastructure\GameConfigurationReferenceGuard;
 use App\Admin\Infrastructure\GameRulesetPublisher;
+use Doctrine\DBAL\Exception as DbalException;
 use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
@@ -44,11 +45,11 @@ abstract class GameCrudController extends AbstractCrudController
             });
             $this->publisher->invalidateAfterCommit();
             $this->promotedImage = null;
-        } catch (InvalidArgumentException|LogicException $exception) {
+        } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             $this->compensateImage($entityInstance, null);
             // Retourner ferait croire à EasyAdmin que l'écriture a réussi et déclencherait
             // l'événement post-persisté sur une transaction annulée.
-            throw new BadRequestHttpException($exception->getMessage(), $exception);
+            throw new BadRequestHttpException($this->formError($exception), $exception);
         } catch (Throwable $exception) {
             $this->compensateImage($entityInstance, null);
             throw $exception;
@@ -69,9 +70,9 @@ abstract class GameCrudController extends AbstractCrudController
             });
             $this->publisher->invalidateAfterCommit();
             $this->promotedImage = null;
-        } catch (InvalidArgumentException|LogicException $exception) {
+        } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             $this->compensateImage($entityInstance, $oldImage);
-            throw new BadRequestHttpException($exception->getMessage(), $exception);
+            throw new BadRequestHttpException($this->formError($exception), $exception);
         } catch (Throwable $exception) {
             $this->compensateImage($entityInstance, $oldImage);
             throw $exception;
@@ -88,7 +89,7 @@ abstract class GameCrudController extends AbstractCrudController
                 $this->publisher->publish($entityManager);
             });
             $this->publisher->invalidateAfterCommit();
-        } catch (InvalidArgumentException|LogicException $exception) {
+        } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             throw new EntityRemoveException(['entity_name' => $entityInstance::class, 'message' => $exception->getMessage()], $exception);
         }
     }
@@ -147,5 +148,21 @@ abstract class GameCrudController extends AbstractCrudController
             unlink($path);
         }
         $this->promotedImage = null;
+    }
+
+    /** Les contraintes SQL restent une défense finale, mais l’admin doit les comprendre. */
+    private function formError(Throwable $exception): string
+    {
+        if (!$exception instanceof DbalException) {
+            return $exception->getMessage();
+        }
+        $message = $exception->getMessage();
+
+        return match (true) {
+            str_contains($message, 'price_coins') => 'Configuration invalide : le prix en pièces ne peut pas être négatif.',
+            str_contains($message, 'coins_minimum'), str_contains($message, 'coins_maximum') => 'Configuration invalide : les pièces de loot doivent respecter leurs bornes.',
+            str_contains($message, 'sort_order') => 'Configuration invalide : l’ordre doit être unique dans cette configuration.',
+            default => 'Configuration invalide : la modification viole une contrainte de jeu.',
+        };
     }
 }
