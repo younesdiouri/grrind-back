@@ -103,6 +103,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
     {
         $snapshot = $this->rulesets()->snapshot();
         $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))->method('fetchOne')->willReturn(1, 1);
         $connection->expects(self::once())->method('fetchAssociative')->willReturn([
             'revision' => 1,
             'version' => 'ignored-at-runtime',
@@ -120,6 +121,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
     {
         $snapshot = $this->rulesets()->snapshot();
         $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('fetchOne')->willReturn(3);
         $connection->expects(self::once())->method('fetchAssociative')->willReturn([
             'revision' => 3,
             'version' => 'ignored-at-runtime',
@@ -136,6 +138,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
     {
         $snapshot = $this->rulesets()->snapshot();
         $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))->method('fetchOne')->willReturn(5, 5);
         $connection->expects(self::once())->method('fetchAssociative')->willReturn([
             'revision' => 5,
             'version' => 'ignored-at-runtime',
@@ -159,6 +162,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         $second = $first;
         $second['items'][1]['price_coins'] = 99;
         $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))->method('fetchOne')->willReturnOnConsecutiveCalls(1, 2);
         $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
             ['revision' => 1, 'version' => 'ignored', 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
             ['revision' => 2, 'version' => 'ignored', 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
@@ -175,10 +179,35 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertSame(99, $published['items'][1]['price_coins']);
     }
 
+    public function testIndependentMachineCachesObserveTheNewRevisionAfterResetEvenWhenInvalidationFailed(): void
+    {
+        $first = $this->rulesets()->snapshot();
+        /** @var array{items: list<array{price_coins: int}>} $first */
+        $second = $first;
+        $second['items'][1]['price_coins'] = 99;
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))->method('fetchOne')->willReturnOnConsecutiveCalls(1, 2);
+        $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            ['revision' => 1, 'version' => 'ignored', 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
+            ['revision' => 2, 'version' => 'ignored', 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+        );
+
+        // Deux caches filesystem distincts représentent app et worker Fly : la seconde
+        // machine ne peut pas compter sur le tag invalidé par la première.
+        $app = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+        $worker = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+        self::assertSame(1, $app->revision());
+        self::assertSame(2, $worker->revision());
+        $published = $worker->snapshot();
+        /** @var array{items: list<array{price_coins: int}>} $published */
+        self::assertSame(99, $published['items'][1]['price_coins']);
+    }
+
     public function testCacheFailureNeverRejectsThePublishedDatabaseRuleset(): void
     {
         $snapshot = $this->rulesets()->snapshot();
         $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('fetchOne')->willReturn(7);
         $connection->expects(self::once())->method('fetchAssociative')->willReturn([
             'revision' => 7,
             'version' => 'ignored-at-runtime',

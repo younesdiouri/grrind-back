@@ -20,8 +20,8 @@ use Symfony\Component\Uid\Uuid;
  * Mesure reproductible de la part configuration des quatre routes sensibles de #260.
  *
  * Le temps absolu dépend de Docker/CI, donc le contrat testé est structurel : une lecture
- * froide fait une seule lecture du snapshot publié et les dix lectures chaudes suivantes
- * n'en font aucune. Les p50/p95 et le nombre total de requêtes SQL sont imprimés par
+ * froide lit le pointeur puis un snapshot publié ; les lectures chaudes suivantes ne lisent
+ * que le pointeur scalaire. Les p50/p95 et le nombre total de requêtes SQL sont imprimés par
  * `make perf-ruleset`, afin que la PR compare les mêmes conditions avant/après sans figer
  * un chronomètre de machine dans la CI.
  */
@@ -54,19 +54,19 @@ final class RulesetEndpointPerformanceTest extends ApiTestCase
         foreach ($endpoints as $name => $request) {
             $this->emptyPublishedRulesetCache();
             $cold = $this->measure($request, 0);
-            self::assertSame(1, $cold['rulesetQueries'], $name.' doit reconstruire un unique snapshot à froid.');
+            self::assertSame(2, $cold['rulesetQueries'], $name.' doit lire le pointeur et reconstruire un unique snapshot à froid.');
 
             // Un combat fait tourner PostgreSQL et le noyau Docker à froid. Les mesures de
             // comparaison passent donc par un warmup non compté avant l'échantillon robuste.
             for ($sample = 1; $sample <= self::WARMUP_SAMPLES; ++$sample) {
                 $warmup = $this->measure($request, -$sample);
-                self::assertSame(0, $warmup['rulesetQueries'], $name.' ne doit pas recharger le snapshot pendant le warmup.');
+                self::assertSame(1, $warmup['rulesetQueries'], $name.' ne doit lire que le pointeur pendant le warmup.');
             }
 
             $samples = [];
             for ($sample = 1; $sample <= $this->hotSamples(); ++$sample) {
                 $hot = $this->measure($request, $sample);
-                self::assertSame(0, $hot['rulesetQueries'], $name.' ne doit pas réhydrater la configuration à chaud.');
+                self::assertSame(1, $hot['rulesetQueries'], $name.' ne doit lire que le pointeur sans réhydrater la configuration à chaud.');
                 $samples[] = $hot;
             }
 
