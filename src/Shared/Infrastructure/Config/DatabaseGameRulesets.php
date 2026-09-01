@@ -53,31 +53,26 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
             return $this->current;
         }
 
-        /** @var array{revision: int|string, version: string}|false $revision */
-        $revision = $this->connection->fetchAssociative('SELECT revision, version FROM game_ruleset WHERE id = 1');
-        if (false === $revision) {
-            throw new LogicException('Le snapshot de jeu est absent. Appliquer les migrations.');
-        }
-        $expectedRevision = (int) $revision['revision'];
-        // Le YAML restant peut changer au déploiement sans révision DB : il appartient à
-        // la clé de cache afin qu'un ancien snapshot sérialisé ne conserve pas son hash.
-        $key = 'game.ruleset.'.$expectedRevision.'.'.$this->yamlGameplayVersion;
+        // La révision DB ne se relit pas à chaud : l’invalidation taggée, exécutée après
+        // commit, est le signal de changement. Le YAML restant appartient à la clé pour
+        // qu’un déploiement ne réemploie pas une empreinte hybride précédente.
+        $key = 'game.ruleset.current.'.$this->yamlGameplayVersion;
         try {
             /** @var array{revision: int, version: string, snapshot: array<string, mixed>} $current */
-            $current = $this->cache->get($key, function (ItemInterface $item) use ($expectedRevision): array {
+            $current = $this->cache->get($key, function (ItemInterface $item): array {
                 $item->tag('game.ruleset');
 
-                return $this->load($expectedRevision);
+                return $this->load();
             });
         } catch (Throwable) {
-            $current = $this->load($expectedRevision);
+            $current = $this->load();
         }
 
         return $this->current = $current;
     }
 
     /** @return array{revision: int, version: string, snapshot: array<string, mixed>} */
-    private function load(int $expectedRevision): array
+    private function load(): array
     {
         /** @var array{revision: int|string, version: string, snapshot: string|array<string, mixed>}|false $row */
         $row = $this->connection->fetchAssociative('SELECT revision, version, snapshot FROM game_ruleset WHERE id = 1');
@@ -85,11 +80,6 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
             throw new LogicException('Le snapshot de jeu est absent. Appliquer les migrations.');
         }
         $revision = (int) $row['revision'];
-        if ($expectedRevision !== $revision) {
-            // Une publication a gagné entre les deux lectures : repartir sur sa révision,
-            // jamais assembler des tables du moment avec le snapshot précédent.
-            return $this->load($revision);
-        }
         $snapshot = \is_array($row['snapshot']) ? $row['snapshot'] : json_decode($row['snapshot'], true, 512, \JSON_THROW_ON_ERROR);
         \assert(\is_array($snapshot));
         /** @var array<string, mixed> $snapshot */
