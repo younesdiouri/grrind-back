@@ -90,8 +90,10 @@ final class ImportLootTest extends ApiTestCase
         if ([] !== $loot) {
             $item = $loot[0];
             self::assertIsArray($item);
-            self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins'], array_keys($item));
+            self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl'], array_keys($item));
             self::assertContains($item['key'], ['WORN_RUNNING_SHOES', 'IRON_GAUNTLETS', 'TRAVELERS_CLOAK']);
+            self::assertIsString($item['imageUrl']);
+            self::assertMatchesRegularExpression('#^https?://#', $item['imageUrl']);
 
             $inventory = $this->connection()->fetchAssociative(
                 'SELECT item_key, quantity, loot_roll_id FROM rewards_inventory_item WHERE user_id = :id',

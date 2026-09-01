@@ -11,7 +11,7 @@ RUN_DB  := $(DC) run --rm php
 RUN_TEST := $(DC) run --rm -e APP_ENV=test php
 
 .DEFAULT_GOAL := help
-.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset openapi test perf-ruleset qa phpstan cs cs-fix deptrac install
+.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset test-db-reset openapi test perf-ruleset qa phpstan cs cs-fix deptrac install
 
 help: ## Liste les commandes disponibles
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -88,6 +88,11 @@ db-reset: ## Recrée la base et rejoue toutes les migrations
 	$(RUN_DB) bin/console doctrine:database:drop --if-exists --force
 	$(RUN_DB) bin/console doctrine:database:create
 	$(RUN_DB) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+
+test-db-reset: ## Recrée la base de test et rejoue toutes les migrations
+	$(RUN_TEST) bin/console doctrine:database:drop --if-exists --force
+	$(RUN_TEST) bin/console doctrine:database:create
+	$(RUN_TEST) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
 # La migration du déploiement. Elle ne tourne pas dans l'image de dev mais dans
 # l'image de prod — celle qui partira sur ECS — pour que ce qui migre la base soit
