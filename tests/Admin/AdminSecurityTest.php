@@ -47,6 +47,18 @@ final class AdminSecurityTest extends ApiTestCase
         self::assertResponseRedirects('/admin/login');
     }
 
+    public function testLoginRejectsAnInvalidCsrfTokenBeforeCheckingCredentials(): void
+    {
+        $this->openAccount('csrf-login@grrind.app');
+        $this->client->request('POST', '/admin/login', [
+            '_username' => 'csrf-login@grrind.app',
+            '_password' => 'un-mot-de-passe-assez-long',
+            '_csrf_token' => 'forged-token',
+        ]);
+
+        self::assertResponseRedirects('/admin/login');
+    }
+
     public function testLogoutRequiresItsCsrfToken(): void
     {
         $this->openAccount('logout@grrind.app');
@@ -58,6 +70,9 @@ final class AdminSecurityTest extends ApiTestCase
         $this->login('logout@grrind.app', 'un-mot-de-passe-assez-long');
 
         $this->client->request('GET', '/admin/logout');
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+
+        $this->client->request('GET', '/admin/logout?_csrf_token=forged-token');
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
 
         $csrf = self::getContainer()->get(CsrfTokenManagerInterface::class);
