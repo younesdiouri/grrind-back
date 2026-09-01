@@ -69,6 +69,41 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertSame(1, $rulesets->revision());
     }
 
+    public function testColdReadLoadsExactlyOnePublishedSnapshot(): void
+    {
+        $snapshot = $this->rulesets()->snapshot();
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('fetchAssociative')->willReturn([
+            'revision' => 3,
+            'version' => 'ignored-at-runtime',
+            'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR),
+        ]);
+
+        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+
+        self::assertSame(3, $rulesets->revision());
+        self::assertSame($snapshot, $rulesets->snapshot());
+    }
+
+    public function testTwoReadersObserveTheSameCachedRevision(): void
+    {
+        $snapshot = $this->rulesets()->snapshot();
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('fetchAssociative')->willReturn([
+            'revision' => 5,
+            'version' => 'ignored-at-runtime',
+            'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR),
+        ]);
+        $cache = new TagAwareAdapter(new ArrayAdapter());
+
+        $first = new DatabaseGameRulesets($connection, $cache, 'v1-yaml');
+        $second = new DatabaseGameRulesets($connection, $cache, 'v1-yaml');
+
+        self::assertSame(5, $first->revision());
+        self::assertSame(5, $second->revision());
+        self::assertSame($first->snapshot(), $second->snapshot());
+    }
+
     public function testInvalidatedCacheLoadsOneWholeNewRevision(): void
     {
         $first = $this->rulesets()->snapshot();
