@@ -8,17 +8,28 @@ use App\Identity\Domain\Role;
 use App\Identity\Domain\User;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
 use App\Identity\UI\Console\GrantAdminCommand;
+use App\Progression\Application\GrantXp;
+use App\Progression\Application\GrantXpHandler;
+use App\Progression\Domain\XpTransaction;
+use App\Rewards\Domain\CoinReason;
+use App\Rewards\Infrastructure\Doctrine\CoinTransactionRepository;
+use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
+use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Timezone;
 use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\Battles;
 use DateTimeImmutable;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Symfony\Component\Uid\Uuid;
 
 /** Le dashboard doit conserver une session Symfony distincte des jetons mobiles. */
 final class AdminSecurityTest extends ApiTestCase
 {
+    use Battles;
+
     public function testAnonymousAndPlayerAreRefusedWhileAdminCanOpenDashboard(): void
     {
         $this->client->request('GET', '/admin');
@@ -131,6 +142,49 @@ final class AdminSecurityTest extends ApiTestCase
                 'entityFqcn' => User::class,
                 'batchActionCsrfToken' => 'bypass-attempt',
             ]);
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        }
+    }
+
+    public function testReadOnlyDetailsExposeOnlySafeFactsAndRefuseEveryMutationRoute(): void
+    {
+        $account = $this->openAccount('readonly-details@grrind.app');
+        $users = self::getContainer()->get(UserRepository::class);
+        $admin = $users->ofEmail('readonly-details@grrind.app');
+        self::assertNotNull($admin);
+        $admin->grant(Role::Admin);
+        $users->commit();
+
+        $now = new DateTimeImmutable();
+        $battleId = $this->recordBattle($account, $now);
+        $inventory = self::getContainer()->get(InventoryItemRepository::class)->grant($account->id, 'WORN_RUNNING_SHOES', null, $now);
+        $coins = self::getContainer()->get(CoinTransactionRepository::class)->record($account->id, CoinReason::WorkoutDrop, Uuid::v7(), 1, $now);
+        $grantXp = self::getContainer()->get(GrantXpHandler::class);
+        $grantXp(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3_600, $now));
+        $xp = self::getContainer()->get('doctrine')->getRepository(XpTransaction::class)->findOneBy(['userId' => $account->id]);
+        self::assertInstanceOf(XpTransaction::class, $xp);
+
+        $this->login('readonly-details@grrind.app', 'un-mot-de-passe-assez-long');
+        $details = [
+            '/admin/user' => $account->id->toRfc4122(),
+            '/admin/battle' => $battleId,
+            '/admin/inventory' => $inventory->id()->toRfc4122(),
+            '/admin/xp-transaction' => $xp->id()->toRfc4122(),
+            '/admin/coin-transaction' => $coins->id()->toRfc4122(),
+        ];
+
+        foreach ($details as $path => $id) {
+            $this->client->request('GET', $path.'/'.$id);
+            self::assertResponseIsSuccessful();
+            $content = strtolower((string) $this->client->getResponse()->getContent());
+            self::assertStringNotContainsString('seed', $content);
+            self::assertStringNotContainsString('access token', $content);
+            self::assertStringNotContainsString('refresh token', $content);
+
+            $this->client->request('GET', $path.'/'.$id.'/edit');
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+
+            $this->client->request('POST', $path.'/'.$id.'/delete', ['token' => 'bypass-attempt']);
             self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         }
     }
