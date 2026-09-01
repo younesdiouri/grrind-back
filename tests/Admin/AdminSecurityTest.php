@@ -178,6 +178,8 @@ final class AdminSecurityTest extends ApiTestCase
             self::assertResponseIsSuccessful();
             $content = strtolower((string) $this->client->getResponse()->getContent());
             self::assertStringNotContainsString('seed', $content);
+            self::assertStringNotContainsString('password', $content);
+            self::assertStringNotContainsString('rng', $content);
             self::assertStringNotContainsString('access token', $content);
             self::assertStringNotContainsString('refresh token', $content);
 
