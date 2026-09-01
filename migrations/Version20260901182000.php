@@ -66,6 +66,9 @@ final class Version20260901182000 extends AbstractMigration
     {
         $columns = array_keys($values);
         $values = array_map(static fn (mixed $value): mixed => is_bool($value) ? ($value ? 'true' : 'false') : $value, $values);
-        $this->addSql(sprintf('INSERT INTO %s (%s) VALUES (%s)', $table, implode(', ', $columns), implode(', ', array_fill(0, count($columns), '?'))), array_values($values));
+        // Cette migration répare aussi un déploiement interrompu après les tables éditables
+        // mais avant le snapshot. Les clés et ordres uniques rendent le seed rejouable sans
+        // écraser la configuration déjà administrée.
+        $this->addSql(sprintf('INSERT INTO %s (%s) VALUES (%s) ON CONFLICT DO NOTHING', $table, implode(', ', $columns), implode(', ', array_fill(0, count($columns), '?'))), array_values($values));
     }
 }
