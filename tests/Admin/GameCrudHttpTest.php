@@ -78,7 +78,9 @@ final class GameCrudHttpTest extends ApiTestCase
 
         $this->delete('/admin/loot-table/'.$updated->getId()->toRfc4122().'/edit', '/admin/loot-table/'.$updated->getId()->toRfc4122().'/delete');
         self::getContainer()->get('doctrine')->getManager()->clear();
-        self::assertNull($tables->findOneBy(['key' => $key, 'kind' => 'workout']));
+        $stillPublished = $tables->findOneBy(['key' => $key, 'kind' => 'workout']);
+        self::assertInstanceOf(GameLootTable::class, $stillPublished);
+        self::assertFalse($stillPublished->isActive());
     }
 
     public function testConfigurationIndexesExposeSearchFiltersAndStableSorts(): void
@@ -147,7 +149,9 @@ final class GameCrudHttpTest extends ApiTestCase
         $this->client->request('POST', '/admin/title/'.$deactivated->getId()->toRfc4122().'/delete', ['token' => $token]);
         self::assertResponseRedirects();
         self::getContainer()->get('doctrine')->getManager()->clear();
-        self::assertNull(self::getContainer()->get('doctrine')->getRepository(GameTitle::class)->findOneBy(['key' => $key]));
+        $stillPublished = self::getContainer()->get('doctrine')->getRepository(GameTitle::class)->findOneBy(['key' => $key]);
+        self::assertInstanceOf(GameTitle::class, $stillPublished);
+        self::assertFalse($stillPublished->isActive());
     }
 
     public function testInactiveEnemyCanBeCreatedUpdatedAndDeletedThroughAdmin(): void

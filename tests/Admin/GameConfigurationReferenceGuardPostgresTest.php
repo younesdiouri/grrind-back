@@ -18,6 +18,7 @@ final class GameConfigurationReferenceGuardPostgresTest extends KernelTestCase
         self::assertInstanceOf(Connection::class, $connection);
         $item = new GameItem();
         $item->setKey('FREE_POSTGRES_GUARD');
+        $item->setActive(false);
 
         new GameConfigurationReferenceGuard($connection)->assertDeletable($item);
         self::addToAssertionCount(1);

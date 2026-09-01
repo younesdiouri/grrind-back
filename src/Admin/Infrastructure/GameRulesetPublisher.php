@@ -55,6 +55,12 @@ final readonly class GameRulesetPublisher
             throw new LogicException('Les réglages globaux initiaux sont absents. Rejouer les migrations avant d’ouvrir EasyAdmin.');
         }
 
+        foreach ([...$items, ...$titles, ...$enemies, ...$tables] as $configuration) {
+            if ($configuration->isActive()) {
+                $configuration->markPublishedActive();
+            }
+        }
+
         $snapshot = self::snapshot($items, $titles, $enemies, $tables, $settings);
         $previous = $ruleset->snapshot();
         if (self::lootGameplay($previous) !== self::lootGameplay($snapshot)) {

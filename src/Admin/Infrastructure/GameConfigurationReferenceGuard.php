@@ -31,6 +31,16 @@ final readonly class GameConfigurationReferenceGuard
         if ($active) {
             throw new LogicException('Suppression refusée : désactivez d’abord cette configuration publiée.');
         }
+        $everPublishedActive = match (true) {
+            $configuration instanceof GameItem, $configuration instanceof GameTitle, $configuration instanceof GameEnemy, $configuration instanceof GameLootTable => $configuration->wasEverPublishedActive(),
+            default => false,
+        };
+        if ($everPublishedActive) {
+            // Une opération démarrée sous une ancienne révision peut encore écrire son fait.
+            // Garder sa clé après désactivation ferme cette course sans imposer de verrou à
+            // chaque lecture historique (inventaire, loot et bataille).
+            throw new LogicException('Suppression refusée : cette configuration a déjà été publiée active et peut être référencée par une opération en cours.');
+        }
         [$label, $key, $queries] = match (true) {
             $configuration instanceof GameItem => ['item', $configuration->getKey(), [
                 ['SELECT 1 FROM rewards_inventory_item WHERE item_key = ? LIMIT 1', [$configuration->getKey()]],

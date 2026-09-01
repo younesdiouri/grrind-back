@@ -20,6 +20,7 @@ class GameEnemy
     #[ORM\Id] #[ORM\Column(type: UuidType::NAME)] private Uuid $id;
     #[ORM\Column(name: 'enemy_key', length: 64)] private string $key;
     #[ORM\Column] private bool $active = true;
+    #[ORM\Column(name: 'ever_published_active')] private bool $everPublishedActive = false;
     #[ORM\Column(name: 'sort_order')] private int $sortOrder = 0;
     #[ORM\Column] private bool $boss = false;
     #[ORM\Column(name: 'minimum_level')] private int $minimumLevel = 1;
@@ -63,6 +64,16 @@ class GameEnemy
     public function setActive(bool $active): void
     {
         $this->active = $active;
+    }
+
+    public function wasEverPublishedActive(): bool
+    {
+        return $this->everPublishedActive;
+    }
+
+    public function markPublishedActive(): void
+    {
+        $this->everPublishedActive = true;
     }
 
     public function getSortOrder(): int

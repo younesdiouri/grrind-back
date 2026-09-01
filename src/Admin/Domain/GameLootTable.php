@@ -21,6 +21,7 @@ class GameLootTable
     #[ORM\Column(name: 'table_kind', length: 20)] private string $kind = 'workout';
     #[ORM\Column(name: 'table_key', length: 64)] private string $key;
     #[ORM\Column] private bool $active = true;
+    #[ORM\Column(name: 'ever_published_active')] private bool $everPublishedActive = false;
     #[ORM\Column(name: 'sort_order')] private int $sortOrder = 0;
     /** @var array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}|null */
     #[ORM\Column(type: Types::JSON, nullable: true)] private ?array $eligibility = null;
@@ -71,6 +72,16 @@ class GameLootTable
     public function setActive(bool $active): void
     {
         $this->active = $active;
+    }
+
+    public function wasEverPublishedActive(): bool
+    {
+        return $this->everPublishedActive;
+    }
+
+    public function markPublishedActive(): void
+    {
+        $this->everPublishedActive = true;
     }
 
     public function getSortOrder(): int

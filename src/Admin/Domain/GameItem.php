@@ -31,6 +31,10 @@ class GameItem
     #[ORM\Column]
     private bool $active = true;
 
+    /** Empêche de supprimer une clé qu'une révision antérieure a pu livrer à une opération. */
+    #[ORM\Column(name: 'ever_published_active')]
+    private bool $everPublishedActive = false;
+
     #[ORM\Column(name: 'sort_order')]
     private int $sortOrder = 0;
 
@@ -97,6 +101,16 @@ class GameItem
     public function setActive(bool $active): void
     {
         $this->active = $active;
+    }
+
+    public function wasEverPublishedActive(): bool
+    {
+        return $this->everPublishedActive;
+    }
+
+    public function markPublishedActive(): void
+    {
+        $this->everPublishedActive = true;
     }
 
     public function getSortOrder(): int

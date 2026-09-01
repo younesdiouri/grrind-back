@@ -87,6 +87,18 @@ abstract class GameCrudController extends AbstractCrudController
         }
     }
 
+    /** @param AdminContext<object> $context */
+    public function delete(AdminContext $context): KeyValueStore|Response
+    {
+        try {
+            return parent::delete($context);
+        } catch (EntityRemoveException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+
+            return $this->redirectToRoute($context->getDashboardRouteName());
+        }
+    }
+
     public function persistEntity(EntityManagerInterface $entityManager, object $entityInstance): void
     {
         $this->promotedImage = null;

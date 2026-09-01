@@ -85,4 +85,18 @@ final class GameConfigurationReferenceGuardTest extends TestCase
         $this->expectExceptionMessage('désactivez d’abord');
         new GameConfigurationReferenceGuard($connection)->assertDeletable($item);
     }
+
+    public function testAnInactiveKeyOncePublishedActiveCannotBeDeletedDuringAnOldOperation(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('fetchOne');
+        $item = new GameItem();
+        $item->setKey('FORMERLY_ACTIVE_ITEM');
+        $item->setActive(false);
+        $item->markPublishedActive();
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('déjà été publiée active');
+        new GameConfigurationReferenceGuard($connection)->assertDeletable($item);
+    }
 }
