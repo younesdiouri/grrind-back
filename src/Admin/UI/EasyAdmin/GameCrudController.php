@@ -158,7 +158,7 @@ abstract class GameCrudController extends AbstractCrudController
             return;
         }
         $name = $entity->getImagePath();
-        if (!preg_match('/^[a-f0-9]{40}(?:-[0-9]+)?\.(?:jpg|jpeg|png|webp)$/', $name)) {
+        if (!preg_match('/^[a-f0-9]{40}(?:-[0-9]+|-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?\.(?:jpg|jpeg|png|webp)$/', $name)) {
             throw new LogicException('Le nom de l’image envoyée est invalide.');
         }
         $staged = $this->stagingImageDirectory().\DIRECTORY_SEPARATOR.$name;

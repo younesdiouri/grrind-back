@@ -79,6 +79,34 @@ final class GameImageStagingTest extends TestCase
         }
     }
 
+    public function testConcurrentUploadsWithTheSameContentCannotCompensateEachOther(): void
+    {
+        $directory = $this->temporaryDirectory();
+        try {
+            $first = $this->controller($directory);
+            $second = $this->controller($directory);
+            $hash = str_repeat('d', 40);
+            $firstName = $hash.'-11111111-1111-4111-8111-111111111111.png';
+            $secondName = $hash.'-22222222-2222-4222-8222-222222222222.png';
+            file_put_contents($first->staging().\DIRECTORY_SEPARATOR.$firstName, 'first');
+            file_put_contents($second->staging().\DIRECTORY_SEPARATOR.$secondName, 'second');
+            $firstItem = new GameItem();
+            $firstItem->setImagePath($firstName);
+            $secondItem = new GameItem();
+            $secondItem->setImagePath($secondName);
+
+            $first->publishImage($firstItem);
+            $second->publishImage($secondItem);
+            // A échoue après sa promotion alors que B vient de committer : seul A est retiré.
+            $first->compensate($firstItem, 'placeholder.png');
+
+            self::assertFileDoesNotExist($directory.\DIRECTORY_SEPARATOR.$firstName);
+            self::assertSame('second', file_get_contents($directory.\DIRECTORY_SEPARATOR.$secondName));
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
     private function controller(string $directory): ImageStagingCrudController
     {
         return new ImageStagingCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter()), 'v1'), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), $directory);

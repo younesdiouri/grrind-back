@@ -62,7 +62,9 @@ final class ItemCrudController extends GameCrudController
         yield ImageField::new('imagePath')
             ->setBasePath('/game-images')
             ->setUploadDir($this->stagingImageDirectory())
-            ->setUploadedFileNamePattern('[contenthash].[extension]')
+            // EasyAdmin calcule le SHA-1, le suffixe UUID isole deux transactions qui ont le
+            // même binaire en staging : l'annulation de l'une ne peut plus effacer l'autre.
+            ->setUploadedFileNamePattern('[contenthash]-[uuid].[extension]')
             ->setFileConstraints(new Image(maxSize: '2M', mimeTypes: ['image/jpeg', 'image/png', 'image/webp'], maxWidth: 4096, maxHeight: 4096))
             ->mimeTypes('image/jpeg,image/png,image/webp')
             ->setFormTypeOption('allow_delete', false)

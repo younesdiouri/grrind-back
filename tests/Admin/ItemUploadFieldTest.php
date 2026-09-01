@@ -26,6 +26,7 @@ final class ItemUploadFieldTest extends TestCase
 
         self::assertTrue($this->imageField($controller, Crud::PAGE_NEW)->getAsDto()->getFormTypeOption('required'));
         self::assertFalse($this->imageField($controller, Crud::PAGE_EDIT)->getAsDto()->getFormTypeOption('required'));
+        self::assertSame('[contenthash]-[uuid].[extension]', $this->imageField($controller, Crud::PAGE_NEW)->getAsDto()->getCustomOption(ImageField::OPTION_UPLOADED_FILE_NAME_PATTERN));
     }
 
     public function testForgedMimeSvgOversizeAndOversizedDimensionsAreRejectedByTheActualFieldConstraint(): void
