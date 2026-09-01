@@ -92,6 +92,17 @@ final class BattlesTest extends ApiTestCase
         }
     }
 
+    public function testAHotBattleDoesNotReloadThePublishedRuleset(): void
+    {
+        $bob = $this->openAccount('battle-hot@grrind.app');
+        $this->client->disableReboot();
+        $this->fight($bob, 'battle-warmup');
+
+        $this->client->enableProfiler();
+        self::assertSame(Response::HTTP_CREATED, $this->fight($bob, 'battle-hot')->getStatusCode());
+        $this->assertNoRulesetSql();
+    }
+
     /**
      * Le rejeu d'une requête dont la réponse s'est perdue rend le **même** combat, jamais un
      * second : un tirage aléatoire ne se rattrape pas, contrairement à un import.
