@@ -55,8 +55,8 @@ abstract class GameCrudController extends AbstractCrudController
     public function deleteEntity(EntityManagerInterface $entityManager, object $entityInstance): void
     {
         try {
-            $this->references->assertDeletable($entityInstance);
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
+                $this->references->assertDeletable($entityInstance);
                 $entityManager->remove($entityInstance);
                 $entityManager->flush();
                 $this->publisher->publish($entityManager);
