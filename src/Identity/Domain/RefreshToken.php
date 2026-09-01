@@ -64,9 +64,11 @@ class RefreshToken
      * la rotation. Sans FK — comme `familyId`, c'est un pointeur applicatif, pas une
      * association vers une entité qu'on charge en cascade.
      *
-     * Sert `RefreshSessionHandler` à juger un rejeu de ce jeton (#250) : si ce successeur
-     * n'a jamais servi, la présentation la plus probable est une réponse de rotation que
-     * le client n'a jamais reçue — pas une copie qui circule.
+     * Ne sert pas à décider — le rejeu coupe toujours la famille, voir le docblock de
+     * `RefreshSessionHandler` (#250). Sert uniquement au journal qu'elle écrit avant de
+     * couper : si ce successeur n'a jamais servi, la présentation avait la forme d'une
+     * rotation perdue en vol plutôt que d'une copie qui circule — un diagnostic, pas un
+     * verdict qui changerait l'issue.
      */
     #[ORM\Column(type: UuidType::NAME, nullable: true)]
     private ?Uuid $successorId = null;
@@ -136,15 +138,10 @@ class RefreshToken
     }
 
     /**
-     * Consommé par une rotation normale, et seulement ça — pas par une révocation de
-     * famille. C'est la moitié d'`isReplay()` qui vaut la peine d'être examinée de plus
-     * près : voir `successorId()` et le docblock de `RefreshSessionHandler` (#250).
+     * Ne sert plus à décider (voir le docblock de `RefreshSessionHandler`, #250) : le
+     * rejeu, lui, coupe toujours la famille. Seulement à raconter, dans le journal, si la
+     * présentation avait la forme d'une rotation perdue en vol.
      */
-    public function wasRotated(): bool
-    {
-        return null !== $this->consumedAt && null === $this->revokedAt;
-    }
-
     public function successorId(): ?Uuid
     {
         return $this->successorId;

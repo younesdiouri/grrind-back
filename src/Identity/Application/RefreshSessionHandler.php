@@ -13,6 +13,7 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * #250 : entre `rotate()` + `commit()` côté serveur et l'écriture du secret neuf dans le
@@ -24,21 +25,28 @@ use Psr\Clock\ClockInterface;
  * Ce n'est donc pas un aléa réseau de quelques millisecondes — une fenêtre de grâce
  * temporelle sur le rejeu n'aurait pas couvert ce cas sans devenir absurdement longue.
  *
- * La forme retenue (piste 2 du ticket) : un jeton déjà consommé n'est traité comme une
- * rotation perdue — famille épargnée, nouvelle paire émise — que si son successeur direct
- * n'a **jamais servi** (`RefreshToken::wasRotated()` + `successorId()`). C'est la signature
- * exacte d'une réponse jamais reçue : un successeur qui a lui-même tourné signifie que
- * quelqu'un s'en est servi, donc que la présentation de l'ancien est une vraie copie qui
- * circule — la famille saute, comme avant #250.
+ * **Le serveur reste strict.** Une piste a été tentée puis retirée : tolérer le rejeu quand
+ * le successeur direct n'a jamais servi. Elle paraissait sûre, mais elle s'auto-entretient —
+ * chaque tolérance `rotate()` le successeur et fabrique donc un nouveau successeur inutilisé,
+ * qui autorise la tolérance suivante. Un voleur et le vrai client qui alternent ne présentent
+ * jamais un jeton dont le successeur a servi : `revokeFamily()` ne serait plus jamais atteint,
+ * et le voleur resterait authentifié indéfiniment sans qu'aucun signal ne le trahisse. Ce
+ * n'est pas rattrapable en resserrant la condition : côté serveur, une rotation perdue et un
+ * vol produisent **exactement les mêmes octets** — un jeton consommé présenté par quelqu'un
+ * qui n'a pas le successeur. On ne peut pas distinguer le voleur du vrai client qui a été
+ * doublé, et c'est la phrase d'origine du module, pas une régression de #250.
  *
- * Faiblesse assumée, pas ignorée : entre l'instant où le vrai client obtient son
- * successeur et celui où il s'en sert, un voleur qui rejouerait l'ancien passerait aussi.
- * On ne l'écarte pas parce qu'aucune des deux autres pistes ne fait mieux sans coûter plus
- * cher : une fenêtre de grâce temporelle est mal calibrée pour la même raison que ci-dessus,
- * et une clé d'idempotence sur la rotation exige un contrat client à refaire pour un
- * scénario mesuré une fois en seize jours. La ligne rouge tient : un rejeu toléré ne rend
- * jamais un secret déjà émis — la récupération réutilise `rotate()` telle quelle, qui ne
- * connaît que des hachages, et rend toujours une paire neuve.
+ * La seule tolérance serveur qui resterait envisageable est la piste 3 du ticket — une clé
+ * d'idempotence sur la rotation, générée et persistée côté client *avant* l'appel — parce
+ * qu'elle seule porte une preuve qu'un voleur n'a pas : un secret que le client a créé et
+ * gardé, pas un état de la lignée qu'il observe autant que lui. Non implémentée ici ; elle
+ * demande un contrat client à part.
+ *
+ * Ce qui reste de cette PR : `successorId` sur `RefreshToken`, et le journal ci-dessous. Le
+ * successeur ne sert plus à décider, seulement à raconter *pourquoi* une famille est tombée —
+ * distinguer, dans le `warning`, une rotation qui a plausiblement été perdue en vol (successeur
+ * jamais consommé) d'une copie qui a vraiment servi deux fois (successeur déjà consommé), sans
+ * changer l'issue : la famille saute dans les deux cas.
  */
 final readonly class RefreshSessionHandler
 {
@@ -47,6 +55,7 @@ final readonly class RefreshSessionHandler
         private UserDeviceRepository $devices,
         private JWTTokenManagerInterface $jwt,
         private ClockInterface $clock,
+        private LoggerInterface $logger,
         private int $accessTokenTtl,
     ) {
     }
@@ -64,25 +73,29 @@ final readonly class RefreshSessionHandler
         }
 
         if ($presented->isReplay()) {
-            $recovered = $this->recoverLostRotation($presented, $now);
+            // Voir le docblock de la classe : impossible de distinguer le voleur du vrai
+            // client, donc on coupe la famille entière — et l'appareil qu'elle portait, même
+            // transaction (#136, même geste que LogOutHandler).
+            $familyId = $presented->familyId();
 
-            if (null === $recovered) {
-                // Voir le docblock de la classe : impossible de distinguer le voleur du
-                // vrai client au-delà du cas couvert par la récupération, donc on coupe
-                // la famille entière — et l'appareil qu'elle portait, même transaction
-                // (#136, même geste que LogOutHandler).
-                $familyId = $presented->familyId();
+            // Identifiants de lignes et verdict seulement — jamais le secret du jeton, ni en
+            // clair, ni tronqué, ni haché : c'est la session elle-même.
+            $this->logger->warning('Rejeu détecté sur un refresh token : famille révoquée.', [
+                'presentedTokenId' => $presented->id()->toRfc4122(),
+                'familyId' => $familyId->toRfc4122(),
+                'successorId' => $presented->successorId()?->toRfc4122(),
+                'verdict' => $this->rejeuVerdict($presented, $now),
+            ]);
 
-                $this->refreshTokens->transactional(function () use ($familyId, $now): void {
-                    $this->refreshTokens->revokeFamily($familyId, $now);
-                    $this->devices->discardFamily($familyId);
-                });
+            $this->refreshTokens->transactional(function () use ($familyId, $now): void {
+                $this->refreshTokens->revokeFamily($familyId, $now);
+                $this->devices->discardFamily($familyId);
+            });
 
-                throw new InvalidRefreshToken();
-            }
+            throw new InvalidRefreshToken();
+        }
 
-            $presented = $recovered;
-        } elseif (!$presented->isUsable($now)) {
+        if (!$presented->isUsable($now)) {
             throw new InvalidRefreshToken();
         }
 
@@ -113,31 +126,24 @@ final readonly class RefreshSessionHandler
     }
 
     /**
-     * `null` fait tomber l'appelant sur le vrai rejeu : famille révoquée. Un résultat non
-     * `null` est le successeur à faire tourner à la place de `$presented` — voir le
-     * docblock de la classe pour la mesure qui a validé cette piste.
+     * Diagnostic seul — n'influence plus la décision, voir le docblock de la classe.
+     * C'est la donnée qui a manqué le 2026-09-01 : reconstruire cette distinction a demandé
+     * une requête SQL à la main après coup, pour un incident déjà passé.
      */
-    private function recoverLostRotation(RefreshToken $presented, DateTimeImmutable $now): ?RefreshToken
+    private function rejeuVerdict(RefreshToken $presented, DateTimeImmutable $now): string
     {
-        if (!$presented->wasRotated()) {
-            return null;
-        }
-
         $successorId = $presented->successorId();
 
         if (null === $successorId) {
-            return null;
+            return 'aucun successeur : jamais rotaté avant ce rejeu';
         }
 
         $successor = $this->refreshTokens->ofId($successorId);
 
-        // `isUsable()` couvre les trois façons dont ce successeur aurait cessé d'être la
-        // signature d'une rotation perdue : consommé (quelqu'un s'en est servi), révoqué
-        // (la famille est tombée entre-temps), ou expiré.
-        if (null === $successor || !$successor->isUsable($now)) {
-            return null;
+        if (null !== $successor && $successor->isUsable($now)) {
+            return 'successeur jamais consommé';
         }
 
-        return $successor;
+        return 'successeur déjà consommé';
     }
 }
