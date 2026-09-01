@@ -1,6 +1,5 @@
-# Le cache reste sur le filesystem : rien dans le code ne dépend d'un état partagé entre
-# processus. Le jour où quelque chose en dépendra — le rate limiter (#38) sera le premier —
-# ce pool devra devenir partagé, et c'est à ce moment-là que la question de Redis se pose.
+# Le cache reste sur le filesystem. Le snapshot de règles y survit aux resets des workers ;
+# PostgreSQL demeure néanmoins la source de vérité si ce pool est indisponible.
 framework:
     cache:
         pools:
