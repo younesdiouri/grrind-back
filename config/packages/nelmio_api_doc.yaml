@@ -1059,7 +1059,7 @@ when@dev:
                                 description: "Dans l'ordre du catalogue."
                                 items: { $ref: '#/components/schemas/DroppedItemModifier' }
                             priceCoins: { type: integer, example: 30, description: "En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue." }
-                            imageUrl: { type: string, format: uri, example: "https://api.grrind.app/admin/images/placeholder.png", description: "URL absolue de l'image livrée par le serveur." }
+                            imageUrl: { type: string, format: uri, example: "https://api.grrind.app/game-images/placeholder.png", description: "URL absolue de l'image livrée par le serveur." }
 
                     InventoryLine:
                         type: object

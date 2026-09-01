@@ -20,6 +20,9 @@ use Throwable;
 /** @extends AbstractCrudController<object> */
 abstract class GameCrudController extends AbstractCrudController
 {
+    /** Le fichier final réellement promu, pour ne jamais effacer une collision déjà publiée. */
+    private ?string $promotedImage = null;
+
     public function __construct(private readonly GameRulesetPublisher $publisher, private readonly GameConfigurationReferenceGuard $references, protected readonly string $gameImageDirectory)
     {
     }
@@ -31,6 +34,7 @@ abstract class GameCrudController extends AbstractCrudController
 
     public function persistEntity(EntityManagerInterface $entityManager, object $entityInstance): void
     {
+        $this->promotedImage = null;
         try {
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
                 $entityManager->persist($entityInstance);
@@ -39,6 +43,7 @@ abstract class GameCrudController extends AbstractCrudController
                 $this->publisher->publish($entityManager);
             });
             $this->publisher->invalidateAfterCommit();
+            $this->promotedImage = null;
         } catch (InvalidArgumentException|LogicException $exception) {
             $this->compensateImage($entityInstance, null);
             // Retourner ferait croire à EasyAdmin que l'écriture a réussi et déclencherait
@@ -52,6 +57,7 @@ abstract class GameCrudController extends AbstractCrudController
 
     public function updateEntity(EntityManagerInterface $entityManager, object $entityInstance): void
     {
+        $this->promotedImage = null;
         $original = $entityManager->getUnitOfWork()->getOriginalEntityData($entityInstance);
         $oldImage = $original['imagePath'] ?? null;
         \assert(null === $oldImage || \is_string($oldImage));
@@ -62,6 +68,7 @@ abstract class GameCrudController extends AbstractCrudController
                 $this->publisher->publish($entityManager);
             });
             $this->publisher->invalidateAfterCommit();
+            $this->promotedImage = null;
         } catch (InvalidArgumentException|LogicException $exception) {
             $this->compensateImage($entityInstance, $oldImage);
             throw new BadRequestHttpException($exception->getMessage(), $exception);
@@ -112,15 +119,23 @@ abstract class GameCrudController extends AbstractCrudController
             return;
         }
         $final = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;
+        // Le hash de contenu peut naturellement désigner un fichier déjà publié. La collision
+        // est alors le même binaire attendu ; conserver l'ancien chemin protège ses snapshots.
+        if (is_file($final)) {
+            unlink($staged);
+
+            return;
+        }
         if (!rename($staged, $final)) {
             throw new LogicException('Impossible de publier l’image envoyée.');
         }
+        $this->promotedImage = $name;
     }
 
     /** Retire seulement le nouveau fichier déplacé par EasyAdmin avant notre transaction. */
     protected function compensateImage(object $entity, ?string $previousPath): void
     {
-        if (!$entity instanceof GameItem || $entity->getImagePath() === $previousPath) {
+        if (!$entity instanceof GameItem || $entity->getImagePath() === $previousPath || $entity->getImagePath() !== $this->promotedImage) {
             return;
         }
         $name = $entity->getImagePath();
@@ -131,5 +146,6 @@ abstract class GameCrudController extends AbstractCrudController
         if (is_file($path)) {
             unlink($path);
         }
+        $this->promotedImage = null;
     }
 }

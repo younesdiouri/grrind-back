@@ -13,7 +13,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Option\ReplacedFileBehavior;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ImageField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
@@ -57,6 +56,6 @@ final class ItemCrudController extends GameCrudController
             ->setFormTypeOption('allow_delete', false)
             ->setCustomOption(ImageField::OPTION_REPLACED_FILE_BEHAVIOR, ReplacedFileBehavior::KEEP)
             ->setRequired('new' === $pageName);
-        yield Field::new('translations')->setFormType(TranslationsType::class)->hideOnIndex();
+        yield StructuredField::new('translations')->setFormType(TranslationsType::class)->hideOnIndex();
     }
 }

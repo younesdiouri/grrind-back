@@ -21,6 +21,11 @@ class GameSettings
         return 'Réglages globaux';
     }
 
+    public function getId(): int
+    {
+        return $this->id;
+    }
+
     /** @return array<string, int> */
     public function getFighter(): array
     {

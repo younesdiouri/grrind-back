@@ -17,4 +17,12 @@ final class GameItemImagePathTest extends TestCase
 
         self::assertSame('0123456789012345678901234567890123456789.png', $item->getImagePath());
     }
+
+    public function testEditingAPlaceholderOnAnEmptyVolumeDoesNotTurnItIntoAnEmptyPath(): void
+    {
+        $item = new GameItem();
+        $item->setImagePath('');
+
+        self::assertSame('placeholder.png', $item->getImagePath());
+    }
 }

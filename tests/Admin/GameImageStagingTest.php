@@ -58,6 +58,27 @@ final class GameImageStagingTest extends TestCase
         }
     }
 
+    public function testExistingContentHashWinsCollisionAndIsNeverCompensatedAway(): void
+    {
+        $directory = $this->temporaryDirectory();
+        try {
+            $controller = $this->controller($directory);
+            $name = str_repeat('c', 40).'.png';
+            file_put_contents($directory.\DIRECTORY_SEPARATOR.$name, 'published-before');
+            file_put_contents($controller->staging().\DIRECTORY_SEPARATOR.$name, 'same-content-upload');
+            $item = new GameItem();
+            $item->setImagePath($name);
+
+            $controller->publishImage($item);
+            $controller->compensate($item, 'placeholder.png');
+
+            self::assertSame('published-before', file_get_contents($directory.\DIRECTORY_SEPARATOR.$name));
+            self::assertFileDoesNotExist($controller->staging().\DIRECTORY_SEPARATOR.$name);
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
     private function controller(string $directory): ImageStagingCrudController
     {
         return new ImageStagingCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter()), 'v1'), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), $directory);

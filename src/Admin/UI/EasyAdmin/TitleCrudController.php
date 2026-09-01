@@ -9,7 +9,6 @@ use App\Admin\UI\Form\TranslationsType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 
@@ -38,6 +37,6 @@ final class TitleCrudController extends GameCrudController
         yield TextField::new('conditionType');
         yield IntegerField::new('threshold');
         yield TextField::new('discipline');
-        yield Field::new('translations')->setFormType(TranslationsType::class)->hideOnIndex();
+        yield StructuredField::new('translations')->setFormType(TranslationsType::class)->hideOnIndex();
     }
 }
