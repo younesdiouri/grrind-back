@@ -26,6 +26,7 @@ services:
 
     App\Shared\Infrastructure\Config\DatabaseGameRulesets:
         arguments:
+            $cache: '@game.ruleset'
             $yamlGameplayVersion: '%game.ruleset_version%'
 
     App\Admin\Infrastructure\GameRulesetPublisher:

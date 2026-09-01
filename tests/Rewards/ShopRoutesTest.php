@@ -16,7 +16,9 @@ use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bridge\Doctrine\DataCollector\DoctrineDataCollector;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Profiler\Profile;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -79,6 +81,32 @@ final class ShopRoutesTest extends ApiTestCase
 
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('content-type', 'image/png');
+    }
+
+    public function testAHotCatalogReadDoesNotQueryThePublishedConfigurationAgain(): void
+    {
+        $bob = $this->openAccount('hot-cache@grrind.app');
+        $this->client->disableReboot();
+        $this->shop($bob);
+
+        $this->client->enableProfiler();
+        $response = $this->get('/api/shop', $bob->headers);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $profile = $this->client->getProfile();
+        self::assertInstanceOf(Profile::class, $profile);
+        $collector = $profile->getCollector('db');
+        self::assertInstanceOf(DoctrineDataCollector::class, $collector);
+
+        $connections = $collector->getQueries();
+        foreach ($connections as $queries) {
+            self::assertIsArray($queries);
+            foreach ($queries as $query) {
+                self::assertIsArray($query);
+                $sql = $query['sql'] ?? '';
+                self::assertIsString($sql);
+                self::assertDoesNotMatchRegularExpression('/\bgame_ruleset\b/i', $sql);
+            }
+        }
     }
 
     public function testNoEpicOrLegendaryItemEverAppearsOnTheStall(): void

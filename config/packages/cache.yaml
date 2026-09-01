@@ -2,4 +2,10 @@
 # processus. Le jour où quelque chose en dépendra — le rate limiter (#38) sera le premier —
 # ce pool devra devenir partagé, et c'est à ce moment-là que la question de Redis se pose.
 framework:
-    cache: ~
+    cache:
+        pools:
+            # Le snapshot est relu dans les workers et entre deux requêtes : un pool Array
+            # ferait repasser PostgreSQL à chaque reset Symfony et annulerait le hot path.
+            game.ruleset:
+                adapter: cache.adapter.filesystem
+                tags: true
