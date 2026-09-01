@@ -11,8 +11,10 @@ use App\Shared\Infrastructure\Config\DatabaseGameRulesets;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Cache\Adapter\TagAwareAdapter;
+use Symfony\Contracts\Cache\CacheInterface;
 
 /** Les entrées retirées restent lisibles pour les faits, jamais sélectionnables à nouveau. */
 final class DatabaseRuntimeCatalogTest extends TestCase
@@ -88,6 +90,24 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         $published = $rulesets->snapshot();
         /** @var array{items: list<array{price_coins: int}>} $published */
         self::assertSame(99, $published['items'][1]['price_coins']);
+    }
+
+    public function testCacheFailureNeverRejectsThePublishedDatabaseRuleset(): void
+    {
+        $snapshot = $this->rulesets()->snapshot();
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('fetchAssociative')->willReturn([
+            'revision' => 7,
+            'version' => 'ignored-at-runtime',
+            'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR),
+        ]);
+        $cache = $this->createMock(CacheInterface::class);
+        $cache->expects(self::once())->method('get')->willThrowException(new RuntimeException('Redis indisponible'));
+
+        $rulesets = new DatabaseGameRulesets($connection, $cache, 'v1-yaml');
+
+        self::assertSame(7, $rulesets->revision());
+        self::assertSame($snapshot, $rulesets->snapshot());
     }
 
     private function rulesets(): GameRulesets
