@@ -24,7 +24,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Les tables livrées, celles de `config/game/v1/items.yaml` et `config/game/v1/loot.yaml`,
+ * Les tables publiées depuis l'administration,
  * contre ce que le domaine exige réellement — même geste que `CombatCoverageTest` et
  * `AttributeSplitCoverageTest`.
  *

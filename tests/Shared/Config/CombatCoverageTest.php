@@ -24,7 +24,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * La table livrée, celle de `config/game/v1/combat.yaml`, contre ce que le domaine exige
+ * Le catalogue publié depuis l'administration, contre ce que le domaine exige
  * réellement — même geste qu'`AttributeSplitCoverageTest` pour la répartition d'XP. Que la
  * compilation ait abouti prouve déjà que `CombatSection` a validé les socles et le
  * catalogue sans broncher ; ce test vérifie ce qu'ils valent, construits depuis les

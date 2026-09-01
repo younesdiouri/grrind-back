@@ -13,7 +13,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * Le filet sous le catalogue de traduction — même geste que `EnemyTranslationsTest` et
  * `TitleTranslationsTest`.
  *
- * Un objet ajouté à `config/game/v1/items.yaml` sans son nom ne casse rien : le traducteur
+ * Un objet ajouté au snapshot publié depuis l'administration sans son nom ne casse rien : le traducteur
  * rend la clé, et elle part sur le réseau. C'est un bug silencieux, qui ne se voit qu'en
  * production et seulement par les joueurs d'une des deux langues.
  */
