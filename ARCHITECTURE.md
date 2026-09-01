@@ -581,8 +581,9 @@ Ce qui compte, et qui n'est pas visible dans le code parce que c'est le framewor
 
 ## 6. La balance du jeu est du code, pas de la donnée
 
-Courbe de niveaux, barème d'XP, garde-fous, catalogue de titres : tout vit en YAML versionné
-sous `config/game/v1/`, **lu une seule fois, à la compilation du conteneur**.
+Courbe de niveaux, barème d'XP et garde-fous restent en YAML versionné sous
+`config/game/v1/`, **lus une seule fois à la compilation du conteneur**. Le catalogue
+d'items, loot, titres et combat est le snapshot publié en base, administré dans EasyAdmin.
 
 ```mermaid
 flowchart TB
@@ -590,7 +591,7 @@ flowchart TB
         y1["training.yaml"]
         y2["xp.yaml"]
         y3["levels.yaml"]
-        y4["titles.yaml"]
+        y4["autres YAML gameplay"]
     end
 
     yaml --> pass["<b>GameBalancePass</b><br/><i>compilation du conteneur</i>"]
@@ -599,10 +600,12 @@ flowchart TB
     pass -->|"valide, ou casse le build"| params["paramètres scalaires<br/>game.xp.disciplines …"]
     pass -->|"SHA-256 de la config normalisée"| version["rulesetVersion<br/>v1-fe4edd019948"]
 
-    params --> objs["objets typés du domaine<br/>XpRates · LevelCurve · TitleCatalog<br/>DiminishingReturns · TrainingRules"]
-    version --> tx["stocké sur <b>chaque</b> XpTransaction"]
+    params --> ruleset["<b>GameRulesets</b><br/>YAML restant + snapshot DB publié"]
+    ruleset --> objs["objets typés du domaine<br/>XpRates · LevelCurve · TitleCatalog<br/>DiminishingReturns · TrainingRules"]
+    version --> ruleset
+    ruleset --> tx["version hybride stockée sur les faits"]
 
-    trad["translations/titles.fr.yaml<br/>translations/titles.en.yaml"] -.->|"hors du hash — les mots<br/>ne sont pas de l'équilibrage"| objs
+    trad["traductions DB FR/EN"] -.->|"hors du hash — les mots<br/>ne sont pas de l'équilibrage"| objs
 ```
 
 **Trois conséquences voulues :**

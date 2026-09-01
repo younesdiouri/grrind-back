@@ -476,9 +476,9 @@ when@test:
         App\Tests\Support\Messaging\:
             resource: '../tests/Support/Messaging/'
 
-        # Publics pour que `FightBattleHandlerTest` (#211) appelle le pipeline de combat
-        # directement, avec les mêmes collaborateurs — chargés depuis le vrai `combat.yaml`
-        # — que ceux que le handler emploie. `FightController` (#212) les consomme
+        # Publics pour que `FightBattleHandlerTest` appelle le pipeline de combat
+        # directement, avec les mêmes collaborateurs du snapshot publié que ceux du handler.
+        # `FightController` les consomme
         # désormais aussi, mais par injection de constructeur : ça ne rend pas la
         # déclaration publique inutile, `container->get()` continue d'exiger `public: true`
         # — même besoin que `GrantXpHandler` plus haut.

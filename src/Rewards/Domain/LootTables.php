@@ -21,18 +21,11 @@ use InvalidArgumentException;
  *
  * ## Pourquoi les clés inconnues ne sont pas refusées par `LootSection`
  *
- * Un objet inexistant ou une clé d'adversaire inconnue sont des références **vers un autre
- * fichier** — le snapshot publié, le snapshot publié — et `GameBalanceLoader` valide chaque fichier
- * indépendamment des autres : `LootSection` ne voit jamais leur contenu. C'est exactement
- * la limite déjà documentée par {@see \App\Progression\Infrastructure\Config\AttributeSplitSection}
- * pour `xp.yaml` et `attributes.yaml`, et la même réponse s'applique : le croisement se
- * fait ici, à la construction réelle du service, câblée par `services.yaml` avec les
- * paramètres bruts des sections concernées — `%game.items.items%`, `%game.combat.enemies%`,
- * `%game.combat.bosses%` — et non par un import d'`ItemCatalog` ni d'`EnemyCatalog` :
- * Deptrac interdit à `Rewards` de connaître `Combat`, et ces deux tableaux ne sont que de
- * la donnée, jamais un objet de leur domaine. La couverture réelle est prouvée par
- * `RewardsCoverageTest`, qui construit cette classe depuis les paramètres du conteneur
- * comme `services.yaml` le fait réellement — même geste qu'`AttributeSplitCoverageTest`.
+ * Un objet inexistant ou une clé d'adversaire inconnue sont des références vers une autre
+ * partie du snapshot publié. Les croiser ici garde `Rewards` indépendant de `Combat` : les
+ * deux tableaux restent de la donnée, jamais un objet importé d'un autre module. La
+ * publication admin reconstruit cette classe avant commit, et la couverture runtime
+ * construit la même forme depuis `GameRulesets`.
  *
  * ## Une clé de table de coffre doit être un objet `kind: CHEST` connu (#230)
  *
