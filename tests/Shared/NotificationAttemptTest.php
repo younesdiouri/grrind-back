@@ -15,9 +15,8 @@ use Symfony\Component\Uid\Uuid;
 final class NotificationAttemptTest extends ApiTestCase
 {
     /**
-     * `SESSION_CREDITED` est retirée du catalogue vivant au #256, mais l'unique trace
-     * antérieure reste un audit : la colonne doit donc s'hydrater comme une chaîne, pas
-     * comme une enum qui ne connaît plus cette valeur.
+     * Une catégorie retirée reste une trace d'audit : la colonne doit donc s'hydrater comme
+     * une chaîne, pas comme une enum qui ne connaît plus cette valeur.
      */
     public function testHydratesAnHistoricalCategoryThatIsNoLongerLive(): void
     {
@@ -27,14 +26,14 @@ final class NotificationAttemptTest extends ApiTestCase
             'id' => $id->toRfc4122(),
             'event_id' => Uuid::v7()->toRfc4122(),
             'recipient_id' => Uuid::v7()->toRfc4122(),
-            'category' => 'SESSION_CREDITED',
+            'category' => 'RETIRED_CATEGORY',
             'created_at' => new DateTimeImmutable(),
         ], ['created_at' => Types::DATETIMETZ_IMMUTABLE]);
 
         $attempt = $this->attempts()->find($id);
 
         self::assertInstanceOf(NotificationAttempt::class, $attempt);
-        self::assertSame('SESSION_CREDITED', $attempt->category());
+        self::assertSame('RETIRED_CATEGORY', $attempt->category());
     }
 
     private function attempts(): NotificationAttemptRepository

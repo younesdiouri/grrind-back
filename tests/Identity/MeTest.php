@@ -148,26 +148,11 @@ final class MeTest extends ApiTestCase
         );
     }
 
-    public function testRejectsAnUnknownCategory(): void
+    public function testRejectsAnUnknownCategoryAsAValidationError(): void
     {
         $response = $this->send('PATCH', '/api/me', [
             'notificationPreferences' => [
                 ['category' => 'NOT_A_CATEGORY', 'enabled' => false],
-            ],
-        ], $this->authenticated());
-
-        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
-    }
-
-    /**
-     * La compatibilité d'entrée a pris fin avec le bake #255 : cette valeur est désormais
-     * une valeur d'enum inconnue, pas un cas spécial à maintenir dans le contrôleur.
-     */
-    public function testRejectsTheRetiredSessionCreditedCategoryAsAValidationError(): void
-    {
-        $response = $this->send('PATCH', '/api/me', [
-            'notificationPreferences' => [
-                ['category' => 'SESSION_CREDITED', 'enabled' => false],
             ],
         ], $this->authenticated());
 
