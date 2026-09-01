@@ -78,6 +78,26 @@ final class GameCrudHttpTest extends ApiTestCase
         self::assertNull($tables->findOneBy(['key' => $key, 'kind' => 'workout']));
     }
 
+    public function testConfigurationIndexesExposeSearchFiltersAndStableSorts(): void
+    {
+        $this->loginAdmin('catalog-index-admin@grrind.app');
+
+        foreach (['/admin/item', '/admin/title', '/admin/enemy', '/admin/loot-table'] as $path) {
+            $crawler = $this->client->request('GET', $path);
+            self::assertResponseIsSuccessful();
+            self::assertGreaterThan(0, $crawler->filter('th[data-column="key"].searchable')->count());
+            self::assertGreaterThan(0, $crawler->filter('th[data-column="sortOrder"] a')->count());
+
+            $filters = $this->client->request('GET', $path.'/render-filters');
+            self::assertResponseIsSuccessful();
+            self::assertGreaterThan(0, $filters->filter('form[data-ea-filters-form-id]')->count());
+        }
+
+        $settings = $this->client->request('GET', '/admin/settings');
+        self::assertResponseIsSuccessful();
+        self::assertGreaterThan(0, $settings->filter('th[data-column="id"] a')->count());
+    }
+
     public function testTitleCanBeCreatedUpdatedDeactivatedAndDeletedThroughAdmin(): void
     {
         $this->loginAdmin();

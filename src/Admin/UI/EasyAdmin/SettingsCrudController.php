@@ -10,6 +10,7 @@ use App\Admin\UI\Form\LootLuckType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 
 final class SettingsCrudController extends GameCrudController
 {
@@ -32,7 +33,8 @@ final class SettingsCrudController extends GameCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        yield StructuredField::new('fighter')->setFormType(FighterType::class);
-        yield StructuredField::new('lootLuck')->setFormType(LootLuckType::class);
+        yield IntegerField::new('id')->onlyOnIndex();
+        yield StructuredField::new('fighter')->setFormType(FighterType::class)->hideOnIndex();
+        yield StructuredField::new('lootLuck')->setFormType(LootLuckType::class)->hideOnIndex();
     }
 }
