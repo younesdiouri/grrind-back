@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
-use App\Admin\Infrastructure\GameRulesetSeed;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 use Symfony\Component\Uid\Uuid;
@@ -19,6 +18,7 @@ final class Version20260901182000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        require_once __DIR__.'/GameRulesetSeed.php';
         $this->addSql('ALTER TABLE game_settings ADD COLUMN IF NOT EXISTS loot_version INT NOT NULL DEFAULT 1');
         // La première ébauche de #260 publiait le marqueur transitoire `v1-seeded`.
         // La même empreinte hybride que le seed immuable le remplace sans toucher au

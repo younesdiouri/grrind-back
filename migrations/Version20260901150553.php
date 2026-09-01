@@ -20,6 +20,7 @@ final class Version20260901150553 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        require_once __DIR__.'/GameRulesetSeed.php';
         $this->addSql('CREATE TABLE game_enemy (id UUID NOT NULL, enemy_key VARCHAR(64) NOT NULL, active BOOLEAN NOT NULL, sort_order INT NOT NULL, boss BOOLEAN NOT NULL, minimum_level INT NOT NULL, hp INT NOT NULL, damage INT NOT NULL, mitigation_permille INT NOT NULL, extra_turn_permille INT NOT NULL, dodge_permille INT NOT NULL, translations JSON NOT NULL, PRIMARY KEY (id), CONSTRAINT game_enemy_sort_order_unique UNIQUE (boss, sort_order))');
         $this->addSql('CREATE UNIQUE INDEX uniq_game_enemy_key ON game_enemy (enemy_key)');
         $this->addSql('CREATE TABLE game_item (id UUID NOT NULL, item_key VARCHAR(64) NOT NULL, active BOOLEAN NOT NULL, sort_order INT NOT NULL UNIQUE, rarity VARCHAR(20) NOT NULL, kind VARCHAR(20) NOT NULL, slot VARCHAR(30) DEFAULT NULL, price_coins INT NOT NULL CHECK (price_coins >= 0), modifiers JSON NOT NULL, shop_available BOOLEAN NOT NULL, shop_minimum_level INT DEFAULT NULL CHECK (shop_minimum_level IS NULL OR shop_minimum_level >= 1), image_path VARCHAR(255) NOT NULL, translations JSON NOT NULL, PRIMARY KEY (id))');
@@ -30,7 +31,7 @@ final class Version20260901150553 extends AbstractMigration
         $this->addSql('CREATE TABLE game_settings (id INT NOT NULL, fighter JSON NOT NULL, loot_luck JSON NOT NULL, loot_version INT NOT NULL, PRIMARY KEY (id))');
         $this->addSql('CREATE TABLE game_title (id UUID NOT NULL, title_key VARCHAR(64) NOT NULL, active BOOLEAN NOT NULL, sort_order INT NOT NULL UNIQUE, condition_type VARCHAR(40) NOT NULL, threshold INT NOT NULL CHECK (threshold >= 0), discipline VARCHAR(30) DEFAULT NULL, translations JSON NOT NULL, PRIMARY KEY (id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_game_title_key ON game_title (title_key)');
-        $seed = \App\Admin\Infrastructure\GameRulesetSeed::data();
+        $seed = GameRulesetSeed::data();
         /** @var list<array<string, mixed>> $items */
         $items = $seed['items'];
         /** @var list<array<string, mixed>> $titles */
