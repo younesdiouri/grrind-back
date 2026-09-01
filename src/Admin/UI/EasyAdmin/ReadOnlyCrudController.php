@@ -10,6 +10,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\BatchActionDto;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
@@ -35,6 +36,12 @@ abstract class ReadOnlyCrudController extends AbstractCrudController
     }
 
     public function delete(AdminContext $context): KeyValueStore|Response
+    {
+        throw new AccessDeniedHttpException('Cette ressource est en lecture seule.');
+    }
+
+    /** @param BatchActionDto<object> $batchActionDto */
+    public function batchDelete(AdminContext $context, BatchActionDto $batchActionDto): Response
     {
         throw new AccessDeniedHttpException('Cette ressource est en lecture seule.');
     }
