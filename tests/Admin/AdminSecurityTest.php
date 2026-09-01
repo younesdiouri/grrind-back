@@ -8,6 +8,7 @@ use App\Identity\Domain\Role;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
 use App\Tests\Support\ApiTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
 /** Le dashboard doit conserver une session Symfony distincte des jetons mobiles. */
 final class AdminSecurityTest extends ApiTestCase
@@ -37,6 +38,25 @@ final class AdminSecurityTest extends ApiTestCase
         $this->openAccount('wrong-password@grrind.app');
         $this->login('wrong-password@grrind.app', 'incorrect');
 
+        self::assertResponseRedirects('/admin/login');
+    }
+
+    public function testLogoutRequiresItsCsrfToken(): void
+    {
+        $this->openAccount('logout@grrind.app');
+        $users = self::getContainer()->get(UserRepository::class);
+        $user = $users->ofEmail('logout@grrind.app');
+        self::assertNotNull($user);
+        $user->grant(Role::Admin);
+        $users->commit();
+        $this->login('logout@grrind.app', 'un-mot-de-passe-assez-long');
+
+        $this->client->request('GET', '/admin/logout');
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+
+        $csrf = self::getContainer()->get(CsrfTokenManagerInterface::class);
+        $token = $csrf->getToken('logout')->getValue();
+        $this->client->request('GET', '/admin/logout?_csrf_token='.$token);
         self::assertResponseRedirects('/admin/login');
     }
 
