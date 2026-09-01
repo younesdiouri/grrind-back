@@ -8,6 +8,7 @@ use App\Admin\Domain\GameLootTable;
 use App\Admin\UI\Form\EligibilityType;
 use App\Admin\UI\Form\LootEntryType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
@@ -20,6 +21,16 @@ final class LootTableCrudController extends GameCrudController
     public static function getEntityFqcn(): string
     {
         return GameLootTable::class;
+    }
+
+    public function configureCrud(Crud $crud): Crud
+    {
+        return parent::configureCrud($crud)->setSearchFields(['key', 'kind'])->setDefaultSort(['kind' => 'ASC', 'sortOrder' => 'ASC']);
+    }
+
+    public function configureFilters(Filters $filters): Filters
+    {
+        return $filters->add('active')->add('kind');
     }
 
     public function configureFields(string $pageName): iterable

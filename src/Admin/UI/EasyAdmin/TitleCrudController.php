@@ -7,6 +7,7 @@ namespace App\Admin\UI\EasyAdmin;
 use App\Admin\Domain\GameTitle;
 use App\Admin\UI\Form\TranslationsType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
@@ -17,6 +18,16 @@ final class TitleCrudController extends GameCrudController
     public static function getEntityFqcn(): string
     {
         return GameTitle::class;
+    }
+
+    public function configureCrud(Crud $crud): Crud
+    {
+        return parent::configureCrud($crud)->setSearchFields(['key', 'conditionType', 'discipline'])->setDefaultSort(['sortOrder' => 'ASC']);
+    }
+
+    public function configureFilters(Filters $filters): Filters
+    {
+        return $filters->add('active')->add('conditionType')->add('discipline');
     }
 
     public function configureFields(string $pageName): iterable

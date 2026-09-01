@@ -8,6 +8,7 @@ use App\Admin\Domain\GameItem;
 use App\Admin\UI\Form\ModifierEntryType;
 use App\Admin\UI\Form\TranslationsType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Option\ReplacedFileBehavior;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
@@ -27,7 +28,12 @@ final class ItemCrudController extends GameCrudController
 
     public function configureCrud(Crud $crud): Crud
     {
-        return parent::configureCrud($crud)->setSearchFields(['key', 'rarity', 'kind']);
+        return parent::configureCrud($crud)->setSearchFields(['key', 'rarity', 'kind'])->setDefaultSort(['sortOrder' => 'ASC']);
+    }
+
+    public function configureFilters(Filters $filters): Filters
+    {
+        return $filters->add('active')->add('rarity')->add('kind')->add('shopAvailable');
     }
 
     public function configureFields(string $pageName): iterable
