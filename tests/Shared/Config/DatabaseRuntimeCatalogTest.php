@@ -67,6 +67,29 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertSame(1, $rulesets->revision());
     }
 
+    public function testInvalidatedCacheLoadsOneWholeNewRevision(): void
+    {
+        $first = $this->rulesets()->snapshot();
+        /** @var array{items: list<array<string, mixed>>} $first */
+        $second = $first;
+        $second['items'][1]['price_coins'] = 99;
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            ['revision' => 1, 'version' => 'ignored', 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
+            ['revision' => 2, 'version' => 'ignored', 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+        );
+        $cache = new TagAwareAdapter(new ArrayAdapter());
+        $rulesets = new DatabaseGameRulesets($connection, $cache, 'v1-yaml');
+        self::assertSame(1, $rulesets->revision());
+
+        $cache->invalidateTags(['game.ruleset']);
+        $rulesets->reset();
+        self::assertSame(2, $rulesets->revision());
+        $published = $rulesets->snapshot();
+        /** @var array{items: list<array{price_coins: int}>} $published */
+        self::assertSame(99, $published['items'][1]['price_coins']);
+    }
+
     private function rulesets(): GameRulesets
     {
         return new class implements GameRulesets {
