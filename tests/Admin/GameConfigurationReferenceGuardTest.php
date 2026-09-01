@@ -23,6 +23,7 @@ final class GameConfigurationReferenceGuardTest extends TestCase
     public function testUnusedConfigurationCanBeDeleted(Closure $configuration, int $referenceQueries): void
     {
         $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturn(['active' => false, 'ever_published_active' => false]);
         $connection->expects(self::exactly($referenceQueries))->method('fetchOne')->willReturn(false);
 
         new GameConfigurationReferenceGuard($connection)->assertDeletable($configuration());
@@ -33,6 +34,7 @@ final class GameConfigurationReferenceGuardTest extends TestCase
     public function testFirstConfigurationOrHistoricalReferenceRefusesDeletion(Closure $configuration, int $referenceQueries): void
     {
         $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturn(['active' => false, 'ever_published_active' => false]);
         $connection->expects(self::once())->method('fetchOne')->willReturn('used');
 
         $this->expectException(LogicException::class);
@@ -77,6 +79,7 @@ final class GameConfigurationReferenceGuardTest extends TestCase
     public function testActiveConfigurationMustBeDeactivatedBeforePhysicalDeletion(): void
     {
         $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturn(['active' => true, 'ever_published_active' => true]);
         $connection->expects(self::never())->method('fetchOne');
         $item = new GameItem();
         $item->setKey('PUBLISHED_ITEM');
@@ -89,6 +92,7 @@ final class GameConfigurationReferenceGuardTest extends TestCase
     public function testAnInactiveKeyOncePublishedActiveCannotBeDeletedDuringAnOldOperation(): void
     {
         $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturn(['active' => false, 'ever_published_active' => true]);
         $connection->expects(self::never())->method('fetchOne');
         $item = new GameItem();
         $item->setKey('FORMERLY_ACTIVE_ITEM');

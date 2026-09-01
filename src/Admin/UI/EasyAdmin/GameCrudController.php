@@ -22,6 +22,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Exception\EntityRemoveException;
 use InvalidArgumentException;
 use LogicException;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -47,7 +48,10 @@ abstract class GameCrudController extends AbstractCrudController
     public function new(AdminContext $context): KeyValueStore|Response
     {
         try {
-            return parent::new($context);
+            $response = parent::new($context);
+            $this->compensateInvalidFormImage($response, $context, null);
+
+            return $response;
         } catch (BadRequestHttpException $exception) {
             $crud = $context->getCrud();
             \assert($crud instanceof CrudDto);
@@ -68,8 +72,13 @@ abstract class GameCrudController extends AbstractCrudController
     /** @param AdminContext<object> $context */
     public function edit(AdminContext $context): KeyValueStore|Response
     {
+        $original = $context->getEntity()->getInstance();
+        $oldImage = $original instanceof GameItem ? $original->getImagePath() : null;
         try {
-            return parent::edit($context);
+            $response = parent::edit($context);
+            $this->compensateInvalidFormImage($response, $context, $oldImage);
+
+            return $response;
         } catch (BadRequestHttpException $exception) {
             $crud = $context->getCrud();
             \assert($crud instanceof CrudDto);
@@ -130,6 +139,7 @@ abstract class GameCrudController extends AbstractCrudController
         \assert(null === $oldImage || \is_string($oldImage));
         try {
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
+                $this->references->lockForMutation($entityInstance);
                 $this->finalizeStagedImage($entityInstance);
                 $entityManager->flush();
                 $this->publisher->publish($entityManager);
@@ -183,6 +193,10 @@ abstract class GameCrudController extends AbstractCrudController
             $target = $this->lootPairFor($entity);
             $manager = $this->managerFor($entity);
             $manager->wrapInTransaction(function () use ($manager, $entity, $target): void {
+                // Verrouiller les deux lignes avant leur flush évite qu'un DELETE concurrent
+                // enlève une paire pendant que cette demande attend sur PostgreSQL.
+                $this->references->lockForMutation($entity);
+                $this->references->lockForMutation($target);
                 if ($entity->isActive() !== $target->isActive()) {
                     throw new LogicException('La paire est incohérente : préparez les deux entrées inactives avant de la publier.');
                 }
@@ -243,18 +257,49 @@ abstract class GameCrudController extends AbstractCrudController
     /** Retire seulement le nouveau fichier déplacé par EasyAdmin avant notre transaction. */
     protected function compensateImage(object $entity, ?string $previousPath): void
     {
-        if (!$entity instanceof GameItem || $entity->getImagePath() === $previousPath || $entity->getImagePath() !== $this->promotedImage) {
+        if (!$entity instanceof GameItem || $entity->getImagePath() === $previousPath) {
             return;
         }
         $name = $entity->getImagePath();
         if ('placeholder.png' === $name || basename($name) !== $name) {
             return;
         }
-        $path = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;
-        if (is_file($path)) {
-            unlink($path);
+        // Une erreur de validation peut arriver avant la promotion : le staging est alors
+        // la seule trace du formulaire refusé et doit disparaître aussi.
+        $staged = $this->stagingImageDirectory().\DIRECTORY_SEPARATOR.$name;
+        if (is_file($staged)) {
+            unlink($staged);
+        }
+        if ($name === $this->promotedImage) {
+            $path = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;
+            if (is_file($path)) {
+                unlink($path);
+            }
         }
         $this->promotedImage = null;
+    }
+
+    /**
+     * EasyAdmin ne promeut normalement qu'après un formulaire valide, mais son extension
+     * d'upload peut déjà avoir transformé un candidat selon le navigateur. Ce filet défensif
+     * est exécuté avant persistEntity/updateEntity : une erreur d'un autre champ ne laisse
+     * jamais ce candidat dans .staging, et l'ancien fichier final d'un edit reste intact.
+     *
+     * @param AdminContext<object> $context
+     */
+    private function compensateInvalidFormImage(KeyValueStore|Response $response, AdminContext $context, ?string $previousPath): void
+    {
+        if (!$response instanceof KeyValueStore) {
+            return;
+        }
+        $form = $response->get('new_form', $response->get('edit_form'));
+        if (!$form instanceof FormInterface || !$form->isSubmitted() || $form->isValid()) {
+            return;
+        }
+        $entity = $context->getEntity()->getInstance();
+        if ($entity instanceof GameItem) {
+            $this->compensateImage($entity, $previousPath);
+        }
     }
 
     /** Les contraintes SQL restent une défense finale, mais l’admin doit les comprendre. */

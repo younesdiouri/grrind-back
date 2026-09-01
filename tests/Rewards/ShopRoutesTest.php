@@ -16,9 +16,7 @@ use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bridge\Doctrine\DataCollector\DoctrineDataCollector;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Profiler\Profile;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -30,7 +28,7 @@ use Symfony\Component\Uid\Uuid;
  * `SWIFT_TRAIL_LEGGINGS`, `EMBER_OF_THE_ANCESTORS` — niveau 10 —, et les deux coffres du #230,
  * `WOODEN_CHEST` — niveau 1 — et `IRON_BOUND_CHEST` — niveau 10) et trois hors étal
  * (`OBSIDIAN_WARBLADE`, `STORMCALLERS_BOOTS`, `CROWN_OF_THE_TIRELESS`, les trois EPIC ou
- * LEGENDARY) — voir `items.yaml`.
+ * LEGENDARY) — publiés depuis le snapshot DB administrable.
  *
  * @phpstan-type ShopLine array{key: string, kind: string, name: string, rarity: string, slot: string|null, modifiers: list<array<string, mixed>>, priceCoins: int, imageUrl: string, affordable: bool, owned: bool, minimumLevel: int, unlocked: bool}
  * @phpstan-type ShopBody array{coins: int, items: list<ShopLine>}
@@ -83,7 +81,7 @@ final class ShopRoutesTest extends ApiTestCase
         self::assertResponseHeaderSame('content-type', 'image/png');
     }
 
-    public function testAHotCatalogReadDoesNotQueryThePublishedConfigurationAgain(): void
+    public function testAHotCatalogReadOnlyQueriesTheMonotonicRevisionPointer(): void
     {
         $bob = $this->openAccount('hot-cache@grrind.app');
         $this->client->disableReboot();
@@ -92,21 +90,7 @@ final class ShopRoutesTest extends ApiTestCase
         $this->client->enableProfiler();
         $response = $this->get('/api/shop', $bob->headers);
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-        $profile = $this->client->getProfile();
-        self::assertInstanceOf(Profile::class, $profile);
-        $collector = $profile->getCollector('db');
-        self::assertInstanceOf(DoctrineDataCollector::class, $collector);
-
-        $connections = $collector->getQueries();
-        foreach ($connections as $queries) {
-            self::assertIsArray($queries);
-            foreach ($queries as $query) {
-                self::assertIsArray($query);
-                $sql = $query['sql'] ?? '';
-                self::assertIsString($sql);
-                self::assertDoesNotMatchRegularExpression('/\bgame_ruleset\b/i', $sql);
-            }
-        }
+        $this->assertOnlyRulesetRevisionPointerSql();
     }
 
     public function testNoEpicOrLegendaryItemEverAppearsOnTheStall(): void

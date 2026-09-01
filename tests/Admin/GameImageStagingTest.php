@@ -79,6 +79,27 @@ final class GameImageStagingTest extends TestCase
         }
     }
 
+    public function testRejectedCandidateCleansItsUnpromotedStagingFile(): void
+    {
+        $directory = $this->temporaryDirectory();
+        try {
+            $controller = $this->controller($directory);
+            $name = str_repeat('e', 40).'-11111111-1111-4111-8111-111111111111.png';
+            file_put_contents($controller->staging().\DIRECTORY_SEPARATOR.$name, 'candidate');
+            $item = new GameItem();
+            $item->setImagePath($name);
+
+            // Le formulaire peut être rejeté avant persistEntity : aucune promotion n'a eu
+            // lieu, mais le staging reste notre responsabilité et ne doit pas s'accumuler.
+            $controller->compensate($item, 'placeholder.png');
+
+            self::assertFileDoesNotExist($controller->staging().\DIRECTORY_SEPARATOR.$name);
+            self::assertFileDoesNotExist($directory.\DIRECTORY_SEPARATOR.$name);
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
     public function testConcurrentUploadsWithTheSameContentCannotCompensateEachOther(): void
     {
         $directory = $this->temporaryDirectory();

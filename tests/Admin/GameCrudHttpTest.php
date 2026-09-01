@@ -337,6 +337,9 @@ final class GameCrudHttpTest extends ApiTestCase
             self::assertInstanceOf(GameItem::class, $item);
             self::assertFalse($item->isActive());
             self::assertNotSame('placeholder.png', $item->getImagePath());
+            $this->client->request('GET', '/game-images/'.$item->getImagePath());
+            self::assertResponseIsSuccessful();
+            self::assertSame('image/png', $this->client->getResponse()->headers->get('Content-Type'));
 
             $crawler = $this->client->request('GET', '/admin/item/'.$item->getId()->toRfc4122().'/edit');
             $edit = $crawler->filter('form[name="GameItem"]')->form();
@@ -381,6 +384,46 @@ final class GameCrudHttpTest extends ApiTestCase
         self::assertSame($revision, $published->revision());
     }
 
+    public function testInvalidImageFormLeavesNoStagingFileBeforePersistence(): void
+    {
+        $this->loginAdmin('staging-invalid-form-admin@grrind.app');
+        $directory = self::getContainer()->getParameter('kernel.project_dir').'/var/game-images';
+        $before = $this->imageFiles($directory);
+        $path = tempnam(sys_get_temp_dir(), 'grrind-invalid-image-');
+        self::assertIsString($path);
+        file_put_contents($path, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8ywAAAABJRU5ErkJggg==', true));
+
+        try {
+            $crawler = $this->client->request('GET', '/admin/item/new');
+            $form = $crawler->filter('form[name="GameItem"]')->form();
+            $active = $form['GameItem[active]'];
+            self::assertInstanceOf(ChoiceFormField::class, $active);
+            $active->untick();
+            $upload = $form['GameItem[imagePath][file]'];
+            self::assertInstanceOf(FileFormField::class, $upload);
+            $upload->upload($path);
+            $form->setValues([
+                'GameItem[key]' => 'INVALID_STAGING_'.bin2hex(random_bytes(4)),
+                // L'image est valide ; c'est ce champ frère qui fait échouer le formulaire
+                // avant persistEntity et vérifie le nettoyage défensif de .staging.
+                'GameItem[sortOrder]' => 'pas-un-entier',
+                'GameItem[rarity]' => 'COMMON',
+                'GameItem[kind]' => 'EQUIPMENT',
+                'GameItem[slot]' => 'FEET',
+                'GameItem[priceCoins]' => '1',
+                'GameItem[shopMinimumLevel]' => '',
+                'GameItem[translations][fr][name]' => 'Invalide',
+                'GameItem[translations][en][name]' => 'Invalid',
+            ]);
+            $this->client->submit($form);
+
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame($before, $this->imageFiles($directory));
+        } finally {
+            unlink($path);
+        }
+    }
+
     public function testEditingAnItemShowsItsCurrentPublicImagePreview(): void
     {
         $this->loginAdmin('image-preview-admin@grrind.app');
@@ -391,6 +434,32 @@ final class GameCrudHttpTest extends ApiTestCase
 
         self::assertResponseIsSuccessful();
         self::assertGreaterThan(0, $crawler->filter('img[src="/game-images/'.$item->getImagePath().'"]')->count());
+    }
+
+    public function testConfigurationDetailsRenderTheirStructuredValues(): void
+    {
+        $this->loginAdmin('configuration-details-admin@grrind.app');
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+        $item = $manager->getRepository(GameItem::class)->findOneBy([]);
+        $title = $manager->getRepository(GameTitle::class)->findOneBy([]);
+        $enemy = $manager->getRepository(GameEnemy::class)->findOneBy([]);
+        $table = $manager->getRepository(GameLootTable::class)->findOneBy([]);
+        self::assertInstanceOf(GameItem::class, $item);
+        self::assertInstanceOf(GameTitle::class, $title);
+        self::assertInstanceOf(GameEnemy::class, $enemy);
+        self::assertInstanceOf(GameLootTable::class, $table);
+
+        foreach ([
+            '/admin/item/'.$item->getId()->toRfc4122(),
+            '/admin/title/'.$title->getId()->toRfc4122(),
+            '/admin/enemy/'.$enemy->getId()->toRfc4122(),
+            '/admin/loot-table/'.$table->getId()->toRfc4122(),
+            '/admin/settings/1',
+        ] as $path) {
+            $this->client->request('GET', $path);
+            self::assertResponseIsSuccessful($path);
+        }
     }
 
     private function delete(string $editUrl, string $deleteUrl): void
@@ -455,5 +524,15 @@ final class GameCrudHttpTest extends ApiTestCase
         $table->setEntries([['item' => null, 'weight' => 1], ['item' => 'WORN_RUNNING_SHOES', 'weight' => 1]]);
 
         return $table;
+    }
+
+    /** @return list<string> */
+    private function imageFiles(string $directory): array
+    {
+        $files = [...(glob($directory.'/*') ?: []), ...(glob($directory.'/.staging/*') ?: [])];
+        $names = array_map(static fn (string $path): string => str_replace($directory.'/', '', $path), $files);
+        sort($names);
+
+        return $names;
     }
 }

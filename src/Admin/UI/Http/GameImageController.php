@@ -16,7 +16,7 @@ final readonly class GameImageController
     {
     }
 
-    #[Route('/game-images/{name}', name: 'game_image', methods: ['GET'], requirements: ['name' => '(?:[a-f0-9]{40}(?:-[0-9]+)?|placeholder)\\.(?:jpg|jpeg|png|webp)'])]
+    #[Route('/game-images/{name}', name: 'game_image', methods: ['GET'], requirements: ['name' => '(?:[a-f0-9]{40}(?:-[0-9]+|-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?|placeholder)\\.(?:jpg|jpeg|png|webp)'])]
     public function __invoke(string $name): Response
     {
         $path = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;

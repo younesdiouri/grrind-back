@@ -24,6 +24,9 @@ final class StructuredField implements FieldInterface
         return new self()
             ->setProperty($propertyName)
             ->setLabel($label)
-            ->setTemplateName('crud/field/text');
+            // Les pages DETAIL affichent aussi ces tableaux : le template texte EasyAdmin
+            // appelle nl2br() et échoue sur un JSON PHP. Une représentation JSON sûre garde
+            // les écrans de lecture consultables sans réintroduire un textarea fragile.
+            ->setTemplatePath('admin/easyadmin/field/structured.html.twig');
     }
 }

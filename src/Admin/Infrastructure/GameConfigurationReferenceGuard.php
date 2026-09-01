@@ -24,18 +24,11 @@ final readonly class GameConfigurationReferenceGuard
 
     public function assertDeletable(object $configuration): void
     {
-        $active = match (true) {
-            $configuration instanceof GameItem, $configuration instanceof GameTitle, $configuration instanceof GameEnemy, $configuration instanceof GameLootTable => $configuration->isActive(),
-            default => false,
-        };
-        if ($active) {
+        $state = $this->lockCurrentState($configuration);
+        if ($state['active']) {
             throw new LogicException('Suppression refusée : désactivez d’abord cette configuration publiée.');
         }
-        $everPublishedActive = match (true) {
-            $configuration instanceof GameItem, $configuration instanceof GameTitle, $configuration instanceof GameEnemy, $configuration instanceof GameLootTable => $configuration->wasEverPublishedActive(),
-            default => false,
-        };
-        if ($everPublishedActive) {
+        if ($state['everPublishedActive']) {
             // Une opération démarrée sous une ancienne révision peut encore écrire son fait.
             // Garder sa clé après désactivation ferme cette course sans imposer de verrou à
             // chaque lecture historique (inventaire, loot et bataille).
@@ -66,5 +59,47 @@ final readonly class GameConfigurationReferenceGuard
                 throw new LogicException(\sprintf('Suppression refusée : %s « %s » est référencé par des données de jeu ou historiques.', $label, $key));
             }
         }
+    }
+
+    /**
+     * Prend le même verrou de ligne qu'une mutation avant son flush. Un objet Doctrine peut
+     * être ancien : lire son booléen hydraté après l'attente d'un DELETE ne ferme pas la
+     * course activation/publication -> suppression. La lecture verrouillée devient donc la
+     * décision, et non un simple contrôle d'interface.
+     */
+    public function lockForMutation(object $configuration): void
+    {
+        if (!$configuration instanceof GameItem && !$configuration instanceof GameTitle && !$configuration instanceof GameEnemy && !$configuration instanceof GameLootTable) {
+            return;
+        }
+        $this->lockCurrentState($configuration);
+    }
+
+    /** @return array{active: bool, everPublishedActive: bool} */
+    private function lockCurrentState(object $configuration): array
+    {
+        [$table, $id] = match (true) {
+            $configuration instanceof GameItem => ['game_item', $configuration->getId()->toRfc4122()],
+            $configuration instanceof GameTitle => ['game_title', $configuration->getId()->toRfc4122()],
+            $configuration instanceof GameEnemy => ['game_enemy', $configuration->getId()->toRfc4122()],
+            $configuration instanceof GameLootTable => ['game_loot_table', $configuration->getId()->toRfc4122()],
+            default => throw new LogicException('Cette configuration ne peut pas être supprimée.'),
+        };
+        $state = $this->connection->fetchAssociative("SELECT active, ever_published_active FROM {$table} WHERE id = ? FOR UPDATE", [$id]);
+        if (false === $state) {
+            // Si l'administrateur a attendu un DELETE concurrent, son UPDATE ne doit jamais
+            // publier l'ancienne entité encore en mémoire comme si elle existait toujours.
+            throw new LogicException('Cette configuration a été supprimée par une autre opération. Actualisez la page avant de réessayer.');
+        }
+
+        return [
+            'active' => $this->databaseBoolean($state['active'] ?? false),
+            'everPublishedActive' => $this->databaseBoolean($state['ever_published_active'] ?? false),
+        ];
+    }
+
+    private function databaseBoolean(mixed $value): bool
+    {
+        return true === $value || 1 === $value || '1' === $value || 't' === $value || 'true' === $value;
     }
 }
