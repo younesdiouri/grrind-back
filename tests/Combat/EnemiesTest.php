@@ -93,6 +93,17 @@ final class EnemiesTest extends ApiTestCase
         self::assertSame(Response::HTTP_UNAUTHORIZED, $this->get('/api/enemies')->getStatusCode());
     }
 
+    public function testAHotEnemyCatalogueReadDoesNotReloadTheRuleset(): void
+    {
+        $bob = $this->openAccount('enemies-hot@grrind.app');
+        $this->client->disableReboot();
+        self::assertSame(Response::HTTP_OK, $this->get('/api/enemies', $bob->headers)->getStatusCode());
+
+        $this->client->enableProfiler();
+        self::assertSame(Response::HTTP_OK, $this->get('/api/enemies', $bob->headers)->getStatusCode());
+        $this->assertNoRulesetSql();
+    }
+
     /**
      * @return list<mixed>
      */
