@@ -11,12 +11,6 @@ use Symfony\Component\Config\Definition\Builder\TreeBuilder;
  * Le schéma de `config/game/v1/notifications.yaml` — les garde-fous qui empêchent une
  * séance créditée de noyer une guilde de pushes (#133).
  *
- * **Reste ici malgré le #252**, qui ajoute un second consommateur des mêmes réglages
- * (`App\Shared\Application\SessionCreditedNotifier`, dans `Shared`) : ce que ce fichier
- * expose n'est qu'un paramètre du conteneur (`%game.notifications.*%`), pas une classe —
- * Deptrac ne voit aucune dépendance à y redresser, et déplacer cette classe pour un seul
- * paramètre de plus n'aurait rien acheté.
- *
  * Pas de délégation à un objet du domaine, contrairement à `CommunitySection` : les cinq
  * réglages n'ont aucune cohérence à faire respecter entre eux — chaque combinaison
  * d'heures calmes valides est une combinaison valide, et `announcement_delay_seconds` ne

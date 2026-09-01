@@ -28,11 +28,9 @@ namespace App\Shared\Domain;
  * bavardage de sa guilde sans faire taire ce qui nous demande d'agir. Les fondre obligerait à
  * choisir entre les deux, et le joueur qui coupe finirait par manquer son tour.
  *
- * **`SESSION_CREDITED` (#252) est la seule des quatre adressée à l'auteur de la séance, pas
- * à un tiers.** Les trois autres réveillent quelqu'un d'autre ; celle-ci appelle le joueur
- * à regarder ce que le serveur vient de lui accorder pendant que l'app tournait en fond —
- * voir {@see \App\Shared\Application\SessionCreditedNotifier} pour pourquoi un push existe
- * en plus du `RewardSummary` déjà rendu par la réponse d'import.
+ * **`SESSION_CREDITED` (#252) est un tombeau de compatibilité au #255.** Il reste accepté
+ * pour les PATCH d'écrans déjà chargés et les messages en vol, mais ne figure plus dans le
+ * GET et aucun push serveur ne l'utilise avant sa suppression au #256.
  */
 enum NotificationCategory: string
 {

@@ -3,12 +3,9 @@
 # `training.yaml` : ce qui protège un joueur d'un import massif protège aussi ses
 # co-équipiers d'un push par séance.
 #
-# Depuis le #252, `freshness_window_minutes`, `announcement_delay_seconds` et
-# `stale_window_minutes` servent aussi le push que l'auteur reçoit pour sa propre séance
-# (`App\Shared\Application\SessionCreditedNotifier`) — même valeurs, la fraîcheur d'une
-# séance ne dépend pas de qui la reçoit. Seules `quiet_hours_start_hour`/`quiet_hours_end_hour`
-# restent propres au destinataire tiers de `GuildActivityNotifier` : voir le docblock de
-# `SessionCreditedNotifier` pour pourquoi cette catégorie-ci n'en tient pas compte.
+# Le #255 neutralise le producteur auteur : ces réglages restent donc tous propres à
+# `GuildActivityNotifier`. Les tombeaux SESSION_CREDITED ne les lisent plus et le #256 les
+# retirera avec le contrat une fois les files Messenger drainées.
 #
 # Ce fichier est de la donnée, pas de la configuration Symfony : il est lu et validé à la
 # compilation du conteneur par App\Community\Infrastructure\Config\NotificationsSection, et
