@@ -23,7 +23,7 @@ final class EnemyCrudController extends GameCrudController
 
     public function configureCrud(Crud $crud): Crud
     {
-        return parent::configureCrud($crud)->setSearchFields(['key'])->setDefaultSort(['boss' => 'ASC', 'sortOrder' => 'ASC']);
+        return parent::configureCrud($crud)->setSearchFields(['key'])->setDefaultSort(['boss' => 'ASC', 'sortOrder' => 'ASC'])->showEntityActionsInlined();
     }
 
     public function configureFilters(Filters $filters): Filters
@@ -35,7 +35,7 @@ final class EnemyCrudController extends GameCrudController
     {
         $pair = Action::new('toggleLootPair', 'Activer/désactiver la paire de loot')
             ->linkToCrudAction('toggleLootPair')
-            ->askConfirmation('Publier ce changement atomique avec la table de loot associée ?');
+            ->setTemplatePath('admin/easyadmin/action/toggle_loot_pair.html.twig');
 
         return $actions->add(Crud::PAGE_INDEX, $pair)->add(Crud::PAGE_DETAIL, $pair);
     }

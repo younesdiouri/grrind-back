@@ -209,11 +209,22 @@ final class GameCrudHttpTest extends ApiTestCase
         }
         $manager->flush();
 
-        foreach ([
+        $pairs = [
             ['/admin/enemy/'.$enemy->getId()->toRfc4122().'/toggle-loot-pair', GameEnemy::class, $enemy->getId(), GameLootTable::class, $enemyTable->getId()],
             ['/admin/item/'.$chest->getId()->toRfc4122().'/toggle-loot-pair', GameItem::class, $chest->getId(), GameLootTable::class, $chestTable->getId()],
-        ] as [$url, $leftClass, $leftId, $rightClass, $rightId]) {
-            $this->client->request('GET', $url);
+        ];
+        $firstUrl = $pairs[0][0];
+        $page = $this->client->request('GET', '/admin/enemy');
+        self::assertResponseIsSuccessful();
+        $token = $page->filterXPath('//form[contains(@action, "toggle-loot-pair")]//input[@name="token"]')->attr('value');
+        self::assertIsString($token);
+        $this->client->request('GET', $firstUrl);
+        self::assertResponseStatusCodeSame(405);
+        $this->client->request('POST', $firstUrl, ['token' => 'forged']);
+        self::assertResponseStatusCodeSame(403);
+
+        foreach ($pairs as [$url, $leftClass, $leftId, $rightClass, $rightId]) {
+            $this->client->request('POST', $url, ['token' => $token]);
             self::assertResponseRedirects();
             $manager->clear();
             $left = $manager->find($leftClass, $leftId);
@@ -223,7 +234,7 @@ final class GameCrudHttpTest extends ApiTestCase
             self::assertTrue($left->isActive());
             self::assertTrue($right->isActive());
 
-            $this->client->request('GET', $url);
+            $this->client->request('POST', $url, ['token' => $token]);
             self::assertResponseRedirects();
             $manager->clear();
             $left = $manager->find($leftClass, $leftId);
@@ -237,7 +248,7 @@ final class GameCrudHttpTest extends ApiTestCase
         $orphan = $this->inactiveEnemy('ORPHAN_ENEMY_'.$suffix, 7_000_003, 100);
         $manager->persist($orphan);
         $manager->flush();
-        $this->client->request('GET', '/admin/enemy/'.$orphan->getId()->toRfc4122().'/toggle-loot-pair');
+        $this->client->request('POST', '/admin/enemy/'.$orphan->getId()->toRfc4122().'/toggle-loot-pair', ['token' => $token]);
         self::assertResponseRedirects();
         $manager->clear();
         $orphan = $manager->find(GameEnemy::class, $orphan->getId());
@@ -364,6 +375,18 @@ final class GameCrudHttpTest extends ApiTestCase
         self::assertInstanceOf(GameRuleset::class, $published);
         self::assertSame($price, $stored->getPriceCoins());
         self::assertSame($revision, $published->revision());
+    }
+
+    public function testEditingAnItemShowsItsCurrentPublicImagePreview(): void
+    {
+        $this->loginAdmin('image-preview-admin@grrind.app');
+        $item = self::getContainer()->get('doctrine')->getRepository(GameItem::class)->findOneBy([]);
+        self::assertInstanceOf(GameItem::class, $item);
+
+        $crawler = $this->client->request('GET', '/admin/item/'.$item->getId()->toRfc4122().'/edit');
+
+        self::assertResponseIsSuccessful();
+        self::assertGreaterThan(0, $crawler->filter('img[src="/game-images/'.$item->getImagePath().'"]')->count());
     }
 
     private function delete(string $editUrl, string $deleteUrl): void

@@ -18,6 +18,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ImageField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Validator\Constraints\Image;
 
 final class ItemCrudController extends GameCrudController
@@ -29,7 +30,7 @@ final class ItemCrudController extends GameCrudController
 
     public function configureCrud(Crud $crud): Crud
     {
-        return parent::configureCrud($crud)->setSearchFields(['key', 'rarity', 'kind'])->setDefaultSort(['sortOrder' => 'ASC']);
+        return parent::configureCrud($crud)->setSearchFields(['key', 'rarity', 'kind'])->setDefaultSort(['sortOrder' => 'ASC'])->showEntityActionsInlined();
     }
 
     public function configureFilters(Filters $filters): Filters
@@ -42,7 +43,7 @@ final class ItemCrudController extends GameCrudController
         $pair = Action::new('toggleLootPair', 'Activer/désactiver la paire de loot')
             ->linkToCrudAction('toggleLootPair')
             ->displayIf(static fn (GameItem $item): bool => 'CHEST' === $item->getKind())
-            ->askConfirmation('Publier ce changement atomique avec la table de loot associée ?');
+            ->setTemplatePath('admin/easyadmin/action/toggle_loot_pair.html.twig');
 
         return $actions->add(Crud::PAGE_INDEX, $pair)->add(Crud::PAGE_DETAIL, $pair);
     }
@@ -61,7 +62,13 @@ final class ItemCrudController extends GameCrudController
         yield IntegerField::new('shopMinimumLevel')->hideOnIndex();
         yield ImageField::new('imagePath')
             ->setBasePath('/game-images')
-            ->setUploadDir($this->stagingImageDirectory())
+            // Le transformeur EasyAdmin relit le fichier courant depuis le volume final pour
+            // afficher sa miniature ; seul son écriture est redirigée vers le staging ci-dessous.
+            ->setUploadDir($this->gameImageDirectory)
+            ->setFormTypeOption('download_path', '/game-images/')
+            ->setFormTypeOption('upload_new', function (UploadedFile $file, string $unusedDirectory, string $name): void {
+                $file->move($this->stagingImageDirectory(), $name);
+            })
             // EasyAdmin calcule le SHA-1, le suffixe UUID isole deux transactions qui ont le
             // même binaire en staging : l'annulation de l'une ne peut plus effacer l'autre.
             ->setUploadedFileNamePattern('[contenthash]-[uuid].[extension]')

@@ -23,6 +23,7 @@ use InvalidArgumentException;
 use LogicException;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
 
@@ -155,16 +156,17 @@ abstract class GameCrudController extends AbstractCrudController
      * intermédiaire que le runtime refuserait à juste titre.
      */
     /** @param AdminContext<object> $context */
-    #[AdminRoute(path: '/{entityId}/toggle-loot-pair', name: 'toggle_loot_pair')]
+    #[AdminRoute(path: '/{entityId}/toggle-loot-pair', name: 'toggle_loot_pair', options: ['methods' => ['POST']])]
     public function toggleLootPair(AdminContext $context): Response
     {
+        $token = $context->getRequest()->request->get('token');
+        if (!$this->isCsrfTokenValid('ea-toggle-loot-pair', \is_string($token) ? $token : null)) {
+            throw new AccessDeniedHttpException('Le jeton CSRF de publication de la paire est invalide.');
+        }
         $entity = $context->getEntity()->getInstance();
         if (!$entity instanceof GameEnemy && !$entity instanceof GameItem && !$entity instanceof GameLootTable) {
             throw new LogicException('Cette action ne peut modifier qu’une paire de configuration de jeu.');
         }
-        $redirect = $context->getRequest()->headers->get('referer', '/admin');
-        \assert(\is_string($redirect));
-
         try {
             $target = $this->lootPairFor($entity);
             $manager = $this->managerFor($entity);
@@ -184,7 +186,7 @@ abstract class GameCrudController extends AbstractCrudController
             $this->addFlash('danger', $this->formError($exception));
         }
 
-        return $this->redirect($redirect);
+        return $this->redirectToRoute($context->getDashboardRouteName());
     }
 
     /** Le staging n'est jamais servi ; une annulation ne peut donc pas publier d'image orpheline. */

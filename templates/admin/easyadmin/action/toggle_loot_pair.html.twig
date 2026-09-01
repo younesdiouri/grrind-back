@@ -1,0 +1,7 @@
+{# Cette publication est une mutation : EasyAdmin affiche donc un POST portant son CSRF. #}
+<form action="{{ action.linkUrl }}" method="post" class="d-inline">
+    <input type="hidden" name="token" value="{{ csrf_token('ea-toggle-loot-pair') }}">
+    <button type="submit" class="{{ action.cssClass }} btn btn-secondary">
+        <span class="action-label">{{ action.label|trans|raw }}</span>
+    </button>
+</form>
