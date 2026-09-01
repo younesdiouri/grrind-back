@@ -2971,6 +2971,7 @@ components:
         - GUILD_ACTIVITY
         - RISALA_TURN
         - RISALA_REVEALED
+        - SESSION_CREDITED
     NotificationPreferenceRequest:
       properties:
         category:

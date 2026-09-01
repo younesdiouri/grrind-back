@@ -114,6 +114,18 @@ services:
         arguments:
             $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
 
+    # Le pendant, pour l'auteur lui-même, des deux services ci-dessus (#252) — mêmes
+    # réglages, `notifications.yaml` n'a aucune raison de diverger entre les deux
+    # destinataires d'une même séance créditée.
+    App\Shared\Application\SessionCreditedNotifier:
+        arguments:
+            $freshnessWindowMinutes: '%game.notifications.freshness_window_minutes%'
+            $announcementDelaySeconds: '%game.notifications.announcement_delay_seconds%'
+
+    App\Shared\Infrastructure\Doctrine\PendingSessionCreditRepository:
+        arguments:
+            $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
+
     App\Progression\Domain\LevelCurve:
         arguments:
             $levels: '%game.levels.levels%'
@@ -380,6 +392,20 @@ when@test:
         # ouverte et pose une réservation d'envoi avant d'appeler le handler — simuler une
         # panne au milieu de la boucle d'envoi sans en provoquer une vraie.
         App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository:
+            public: true
+            arguments:
+                $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
+
+        # Le pendant, pour l'auteur lui-même, des trois services ci-dessus (#252) — même
+        # besoin, même geste : appeler le handler sans attendre le `DelayStamp`, observer
+        # ses envois sur l'espion plutôt que sur le vrai `PushSender`, et poser une
+        # réservation avant coup pour simuler une panne au milieu de l'envoi.
+        App\Shared\Application\AnnounceSessionCreditHandler:
+            public: true
+            arguments:
+                $pushSender: '@App\Tests\Support\SpyingPushSender'
+
+        App\Shared\Infrastructure\Doctrine\PendingSessionCreditRepository:
             public: true
             arguments:
                 $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
