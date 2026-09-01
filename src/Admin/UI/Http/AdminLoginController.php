@@ -21,7 +21,7 @@ final class AdminLoginController extends AbstractController
         ]);
     }
 
-    #[Route('/admin/logout', name: 'admin_logout', methods: ['POST'])]
+    #[Route('/admin/logout', name: 'admin_logout', methods: ['GET', 'POST'])]
     public function logout(): never
     {
         throw new LogicException('Le firewall Symfony intercepte cette route.');

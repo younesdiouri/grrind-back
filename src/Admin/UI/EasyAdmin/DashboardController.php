@@ -8,10 +8,15 @@ use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
 #[AdminDashboard(routePath: '/admin', routeName: 'admin', allowedControllers: [ItemCrudController::class, TitleCrudController::class, EnemyCrudController::class, LootTableCrudController::class, SettingsCrudController::class, UserCrudController::class, BattleCrudController::class, InventoryCrudController::class, XpTransactionCrudController::class, CoinTransactionCrudController::class])]
 final class DashboardController extends AbstractDashboardController
 {
+    public function __construct(private readonly CsrfTokenManagerInterface $csrf)
+    {
+    }
+
     public function configureDashboard(): Dashboard
     {
         return Dashboard::new()->setTitle('GRRIND · Administration');
@@ -31,5 +36,7 @@ final class DashboardController extends AbstractDashboardController
         yield MenuItem::linkTo(InventoryCrudController::class, 'Inventaires', 'fa fa-box');
         yield MenuItem::linkTo(XpTransactionCrudController::class, 'Transactions XP', 'fa fa-star');
         yield MenuItem::linkTo(CoinTransactionCrudController::class, 'Transactions pièces', 'fa fa-coins');
+        yield MenuItem::section('Session');
+        yield MenuItem::linkToRoute('Déconnexion', 'fa fa-sign-out', 'admin_logout', ['_csrf_token' => $this->csrf->getToken('logout')->getValue()]);
     }
 }
