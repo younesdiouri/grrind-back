@@ -8,7 +8,7 @@ use App\Shared\Application\GameRulesets;
 use InvalidArgumentException;
 
 /**
- * Le catalogue des adversaires PvE, chargé depuis `config/game/v1/combat.yaml` — les ennemis
+ * Le catalogue des adversaires PvE, chargé depuis le snapshot de jeu publié — les ennemis
  * ordinaires **et**, depuis le #219, les boss.
  *
  * **Un catalogue, pas une table.** Les adversaires ne vivent pas en base — même geste que
@@ -34,7 +34,7 @@ use InvalidArgumentException;
  *
  * ## Deux listes, une seule classe `Enemy` (#219)
  *
- * `bosses:` est un second bloc de `combat.yaml`, chargé à côté de `enemies:` — pas dedans.
+ * `bosses:` est un second bloc de le snapshot publié, chargé à côté de `enemies:` — pas dedans.
  * La raison est un invariant, pas une préférence d'écriture : `enemies:` refuse deux entrées
  * au même niveau, et c'est ce qui garantit que `forLevel()` rend toujours un adversaire et un
  * seul. Un boss posé au niveau d'un ennemi existant casserait cet invariant s'il partageait

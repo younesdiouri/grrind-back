@@ -15,7 +15,7 @@ namespace App\Progression\Domain;
  * Les conditions de streak et de classement viendront quand `Engagement` existera (#24,
  * #35). Les écrire maintenant reviendrait à coder contre une table absente.
  *
- * Les valeurs sont celles écrites dans `config/game/v1/titles.yaml` : les changer
+ * Les valeurs sont celles écrites dans le snapshot de jeu publié : les changer
  * invaliderait le catalogue livré.
  */
 enum TitleRequirement: string

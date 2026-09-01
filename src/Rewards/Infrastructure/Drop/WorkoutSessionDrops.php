@@ -59,7 +59,7 @@ use Random\Randomizer;
  *
  * **Aucune écriture de pièces si la bande a tiré zéro.** {@see CoinLedger::credit()} exige
  * un montant strictement positif ; une bande à zéro reste possible en théorie
- * (`minimum: 0` dans `loot.yaml`) même si aucune table livrée ne le fait aujourd'hui, et ce
+ * (`minimum: 0` dans le snapshot publié) même si aucune table livrée ne le fait aujourd'hui, et ce
  * n'est pas une raison d'écrire une ligne qui ne changerait rien au solde.
  */
 final readonly class WorkoutSessionDrops implements SessionDrops

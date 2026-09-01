@@ -12,7 +12,7 @@ use InvalidArgumentException;
  * l'équilibrage, pas des constantes de classe, même geste que
  * {@see \App\Community\Domain\GuildRules} : la bonne dureté d'un combat est une question de
  * produit qui bougera après les premiers joueurs, et elle se règle dans
- * `config/game/v1/combat.yaml` sans toucher au code.
+ * le snapshot de jeu publié sans toucher au code.
  *
  * **La dérivation elle-même n'est pas ici.** Ce ticket (#208) pose les nombres et leur
  * cohérence ; transformer une caractéristique en PV ou en dégâts est le #210. L'objet

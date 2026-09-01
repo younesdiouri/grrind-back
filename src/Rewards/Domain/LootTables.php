@@ -9,10 +9,10 @@ use App\Shared\Domain\Activity\Discipline;
 use InvalidArgumentException;
 
 /**
- * Les tables de tirage, chargées depuis `config/game/v1/loot.yaml` — trois origines, trois
+ * Les tables de tirage, chargées depuis le snapshot de jeu publié — trois origines, trois
  * jeux de tables : la séance ({@see WorkoutLootTable}, gardée par une éligibilité),
  * l'adversaire et le coffre (#230), chacun une {@see LootTable} par clé — d'ennemi ou de
- * boss de `combat.yaml` pour l'un, d'objet `kind: CHEST` d'`items.yaml` pour l'autre — sans
+ * boss de le snapshot publié pour l'un, d'objet `kind: CHEST` du snapshot publié pour l'autre — sans
  * condition ni pour l'un ni pour l'autre : ce qui a été choisi *est* la condition.
  *
  * `$version` est la version de la table, indépendante du `rulesetVersion` global : un
@@ -22,7 +22,7 @@ use InvalidArgumentException;
  * ## Pourquoi les clés inconnues ne sont pas refusées par `LootSection`
  *
  * Un objet inexistant ou une clé d'adversaire inconnue sont des références **vers un autre
- * fichier** — `items.yaml`, `combat.yaml` — et `GameBalanceLoader` valide chaque fichier
+ * fichier** — le snapshot publié, le snapshot publié — et `GameBalanceLoader` valide chaque fichier
  * indépendamment des autres : `LootSection` ne voit jamais leur contenu. C'est exactement
  * la limite déjà documentée par {@see \App\Progression\Infrastructure\Config\AttributeSplitSection}
  * pour `xp.yaml` et `attributes.yaml`, et la même réponse s'applique : le croisement se
@@ -72,7 +72,7 @@ final class LootTables
      * @param list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $chest     une table par clé de coffre (#230) — même forme que `$adversary`
-     * @param list<array{key: string, kind?: string}>                                                                                                                                                                                $items     le catalogue brut d'`items.yaml` — la clé, et depuis le #230 `kind`, importent ici
+     * @param list<array{key: string, kind?: string}>                                                                                                                                                                                $items     le catalogue brut du snapshot publié — la clé, et depuis le #230 `kind`, importent ici
      * @param list<array{key: string}>                                                                                                                                                                                               $enemies   `game.combat.enemies`
      * @param list<array{key: string}>                                                                                                                                                                                               $bosses    `game.combat.bosses`
      *

@@ -28,7 +28,7 @@ use Random\Randomizer;
  *
  * ## Départager les tables de séance éligibles (#28, après le #27)
  *
- * `loot.yaml` laisse volontairement les seuils de plusieurs tables se recouvrir — voir son
+ * le snapshot publié laisse volontairement les seuils de plusieurs tables se recouvrir — voir son
  * docblock — et ne tranche pas laquelle s'applique quand plusieurs le sont à la fois.
  * {@see rollForWorkout()} retient **la plus exigeante des tables éligibles** : celle dont
  * `minimumLevel` est le plus haut, et à égalité, celle dont `minimumDurationMinutes` est le
@@ -50,8 +50,8 @@ use Random\Randomizer;
  *
  * {@see LootTables::forAdversary()} rend `null` pour une clé sans table — aucun adversaire
  * livré n'est dans ce cas, {@see \App\Tests\Shared\Config\RewardsCoverageTest} le prouve —
- * mais {@see rollForAdversary()} doit s'en accommoder proprement le jour où `combat.yaml`
- * ouvre un adversaire avant que sa table n'existe dans `loot.yaml` : `null` en retour,
+ * mais {@see rollForAdversary()} doit s'en accommoder proprement le jour où le snapshot publié
+ * ouvre un adversaire avant que sa table n'existe dans le snapshot publié : `null` en retour,
  * jamais une exception pour un cas que le catalogue autorise déjà.
  *
  * ## `LOOT_LUCK` déplace les poids, jamais le nombre de tirages

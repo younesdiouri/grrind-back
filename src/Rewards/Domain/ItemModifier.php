@@ -17,7 +17,7 @@ use App\Shared\Domain\Modifier\ModifierType;
  * **Le vocabulaire est celui de `Shared`, jamais un mécanisme parallèle.** `$type` se
  * valide contre `ModifierType::tryFrom()`, pas contre une liste recopiée ici : le jour où
  * le #224 ouvre les caractéristiques pures et les stats de combat, un objet qui les porte
- * entre dans `items.yaml` sans qu'une ligne bouge dans cette classe ni dans {@see
+ * entre dans le snapshot publié sans qu'une ligne bouge dans cette classe ni dans {@see
  * \App\Rewards\Infrastructure\Config\ItemsSection}.
  */
 final readonly class ItemModifier

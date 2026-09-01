@@ -17,7 +17,7 @@ namespace App\Rewards\Domain;
  * **`$itemRoll` et `$itemTotalWeight` sont le tirage brut, distincts du résultat.** Ce sont
  * eux qui vont dans la colonne `roll` de {@see LootRoll} : le nombre tiré et la somme des
  * poids qui lui donnait son sens au moment du tirage, indépendamment de toute relecture
- * future de `loot.yaml`. Les pièces n'ont pas leur pendant : leur tirage *est* déjà leur
+ * future de le snapshot publié. Les pièces n'ont pas leur pendant : leur tirage *est* déjà leur
  * résultat, un entier uniforme dans la bande — les dupliquer dans `roll` n'apporterait
  * aucune information de plus, voir le docblock de `LootRoll`.
  */

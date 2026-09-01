@@ -9,7 +9,7 @@ use App\Shared\Domain\Activity\Discipline;
 use InvalidArgumentException;
 
 /**
- * Le catalogue des titres, chargé depuis `config/game/v1/titles.yaml`.
+ * Le catalogue des titres, chargé depuis le snapshot de jeu publié.
  *
  * **Un catalogue, pas une table.** Les titres ne vivent pas en base : ce qui est persisté,
  * c'est *qui a débloqué quoi et quand*. Ajouter un titre est un déploiement, pas un INSERT

@@ -17,7 +17,7 @@ use App\Combat\Infrastructure\Translation\EnemyTranslator;
  * rend `{"workouts": [...], "nextCursor": ...}`,
  * {@see \App\Progression\UI\Http\Response\TitleBoardResource} rend `{"titles": [...]}` — et
  * c'est ce qui laisse la place à un champ frère plus tard (un compteur, une pagination le
- * jour où le catalogue grossit au-delà du niveau 50, voir `combat.yaml`) sans jamais casser
+ * jour où le catalogue grossit au-delà du niveau 50, voir le snapshot publié) sans jamais casser
  * le décodage d'un client déjà déployé.
  *
  * Ennemis ordinaires puis boss, dans l'ordre de déclaration de chaque liste — même ordre que

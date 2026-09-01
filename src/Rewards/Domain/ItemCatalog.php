@@ -10,7 +10,7 @@ use App\Shared\Domain\Modifier\ModifierType;
 use InvalidArgumentException;
 
 /**
- * Le catalogue des objets, chargé depuis `config/game/v1/items.yaml`.
+ * Le catalogue des objets, chargé depuis le snapshot de jeu publié.
  *
  * **Un catalogue, pas une table.** Les objets ne vivent pas en base — même geste que
  * {@see \App\Combat\Domain\EnemyCatalog} pour les ennemis, {@see
@@ -40,8 +40,8 @@ use InvalidArgumentException;
  * `MITIGATION_BONUS`, `EXTRA_TURN_BONUS`, `DODGE_BONUS`) comme globaux, sans jamais regarder
  * {@see \App\Shared\Domain\Modifier\Modifier::$discipline} — voir son docblock : « un combat
  * n'a lieu dans aucune discipline ». Écrire `{ type: STRENGTH_BONUS, value: 350, discipline:
- * RUNNING }` dans `items.yaml` produirait donc un objet qui s'applique **partout**, alors que
- * le fichier prétend le contraire de ce que le moteur fait. Une config qui ment se refuse au
+ * RUNNING }` dans le snapshot publié produirait donc un objet qui s'applique **partout**, alors que
+ * la configuration prétend le contraire de ce que le moteur fait. Une config qui ment se refuse au
  * démarrage plutôt que de se documenter : voir {@see self::COMBAT_MODIFIER_TYPES} et le refus
  * dans {@see modifiers()}.
  *
@@ -55,7 +55,7 @@ use InvalidArgumentException;
  *     pour un objet qui prétend ne pas être vendu ne veut rien dire ;
  *   - un objet EPIC ou LEGENDARY listé à l'étal : ces deux raretés ne se vendent jamais — un
  *     objet qui s'achète n'est plus une récompense de tirage, et si les meilleurs objets
- *     s'achètent, le loot ne récompense plus rien. `items.yaml` n'en pose aucun aujourd'hui ;
+ *     s'achètent, le loot ne récompense plus rien. Le snapshot publié n'en pose aucun aujourd'hui ;
  *     ce refus protège la décision plutôt que de compter sur ce qu'un futur contributeur se
  *     souvienne de la prose du fichier.
  *
@@ -71,7 +71,7 @@ use InvalidArgumentException;
  *   - un modificateur posé sur un coffre : un coffre ne s'équipe pas, il n'a rien à modifier.
  *
  * **Une table de coffre est exigée, mais pas ici.** `ItemsSection` ne voit que ce fichier —
- * même limite que documentée sur `LootTables` pour `loot.yaml` — donc « un coffre doit avoir
+ * même limite que documentée sur `LootTables` pour le snapshot publié — donc « un coffre doit avoir
  * une table, un `EQUIPMENT` ne peut pas en avoir » se prouve à la construction réelle de
  * {@see LootTables}, câblée par `services.yaml`, et par `RewardsCoverageTest` : le geste exact
  * que `testChaqueAdversaireDuCatalogueALivreATableDeTirage()` fait déjà pour les adversaires.

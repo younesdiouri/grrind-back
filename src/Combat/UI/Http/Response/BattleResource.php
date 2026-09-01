@@ -28,7 +28,7 @@ use DateTimeInterface;
  * snapshot lui-même ne re-dérive pas les stats de l'ennemi au moment de la lecture (voir le
  * docblock de `Battle`). Consulter le catalogue ici forçait, en plus, un cas d'erreur qui
  * n'existait nulle part ailleurs dans le module : retirer ou renommer une entrée de
- * `combat.yaml` — un geste que ce fichier annonce lui-même comme normal — rendait alors
+ * le snapshot publié — un geste que ce fichier annonce lui-même comme normal — rendait alors
  * illisible tout combat déjà joué contre cet ennemi. Le pire cas est désormais un nom qui
  * s'affiche comme sa clé de traduction si l'entrée disparaît aussi de
  * `translations/enemies.*.yaml` — dégradé et lisible, jamais un 500. Même principe que

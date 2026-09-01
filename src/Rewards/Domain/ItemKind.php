@@ -10,7 +10,7 @@ namespace App\Rewards\Domain;
  * nature que ces deux-là.
  *
  * **`EQUIPMENT` est le défaut**, voir {@see ItemCatalog} : c'est la valeur implicite de
- * `items.yaml` avant le #230, et les neuf objets déjà livrés n'ont rien eu à déclarer pour
+ * le snapshot publié avant le #230, et les neuf objets déjà livrés n'ont rien eu à déclarer pour
  * le rester.
  */
 enum ItemKind: string

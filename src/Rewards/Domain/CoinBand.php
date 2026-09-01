@@ -7,7 +7,7 @@ namespace App\Rewards\Domain;
 use InvalidArgumentException;
 
 /**
- * Une bande de pièces, jamais un montant fixe — voir le docblock de `loot.yaml` : un
+ * Une bande de pièces, jamais un montant fixe — voir le docblock de le snapshot publié : un
  * nombre constant n'est pas une récompense, c'est un compteur. Le tirage réel (#28) piochera
  * dedans sous la même graine que les objets, pour rester auditable au même titre.
  */
