@@ -37,6 +37,24 @@ security:
             pattern: ^/api/auth/
             security: false
 
+        # Le back-office ne partage jamais l'authentification JWT mobile : une session
+        # stateful, le formulaire Symfony et son CSRF protègent les opérations EasyAdmin.
+        admin:
+            pattern: ^/admin
+            lazy: true
+            provider: app_users
+            form_login:
+                login_path: admin_login
+                check_path: admin_login
+                enable_csrf: true
+                csrf_token_id: authenticate
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
+            logout:
+                path: admin_logout
+                target: admin_login
+
         api:
             pattern: ^/api
             stateless: true
@@ -48,6 +66,9 @@ security:
             security: false
 
     access_control:
+        - { path: ^/admin/images/, roles: PUBLIC_ACCESS }
+        - { path: ^/admin/login$, roles: PUBLIC_ACCESS }
+        - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:

@@ -807,3 +807,16 @@ Les pièges qui se reproduisent. Les autres sont datés, corrigés, et vivent da
   autoconfiguration coupée, service retiré parce qu'inutilisé : l'itérateur est simplement
   vide. Un contributeur de modificateurs qui se tait sous-paie un joueur en silence, et
   l'écriture est au ledger — donc chaque port en éventail se prouve contre le vrai conteneur.
+
+## Back-office et configuration jouable
+
+`/admin` est un firewall Symfony stateful distinct du JWT mobile. Seul `ROLE_ADMIN` y entre ;
+la commande `app:user:grant-admin <email>` promeut un compte local existant et refuse un compte
+social sans mot de passe. Les données de balance éditables sont importées une fois dans les tables
+`game_*`. Toute mutation EasyAdmin reconstruit le snapshot dans une transaction et rejoue les
+constructeurs métier : une configuration incohérente ne devient jamais visible partiellement.
+
+Les images d'items vivent provisoirement hors webroot dans `GAME_IMAGES_DIR` (`/data/game-images`
+sur Fly) et sont servies via une route à nom strict. Le volume Fly est mono-machine et non
+répliqué : le process `app` ne doit pas être scalé horizontalement avant migration vers un
+stockage objet.

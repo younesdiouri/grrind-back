@@ -1038,7 +1038,7 @@ when@dev:
                             emplacement, mais c'était une déduction à écrire côté client plutôt
                             qu'une donnée du contrat — elle se serait tue en silence au premier
                             objet non équipable de plus.
-                        required: [key, kind, name, rarity, slot, modifiers, priceCoins]
+                        required: [key, kind, name, rarity, slot, modifiers, priceCoins, imageUrl]
                         properties:
                             key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
                             kind:
@@ -1059,6 +1059,7 @@ when@dev:
                                 description: "Dans l'ordre du catalogue."
                                 items: { $ref: '#/components/schemas/DroppedItemModifier' }
                             priceCoins: { type: integer, example: 30, description: "En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue." }
+                            imageUrl: { type: string, format: uri, example: "https://api.grrind.app/admin/images/placeholder.png", description: "URL absolue de l'image livrée par le serveur." }
 
                     InventoryLine:
                         type: object

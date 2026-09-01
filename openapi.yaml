@@ -1973,6 +1973,7 @@ components:
         - slot
         - modifiers
         - priceCoins
+        - imageUrl
       properties:
         key:
           description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire."
@@ -2017,6 +2018,11 @@ components:
           description: "En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue."
           type: integer
           example: 30
+        imageUrl:
+          description: "URL absolue de l'image livrée par le serveur."
+          type: string
+          format: uri
+          example: 'https://api.grrind.app/admin/images/placeholder.png'
       type: object
     InventoryLine:
       description: "Un objet possédé (#30) — la même forme que `DroppedItem`, une seule clé de plus :\n`quantity`. Ce n'est pas une troisième forme d'objet, c'est la même, augmentée d'un\nfait qu'un tirage n'a jamais eu à porter — un objet qui tombe en crée ou en\nincrémente une, il n'en a jamais une à afficher lui-même.\n"

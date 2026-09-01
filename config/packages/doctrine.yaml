@@ -68,6 +68,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Rewards/Domain'
                 prefix: 'App\Rewards\Domain'
                 alias: Rewards
+            Admin:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Admin/Domain'
+                prefix: 'App\Admin\Domain'
+                alias: Admin
 
 when@test:
     doctrine:

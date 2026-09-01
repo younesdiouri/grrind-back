@@ -1,0 +1,7 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Administration GRRIND</title></head><body>
+<main><h1>Administration GRRIND</h1><form method="post" action="{{ path('admin_login') }}">
+{% if error %}<p>Connexion refusée.</p>{% endif %}
+<label for="username">E-mail</label><input id="username" name="_username" value="{{ last_username }}" type="email" required autofocus>
+<label for="password">Mot de passe</label><input id="password" name="_password" type="password" required>
+<input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}"><button type="submit">Connexion</button>
+</form></main></body></html>

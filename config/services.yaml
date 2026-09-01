@@ -19,6 +19,7 @@ services:
             # Le hash de l'équilibrage chargé. Il se stocke avec chaque transaction d'XP :
             # c'est ce qui permet de rééquilibrer sans corrompre l'historique.
             string $rulesetVersion: '%game.ruleset_version%'
+            string $gameImageDirectory: '%env(resolve:GAME_IMAGES_DIR)%'
 
     App\:
         resource: '../src/'

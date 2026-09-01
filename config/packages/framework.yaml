@@ -30,10 +30,12 @@ framework:
         App\Shared\Domain\Exception\DomainError:
             log_level: warning
 
-    # L'API est stateless de bout en bout : tous les firewalls le sont ou n'en ont pas,
-    # et rien ne lit la session. En mode worker FrankenPHP, un composant à état qui ne
-    # sert à personne est un risque pour rien.
-    session: false
+    # L'API reste stateless ; le back-office, lui, utilise le firewall Symfony stateful.
+    # Une session n'est donc activée que parce que `/admin` en a réellement besoin.
+    session:
+        cookie_secure: auto
+        cookie_httponly: true
+        cookie_samesite: lax
 
 when@test:
     framework:

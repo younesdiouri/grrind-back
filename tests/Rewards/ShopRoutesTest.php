@@ -61,7 +61,7 @@ final class ShopRoutesTest extends ApiTestCase
 
         $item = $body['items'][0];
         self::assertSame(
-            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
             array_keys($item),
         );
     }
