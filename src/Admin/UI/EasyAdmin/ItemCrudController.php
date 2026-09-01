@@ -7,6 +7,8 @@ namespace App\Admin\UI\EasyAdmin;
 use App\Admin\Domain\GameItem;
 use App\Admin\UI\Form\ModifierEntryType;
 use App\Admin\UI\Form\TranslationsType;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Option\ReplacedFileBehavior;
@@ -33,6 +35,16 @@ final class ItemCrudController extends GameCrudController
     public function configureFilters(Filters $filters): Filters
     {
         return $filters->add('active')->add('rarity')->add('kind')->add('shopAvailable');
+    }
+
+    public function configureActions(Actions $actions): Actions
+    {
+        $pair = Action::new('toggleLootPair', 'Activer/désactiver la paire de loot')
+            ->linkToCrudAction('toggleLootPair')
+            ->displayIf(static fn (GameItem $item): bool => 'CHEST' === $item->getKind())
+            ->askConfirmation('Publier ce changement atomique avec la table de loot associée ?');
+
+        return $actions->add(Crud::PAGE_INDEX, $pair)->add(Crud::PAGE_DETAIL, $pair);
     }
 
     public function configureFields(string $pageName): iterable

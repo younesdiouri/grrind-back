@@ -7,6 +7,8 @@ namespace App\Admin\UI\EasyAdmin;
 use App\Admin\Domain\GameLootTable;
 use App\Admin\UI\Form\EligibilityType;
 use App\Admin\UI\Form\LootEntryType;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
@@ -30,6 +32,16 @@ final class LootTableCrudController extends GameCrudController
     public function configureFilters(Filters $filters): Filters
     {
         return $filters->add('active')->add('kind');
+    }
+
+    public function configureActions(Actions $actions): Actions
+    {
+        $pair = Action::new('toggleLootPair', 'Activer/désactiver la paire')
+            ->linkToCrudAction('toggleLootPair')
+            ->displayIf(static fn (GameLootTable $table): bool => \in_array($table->getKind(), ['adversary', 'chest'], true))
+            ->askConfirmation('Publier ce changement atomique avec la rencontre ou le coffre associé ?');
+
+        return $actions->add(Crud::PAGE_INDEX, $pair)->add(Crud::PAGE_DETAIL, $pair);
     }
 
     public function configureFields(string $pageName): iterable

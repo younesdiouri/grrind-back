@@ -26,7 +26,7 @@ class GameLootTable
     #[ORM\Column(type: Types::JSON, nullable: true)] private ?array $eligibility = null;
     #[ORM\Column(name: 'coins_minimum')] private int $coinsMinimum = 0;
     #[ORM\Column(name: 'coins_maximum')] private int $coinsMaximum = 0;
-    /** @var list<array{item?: string, weight: int}> */
+    /** @var list<array{item?: string|null, weight: int}> */
     #[ORM\Column(type: Types::JSON)] private array $entries = [];
     public function __construct()
     {
@@ -115,13 +115,13 @@ class GameLootTable
         $this->coinsMaximum = $value;
     }
 
-    /** @return list<array{item?: string, weight: int}> */
+    /** @return list<array{item?: string|null, weight: int}> */
     public function getEntries(): array
     {
         return $this->entries;
     }
 
-    /** @param list<array{item?: string, weight: int}> $entries */
+    /** @param list<array{item?: string|null, weight: int}> $entries */
     public function setEntries(array $entries): void
     {
         $this->entries = $entries;

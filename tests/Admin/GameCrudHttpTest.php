@@ -9,9 +9,11 @@ use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLootTable;
 use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
+use App\Admin\Infrastructure\GameRulesetPublisher;
 use App\Identity\Domain\Role;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
 use App\Tests\Support\ApiTestCase;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DomCrawler\Field\ChoiceFormField;
 use Symfony\Component\DomCrawler\Field\FileFormField;
 use Symfony\Component\DomCrawler\Form;
@@ -191,6 +193,76 @@ final class GameCrudHttpTest extends ApiTestCase
         self::assertNull(self::getContainer()->get('doctrine')->getRepository(GameEnemy::class)->findOneBy(['key' => $key]));
     }
 
+    public function testEnemyAndChestLootPairsArePublishedAtomicallyThroughAdmin(): void
+    {
+        $this->loginAdmin('pair-crud-admin@grrind.app');
+        $manager = self::getContainer()->get('doctrine')->getManager();
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+        $suffix = bin2hex(random_bytes(4));
+        $enemy = $this->inactiveEnemy('PAIR_ENEMY_'.$suffix, 7_000_001);
+        $enemyTable = $this->inactiveLoot('adversary', $enemy->getKey(), 7_000_001);
+        $chest = $this->inactiveChest('PAIR_CHEST_'.$suffix, 7_000_002);
+        $chestTable = $this->inactiveLoot('chest', $chest->getKey(), 7_000_002);
+        foreach ([$enemy, $enemyTable, $chest, $chestTable] as $configuration) {
+            $manager->persist($configuration);
+        }
+        $manager->flush();
+
+        foreach ([
+            ['/admin/enemy/'.$enemy->getId()->toRfc4122().'/toggle-loot-pair', GameEnemy::class, $enemy->getId(), GameLootTable::class, $enemyTable->getId()],
+            ['/admin/item/'.$chest->getId()->toRfc4122().'/toggle-loot-pair', GameItem::class, $chest->getId(), GameLootTable::class, $chestTable->getId()],
+        ] as [$url, $leftClass, $leftId, $rightClass, $rightId]) {
+            $this->client->request('GET', $url);
+            self::assertResponseRedirects();
+            $manager->clear();
+            $left = $manager->find($leftClass, $leftId);
+            $right = $manager->find($rightClass, $rightId);
+            self::assertInstanceOf(GameEnemy::class === $leftClass ? GameEnemy::class : GameItem::class, $left);
+            self::assertInstanceOf(GameLootTable::class, $right);
+            self::assertTrue($left->isActive());
+            self::assertTrue($right->isActive());
+
+            $this->client->request('GET', $url);
+            self::assertResponseRedirects();
+            $manager->clear();
+            $left = $manager->find($leftClass, $leftId);
+            $right = $manager->find($rightClass, $rightId);
+            self::assertInstanceOf(GameEnemy::class === $leftClass ? GameEnemy::class : GameItem::class, $left);
+            self::assertInstanceOf(GameLootTable::class, $right);
+            self::assertFalse($left->isActive());
+            self::assertFalse($right->isActive());
+        }
+
+        $orphan = $this->inactiveEnemy('ORPHAN_ENEMY_'.$suffix, 7_000_003, 100);
+        $manager->persist($orphan);
+        $manager->flush();
+        $this->client->request('GET', '/admin/enemy/'.$orphan->getId()->toRfc4122().'/toggle-loot-pair');
+        self::assertResponseRedirects();
+        $manager->clear();
+        $orphan = $manager->find(GameEnemy::class, $orphan->getId());
+        self::assertInstanceOf(GameEnemy::class, $orphan);
+        self::assertFalse($orphan->isActive());
+
+        // Les scénarios HTTP créent une paire réelle, mais l'état de référence migré reste
+        // identique pour les scénarios suivants : la suppression est ici un nettoyage de test,
+        // pas un chemin exposé à l'administration.
+        foreach ([$enemy, $enemyTable, $chest, $chestTable, $orphan] as $configuration) {
+            $managed = $manager->find($configuration::class, $configuration->getId());
+            if (null !== $managed) {
+                $manager->remove($managed);
+            }
+        }
+        $manager->wrapInTransaction(static function () use ($manager): void {
+            $manager->flush();
+            $publisher = self::getContainer()->get(GameRulesetPublisher::class);
+            self::assertInstanceOf(GameRulesetPublisher::class, $publisher);
+            $publisher->publish($manager);
+        });
+        $publisher = self::getContainer()->get(GameRulesetPublisher::class);
+        self::assertInstanceOf(GameRulesetPublisher::class, $publisher);
+        $publisher->invalidateAfterCommit();
+    }
+
     public function testSettingsStructuredFormUpdatesAndRestoresLootLuck(): void
     {
         $this->loginAdmin('settings-crud-admin@grrind.app');
@@ -286,5 +358,45 @@ final class GameCrudHttpTest extends ApiTestCase
         $token = $login->filter('input[name="_csrf_token"]')->attr('value');
         self::assertIsString($token);
         $this->client->request('POST', '/admin/login', ['_username' => $email, '_password' => 'un-mot-de-passe-assez-long', '_csrf_token' => $token]);
+    }
+
+    private function inactiveEnemy(string $key, int $sortOrder, int $minimumLevel = 99): GameEnemy
+    {
+        $enemy = new GameEnemy();
+        $enemy->setKey($key);
+        $enemy->setActive(false);
+        $enemy->setSortOrder($sortOrder);
+        $enemy->setMinimumLevel($minimumLevel);
+        $enemy->setHp(100);
+        $enemy->setDamage(1);
+        $enemy->setTranslations(['fr' => ['name' => 'Ennemi de paire'], 'en' => ['name' => 'Pair enemy']]);
+
+        return $enemy;
+    }
+
+    private function inactiveChest(string $key, int $sortOrder): GameItem
+    {
+        $item = new GameItem();
+        $item->setKey($key);
+        $item->setActive(false);
+        $item->setSortOrder($sortOrder);
+        $item->setKind('CHEST');
+        $item->setTranslations(['fr' => ['name' => 'Coffre de paire'], 'en' => ['name' => 'Pair chest']]);
+
+        return $item;
+    }
+
+    private function inactiveLoot(string $kind, string $key, int $sortOrder): GameLootTable
+    {
+        $table = new GameLootTable();
+        $table->setKind($kind);
+        $table->setKey($key);
+        $table->setActive(false);
+        $table->setSortOrder($sortOrder);
+        $table->setCoinsMinimum(0);
+        $table->setCoinsMaximum(1);
+        $table->setEntries([['item' => null, 'weight' => 1], ['item' => 'WORN_RUNNING_SHOES', 'weight' => 1]]);
+
+        return $table;
     }
 }
