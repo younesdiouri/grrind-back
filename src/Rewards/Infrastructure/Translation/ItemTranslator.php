@@ -18,11 +18,10 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * retrouver l'objet dans `ItemCatalog::find()` évite un aller-retour inutile, et garde le
  * rendu d'un objet possédé indépendant de l'état *courant* du catalogue.
  *
- * **Le seul endroit qui connaît les clés de traduction.** Elles se déduisent de la clé de
- * l'objet — `sand_runner_boots.name` — donc ajouter un objet ne demande rien ici : le YAML
- * d'équilibrage et les deux catalogues de traduction suffisent. `ItemTranslationsTest`
- * refuse une clé manquante, sans quoi le repli du traducteur enverrait la clé brute au
- * joueur, en silence et en production.
+ * **Le seul endroit qui lit les libellés publiés.** Les traductions et l'image viennent du
+ * snapshot DB indexé par clé ; aucun YAML de présentation n'est consulté à l'exécution.
+ * `ItemTranslationsTest` refuse une clé manquante, sans quoi le repli enverrait la clé brute
+ * au joueur, en silence et en production.
  */
 final class ItemTranslator implements ResetInterface
 {
