@@ -9,6 +9,7 @@ use App\Admin\UI\Form\FighterType;
 use App\Admin\UI\Form\LootLuckType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 
 final class SettingsCrudController extends GameCrudController
 {
@@ -20,6 +21,13 @@ final class SettingsCrudController extends GameCrudController
     public function configureActions(Actions $actions): Actions
     {
         return $actions->disable(Action::NEW, Action::DELETE);
+    }
+
+    public function configureCrud(Crud $crud): Crud
+    {
+        // Le réglage global est un singleton, mais son index doit rester déterministe comme
+        // les catalogues ordonnés pour que le lien dashboard ne dépende pas du SGBD.
+        return parent::configureCrud($crud)->setDefaultSort(['id' => 'ASC']);
     }
 
     public function configureFields(string $pageName): iterable
