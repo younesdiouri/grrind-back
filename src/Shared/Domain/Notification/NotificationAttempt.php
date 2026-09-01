@@ -65,8 +65,14 @@ class NotificationAttempt
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $recipientId;
 
-    #[ORM\Column(length: 32, enumType: NotificationCategory::class)]
-    private NotificationCategory $category;
+    /**
+     * Trace d'audit, pas le catalogue vivant : une ancienne valeur reste lisible même après
+     * sa sortie de {@see NotificationCategory}. Le #256 conserve ainsi l'historique sans
+     * migration de données et sans laisser cette valeur réapparaître dans les API de création
+     * ou de préférences, qui restent typées par l'enum.
+     */
+    #[ORM\Column(length: 32)]
+    private string $category;
 
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $createdAt;
@@ -76,7 +82,7 @@ class NotificationAttempt
         $this->id = Uuid::v7();
         $this->eventId = $eventId;
         $this->recipientId = $recipientId;
-        $this->category = $category;
+        $this->category = $category->value;
         $this->createdAt = $now;
     }
 
@@ -104,7 +110,7 @@ class NotificationAttempt
         return $this->recipientId;
     }
 
-    public function category(): NotificationCategory
+    public function category(): string
     {
         return $this->category;
     }

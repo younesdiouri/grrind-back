@@ -27,10 +27,6 @@ namespace App\Shared\Domain;
  * que les préférences de `/api/me` se coupent par catégorie : on peut vouloir faire taire le
  * bavardage de sa guilde sans faire taire ce qui nous demande d'agir. Les fondre obligerait à
  * choisir entre les deux, et le joueur qui coupe finirait par manquer son tour.
- *
- * **`SESSION_CREDITED` (#252) est un tombeau de compatibilité au #255.** Il reste accepté
- * pour les PATCH d'écrans déjà chargés et les messages en vol, mais ne figure plus dans le
- * GET et aucun push serveur ne l'utilise avant sa suppression au #256.
  */
 enum NotificationCategory: string
 {
@@ -41,7 +37,4 @@ enum NotificationCategory: string
 
     /** La Risāla de la semaine est partie. À toute la guilde, au même instant. */
     case RisalaRevealed = 'RISALA_REVEALED';
-
-    /** Ta séance a été créditée pendant que l'app était en fond — le réveil de la dopamine que le `RewardSummary`, non regardé, ne déclenche pas seul. */
-    case SessionCredited = 'SESSION_CREDITED';
 }

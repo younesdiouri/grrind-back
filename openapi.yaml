@@ -1552,7 +1552,7 @@ components:
             -
               $ref: '#/components/schemas/PlayerTitle'
         notificationPreferences:
-          description: "Toutes les catégories vivantes, jamais seulement celles coupées (#255) — le\nclient lit l'état exact de chacune plutôt que de connaître le défaut. Clé =\nvaleur de `NotificationCategory`, valeur = activée. `SESSION_CREDITED` reste\naccepté au PATCH pour les écrans chargés avant le déploiement, mais est masqué\nici jusqu'à son retrait définitif.\n"
+          description: "Toutes les catégories vivantes : le client lit l'état exact de chacune plutôt\nque de connaître le défaut. Clé = valeur de `NotificationCategory`, valeur =\nactivée.\n"
           type: object
           example:
             GUILD_ACTIVITY: true
@@ -2971,7 +2971,6 @@ components:
         - GUILD_ACTIVITY
         - RISALA_TURN
         - RISALA_REVEALED
-        - SESSION_CREDITED
     NotificationPreferenceRequest:
       properties:
         category:

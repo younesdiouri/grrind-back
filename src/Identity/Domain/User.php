@@ -81,6 +81,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      * Porté par le compte et non par `UserDevice` : un joueur qui coupe `GUILD_ACTIVITY`
      * sur son iPhone ne veut pas être rattrapé sur son iPad.
      *
+     * Les valeurs restent des chaînes et les inconnues sont conservées : retirer une
+     * catégorie du catalogue ne réécrit pas l'historique des préférences ni ne casse un
+     * rollback. Elles ne peuvent plus être créées par l'API, qui passe par
+     * {@see NotificationCategory}, et ne sont jamais interprétées comme une catégorie vivante.
+     *
      * @var list<string>
      */
     #[ORM\Column(type: Types::JSON)]

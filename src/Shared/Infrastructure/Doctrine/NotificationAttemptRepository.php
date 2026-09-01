@@ -47,7 +47,7 @@ class NotificationAttemptRepository extends ServiceEntityRepository
                 'id' => $attempt->id()->toRfc4122(),
                 'eventId' => $attempt->eventId()->toRfc4122(),
                 'recipientId' => $attempt->recipientId()->toRfc4122(),
-                'category' => $attempt->category()->value,
+                'category' => $attempt->category(),
                 'now' => $attempt->createdAt(),
             ],
             ['now' => Types::DATETIMETZ_IMMUTABLE],

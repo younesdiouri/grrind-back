@@ -3,9 +3,7 @@
 # `training.yaml` : ce qui protège un joueur d'un import massif protège aussi ses
 # co-équipiers d'un push par séance.
 #
-# Le #255 neutralise le producteur auteur : ces réglages restent donc tous propres à
-# `GuildActivityNotifier`. Les tombeaux SESSION_CREDITED ne les lisent plus et le #256 les
-# retirera avec le contrat une fois les files Messenger drainées.
+# Ces réglages restent tous propres à `GuildActivityNotifier`.
 #
 # Ce fichier est de la donnée, pas de la configuration Symfony : il est lu et validé à la
 # compilation du conteneur par App\Community\Infrastructure\Config\NotificationsSection, et
