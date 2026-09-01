@@ -83,14 +83,31 @@ final class Version20260901150553 extends AbstractMigration
         $lootLuck = $loot['loot_luck'];
         $this->insert('game_settings', ['id' => 1, 'fighter' => json_encode($fighter, JSON_THROW_ON_ERROR), 'loot_luck' => json_encode($lootLuck, JSON_THROW_ON_ERROR), 'loot_version' => 1]);
 
+        // Même forme que `GameRulesetPublisher`: le seed est déjà une publication, pas une
+        // préforme qui ferait changer gameplay/hash lors de sa première édition visuelle.
         $snapshot = [
-            'items' => $items,
-            'titles' => $titles,
-            'combat' => ['fighter' => $fighter, 'enemies' => $seed['enemies'], 'bosses' => $seed['bosses']],
-            'loot' => ['version' => 1, ...$loot],
+            'items' => array_map(static fn (array $item): array => [
+                'key' => $item['key'], 'active' => $item['active'], 'rarity' => $item['rarity'], 'kind' => $item['kind'] ?? 'EQUIPMENT', 'slot' => $item['slot'] ?? null,
+                'price_coins' => $item['price_coins'], 'modifiers' => $item['modifiers'] ?? [], 'shop' => ['available' => $item['shop']['available'] ?? false, 'minimum_level' => $item['shop']['minimum_level'] ?? null],
+                'image_path' => $item['image_path'], 'translations' => $item['translations'],
+            ], $items),
+            'titles' => array_map(static fn (array $title): array => [
+                'id' => $title['id'], 'active' => $title['active'], 'condition' => ['type' => $title['condition']['type'], 'threshold' => $title['condition']['threshold'], 'discipline' => $title['condition']['discipline'] ?? null], 'translations' => $title['translations'],
+            ], $titles),
+            'combat' => [
+                'fighter' => $fighter,
+                'enemies' => array_map(static fn (array $enemy): array => ['key' => $enemy['key'], 'active' => $enemy['active'], 'hp' => $enemy['hp'], 'damage' => $enemy['damage'], 'mitigation_permille' => $enemy['mitigation_permille'], 'extra_turn_permille' => $enemy['extra_turn_permille'], 'dodge_permille' => $enemy['dodge_permille'], 'translations' => $enemy['translations'], 'level' => $enemy['minimum_level']], $seed['enemies']),
+                'bosses' => array_map(static fn (array $enemy): array => ['key' => $enemy['key'], 'active' => $enemy['active'], 'hp' => $enemy['hp'], 'damage' => $enemy['damage'], 'mitigation_permille' => $enemy['mitigation_permille'], 'extra_turn_permille' => $enemy['extra_turn_permille'], 'dodge_permille' => $enemy['dodge_permille'], 'translations' => $enemy['translations'], 'minimum_level' => $enemy['minimum_level']], $seed['bosses']),
+            ],
+            'loot' => [
+                'version' => 1, 'loot_luck' => $loot['loot_luck'],
+                'workout' => array_map(static fn (array $table): array => ['key' => $table['key'], 'active' => true, 'coins' => $table['coins'], 'entries' => $table['entries'], 'eligibility' => $table['eligibility']], $loot['workout']),
+                'adversary' => array_map(static fn (array $table): array => ['key' => $table['key'], 'active' => true, 'coins' => $table['coins'], 'entries' => $table['entries']], $loot['adversary']),
+                'chest' => array_map(static fn (array $table): array => ['key' => $table['key'], 'active' => true, 'coins' => $table['coins'], 'entries' => $table['entries']], $loot['chest']),
+            ],
         ];
         $this->insert('game_ruleset', [
-            'id' => 1, 'revision' => 1, 'version' => 'v1-64dbac7efb84',
+            'id' => 1, 'revision' => 1, 'version' => 'v1-fa2662c5628e',
             'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR), 'published_at' => (new \DateTimeImmutable())->format('c'),
         ]);
 
