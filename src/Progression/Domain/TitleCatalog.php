@@ -39,7 +39,7 @@ final class TitleCatalog
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
-    public function __construct(array $titles, ?GameRulesets $rulesets = null)
+    public function __construct(array $titles, ?GameRulesets $rulesets = null, bool $allowEmpty = false)
     {
         $this->rulesets = $rulesets;
         if (null !== $rulesets) {
@@ -47,10 +47,9 @@ final class TitleCatalog
 
             return;
         }
-        if ([] === $titles) {
+        if ([] === $titles && !$allowEmpty) {
             throw new InvalidArgumentException('Un catalogue sans titre ne récompense personne.');
         }
-
         $catalog = [];
 
         foreach ($titles as $entry) {
@@ -114,12 +113,21 @@ final class TitleCatalog
      * Tous les titres, débloqués ou non : un catalogue qui ne montrerait que l'atteint ne
      * donnerait rien à viser, et c'est précisément ce qu'on attend d'un mur de titres.
      *
+     * @param list<string> $historicallyUnlocked
+     *
      * @return list<TitleProgress>
      */
-    public function progressOf(PlayerRecord $record): array
+    public function progressOf(PlayerRecord $record, array $historicallyUnlocked = []): array
     {
         if (null !== $this->rulesets) {
-            return $this->current()->progressOf($record);
+            $progress = $this->active()->progressOf($record);
+            foreach ($historicallyUnlocked as $id) {
+                if (null === $this->active()->find($id) && null !== ($title = $this->current()->find($id))) {
+                    $progress[] = TitleProgress::of($title, $record);
+                }
+            }
+
+            return $progress;
         }
 
         return array_map(
@@ -211,7 +219,7 @@ final class TitleCatalog
         /** @var list<array{id: string, active?: bool, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */
         $titles = $snapshot['titles'];
 
-        return $this->available = new self(array_values(array_filter($titles, static fn (array $title): bool => $title['active'] ?? true)));
+        return $this->available = new self(array_values(array_filter($titles, static fn (array $title): bool => $title['active'] ?? true)), null, true);
     }
 
     /**

@@ -36,7 +36,7 @@ final readonly class TitleBoardProvider
         $unlockedAt = $this->unlockedTitles->unlockedBy($userId);
 
         return new TitleBoard(
-            $this->catalog->progressOf($record),
+            $this->catalog->progressOf($record, array_keys($unlockedAt)),
             $unlockedAt,
             $this->activeTitles->titleIdOf($userId),
             // Ce que le joueur a déjà est écarté d'après la **table**, pas d'après le relevé :
