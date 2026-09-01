@@ -7,6 +7,7 @@ namespace App\Combat\UI\Http\Response;
 use App\Combat\Application\BattlePage;
 use App\Combat\Domain\Battle;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
+use App\Shared\Application\ItemImageUrlResolver;
 
 /**
  * L'enveloppe de `GET /api/battles` — le pendant exact de
@@ -27,11 +28,11 @@ final readonly class BattlePageResource
     ) {
     }
 
-    public static function from(BattlePage $page, EnemyTranslator $enemyNames): self
+    public static function from(BattlePage $page, EnemyTranslator $enemyNames, ?ItemImageUrlResolver $items = null): self
     {
         return new self(
             array_map(
-                static fn (Battle $battle): BattleSummaryResource => BattleSummaryResource::from($battle, $enemyNames),
+                static fn (Battle $battle): BattleSummaryResource => BattleSummaryResource::from($battle, $enemyNames, $items),
                 $page->battles,
             ),
             $page->nextCursor?->encoded(),

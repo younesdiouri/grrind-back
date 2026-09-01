@@ -112,7 +112,34 @@ abstract class ApiTestCase extends WebTestCase
         return $decoded;
     }
 
-    /** Le pool chaud ne doit plus rouvrir le snapshot de configuration pendant une opération. */
+    /**
+     * Un worker chaud ne réhydrate jamais le graphe : il relit uniquement le pointeur monotone.
+     * Cette lecture scalaire rend son cache filesystem cohérent avec les autres machines Fly.
+     */
+    protected function assertOnlyRulesetRevisionPointerSql(): void
+    {
+        $profile = $this->client->getProfile();
+        self::assertInstanceOf(Profile::class, $profile);
+        $collector = $profile->getCollector('db');
+        self::assertInstanceOf(DoctrineDataCollector::class, $collector);
+        $rulesetQueries = [];
+        foreach ($collector->getQueries() as $queries) {
+            self::assertIsArray($queries);
+            foreach ($queries as $query) {
+                self::assertIsArray($query);
+                $sql = $query['sql'] ?? '';
+                self::assertIsString($sql);
+                if (preg_match('/\bgame_ruleset\b/i', $sql)) {
+                    $rulesetQueries[] = $sql;
+                }
+            }
+        }
+
+        self::assertCount(1, $rulesetQueries);
+        self::assertMatchesRegularExpression('/^SELECT revision FROM game_ruleset WHERE id = 1$/i', $rulesetQueries[0]);
+    }
+
+    /** Une réponse qui ne consulte aucun catalogue ne touche pas même le pointeur. */
     protected function assertNoRulesetSql(): void
     {
         $profile = $this->client->getProfile();

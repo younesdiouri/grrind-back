@@ -7,6 +7,7 @@ namespace App\Combat\UI\Http;
 use App\Combat\Domain\Battle;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Response\BattleResource;
+use App\Shared\Application\ItemImageUrlResolver;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -19,6 +20,7 @@ final readonly class ShowBattleController
 {
     public function __construct(
         private EnemyTranslator $enemyNames,
+        private ItemImageUrlResolver $items,
     ) {
     }
 
@@ -47,6 +49,6 @@ final readonly class ShowBattleController
         #[VisibleBattle]
         Battle $battle,
     ): JsonResponse {
-        return new JsonResponse(BattleResource::from($battle, $this->enemyNames)->toArray());
+        return new JsonResponse(BattleResource::from($battle, $this->enemyNames, $this->items)->toArray());
     }
 }

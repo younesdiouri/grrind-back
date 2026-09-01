@@ -101,7 +101,7 @@ final class EnemiesTest extends ApiTestCase
 
         $this->client->enableProfiler();
         self::assertSame(Response::HTTP_OK, $this->get('/api/enemies', $bob->headers)->getStatusCode());
-        $this->assertNoRulesetSql();
+        $this->assertOnlyRulesetRevisionPointerSql();
     }
 
     /**

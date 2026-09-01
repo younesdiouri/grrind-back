@@ -16,6 +16,7 @@ use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\Battles;
 use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
@@ -29,6 +30,8 @@ use Symfony\Component\Uid\Uuid;
  */
 final class BattlesTest extends ApiTestCase
 {
+    use Battles;
+
     public function testFightingCreatesABattleAndRendersItsTimeline(): void
     {
         $bob = $this->openAccount();
@@ -92,7 +95,7 @@ final class BattlesTest extends ApiTestCase
         }
     }
 
-    public function testAHotBattleDoesNotReloadThePublishedRuleset(): void
+    public function testAHotBattleOnlyReadsTheRulesetRevisionPointer(): void
     {
         $bob = $this->openAccount('battle-hot@grrind.app');
         $this->client->disableReboot();
@@ -100,7 +103,7 @@ final class BattlesTest extends ApiTestCase
 
         $this->client->enableProfiler();
         self::assertSame(Response::HTTP_CREATED, $this->fight($bob, 'battle-hot')->getStatusCode());
-        $this->assertNoRulesetSql();
+        $this->assertOnlyRulesetRevisionPointerSql();
     }
 
     /**
@@ -160,6 +163,31 @@ final class BattlesTest extends ApiTestCase
         // écrits. Seul l'ordre des **éléments de la liste** `events` compte, et celui-là
         // survit — voir le docblock de `Battle`.
         self::assertEquals($fought, self::decode($response));
+    }
+
+    public function testAnOldPersistedLootRewardGetsAnAbsoluteReachableImageUrl(): void
+    {
+        $bob = $this->openAccount();
+        $id = $this->recordBattle(
+            $bob,
+            new DateTimeImmutable('2026-07-15T08:00:00+00:00'),
+            reward: ['loot' => [['key' => 'WORN_RUNNING_SHOES']], 'coins' => ['gained' => 8, 'before' => 40, 'after' => 48]],
+        );
+
+        $response = $this->get('/api/battles/'.$id, $bob->headers);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+
+        $body = self::decode($response);
+        self::assertIsArray($body['rewards']);
+        self::assertIsArray($body['rewards']['loot']);
+        $loot = $body['rewards']['loot'][0];
+        self::assertIsArray($loot);
+        self::assertIsString($loot['imageUrl']);
+        self::assertMatchesRegularExpression('#^http://localhost/game-images/[a-z0-9._-]+$#', $loot['imageUrl']);
+
+        $path = parse_url($loot['imageUrl'], \PHP_URL_PATH);
+        self::assertIsString($path);
+        self::assertSame(Response::HTTP_OK, $this->get($path)->getStatusCode());
     }
 
     /**

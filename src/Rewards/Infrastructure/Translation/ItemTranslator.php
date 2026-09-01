@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rewards\Infrastructure\Translation;
 
 use App\Shared\Application\GameRulesets;
+use App\Shared\Application\ItemImageUrlResolver;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -23,7 +24,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * `ItemTranslationsTest` refuse une clé manquante, sans quoi le repli enverrait la clé brute
  * au joueur, en silence et en production.
  */
-final class ItemTranslator implements ResetInterface
+final class ItemTranslator implements ItemImageUrlResolver, ResetInterface
 {
     /** Le domaine de traduction, donc le nom des fichiers : `translations/items.<locale>.yaml`. */
     public const string DOMAIN = 'items';
