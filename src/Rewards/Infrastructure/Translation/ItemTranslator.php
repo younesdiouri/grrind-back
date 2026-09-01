@@ -6,6 +6,7 @@ namespace App\Rewards\Infrastructure\Translation;
 
 use App\Shared\Application\GameRulesets;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -23,15 +24,18 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * refuse une clé manquante, sans quoi le repli du traducteur enverrait la clé brute au
  * joueur, en silence et en production.
  */
-final readonly class ItemTranslator
+final class ItemTranslator implements ResetInterface
 {
     /** Le domaine de traduction, donc le nom des fichiers : `translations/items.<locale>.yaml`. */
     public const string DOMAIN = 'items';
 
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $items = null;
+
     public function __construct(
-        private TranslatorInterface $translator,
-        private GameRulesets $rulesets,
-        private UrlGeneratorInterface $urls,
+        private readonly TranslatorInterface $translator,
+        private readonly GameRulesets $rulesets,
+        private readonly UrlGeneratorInterface $urls,
     ) {
     }
 
@@ -41,7 +45,8 @@ final readonly class ItemTranslator
         $item = $this->item($key);
         /** @var array<string, array{name?: string}> $translations */
         $translations = $item['translations'] ?? [];
-        $name = $translations[$locale]['name'] ?? $translations['fr']['name'] ?? null;
+        $locale = substr($locale, 0, 2);
+        $name = $translations[$locale]['name'] ?? $translations['en']['name'] ?? $translations['fr']['name'] ?? null;
 
         return \is_string($name) && '' !== $name ? $name : $key;
     }
@@ -54,18 +59,28 @@ final readonly class ItemTranslator
         return $this->urls->generate('game_image', ['name' => $path], UrlGeneratorInterface::ABSOLUTE_URL);
     }
 
+    public function reset(): void
+    {
+        $this->items = null;
+    }
+
     /** @return array<string, mixed> */
     private function item(string $key): array
     {
+        if (null !== $this->items) {
+            return $this->items[$key] ?? [];
+        }
         $snapshot = $this->rulesets->snapshot();
         /** @var list<array<string, mixed>> $items */
         $items = $snapshot['items'];
+        $indexed = [];
         foreach ($items as $item) {
-            if ($key === $item['key']) {
-                return $item;
-            }
+            \assert(\is_string($item['key']));
+            $indexed[$item['key']] = $item;
         }
 
-        return [];
+        $this->items = $indexed;
+
+        return $indexed[$key] ?? [];
     }
 }
