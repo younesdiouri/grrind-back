@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Shared\Config;
 
 use App\Combat\Domain\EnemyCatalog;
+use App\Progression\Domain\TitleCatalog;
 use App\Rewards\Domain\ItemCatalog;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Infrastructure\Config\DatabaseGameRulesets;
@@ -34,6 +35,15 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertNotNull($catalog->findHistorical('OLD_ENEMY'));
         self::assertNull($catalog->findAvailable('OLD_ENEMY'));
         self::assertSame('ACTIVE_ENEMY', $catalog->forLevel(1)->key);
+    }
+
+    public function testInactiveTitleRemainsHistoricalButCannotBeSelectedAgain(): void
+    {
+        $catalog = TitleCatalog::runtime($this->rulesets());
+
+        self::assertNotNull($catalog->findHistorical('old_title'));
+        self::assertNull($catalog->findAvailable('old_title'));
+        self::assertNotNull($catalog->findAvailable('active_title'));
     }
 
     public function testHybridVersionChangesForGameplayButNotPresentation(): void
@@ -198,7 +208,10 @@ final class DatabaseRuntimeCatalogTest extends TestCase
                         ['key' => 'OLD_BOOTS', 'active' => false, 'rarity' => 'COMMON', 'kind' => 'EQUIPMENT', 'slot' => 'FEET', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true, 'minimum_level' => 1]],
                         ['key' => 'ACTIVE_BOOTS', 'active' => true, 'rarity' => 'COMMON', 'kind' => 'EQUIPMENT', 'slot' => 'FEET', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true, 'minimum_level' => 1]],
                     ],
-                    'titles' => [],
+                    'titles' => [
+                        ['id' => 'old_title', 'active' => false, 'condition' => ['type' => 'session_count', 'threshold' => 1]],
+                        ['id' => 'active_title', 'active' => true, 'condition' => ['type' => 'session_count', 'threshold' => 1]],
+                    ],
                     'combat' => [
                         'fighter' => [],
                         'enemies' => [
