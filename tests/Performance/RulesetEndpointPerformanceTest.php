@@ -28,7 +28,9 @@ use Symfony\Component\Uid\Uuid;
 #[\PHPUnit\Framework\Attributes\Group('performance')]
 final class RulesetEndpointPerformanceTest extends ApiTestCase
 {
-    private const int HOT_SAMPLES = 10;
+    private const int DEFAULT_HOT_SAMPLES = 10;
+
+    private const int WARMUP_SAMPLES = 10;
 
     public function testColdAndHotRulesetQueriesForEveryGameplayEndpoint(): void
     {
@@ -54,8 +56,15 @@ final class RulesetEndpointPerformanceTest extends ApiTestCase
             $cold = $this->measure($request, 0);
             self::assertSame(1, $cold['rulesetQueries'], $name.' doit reconstruire un unique snapshot à froid.');
 
+            // Un combat fait tourner PostgreSQL et le noyau Docker à froid. Les mesures de
+            // comparaison passent donc par un warmup non compté avant l'échantillon robuste.
+            for ($sample = 1; $sample <= self::WARMUP_SAMPLES; ++$sample) {
+                $warmup = $this->measure($request, -$sample);
+                self::assertSame(0, $warmup['rulesetQueries'], $name.' ne doit pas recharger le snapshot pendant le warmup.');
+            }
+
             $samples = [];
-            for ($sample = 1; $sample <= self::HOT_SAMPLES; ++$sample) {
+            for ($sample = 1; $sample <= $this->hotSamples(); ++$sample) {
                 $hot = $this->measure($request, $sample);
                 self::assertSame(0, $hot['rulesetQueries'], $name.' ne doit pas réhydrater la configuration à chaud.');
                 $samples[] = $hot;
@@ -67,7 +76,7 @@ final class RulesetEndpointPerformanceTest extends ApiTestCase
             $report[$name] = [
                 'cold' => $cold,
                 'hot' => [
-                    'samples' => self::HOT_SAMPLES,
+                    'samples' => $this->hotSamples(),
                     'medianMs' => self::percentile($milliseconds, 50),
                     'p95Ms' => self::percentile($milliseconds, 95),
                     'sqlQueries' => $totalQueries,
@@ -124,6 +133,19 @@ final class RulesetEndpointPerformanceTest extends ApiTestCase
         $rulesets = self::getContainer()->get(GameRulesets::class);
         self::assertInstanceOf(DatabaseGameRulesets::class, $rulesets);
         $rulesets->reset();
+    }
+
+    private function hotSamples(): int
+    {
+        $configured = getenv('GRRIND_PERF_HOT_SAMPLES');
+        if (false === $configured || '' === $configured) {
+            return self::DEFAULT_HOT_SAMPLES;
+        }
+
+        $samples = filter_var($configured, \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 250]]);
+        self::assertIsInt($samples, 'GRRIND_PERF_HOT_SAMPLES doit être compris entre 1 et 250.');
+
+        return $samples;
     }
 
     /** @param list<float> $sortedMilliseconds */

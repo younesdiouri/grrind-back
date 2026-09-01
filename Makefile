@@ -124,7 +124,9 @@ test: ## Suite de tests (base de test créée/migrée au passage)
 		&& vendor/bin/phpunit $(c)"
 
 perf-ruleset: ## Mesure froide/chaude des quatre endpoints de règles (#260)
-	$(MAKE) test c="--group performance"
+	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \
+		&& bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration \
+		&& GRRIND_PERF_HOT_SAMPLES=$${GRRIND_PERF_HOT_SAMPLES:-10} vendor/bin/phpunit --group performance"
 
 qa: phpstan cs deptrac ## Toutes les barrières qualité
 
