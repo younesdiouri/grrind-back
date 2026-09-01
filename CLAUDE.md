@@ -225,9 +225,12 @@ les clients mobiles rejouent leurs requêtes. Il ne fait pas doublon avec l'unic
 d'origine. Sans lui, un client qui rejoue reçoit une synchronisation vide au lieu de sa mise en
 scène — l'XP serait juste, l'animation perdue.
 
-**La balance du jeu est du config-as-code.** Courbe de niveaux, coefficients XP, tables de loot,
-arbres, catalogue d'objets vivent en YAML versionné sous `config/game/v1/`, chargés et validés au
-boot, hashés pour produire le `rulesetVersion`. Rien de tout ça en base en v1.
+**La balance du jeu est versionnée et publiée.** Les paramètres restés sous
+`config/game/v1/` sont validés au boot ; items, titres, ennemis, tables de loot et réglages
+administrables vivent dans `game_*` et sont lus uniquement depuis un snapshot publié. Le
+`rulesetVersion` combine ces deux sources avec une canonicalisation commune, en excluant les
+traductions et les images de présentation. Une opération garde le snapshot qu'elle a ouvert :
+une publication concurrente ne mélange jamais deux révisions.
 
 ## Transaction d'import
 

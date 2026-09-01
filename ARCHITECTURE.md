@@ -815,6 +815,11 @@ la commande `app:user:grant-admin <email>` promeut un compte local existant et r
 social sans mot de passe. Les données de balance éditables sont importées une fois dans les tables
 `game_*`. Toute mutation EasyAdmin reconstruit le snapshot dans une transaction et rejoue les
 constructeurs métier : une configuration incohérente ne devient jamais visible partiellement.
+Le cache taggé n'est qu'une accélération : il est invalidé après le commit et toute panne
+retombe sur PostgreSQL. Le snapshot est indexé par sa révision dans les workers longs ; aucun
+catalogue ne rescane ni ne mélange une ancienne et une nouvelle publication. L'empreinte hybride
+inclut le gameplay YAML restant et le snapshot DB canonique, mais jamais les traductions ni les
+chemins d'images.
 
 Les images d'items vivent provisoirement hors webroot dans `GAME_IMAGES_DIR` (`/data/game-images`
 sur Fly) et sont servies via une route à nom strict. Le volume Fly est mono-machine et non
@@ -826,5 +831,5 @@ Créer le volume dans la région de la machine applicative, avant le premier dé
 `fly volumes list --app grrind-back`; `fly.toml` le monte exclusivement pour `app` sur
 `/data/game-images`. Une seule machine peut monter ce volume à la fois : ne pas augmenter le
 compte du process `app` au-delà de un tant que les images ne sont pas sorties vers un stockage
-objet. `placeholder.png` est servi même sur un volume fraîchement créé ; les uploads, eux,
-restent persistés sur ce volume.
+objet. `placeholder.png` est servi même sur un volume fraîchement créé ; les uploads sont reçus
+dans `/data/game-images/.staging`, puis promus seulement avec la publication transactionnelle.
