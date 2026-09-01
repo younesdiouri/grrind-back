@@ -109,6 +109,14 @@ final class AdminSecurityTest extends ApiTestCase
 
             $this->client->request('GET', $index.'/new');
             self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+
+            $this->client->request('POST', $index.'/batch-delete', [
+                'batchActionName' => 'batch_delete',
+                'batchActionEntityIds' => [],
+                'entityFqcn' => User::class,
+                'batchActionCsrfToken' => 'bypass-attempt',
+            ]);
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         }
     }
 
