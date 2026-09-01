@@ -23,8 +23,7 @@ final class MeTest extends ApiTestCase
         self::assertSame(self::EMAIL, $body['email']);
         self::assertSame('Bob', $body['displayName']);
         self::assertSame('Europe/Paris', $body['timezone']);
-        // Seules les catégories vivantes sont rendues : SESSION_CREDITED reste une valeur de
-        // PATCH pendant le rollout #255, mais ne laisse plus un interrupteur mort au client.
+        // Toutes les catégories vivantes sont rendues, même celles encore activées par défaut.
         self::assertSame(
             ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
             $body['notificationPreferences'],
@@ -160,7 +159,11 @@ final class MeTest extends ApiTestCase
         self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
     }
 
-    public function testAcceptsTheHiddenSessionCreditedPreferenceFromAStaleScreen(): void
+    /**
+     * La compatibilité d'entrée a pris fin avec le bake #255 : cette valeur est désormais
+     * une valeur d'enum inconnue, pas un cas spécial à maintenir dans le contrôleur.
+     */
+    public function testRejectsTheRetiredSessionCreditedCategoryAsAValidationError(): void
     {
         $response = $this->send('PATCH', '/api/me', [
             'notificationPreferences' => [
@@ -168,11 +171,12 @@ final class MeTest extends ApiTestCase
             ],
         ], $this->authenticated());
 
-        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-        self::assertSame(
-            ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
-            self::decode($response)['notificationPreferences'],
-        );
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+
+        $body = self::decode($response);
+        self::assertSame('https://grrind.app/problems/validation-failed', $body['type']);
+        self::assertIsArray($body['violations']);
+        self::assertContains('notificationPreferences[0].category', array_column($body['violations'], 'field'));
     }
 
     /**

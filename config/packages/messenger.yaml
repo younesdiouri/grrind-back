@@ -93,10 +93,6 @@ framework:
             # séances créditées du même lot.
             App\Community\Application\AnnounceGuildActivity: outbox
 
-            # Tombeau #255 : les messages #252 déjà sérialisés doivent rester routés jusqu'au
-            # drainage complet de outbox et failed, conformément au versioning Messenger.
-            App\Shared\Application\AnnounceSessionCredit: outbox
-
             # Les deux annonces des Risālāt (#194), publiées depuis la transaction de la
             # bascule hebdomadaire et consommées après son `COMMIT`. Sans `DelayStamp` à la
             # publication, contrairement à `AnnounceGuildActivity` : rien d'autre n'est en
