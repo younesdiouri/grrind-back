@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Support;
 
 use Doctrine\DBAL\Connection;
+use Symfony\Bridge\Doctrine\DataCollector\DoctrineDataCollector;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Profiler\Profile;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -108,6 +110,24 @@ abstract class ApiTestCase extends WebTestCase
         self::assertIsArray($decoded, 'La réponse n\'est pas un objet JSON : '.$content);
 
         return $decoded;
+    }
+
+    /** Le pool chaud ne doit plus rouvrir le snapshot de configuration pendant une opération. */
+    protected function assertNoRulesetSql(): void
+    {
+        $profile = $this->client->getProfile();
+        self::assertInstanceOf(Profile::class, $profile);
+        $collector = $profile->getCollector('db');
+        self::assertInstanceOf(DoctrineDataCollector::class, $collector);
+        foreach ($collector->getQueries() as $queries) {
+            self::assertIsArray($queries);
+            foreach ($queries as $query) {
+                self::assertIsArray($query);
+                $sql = $query['sql'] ?? '';
+                self::assertIsString($sql);
+                self::assertDoesNotMatchRegularExpression('/\bgame_ruleset\b/i', $sql);
+            }
+        }
     }
 
     private function truncateEverything(): void

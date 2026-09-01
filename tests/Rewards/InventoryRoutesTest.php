@@ -49,6 +49,17 @@ final class InventoryRoutesTest extends ApiTestCase
         self::assertSame(['coins', 'equipment', 'items'], array_keys($this->inventory($bob)));
     }
 
+    public function testAHotInventoryReadDoesNotQueryThePublishedRulesetAgain(): void
+    {
+        $bob = $this->openAccount('inventory-hot@grrind.app');
+        $this->client->disableReboot();
+        $this->inventory($bob);
+
+        $this->client->enableProfiler();
+        $this->inventory($bob);
+        $this->assertNoRulesetSql();
+    }
+
     public function testAnOwnedItemCarriesEverythingNeededToDisplayItWithoutAFurtherRequest(): void
     {
         $bob = $this->openAccount();
