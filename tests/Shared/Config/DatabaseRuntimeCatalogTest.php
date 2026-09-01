@@ -7,8 +7,12 @@ namespace App\Tests\Shared\Config;
 use App\Combat\Domain\EnemyCatalog;
 use App\Rewards\Domain\ItemCatalog;
 use App\Shared\Application\GameRulesets;
+use App\Shared\Infrastructure\Config\DatabaseGameRulesets;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 
 /** Les entrées retirées restent lisibles pour les faits, jamais sélectionnables à nouveau. */
 final class DatabaseRuntimeCatalogTest extends TestCase
@@ -44,6 +48,23 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         $gameplay['items'][0]['price_coins'] = 2;
         self::assertNotSame($version, GameRulesetVersion::of('v1-yaml', $gameplay));
         self::assertNotSame($version, GameRulesetVersion::of('v1-other-yaml', $snapshot));
+    }
+
+    public function testHotReadDoesNotQueryConfigurationAgain(): void
+    {
+        $snapshot = $this->rulesets()->snapshot();
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('fetchAssociative')->willReturn([
+            'revision' => 1,
+            'version' => 'ignored-at-runtime',
+            'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR),
+        ]);
+        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+
+        $rulesets->snapshot();
+        $rulesets->reset();
+        $rulesets->snapshot();
+        self::assertSame(1, $rulesets->revision());
     }
 
     private function rulesets(): GameRulesets
