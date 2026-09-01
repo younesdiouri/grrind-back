@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rewards\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\ModifierType;
 use InvalidArgumentException;
@@ -75,7 +76,7 @@ use InvalidArgumentException;
  * {@see LootTables}, câblée par `services.yaml`, et par `RewardsCoverageTest` : le geste exact
  * que `testChaqueAdversaireDuCatalogueALivreATableDeTirage()` fait déjà pour les adversaires.
  */
-final readonly class ItemCatalog
+final class ItemCatalog
 {
     /**
      * Les neuf types de combat du #224 — voir le docblock de la classe pour pourquoi aucun
@@ -101,13 +102,21 @@ final readonly class ItemCatalog
     /** @var array<string, Item> */
     private array $byKey;
 
+    private ?GameRulesets $rulesets;
+
     /**
      * @param list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
-    public function __construct(array $items)
+    public function __construct(array $items, ?GameRulesets $rulesets = null)
     {
+        $this->rulesets = $rulesets;
+        if (null !== $rulesets) {
+            $this->byKey = [];
+
+            return;
+        }
         // Un catalogue vide ne propose aucune récompense : mieux vaut refuser de démarrer
         // que de laisser le #28 n'avoir rien à tirer.
         if ([] === $items) {
@@ -132,7 +141,7 @@ final readonly class ItemCatalog
                 $rarity,
                 $slot,
                 $entry['price_coins'],
-                self::modifiers($entry['key'], $kind, $entry['modifiers']),
+                self::modifiers($entry['key'], $kind, $entry['modifiers'] ?? []),
                 $kind,
                 $shop['available'],
                 $shop['minimumLevel'],
@@ -148,8 +157,17 @@ final readonly class ItemCatalog
         $this->byKey = $byKey;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return new self([], $rulesets);
+    }
+
     public function find(string $key): ?Item
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->find($key);
+        }
+
         return $this->byKey[$key] ?? null;
     }
 
@@ -162,6 +180,10 @@ final readonly class ItemCatalog
      */
     public function all(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->all();
+        }
+
         return array_values($this->byKey);
     }
 
@@ -174,7 +196,31 @@ final readonly class ItemCatalog
      */
     public function shopItems(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->shopItems();
+        }
+
         return array_values(array_filter($this->byKey, static fn (Item $item): bool => $item->shopAvailable));
+    }
+
+    private function current(): self
+    {
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        $items = $snapshot['items'];
+
+        return new self($items);
+    }
+
+    private function active(): self
+    {
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var list<array{key: string, active?: bool, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        $items = $snapshot['items'];
+
+        return new self(array_values(array_filter($items, static fn (array $item): bool => $item['active'] ?? true)));
     }
 
     /**

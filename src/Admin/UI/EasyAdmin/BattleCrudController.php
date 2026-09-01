@@ -17,7 +17,7 @@ final class BattleCrudController extends ReadOnlyCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        yield TextField::new('enemyKey');
+        yield TextField::new('enemySnapshot.key')->setLabel('Ennemi');
         yield TextField::new('result');
         yield DateTimeField::new('foughtAt');
         yield TextField::new('rulesetVersion');

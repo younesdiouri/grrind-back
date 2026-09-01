@@ -74,4 +74,25 @@ final readonly class CombatRules
             throw new InvalidArgumentException(\sprintf('Le plafond d\'esquive doit rester sous 1000 millièmes (100 %%), %d demandé.', $this->dodgeCapPermille));
         }
     }
+
+    /**
+     * @param array<string, int> $fighter
+     */
+    public static function fromSnapshot(array $fighter): self
+    {
+        return new self(
+            $fighter['base_hp'],
+            $fighter['hp_per_1000_vitality'],
+            $fighter['base_damage'],
+            $fighter['damage_per_1000_strength'],
+            $fighter['mitigation_permille_per_1000_endurance'],
+            $fighter['mitigation_cap_permille'],
+            $fighter['extra_turn_permille_per_1000_dexterity'],
+            $fighter['extra_turn_cap_permille'],
+            $fighter['dodge_permille_per_1000_mobility'],
+            $fighter['dodge_cap_permille'],
+            $fighter['minimum_damage'],
+            $fighter['max_turns'],
+        );
+    }
 }

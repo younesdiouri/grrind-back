@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Rewards\Infrastructure\Translation;
 
+use App\Shared\Application\GameRulesets;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -26,12 +28,44 @@ final readonly class ItemTranslator
     /** Le domaine de traduction, donc le nom des fichiers : `translations/items.<locale>.yaml`. */
     public const string DOMAIN = 'items';
 
-    public function __construct(private TranslatorInterface $translator)
-    {
+    public function __construct(
+        private TranslatorInterface $translator,
+        private GameRulesets $rulesets,
+        private UrlGeneratorInterface $urls,
+    ) {
     }
 
     public function nameOf(string $key): string
     {
-        return $this->translator->trans(strtolower($key).'.name', domain: self::DOMAIN);
+        $locale = $this->translator->getLocale();
+        $item = $this->item($key);
+        /** @var array<string, array{name?: string}> $translations */
+        $translations = $item['translations'] ?? [];
+        $name = $translations[$locale]['name'] ?? $translations['fr']['name'] ?? null;
+
+        return \is_string($name) && '' !== $name ? $name : $key;
+    }
+
+    public function imageUrlOf(string $key): string
+    {
+        $path = $this->item($key)['image_path'] ?? 'placeholder.png';
+        \assert(\is_string($path));
+
+        return $this->urls->generate('game_image', ['name' => $path], UrlGeneratorInterface::ABSOLUTE_URL);
+    }
+
+    /** @return array<string, mixed> */
+    private function item(string $key): array
+    {
+        $snapshot = $this->rulesets->snapshot();
+        /** @var list<array<string, mixed>> $items */
+        $items = $snapshot['items'];
+        foreach ($items as $item) {
+            if ($key === $item['key']) {
+                return $item;
+            }
+        }
+
+        return [];
     }
 }

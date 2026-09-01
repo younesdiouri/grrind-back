@@ -25,6 +25,11 @@ services:
         resource: '../src/'
 
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
+    App\Shared\Application\GameRulesets: '@App\Shared\Infrastructure\Config\DatabaseGameRulesets'
+
+    App\Admin\Infrastructure\GameRulesetPublisher:
+        arguments:
+            $yamlGameplay: '%game.yaml_gameplay%'
 
     # Sonde du #155 : `event.bus` n'est référencé nulle part par son id de service —
     # seulement par le type `MessageBusInterface` avec `#[Target]` — donc le compilateur
@@ -123,40 +128,29 @@ services:
     # liste, et son ordre — qui départage les ex æquo au moment de désigner le prochain
     # titre — doit survivre au conteneur compilé.
     App\Progression\Domain\TitleCatalog:
-        arguments:
-            $titles: '%game.titles.titles%'
+        factory: ['App\Progression\Domain\TitleCatalog', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
-    # Les socles d'un combattant (#208), tirés de `game/v1/combat.yaml`. Même raison que
-    # `WorkoutRules` : le domaine reçoit un objet validé, pas dix entiers venus tel quels
-    # du YAML. La dérivation caractéristique → combattant elle-même arrive au #210.
-    App\Combat\Domain\CombatRules:
+    App\Combat\Application\FighterFactory:
         arguments:
-            $baseHp: '%game.combat.fighter.base_hp%'
-            $hpPer1000Vitality: '%game.combat.fighter.hp_per_1000_vitality%'
-            $baseDamage: '%game.combat.fighter.base_damage%'
-            $damagePer1000Strength: '%game.combat.fighter.damage_per_1000_strength%'
-            $mitigationPermillePer1000Endurance: '%game.combat.fighter.mitigation_permille_per_1000_endurance%'
-            $mitigationCapPermille: '%game.combat.fighter.mitigation_cap_permille%'
-            $extraTurnPermillePer1000Dexterity: '%game.combat.fighter.extra_turn_permille_per_1000_dexterity%'
-            $extraTurnCapPermille: '%game.combat.fighter.extra_turn_cap_permille%'
-            $dodgePermillePer1000Mobility: '%game.combat.fighter.dodge_permille_per_1000_mobility%'
-            $dodgeCapPermille: '%game.combat.fighter.dodge_cap_permille%'
-            $minimumDamage: '%game.combat.fighter.minimum_damage%'
-            $maxTurns: '%game.combat.fighter.max_turns%'
+            $rules: '@App\Shared\Application\GameRulesets'
+
+    App\Combat\Domain\BattleSimulator:
+        arguments:
+            $rules: '@App\Shared\Application\GameRulesets'
 
     # Le catalogue d'ennemis (#208), d'un bloc pour la même raison que le barème de titres :
     # c'est une liste, et son ordre de déclaration doit survivre au conteneur compilé.
     # `$bosses` (#219) suit le même geste, en bloc séparé — voir le docblock d'`EnemyCatalog`.
     App\Combat\Domain\EnemyCatalog:
-        arguments:
-            $enemies: '%game.combat.enemies%'
-            $bosses: '%game.combat.bosses%'
+        factory: ['App\Combat\Domain\EnemyCatalog', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Le catalogue d'objets (#27), d'un bloc pour la même raison que le barème de titres :
     # une liste, et son ordre de déclaration doit survivre au conteneur compilé.
     App\Rewards\Domain\ItemCatalog:
-        arguments:
-            $items: '%game.items.items%'
+        factory: ['App\Rewards\Domain\ItemCatalog', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Les tables de tirage (#27, coffres au #230). `$items`, `$enemies` et `$bosses` sont les
     # paramètres bruts de trois fichiers différents — voir le docblock de `LootTables` pour
@@ -165,22 +159,13 @@ services:
     # interdit à `Rewards` d'importer quoi que ce soit de `Combat`, et ces tableaux ne sont
     # que de la donnée, jamais un objet de leur domaine.
     App\Rewards\Domain\LootTables:
-        arguments:
-            $version: '%game.loot.version%'
-            $workout: '%game.loot.workout%'
-            $adversary: '%game.loot.adversary%'
-            $chest: '%game.loot.chest%'
-            $items: '%game.items.items%'
-            $enemies: '%game.combat.enemies%'
-            $bosses: '%game.combat.bosses%'
+        factory: ['App\Rewards\Domain\LootTables', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
-    # Le plancher et le plafond du LOOT_LUCK effectif (#28) — voir le docblock de
-    # `LootLuckRules` pour ce que chacun garantit. `LootRoller` les reçoit par ce service,
-    # jamais des constantes de classe : c'est de l'équilibrage.
-    App\Rewards\Domain\LootLuckRules:
+    App\Rewards\Domain\LootRoller:
         arguments:
-            $floorPercent: '%game.loot.loot_luck.floor_percent%'
-            $capPercent: '%game.loot.loot_luck.cap_percent%'
+            $luck: '@App\Shared\Application\GameRulesets'
+
 
     App\Progression\Domain\DiminishingReturns:
         arguments:
@@ -485,16 +470,19 @@ when@test:
 
         App\Combat\Application\FighterFactory:
             public: true
+            arguments:
+                $rules: '@App\Shared\Application\GameRulesets'
 
         # `$enemies` et `$bosses` répétés, pour la même raison que `$rulesetVersion` ci-dessus.
         App\Combat\Domain\EnemyCatalog:
             public: true
-            arguments:
-                $enemies: '%game.combat.enemies%'
-                $bosses: '%game.combat.bosses%'
+            factory: ['App\Combat\Domain\EnemyCatalog', 'runtime']
+            arguments: ['@App\Shared\Application\GameRulesets']
 
         App\Combat\Domain\BattleSimulator:
             public: true
+            arguments:
+                $rules: '@App\Shared\Application\GameRulesets'
 
         App\Combat\Infrastructure\Doctrine\BattleRepository:
             public: true

@@ -29,6 +29,7 @@ abstract class GameCrudController extends AbstractCrudController
             $entityManager->flush();
             $this->publisher->publish($entityManager);
         });
+        $this->publisher->invalidateAfterCommit();
     }
 
     public function updateEntity(EntityManagerInterface $entityManager, object $entityInstance): void
@@ -37,6 +38,7 @@ abstract class GameCrudController extends AbstractCrudController
             $entityManager->flush();
             $this->publisher->publish($entityManager);
         });
+        $this->publisher->invalidateAfterCommit();
     }
 
     public function deleteEntity(EntityManagerInterface $entityManager, object $entityInstance): void
@@ -46,5 +48,6 @@ abstract class GameCrudController extends AbstractCrudController
             $entityManager->flush();
             $this->publisher->publish($entityManager);
         });
+        $this->publisher->invalidateAfterCommit();
     }
 }

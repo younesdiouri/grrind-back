@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rewards\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierType;
@@ -95,7 +96,7 @@ use Random\Randomizer;
 final readonly class LootRoller
 {
     public function __construct(
-        private LootLuckRules $luck,
+        private LootLuckRules|GameRulesets $luck,
     ) {
     }
 
@@ -112,9 +113,9 @@ final readonly class LootRoller
             return null;
         }
 
-        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckForDiscipline($modifiers, $discipline));
+        $effectiveLootLuckPercent = $this->luck()->clamp(self::lootLuckForDiscipline($modifiers, $discipline));
 
-        return $this->roll($table->key, $tables->version, $table->table, $effectiveLootLuckPercent, $randomizer);
+        return $this->roll($table->key, $tables->version(), $table->table, $effectiveLootLuckPercent, $randomizer);
     }
 
     /**
@@ -130,9 +131,9 @@ final readonly class LootRoller
             return null;
         }
 
-        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckGlobalOnly($modifiers));
+        $effectiveLootLuckPercent = $this->luck()->clamp(self::lootLuckGlobalOnly($modifiers));
 
-        return $this->roll($adversaryKey, $tables->version, $table, $effectiveLootLuckPercent, $randomizer);
+        return $this->roll($adversaryKey, $tables->version(), $table, $effectiveLootLuckPercent, $randomizer);
     }
 
     /**
@@ -159,9 +160,9 @@ final readonly class LootRoller
             return null;
         }
 
-        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckGlobalOnly($modifiers));
+        $effectiveLootLuckPercent = $this->luck()->clamp(self::lootLuckGlobalOnly($modifiers));
 
-        return $this->roll($chestKey, $tables->version, $table, $effectiveLootLuckPercent, $randomizer);
+        return $this->roll($chestKey, $tables->version(), $table, $effectiveLootLuckPercent, $randomizer);
     }
 
     /**
@@ -188,6 +189,20 @@ final readonly class LootRoller
         }
 
         return $best;
+    }
+
+    private function luck(): LootLuckRules
+    {
+        if ($this->luck instanceof LootLuckRules) {
+            return $this->luck;
+        }
+
+        $snapshot = $this->luck->snapshot();
+        /** @var array{loot: array{loot_luck: array{floor_percent: int, cap_percent: int}}} $snapshot */
+        /** @var array{floor_percent: int, cap_percent: int} $luck */
+        $luck = $snapshot['loot']['loot_luck'];
+
+        return new LootLuckRules($luck['floor_percent'], $luck['cap_percent']);
     }
 
     private function roll(string $tableKey, int $tableVersion, LootTable $table, int $effectiveLootLuckPercent, Randomizer $randomizer): LootRollOutcome

@@ -22,7 +22,7 @@ class GameItem
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $id;
 
-    #[ORM\Column(name: 'item_key', length: 100)]
+    #[ORM\Column(name: 'item_key', length: 64)]
     private string $key;
 
     #[ORM\Column]

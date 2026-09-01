@@ -15,6 +15,7 @@ class GameSettings
     #[ORM\Id] #[ORM\Column] private int $id = 1;
     /** @var array<string, int> */ #[ORM\Column(type: Types::JSON)] private array $fighter = [];
     /** @var array{floor_percent: int, cap_percent: int} */ #[ORM\Column(name: 'loot_luck', type: Types::JSON)] private array $lootLuck = ['floor_percent' => 0, 'cap_percent' => 200];
+    #[ORM\Column(name: 'loot_version')] private int $lootVersion = 1;
     public function __toString(): string
     {
         return 'Réglages globaux';
@@ -42,5 +43,15 @@ class GameSettings
     public function setLootLuck(array $lootLuck): void
     {
         $this->lootLuck = $lootLuck;
+    }
+
+    public function lootVersion(): int
+    {
+        return $this->lootVersion;
+    }
+
+    public function incrementLootVersion(): void
+    {
+        ++$this->lootVersion;
     }
 }

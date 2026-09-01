@@ -112,6 +112,7 @@ final readonly class InventoryResource
                 $item->modifiers,
             ),
             $item->priceCoins,
+            $translator->imageUrlOf($item->key),
         );
 
         return [...$dropped->toArray(), 'quantity' => $owned->quantity()];

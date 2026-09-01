@@ -73,7 +73,7 @@ final class CombatCoverageTest extends KernelTestCase
     {
         $enemies = self::getContainer()->getParameter('game.combat.enemies');
         self::assertIsArray($enemies);
-
+        /** @var list<array{level: int}> $enemies */
         $levels = [];
         foreach ($enemies as $enemy) {
             self::assertIsArray($enemy);

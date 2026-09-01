@@ -46,6 +46,7 @@ security:
             form_login:
                 login_path: admin_login
                 check_path: admin_login
+                default_target_path: admin
                 enable_csrf: true
                 csrf_token_id: authenticate
             login_throttling:
@@ -54,6 +55,8 @@ security:
             logout:
                 path: admin_logout
                 target: admin_login
+                enable_csrf: true
+                csrf_token_id: logout
 
         api:
             pattern: ^/api
@@ -66,7 +69,7 @@ security:
             security: false
 
     access_control:
-        - { path: ^/admin/images/, roles: PUBLIC_ACCESS }
+        - { path: ^/game-images/, roles: PUBLIC_ACCESS }
         - { path: ^/admin/login$, roles: PUBLIC_ACCESS }
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

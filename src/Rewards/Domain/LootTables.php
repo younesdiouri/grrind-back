@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rewards\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use InvalidArgumentException;
 
@@ -48,7 +49,7 @@ use InvalidArgumentException;
  * un objet `kind: CHEST` mentirait donc sur ce que le jeu permet ; {@see self::table()} le
  * refuse au chargement plutôt que de laisser {@see LootRoller} le tirer un jour.
  */
-final readonly class LootTables
+final class LootTables
 {
     public int $version;
 
@@ -61,6 +62,8 @@ final readonly class LootTables
     /** @var array<string, LootTable> */
     private array $chestTables;
 
+    private ?GameRulesets $rulesets;
+
     /**
      * @param list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
@@ -71,8 +74,17 @@ final readonly class LootTables
      *
      * @throws InvalidArgumentException les tables ne tiennent pas debout ; la construction du service s'arrête là
      */
-    public function __construct(int $version, array $workout, array $adversary, array $chest, array $items, array $enemies, array $bosses)
+    public function __construct(int $version, array $workout, array $adversary, array $chest, array $items, array $enemies, array $bosses, ?GameRulesets $rulesets = null)
     {
+        $this->rulesets = $rulesets;
+        if (null !== $rulesets) {
+            $this->version = 0;
+            $this->workoutTables = [];
+            $this->adversaryTables = [];
+            $this->chestTables = [];
+
+            return;
+        }
         if ($version < 1) {
             throw new InvalidArgumentException(\sprintf('La version des tables de tirage doit être au moins 1, %d demandée.', $version));
         }
@@ -149,17 +161,35 @@ final readonly class LootTables
         $this->chestTables = $chestTables;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return new self(1, [], [], [], [], [], [], $rulesets);
+    }
+
     /**
      * @return list<WorkoutLootTable>
      */
     public function workoutTables(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->workoutTables();
+        }
+
         return $this->workoutTables;
+    }
+
+    public function version(): int
+    {
+        return null === $this->rulesets ? $this->version : $this->current()->version();
     }
 
     /** `null` si cet adversaire n'a pas de table dédiée — voir `RewardsCoverageTest` pour la couverture réellement livrée. */
     public function forAdversary(string $key): ?LootTable
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->forAdversary($key);
+        }
+
         return $this->adversaryTables[$key] ?? null;
     }
 
@@ -169,7 +199,32 @@ final readonly class LootTables
      */
     public function forChest(string $key): ?LootTable
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->forChest($key);
+        }
+
         return $this->chestTables[$key] ?? null;
+    }
+
+    private function current(): self
+    {
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var array{loot: array{version: int, workout: list<array{active?: bool}>, adversary: list<array{active?: bool}>, chest: list<array{active?: bool}>}, items: list<array{key: string, kind?: string}>, combat: array{enemies: list<array{key: string}>, bosses: list<array{key: string}>}} $snapshot */
+        /** @var array{version: int, workout: list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>, adversary: list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>, chest: list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>} $loot */ $loot = $snapshot['loot'];
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */ $items = $snapshot['items'];
+        /** @var list<array{key: string}> $enemies */ $enemies = $snapshot['combat']['enemies'];
+        /** @var list<array{key: string}> $bosses */ $bosses = $snapshot['combat']['bosses'];
+
+        return new self(
+            $loot['version'],
+            array_values(array_filter($loot['workout'], static fn (array $table): bool => $table['active'] ?? true)),
+            array_values(array_filter($loot['adversary'], static fn (array $table): bool => $table['active'] ?? true)),
+            array_values(array_filter($loot['chest'], static fn (array $table): bool => $table['active'] ?? true)),
+            $items,
+            $enemies,
+            $bosses,
+        );
     }
 
     /**

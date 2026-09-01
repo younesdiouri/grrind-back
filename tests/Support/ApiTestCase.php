@@ -117,7 +117,9 @@ abstract class ApiTestCase extends WebTestCase
 
         $tables = array_filter(
             $connection->createSchemaManager()->listTableNames(),
-            static fn (string $table): bool => 'doctrine_migration_versions' !== $table,
+            // Les rulesets sont des données de référence migrées, pas des faits du scénario.
+            // Les vider rendrait chaque API test incapable d'exercer le runtime DB qu'il vise.
+            static fn (string $table): bool => !\in_array($table, ['doctrine_migration_versions', 'game_enemy', 'game_item', 'game_loot_table', 'game_ruleset', 'game_settings', 'game_title'], true),
         );
 
         if ([] === $tables) {

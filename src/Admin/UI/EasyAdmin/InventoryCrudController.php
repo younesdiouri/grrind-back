@@ -19,6 +19,6 @@ final class InventoryCrudController extends ReadOnlyCrudController
     {
         yield TextField::new('itemKey');
         yield IntegerField::new('quantity');
-        yield TextField::new('equippedSlot');
+        yield TextField::new('slot');
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Progression\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use InvalidArgumentException;
 
@@ -20,18 +21,26 @@ use InvalidArgumentException;
  * listes, donc `game.titles.titles` reste un paramètre unique et cet ordre survit au
  * conteneur compilé.
  */
-final readonly class TitleCatalog
+final class TitleCatalog
 {
     /** @var array<string, Title> par identifiant, dans l'ordre de déclaration */
     private array $titles;
+
+    private ?GameRulesets $rulesets;
 
     /**
      * @param list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
-    public function __construct(array $titles)
+    public function __construct(array $titles, ?GameRulesets $rulesets = null)
     {
+        $this->rulesets = $rulesets;
+        if (null !== $rulesets) {
+            $this->titles = [];
+
+            return;
+        }
         if ([] === $titles) {
             throw new InvalidArgumentException('Un catalogue sans titre ne récompense personne.');
         }
@@ -53,14 +62,27 @@ final readonly class TitleCatalog
         $this->titles = $catalog;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return new self([], $rulesets);
+    }
+
     /** @return list<Title> */
     public function all(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->all();
+        }
+
         return array_values($this->titles);
     }
 
     public function find(string $id): ?Title
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->find($id);
+        }
+
         return $this->titles[$id] ?? null;
     }
 
@@ -74,6 +96,10 @@ final readonly class TitleCatalog
      */
     public function progressOf(PlayerRecord $record): array
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->progressOf($record);
+        }
+
         return array_map(
             static fn (Title $title): TitleProgress => TitleProgress::of($title, $record),
             $this->all(),
@@ -89,6 +115,10 @@ final readonly class TitleCatalog
      */
     public function newlyUnlockedBy(PlayerRecord $record, array $alreadyUnlocked): array
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->newlyUnlockedBy($record, $alreadyUnlocked);
+        }
+
         return array_values(array_filter(
             $this->all(),
             static fn (Title $title): bool => !\in_array($title->id, $alreadyUnlocked, true)
@@ -110,6 +140,9 @@ final readonly class TitleCatalog
      */
     public function nextFor(PlayerRecord $record, array $alreadyUnlocked): ?TitleProgress
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->nextFor($record, $alreadyUnlocked);
+        }
         $next = null;
 
         foreach ($this->all() as $title) {
@@ -125,6 +158,26 @@ final readonly class TitleCatalog
         }
 
         return $next;
+    }
+
+    private function current(): self
+    {
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */
+        $titles = $snapshot['titles'];
+
+        return new self($titles);
+    }
+
+    private function active(): self
+    {
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var list<array{id: string, active?: bool, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */
+        $titles = $snapshot['titles'];
+
+        return new self(array_values(array_filter($titles, static fn (array $title): bool => $title['active'] ?? true)));
     }
 
     /**

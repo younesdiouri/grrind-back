@@ -820,3 +820,11 @@ Les images d'items vivent provisoirement hors webroot dans `GAME_IMAGES_DIR` (`/
 sur Fly) et sont servies via une route à nom strict. Le volume Fly est mono-machine et non
 répliqué : le process `app` ne doit pas être scalé horizontalement avant migration vers un
 stockage objet.
+
+Créer le volume dans la région de la machine applicative, avant le premier déploiement :
+`fly volumes create game_images --app grrind-back --region cdg --size 1`. Vérifier ensuite
+`fly volumes list --app grrind-back`; `fly.toml` le monte exclusivement pour `app` sur
+`/data/game-images`. Une seule machine peut monter ce volume à la fois : ne pas augmenter le
+compte du process `app` au-delà de un tant que les images ne sont pas sorties vers un stockage
+objet. `placeholder.png` est servi même sur un volume fraîchement créé ; les uploads, eux,
+restent persistés sur ce volume.

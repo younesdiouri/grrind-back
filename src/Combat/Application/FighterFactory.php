@@ -7,6 +7,7 @@ namespace App\Combat\Application;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\Enemy;
 use App\Combat\Domain\Fighter;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Application\ModifierResolver;
 use App\Shared\Application\PlayerProgression;
 use App\Shared\Domain\Modifier\Modifier;
@@ -107,7 +108,7 @@ final readonly class FighterFactory
     private const int PERMILLE = 1000;
 
     public function __construct(
-        private CombatRules $rules,
+        private CombatRules|GameRulesets $rules,
         private ModifierResolver $modifiers,
     ) {
     }
@@ -118,6 +119,7 @@ final readonly class FighterFactory
      */
     public function forPlayer(PlayerProgression $progression, Uuid $playerId, DateTimeImmutable $occurredAt): Fighter
     {
+        $rules = $this->rules();
         $modifiers = $this->modifiers->of($playerId, $occurredAt);
         $attributes = $progression->attributes;
 
@@ -136,19 +138,19 @@ final readonly class FighterFactory
             // pour les PV) pose le plancher de `Fighter` ici plutôt que de compter sur son
             // exception : un bonus négatif affaiblit un combattant, il ne fait pas échouer le
             // combat.
-            hp: max(1, $this->rules->baseHp + self::scale($vitality, $this->rules->hpPer1000Vitality) + self::sumOf($modifiers, ModifierType::HpBonus)),
-            damage: max(0, $this->rules->baseDamage + self::scale($strength, $this->rules->damagePer1000Strength) + self::sumOf($modifiers, ModifierType::DamageBonus)),
+            hp: max(1, $rules->baseHp + self::scale($vitality, $rules->hpPer1000Vitality) + self::sumOf($modifiers, ModifierType::HpBonus)),
+            damage: max(0, $rules->baseDamage + self::scale($strength, $rules->damagePer1000Strength) + self::sumOf($modifiers, ModifierType::DamageBonus)),
             mitigationPermille: min(
-                $this->rules->mitigationCapPermille,
-                max(0, self::scale($endurance, $this->rules->mitigationPermillePer1000Endurance) + self::sumOf($modifiers, ModifierType::MitigationBonus)),
+                $rules->mitigationCapPermille,
+                max(0, self::scale($endurance, $rules->mitigationPermillePer1000Endurance) + self::sumOf($modifiers, ModifierType::MitigationBonus)),
             ),
             extraTurnPermille: min(
-                $this->rules->extraTurnCapPermille,
-                max(0, self::scale($dexterity, $this->rules->extraTurnPermillePer1000Dexterity) + self::sumOf($modifiers, ModifierType::ExtraTurnBonus)),
+                $rules->extraTurnCapPermille,
+                max(0, self::scale($dexterity, $rules->extraTurnPermillePer1000Dexterity) + self::sumOf($modifiers, ModifierType::ExtraTurnBonus)),
             ),
             dodgePermille: min(
-                $this->rules->dodgeCapPermille,
-                max(0, self::scale($mobility, $this->rules->dodgePermillePer1000Mobility) + self::sumOf($modifiers, ModifierType::DodgeBonus)),
+                $rules->dodgeCapPermille,
+                max(0, self::scale($mobility, $rules->dodgePermillePer1000Mobility) + self::sumOf($modifiers, ModifierType::DodgeBonus)),
             ),
         );
     }
@@ -194,5 +196,19 @@ final readonly class FighterFactory
     private static function scale(int $total, int $permille): int
     {
         return intdiv($total * $permille, self::PERMILLE);
+    }
+
+    private function rules(): CombatRules
+    {
+        if ($this->rules instanceof CombatRules) {
+            return $this->rules;
+        }
+
+        $snapshot = $this->rules->snapshot();
+        /** @var array{combat: array{fighter: array<string, int>}} $snapshot */
+        /** @var array<string, int> $fighter */
+        $fighter = $snapshot['combat']['fighter'];
+
+        return CombatRules::fromSnapshot($fighter);
     }
 }

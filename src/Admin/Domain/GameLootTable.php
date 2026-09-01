@@ -16,7 +16,7 @@ class GameLootTable
 {
     #[ORM\Id] #[ORM\Column(type: UuidType::NAME)] private Uuid $id;
     #[ORM\Column(name: 'table_kind', length: 20)] private string $kind = 'workout';
-    #[ORM\Column(name: 'table_key', length: 100)] private string $key;
+    #[ORM\Column(name: 'table_key', length: 64)] private string $key;
     #[ORM\Column] private bool $active = true;
     #[ORM\Column(name: 'sort_order')] private int $sortOrder = 0;
     /** @var array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}|null */

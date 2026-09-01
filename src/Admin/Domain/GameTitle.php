@@ -15,7 +15,7 @@ use Symfony\Component\Uid\Uuid;
 class GameTitle
 {
     #[ORM\Id] #[ORM\Column(type: UuidType::NAME)] private Uuid $id;
-    #[ORM\Column(name: 'title_key', length: 100)] private string $key;
+    #[ORM\Column(name: 'title_key', length: 64)] private string $key;
     #[ORM\Column] private bool $active = true;
     #[ORM\Column(name: 'sort_order')] private int $sortOrder = 0;
     #[ORM\Column(name: 'condition_type', length: 40)] private string $conditionType = 'session_count';

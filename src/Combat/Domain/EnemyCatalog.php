@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Combat\Domain;
 
+use App\Shared\Application\GameRulesets;
 use InvalidArgumentException;
 
 /**
@@ -65,7 +66,7 @@ use InvalidArgumentException;
  * 1000 ‰ de mitigation, un adversaire devient invulnérable ; à 1000 ‰ de tour supplémentaire,
  * il ne rend jamais la main ; à 1000 ‰ d'esquive, il n'encaisse plus jamais rien.
  */
-final readonly class EnemyCatalog
+final class EnemyCatalog
 {
     /** @var array<string, Enemy> ennemis ordinaires, par clé, dans l'ordre de déclaration */
     private array $byKey;
@@ -76,14 +77,24 @@ final readonly class EnemyCatalog
     /** @var array<string, Enemy> boss, par clé, dans l'ordre de déclaration */
     private array $byBossKey;
 
+    private ?GameRulesets $rulesets;
+
     /**
      * @param list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}>         $enemies
      * @param list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
-    public function __construct(array $enemies, array $bosses = [])
+    public function __construct(array $enemies, array $bosses = [], ?GameRulesets $rulesets = null)
     {
+        $this->rulesets = $rulesets;
+        if (null !== $rulesets) {
+            $this->byKey = [];
+            $this->byLevel = [];
+            $this->byBossKey = [];
+
+            return;
+        }
         // Un catalogue vide ne propose aucun combat : mieux vaut refuser de démarrer que
         // de laisser `forLevel()` n'avoir personne à rendre.
         if ([] === $enemies) {
@@ -156,14 +167,27 @@ final readonly class EnemyCatalog
         $this->byBossKey = $byBossKey;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return new self([], [], $rulesets);
+    }
+
     public function find(string $key): ?Enemy
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->find($key);
+        }
+
         return $this->byKey[$key] ?? null;
     }
 
     /** Le pendant de {@see find()} pour un boss — voir le docblock de la classe. */
     public function findBoss(string $key): ?Enemy
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->findBoss($key);
+        }
+
         return $this->byBossKey[$key] ?? null;
     }
 
@@ -178,6 +202,10 @@ final readonly class EnemyCatalog
      */
     public function all(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->all();
+        }
+
         return array_values($this->byKey);
     }
 
@@ -190,6 +218,10 @@ final readonly class EnemyCatalog
      */
     public function bosses(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->bosses();
+        }
+
         return array_values($this->byBossKey);
     }
 
@@ -202,6 +234,9 @@ final readonly class EnemyCatalog
      */
     public function forLevel(int $playerLevel): Enemy
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->forLevel($playerLevel);
+        }
         $candidate = null;
 
         foreach ($this->byLevel as $level => $enemy) {
@@ -215,6 +250,33 @@ final readonly class EnemyCatalog
         \assert(null !== $candidate);
 
         return $candidate;
+    }
+
+    private function current(): self
+    {
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var array{combat: array{enemies: list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}>, bosses: list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}>}} $snapshot */
+        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */ $enemies = $snapshot['combat']['enemies'];
+        /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses */ $bosses = $snapshot['combat']['bosses'];
+
+        return new self($enemies, $bosses);
+    }
+
+    private function active(): self
+    {
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var array{combat: array{enemies: list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}>, bosses: list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}>}} $snapshot */
+        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}> $enemies */
+        $enemies = $snapshot['combat']['enemies'];
+        /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int, active?: bool}> $bosses */
+        $bosses = $snapshot['combat']['bosses'];
+
+        return new self(
+            array_values(array_filter($enemies, static fn (array $enemy): bool => $enemy['active'] ?? true)),
+            array_values(array_filter($bosses, static fn (array $enemy): bool => $enemy['active'] ?? true)),
+        );
     }
 
     /**
