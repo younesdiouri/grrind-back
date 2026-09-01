@@ -108,6 +108,8 @@ final class ItemCatalog
 
     private ?self $available = null;
 
+    private ?int $runtimeRevision = null;
+
     /**
      * @param list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
      *
@@ -225,7 +227,9 @@ final class ItemCatalog
 
     private function current(): self
     {
-        if (null !== $this->historical) {
+        $revision = $this->rulesets?->revision();
+        \assert(\is_int($revision));
+        if (null !== $this->historical && $revision === $this->runtimeRevision) {
             return $this->historical;
         }
         $snapshot = $this->rulesets?->snapshot();
@@ -233,11 +237,15 @@ final class ItemCatalog
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
 
+        $this->runtimeRevision = $revision;
+        $this->available = null;
+
         return $this->historical = new self($items);
     }
 
     private function active(): self
     {
+        $this->current();
         if (null !== $this->available) {
             return $this->available;
         }

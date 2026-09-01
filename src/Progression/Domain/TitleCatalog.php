@@ -32,6 +32,8 @@ final class TitleCatalog
 
     private ?self $available = null;
 
+    private ?int $runtimeRevision = null;
+
     /**
      * @param list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles
      *
@@ -182,7 +184,9 @@ final class TitleCatalog
 
     private function current(): self
     {
-        if (null !== $this->historical) {
+        $revision = $this->rulesets?->revision();
+        \assert(\is_int($revision));
+        if (null !== $this->historical && $revision === $this->runtimeRevision) {
             return $this->historical;
         }
         $snapshot = $this->rulesets?->snapshot();
@@ -190,11 +194,15 @@ final class TitleCatalog
         /** @var list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */
         $titles = $snapshot['titles'];
 
+        $this->runtimeRevision = $revision;
+        $this->available = null;
+
         return $this->historical = new self($titles);
     }
 
     private function active(): self
     {
+        $this->current();
         if (null !== $this->available) {
             return $this->available;
         }

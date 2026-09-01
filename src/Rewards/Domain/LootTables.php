@@ -66,6 +66,8 @@ final class LootTables
 
     private ?self $currentTables = null;
 
+    private ?int $runtimeRevision = null;
+
     /**
      * @param list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
@@ -210,7 +212,9 @@ final class LootTables
 
     private function current(): self
     {
-        if (null !== $this->currentTables) {
+        $revision = $this->rulesets?->revision();
+        \assert(\is_int($revision));
+        if (null !== $this->currentTables && $revision === $this->runtimeRevision) {
             return $this->currentTables;
         }
         $snapshot = $this->rulesets?->snapshot();
@@ -220,6 +224,8 @@ final class LootTables
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */ $items = $snapshot['items'];
         /** @var list<array{key: string}> $enemies */ $enemies = $snapshot['combat']['enemies'];
         /** @var list<array{key: string}> $bosses */ $bosses = $snapshot['combat']['bosses'];
+
+        $this->runtimeRevision = $revision;
 
         return $this->currentTables = new self(
             $loot['version'],

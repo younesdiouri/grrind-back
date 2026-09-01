@@ -34,6 +34,8 @@ final class TitleTranslator implements ResetInterface
     /** @var array<string, array<string, array<string, string>>>|null */
     private ?array $translations = null;
 
+    private ?int $revision = null;
+
     public function __construct(private readonly TranslatorInterface $translator, private readonly ?GameRulesets $rulesets = null)
     {
     }
@@ -81,6 +83,7 @@ final class TitleTranslator implements ResetInterface
     public function reset(): void
     {
         $this->translations = null;
+        $this->revision = null;
     }
 
     private function text(string $key, string $field): string
@@ -100,10 +103,11 @@ final class TitleTranslator implements ResetInterface
     /** @return array<string, array<string, array<string, string>>> */
     private function translations(): array
     {
-        if (null !== $this->translations) {
+        \assert(null !== $this->rulesets);
+        $revision = $this->rulesets->revision();
+        if (null !== $this->translations && $revision === $this->revision) {
             return $this->translations;
         }
-        \assert(null !== $this->rulesets);
         $snapshot = $this->rulesets->snapshot();
         $translations = [];
         $titles = $snapshot['titles'] ?? [];
@@ -116,6 +120,8 @@ final class TitleTranslator implements ResetInterface
             $entry = $title['translations'];
             $translations[$title['id']] = $entry;
         }
+
+        $this->revision = $revision;
 
         return $this->translations = $translations;
     }

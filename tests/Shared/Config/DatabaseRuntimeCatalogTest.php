@@ -72,6 +72,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
     public function testInvalidatedCacheLoadsOneWholeNewRevision(): void
     {
         $first = $this->rulesets()->snapshot();
+        /** @var array{items: list<array{price_coins: int}>} $first */
         /** @var array{items: list<array<string, mixed>>} $first */
         $second = $first;
         $second['items'][1]['price_coins'] = 99;
@@ -108,6 +109,48 @@ final class DatabaseRuntimeCatalogTest extends TestCase
 
         self::assertSame(7, $rulesets->revision());
         self::assertSame($snapshot, $rulesets->snapshot());
+    }
+
+    public function testLongLivedCatalogRebuildsOnlyWhenThePublishedRevisionChanges(): void
+    {
+        $first = $this->rulesets()->snapshot();
+        /** @var array{items: list<array{price_coins: int}>} $first */
+        $rulesets = new class($first) implements GameRulesets {
+            public int $publishedRevision = 1;
+
+            /** @param array<string, mixed> $publishedSnapshot */
+            public function __construct(public array $publishedSnapshot)
+            {
+            }
+
+            public function snapshot(): array
+            {
+                return $this->publishedSnapshot;
+            }
+
+            public function version(): string
+            {
+                return 'v1-test';
+            }
+
+            public function revision(): int
+            {
+                return $this->publishedRevision;
+            }
+        };
+        $catalog = ItemCatalog::runtime($rulesets);
+        $firstItem = $catalog->findHistorical('ACTIVE_BOOTS');
+        self::assertNotNull($firstItem);
+        self::assertSame(1, $firstItem->priceCoins);
+
+        $published = $first;
+        $published['items'][1]['price_coins'] = 9;
+        $rulesets->publishedSnapshot = $published;
+        ++$rulesets->publishedRevision;
+
+        $publishedItem = $catalog->findHistorical('ACTIVE_BOOTS');
+        self::assertNotNull($publishedItem);
+        self::assertSame(9, $publishedItem->priceCoins);
     }
 
     private function rulesets(): GameRulesets

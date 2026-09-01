@@ -32,6 +32,8 @@ final class ItemTranslator implements ResetInterface
     /** @var array<string, array<string, mixed>>|null */
     private ?array $items = null;
 
+    private ?int $revision = null;
+
     public function __construct(
         private readonly TranslatorInterface $translator,
         private readonly GameRulesets $rulesets,
@@ -62,12 +64,14 @@ final class ItemTranslator implements ResetInterface
     public function reset(): void
     {
         $this->items = null;
+        $this->revision = null;
     }
 
     /** @return array<string, mixed> */
     private function item(string $key): array
     {
-        if (null !== $this->items) {
+        $revision = $this->rulesets->revision();
+        if (null !== $this->items && $revision === $this->revision) {
             return $this->items[$key] ?? [];
         }
         $snapshot = $this->rulesets->snapshot();
@@ -80,6 +84,7 @@ final class ItemTranslator implements ResetInterface
         }
 
         $this->items = $indexed;
+        $this->revision = $revision;
 
         return $indexed[$key] ?? [];
     }

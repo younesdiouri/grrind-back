@@ -83,6 +83,8 @@ final class EnemyCatalog
 
     private ?self $available = null;
 
+    private ?int $runtimeRevision = null;
+
     /**
      * @param list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}>         $enemies
      * @param list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses
@@ -284,7 +286,9 @@ final class EnemyCatalog
 
     private function current(): self
     {
-        if (null !== $this->historical) {
+        $revision = $this->rulesets?->revision();
+        \assert(\is_int($revision));
+        if (null !== $this->historical && $revision === $this->runtimeRevision) {
             return $this->historical;
         }
         $snapshot = $this->rulesets?->snapshot();
@@ -293,11 +297,15 @@ final class EnemyCatalog
         /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */ $enemies = $snapshot['combat']['enemies'];
         /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses */ $bosses = $snapshot['combat']['bosses'];
 
+        $this->runtimeRevision = $revision;
+        $this->available = null;
+
         return $this->historical = new self($enemies, $bosses);
     }
 
     private function active(): self
     {
+        $this->current();
         if (null !== $this->available) {
             return $this->available;
         }

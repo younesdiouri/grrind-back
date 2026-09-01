@@ -35,6 +35,8 @@ final class EnemyTranslator implements ResetInterface
     /** @var array<string, array<string, array{name: string}>>|null */
     private ?array $translations = null;
 
+    private ?int $revision = null;
+
     public function __construct(private readonly TranslatorInterface $translator, private readonly ?GameRulesets $rulesets = null)
     {
     }
@@ -63,15 +65,17 @@ final class EnemyTranslator implements ResetInterface
     public function reset(): void
     {
         $this->translations = null;
+        $this->revision = null;
     }
 
     /** @return array<string, array<string, array{name: string}>> */
     private function translations(): array
     {
-        if (null !== $this->translations) {
+        \assert(null !== $this->rulesets);
+        $revision = $this->rulesets->revision();
+        if (null !== $this->translations && $revision === $this->revision) {
             return $this->translations;
         }
-        \assert(null !== $this->rulesets);
         $snapshot = $this->rulesets->snapshot();
         $translations = [];
         $combat = $snapshot['combat'] ?? [];
@@ -88,6 +92,8 @@ final class EnemyTranslator implements ResetInterface
                 $translations[$enemy['key']] = $entry;
             }
         }
+
+        $this->revision = $revision;
 
         return $this->translations = $translations;
     }
