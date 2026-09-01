@@ -103,7 +103,7 @@ final class AdminSecurityTest extends ApiTestCase
         $users->commit();
         $this->login('readonly@grrind.app', 'un-mot-de-passe-assez-long');
 
-        foreach (['/admin/battle', '/admin/inventory'] as $index) {
+        foreach (['/admin/user', '/admin/battle', '/admin/inventory', '/admin/xp-transaction', '/admin/coin-transaction'] as $index) {
             $this->client->request('GET', $index);
             self::assertResponseIsSuccessful();
 
