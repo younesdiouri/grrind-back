@@ -19,14 +19,22 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
  * `COMMIT` réussi, jamais depuis le contrôleur d'import, sinon on annoncerait un fait
  * encore annulable.
  *
- * **Pourquoi ici, dans `Shared`, et pas `Community` ou un autre module.** Rien de ce que ce
- * fichier fait ne dépend d'une guilde, d'un profil ou d'aucune autre donnée propre à un
- * module métier : le destinataire *est* l'auteur, et `WorkoutCredited` porte déjà tout ce
- * qu'il faut pour construire le message (discipline, durée, XP, palier avant/après). Deptrac
- * n'autorise de toute façon aucun module à dépendre d'un autre module métier — seul `Shared`
- * est accessible à tous — donc `Community`, où vit le modèle dont ce fichier s'inspire
- * ({@see \App\Community\Domain\PendingGuildActivity}), n'était pas une option : ce n'est pas
- * un choix arbitraire entre deux modules également valides.
+ * **Pourquoi ici, dans `Shared`, et pas dans un module métier — un choix, pas une
+ * contrainte.** `Community`, `Identity` et `Progression` dépendent tous de `Shared`
+ * (`deptrac.yaml`), et tout ce que ce mécanisme consomme y vit déjà : {@see WorkoutCredited},
+ * `PushSender`, `NotificationAttempt`, `NotificationCategory`. N'importe lequel des trois
+ * aurait donc pu l'héberger — `Community` le premier, puisqu'il héberge exactement de cette
+ * façon {@see \App\Community\Application\GuildActivityNotifier}, qui consomme le même
+ * événement. Rien dans les frontières ne tranchait à notre place.
+ *
+ * `Shared` l'emporte parce que le destinataire *est* l'auteur : rien ici ne dépend d'une
+ * guilde, d'un profil ni d'aucune donnée propre à un module, donc aucun module ne possède
+ * cette décision mieux qu'un autre, et la machinerie de push est déjà entière ici.
+ *
+ * Le corollaire s'assume plutôt qu'il ne se cache : `Shared` étant visible de tous, plus
+ * aucune frontière Deptrac ne protège cette entité. Le jour où un module se met à en
+ * dépendre, ce n'est pas une violation — c'est le signe qu'elle a changé de nature et
+ * qu'elle doit déménager chez lui.
  *
  * **Deux divergences assumées avec `GuildActivityNotifier`, tranchées par le ticket #252 et
  * non rouvertes ici :**
