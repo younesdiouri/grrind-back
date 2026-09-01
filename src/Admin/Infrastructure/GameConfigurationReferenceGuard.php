@@ -28,6 +28,8 @@ final readonly class GameConfigurationReferenceGuard
             $configuration instanceof GameItem => ['item', $configuration->getKey(), [
                 ['SELECT 1 FROM rewards_inventory_item WHERE item_key = ? LIMIT 1', [$configuration->getKey()]],
                 ['SELECT 1 FROM game_loot_table WHERE entries::jsonb @> ?::jsonb LIMIT 1', [json_encode([['item' => $configuration->getKey()]], \JSON_THROW_ON_ERROR)]],
+                ["SELECT 1 FROM rewards_loot_roll WHERE jsonb_exists(result->'items', ?) LIMIT 1", [$configuration->getKey()]],
+                ['SELECT 1 FROM combat_battle WHERE reward @> ?::jsonb LIMIT 1', [json_encode(['loot' => [['key' => $configuration->getKey()]]], \JSON_THROW_ON_ERROR)]],
             ]],
             $configuration instanceof GameTitle => ['titre', $configuration->getKey(), [
                 ['SELECT 1 FROM player_title WHERE title_id = ? LIMIT 1', [$configuration->getKey()]],
