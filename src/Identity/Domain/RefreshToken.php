@@ -59,6 +59,20 @@ class RefreshToken
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
     private ?DateTimeImmutable $revokedAt = null;
 
+    /**
+     * Le successeur direct issu de `rotate()`, posé sur l'ancien jeton au moment même de
+     * la rotation. Sans FK — comme `familyId`, c'est un pointeur applicatif, pas une
+     * association vers une entité qu'on charge en cascade.
+     *
+     * Ne sert pas à décider — le rejeu coupe toujours la famille, voir le docblock de
+     * `RefreshSessionHandler` (#250). Sert uniquement au journal qu'elle écrit avant de
+     * couper : si ce successeur n'a jamais servi, la présentation avait la forme d'une
+     * rotation perdue en vol plutôt que d'une copie qui circule — un diagnostic, pas un
+     * verdict qui changerait l'issue.
+     */
+    #[ORM\Column(type: UuidType::NAME, nullable: true)]
+    private ?Uuid $successorId = null;
+
     private function __construct(User $user, Uuid $familyId, RefreshTokenSecret $secret, DateTimeImmutable $now)
     {
         $this->id = Uuid::v7();
@@ -79,8 +93,10 @@ class RefreshToken
     public function rotate(RefreshTokenSecret $secret, DateTimeImmutable $now): self
     {
         $this->consumedAt = $now;
+        $successor = new self($this->user, $this->familyId, $secret, $now);
+        $this->successorId = $successor->id;
 
-        return new self($this->user, $this->familyId, $secret, $now);
+        return $successor;
     }
 
     public function id(): Uuid
@@ -119,5 +135,15 @@ class RefreshToken
     public function isReplay(): bool
     {
         return null !== $this->consumedAt || null !== $this->revokedAt;
+    }
+
+    /**
+     * Ne sert plus à décider (voir le docblock de `RefreshSessionHandler`, #250) : le
+     * rejeu, lui, coupe toujours la famille. Seulement à raconter, dans le journal, si la
+     * présentation avait la forme d'une rotation perdue en vol.
+     */
+    public function successorId(): ?Uuid
+    {
+        return $this->successorId;
     }
 }

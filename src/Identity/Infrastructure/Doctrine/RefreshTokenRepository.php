@@ -27,6 +27,12 @@ class RefreshTokenRepository extends ServiceEntityRepository
         return $this->findOneBy(['tokenHash' => $secret->hash()]);
     }
 
+    /** Résout le pointeur `successorId` : voir son docblock sur `RefreshToken`. */
+    public function ofId(Uuid $id): ?RefreshToken
+    {
+        return $this->find($id);
+    }
+
     public function add(RefreshToken $token): void
     {
         $this->getEntityManager()->persist($token);
