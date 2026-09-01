@@ -7,6 +7,7 @@ namespace App\Tests\Shared\Config;
 use App\Combat\Domain\EnemyCatalog;
 use App\Progression\Domain\TitleCatalog;
 use App\Rewards\Domain\ItemCatalog;
+use App\Rewards\Domain\LootTables;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Infrastructure\Config\DatabaseGameRulesets;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
@@ -44,6 +45,42 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertNotNull($catalog->findHistorical('old_title'));
         self::assertNull($catalog->findAvailable('old_title'));
         self::assertNotNull($catalog->findAvailable('active_title'));
+    }
+
+    public function testInactiveLootTableIsNeverAvailableForANewRoll(): void
+    {
+        $rulesets = new class implements GameRulesets {
+            public function snapshot(): array
+            {
+                return [
+                    'items' => [],
+                    'titles' => [],
+                    'combat' => ['fighter' => [], 'enemies' => [['key' => 'OLD_ENEMY']], 'bosses' => []],
+                    'loot' => [
+                        'version' => 7,
+                        'loot_luck' => ['floor_percent' => 0, 'cap_percent' => 100],
+                        'workout' => [],
+                        'adversary' => [['key' => 'OLD_ENEMY', 'active' => false, 'coins' => ['minimum' => 0, 'maximum' => 0], 'entries' => [['weight' => 1]]]],
+                        'chest' => [],
+                    ],
+                ];
+            }
+
+            public function version(): string
+            {
+                return 'v1-test';
+            }
+
+            public function revision(): int
+            {
+                return 1;
+            }
+        };
+
+        $tables = LootTables::runtime($rulesets);
+
+        self::assertSame(7, $tables->version());
+        self::assertNull($tables->forAdversary('OLD_ENEMY'));
     }
 
     public function testHybridVersionChangesForGameplayButNotPresentation(): void
