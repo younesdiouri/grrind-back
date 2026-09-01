@@ -70,6 +70,24 @@ final class AdminSecurityTest extends ApiTestCase
         self::assertResponseRedirects('/admin/login');
     }
 
+    public function testLoginThrottlingUsesTrustedFlyForwardedIpAndRejectsSpoofedHeaders(): void
+    {
+        $email = 'throttle@grrind.app';
+        $this->openAccount($email);
+        // Le client n'est pas un proxy Fly : modifier XFF ne change donc pas l'identité qui
+        // est limitée. Les six essais franchissent le seuil réel Symfony sans supposer un 429.
+        for ($attempt = 1; $attempt <= 6; ++$attempt) {
+            $this->loginFrom($email, 'incorrect', ['REMOTE_ADDR' => '198.51.100.42', 'HTTP_X_FORWARDED_FOR' => '203.0.113.'.$attempt]);
+            self::assertResponseRedirects('/admin/login');
+        }
+        $this->loginFrom($email, 'un-mot-de-passe-assez-long', ['REMOTE_ADDR' => '198.51.100.42', 'HTTP_X_FORWARDED_FOR' => '203.0.113.200']);
+        self::assertResponseRedirects('/admin/login');
+
+        // À travers le proxy explicitement autorisé, l'IP réelle sépare bien le limiteur.
+        $this->loginFrom($email, 'un-mot-de-passe-assez-long', ['REMOTE_ADDR' => '127.0.0.1', 'HTTP_X_FORWARDED_FOR' => '203.0.113.201']);
+        self::assertResponseRedirects('/admin');
+    }
+
     public function testLogoutRequiresItsCsrfToken(): void
     {
         $this->openAccount('logout@grrind.app');
@@ -201,5 +219,18 @@ final class AdminSecurityTest extends ApiTestCase
             '_password' => $password,
             '_csrf_token' => $token,
         ]);
+    }
+
+    /** @param array<string, string> $server */
+    private function loginFrom(string $email, string $password, array $server): void
+    {
+        $crawler = $this->client->request('GET', '/admin/login', [], [], $server);
+        $token = $crawler->filter('input[name="_csrf_token"]')->attr('value');
+        self::assertIsString($token);
+        $this->client->request('POST', '/admin/login', [
+            '_username' => $email,
+            '_password' => $password,
+            '_csrf_token' => $token,
+        ], [], $server);
     }
 }
