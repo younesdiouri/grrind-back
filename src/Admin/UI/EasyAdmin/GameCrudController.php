@@ -34,6 +34,7 @@ abstract class GameCrudController extends AbstractCrudController
         try {
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
                 $entityManager->persist($entityInstance);
+                $this->finalizeStagedImage($entityInstance);
                 $entityManager->flush();
                 $this->publisher->publish($entityManager);
             });
@@ -55,7 +56,8 @@ abstract class GameCrudController extends AbstractCrudController
         $oldImage = $original['imagePath'] ?? null;
         \assert(null === $oldImage || \is_string($oldImage));
         try {
-            $entityManager->wrapInTransaction(function () use ($entityManager): void {
+            $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
+                $this->finalizeStagedImage($entityInstance);
                 $entityManager->flush();
                 $this->publisher->publish($entityManager);
             });
@@ -81,6 +83,37 @@ abstract class GameCrudController extends AbstractCrudController
             $this->publisher->invalidateAfterCommit();
         } catch (InvalidArgumentException|LogicException $exception) {
             throw new EntityRemoveException(['entity_name' => $entityInstance::class, 'message' => $exception->getMessage()], $exception);
+        }
+    }
+
+    /** Le staging n'est jamais servi ; une annulation ne peut donc pas publier d'image orpheline. */
+    protected function stagingImageDirectory(): string
+    {
+        $directory = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.'.staging';
+        if (!is_dir($directory) && !mkdir($directory, 0o775, true) && !is_dir($directory)) {
+            throw new LogicException('Impossible de préparer le répertoire temporaire des images.');
+        }
+
+        return $directory;
+    }
+
+    /** Déplace l'upload hors de la zone publique seulement quand l'écriture va être publiée. */
+    private function finalizeStagedImage(object $entity): void
+    {
+        if (!$entity instanceof GameItem || 'placeholder.png' === $entity->getImagePath()) {
+            return;
+        }
+        $name = $entity->getImagePath();
+        if (!preg_match('/^[a-f0-9]{40}(?:-[0-9]+)?\.(?:jpg|jpeg|png|webp)$/', $name)) {
+            throw new LogicException('Le nom de l’image envoyée est invalide.');
+        }
+        $staged = $this->stagingImageDirectory().\DIRECTORY_SEPARATOR.$name;
+        if (!is_file($staged)) {
+            return;
+        }
+        $final = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;
+        if (!rename($staged, $final)) {
+            throw new LogicException('Impossible de publier l’image envoyée.');
         }
     }
 

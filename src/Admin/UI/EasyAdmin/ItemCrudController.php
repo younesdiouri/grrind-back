@@ -50,7 +50,7 @@ final class ItemCrudController extends GameCrudController
         yield IntegerField::new('shopMinimumLevel')->hideOnIndex();
         yield ImageField::new('imagePath')
             ->setBasePath('/game-images')
-            ->setUploadDir($this->gameImageDirectory)
+            ->setUploadDir($this->stagingImageDirectory())
             ->setUploadedFileNamePattern('[contenthash].[extension]')
             ->setFileConstraints(new Image(maxSize: '2M', mimeTypes: ['image/jpeg', 'image/png', 'image/webp'], maxWidth: 4096, maxHeight: 4096))
             ->mimeTypes('image/jpeg,image/png,image/webp')
