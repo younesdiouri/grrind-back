@@ -27,18 +27,50 @@ final class RefreshTokenTest extends ApiTestCase
         self::assertNotSame($refreshToken, $tokens['refreshToken'], 'Le refresh token doit tourner à chaque échange.');
     }
 
-    public function testTheOldTokenIsBurntOnceExchanged(): void
+    /**
+     * #250 : présenter un jeton déjà consommé n'est plus, à lui seul, un rejeu — voir le
+     * docblock de `RefreshSessionHandler`. Si son successeur direct n'a jamais servi, c'est
+     * la signature d'une réponse de rotation que le client n'a jamais reçue (mesuré en
+     * production : 49 minutes entre le `COMMIT` serveur et cette re-présentation), pas
+     * d'une copie qui circule. La famille survit et une paire neuve est émise.
+     */
+    public function testARotationLostInFlightIsRecoveredNotBurnt(): void
     {
         $first = $this->openSession();
-        $this->post('/api/auth/refresh', ['refreshToken' => $first]);
 
-        $response = $this->post('/api/auth/refresh', ['refreshToken' => $first]);
+        // Le client rotate, mais on ne se sert jamais du successeur ensuite — exactement
+        // comme un client qui n'aurait jamais reçu la réponse.
+        $lost = self::decode($this->post('/api/auth/refresh', ['refreshToken' => $first]))['tokens'];
+        self::assertIsArray($lost);
+        self::assertIsString($lost['refreshToken']);
 
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
-        self::assertSame('https://grrind.app/problems/invalid-refresh-token', self::decode($response)['type']);
+        $recovered = $this->post('/api/auth/refresh', ['refreshToken' => $first]);
+
+        self::assertSame(Response::HTTP_OK, $recovered->getStatusCode());
+        $recoveredTokens = self::decode($recovered)['tokens'];
+        self::assertIsArray($recoveredTokens);
+        self::assertIsString($recoveredTokens['refreshToken']);
+        self::assertNotSame($first, $recoveredTokens['refreshToken']);
+        self::assertNotSame(
+            $lost['refreshToken'],
+            $recoveredTokens['refreshToken'],
+            'Un rejeu toléré ne rend jamais un secret déjà émis : il rotate de nouveau.',
+        );
+
+        // Le jeton rendu au client dans le cas légitime est utilisable.
+        self::assertSame(
+            Response::HTTP_OK,
+            $this->post('/api/auth/refresh', ['refreshToken' => $recoveredTokens['refreshToken']])->getStatusCode(),
+        );
     }
 
-    public function testReplayingAnOldTokenKillsTheWholeFamily(): void
+    /**
+     * #250 : le cas que la récupération ne couvre pas. Si le successeur direct a déjà
+     * servi à une rotation suivante, la présentation de l'ancien reste un vrai rejeu — on
+     * ne peut plus distinguer le voleur du vrai client, donc la lignée entière saute,
+     * comme avant #250.
+     */
+    public function testReplayingAnOldTokenKillsTheWholeFamilyWhenItsSuccessorAlreadyServed(): void
     {
         $first = $this->openSession();
 
@@ -46,13 +78,22 @@ final class RefreshTokenTest extends ApiTestCase
         self::assertIsArray($second);
         self::assertIsString($second['refreshToken']);
 
-        // Rejeu du jeton déjà consommé : on ne sait pas qui du client ou du voleur
-        // le présente, donc la lignée entière saute.
-        $this->post('/api/auth/refresh', ['refreshToken' => $first]);
+        $third = self::decode($this->post('/api/auth/refresh', ['refreshToken' => $second['refreshToken']]))['tokens'];
+        self::assertIsArray($third);
+        self::assertIsString($third['refreshToken']);
 
-        $response = $this->post('/api/auth/refresh', ['refreshToken' => $second['refreshToken']]);
+        // Le successeur de $first (= $second) a déjà servi à produire $third : plus rien
+        // ne distingue cette présentation d'un vol.
+        $response = $this->post('/api/auth/refresh', ['refreshToken' => $first]);
 
         self::assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
+        self::assertSame('https://grrind.app/problems/invalid-refresh-token', self::decode($response)['type']);
+
+        // La famille entière tombe, y compris le jeton légitime le plus récent.
+        self::assertSame(
+            Response::HTTP_UNAUTHORIZED,
+            $this->post('/api/auth/refresh', ['refreshToken' => $third['refreshToken']])->getStatusCode(),
+        );
     }
 
     public function testAnUnknownTokenIsRefused(): void

@@ -59,6 +59,18 @@ class RefreshToken
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
     private ?DateTimeImmutable $revokedAt = null;
 
+    /**
+     * Le successeur direct issu de `rotate()`, posé sur l'ancien jeton au moment même de
+     * la rotation. Sans FK — comme `familyId`, c'est un pointeur applicatif, pas une
+     * association vers une entité qu'on charge en cascade.
+     *
+     * Sert `RefreshSessionHandler` à juger un rejeu de ce jeton (#250) : si ce successeur
+     * n'a jamais servi, la présentation la plus probable est une réponse de rotation que
+     * le client n'a jamais reçue — pas une copie qui circule.
+     */
+    #[ORM\Column(type: UuidType::NAME, nullable: true)]
+    private ?Uuid $successorId = null;
+
     private function __construct(User $user, Uuid $familyId, RefreshTokenSecret $secret, DateTimeImmutable $now)
     {
         $this->id = Uuid::v7();
@@ -79,8 +91,10 @@ class RefreshToken
     public function rotate(RefreshTokenSecret $secret, DateTimeImmutable $now): self
     {
         $this->consumedAt = $now;
+        $successor = new self($this->user, $this->familyId, $secret, $now);
+        $this->successorId = $successor->id;
 
-        return new self($this->user, $this->familyId, $secret, $now);
+        return $successor;
     }
 
     public function id(): Uuid
@@ -119,5 +133,20 @@ class RefreshToken
     public function isReplay(): bool
     {
         return null !== $this->consumedAt || null !== $this->revokedAt;
+    }
+
+    /**
+     * Consommé par une rotation normale, et seulement ça — pas par une révocation de
+     * famille. C'est la moitié d'`isReplay()` qui vaut la peine d'être examinée de plus
+     * près : voir `successorId()` et le docblock de `RefreshSessionHandler` (#250).
+     */
+    public function wasRotated(): bool
+    {
+        return null !== $this->consumedAt && null === $this->revokedAt;
+    }
+
+    public function successorId(): ?Uuid
+    {
+        return $this->successorId;
     }
 }

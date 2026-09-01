@@ -114,6 +114,11 @@ final class DeviceFollowsRefreshFamilyTest extends ApiTestCase
      * La moitié de la justification de l'arbitrage B : un rejeu détecté coupe la famille
      * *et* l'appareil qu'elle portait, exactement comme une déconnexion volontaire — sinon
      * un vol de session laisserait les notifications partir sur l'appareil compromis.
+     *
+     * #250 : une seule rotation suivie d'un rejeu immédiat de l'original ne suffit plus à
+     * déclencher ce chemin — voir `RefreshTokenTest::testARotationLostInFlightIsRecoveredNotBurnt`.
+     * Il faut que le successeur direct ait lui-même déjà servi pour que ce soit un vrai
+     * rejeu plutôt qu'une rotation perdue en vol.
      */
     public function testAReplayDetectedOnRefreshRemovesThePushTokenToo(): void
     {
@@ -124,9 +129,13 @@ final class DeviceFollowsRefreshFamilyTest extends ApiTestCase
         $this->registerDevice($tokens['accessToken']);
         $userId = $this->userIdOf($tokens['accessToken']);
 
-        // Une rotation légitime, puis un rejeu de l'ancien jeton : le signal qu'une copie
-        // circule.
-        $this->post('/api/auth/refresh', ['refreshToken' => $tokens['refreshToken']]);
+        $second = self::decode($this->post('/api/auth/refresh', ['refreshToken' => $tokens['refreshToken']]))['tokens'];
+        self::assertIsArray($second);
+        self::assertIsString($second['refreshToken']);
+
+        // Le successeur de l'original a lui-même déjà servi à rotater une deuxième fois :
+        // plus rien ne distingue le rejeu qui suit d'une copie qui circule.
+        $this->post('/api/auth/refresh', ['refreshToken' => $second['refreshToken']]);
         $replay = $this->post('/api/auth/refresh', ['refreshToken' => $tokens['refreshToken']]);
 
         self::assertSame(Response::HTTP_UNAUTHORIZED, $replay->getStatusCode());
