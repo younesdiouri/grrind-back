@@ -10,8 +10,10 @@ use App\Admin\Infrastructure\GameRulesetPublisher;
 use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use EasyCorp\Bundle\EasyAdminBundle\Exception\EntityRemoveException;
 use InvalidArgumentException;
 use LogicException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
 
 /** Toute mutation EasyAdmin passe par la publication transactionnelle, jamais par un flush isolé. */
@@ -38,7 +40,9 @@ abstract class GameCrudController extends AbstractCrudController
             $this->publisher->invalidateAfterCommit();
         } catch (InvalidArgumentException|LogicException $exception) {
             $this->compensateImage($entityInstance, null);
-            $this->addFlash('danger', $exception->getMessage());
+            // Retourner ferait croire à EasyAdmin que l'écriture a réussi et déclencherait
+            // l'événement post-persisté sur une transaction annulée.
+            throw new BadRequestHttpException($exception->getMessage(), $exception);
         } catch (Throwable $exception) {
             $this->compensateImage($entityInstance, null);
             throw $exception;
@@ -58,7 +62,7 @@ abstract class GameCrudController extends AbstractCrudController
             $this->publisher->invalidateAfterCommit();
         } catch (InvalidArgumentException|LogicException $exception) {
             $this->compensateImage($entityInstance, $oldImage);
-            $this->addFlash('danger', $exception->getMessage());
+            throw new BadRequestHttpException($exception->getMessage(), $exception);
         } catch (Throwable $exception) {
             $this->compensateImage($entityInstance, $oldImage);
             throw $exception;
@@ -76,7 +80,7 @@ abstract class GameCrudController extends AbstractCrudController
             });
             $this->publisher->invalidateAfterCommit();
         } catch (InvalidArgumentException|LogicException $exception) {
-            $this->addFlash('danger', $exception->getMessage());
+            throw new EntityRemoveException(['entity_name' => $entityInstance::class, 'message' => $exception->getMessage()], $exception);
         }
     }
 
