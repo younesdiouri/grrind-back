@@ -24,6 +24,13 @@ final readonly class GameConfigurationReferenceGuard
 
     public function assertDeletable(object $configuration): void
     {
+        $active = match (true) {
+            $configuration instanceof GameItem, $configuration instanceof GameTitle, $configuration instanceof GameEnemy, $configuration instanceof GameLootTable => $configuration->isActive(),
+            default => false,
+        };
+        if ($active) {
+            throw new LogicException('Suppression refusée : désactivez d’abord cette configuration publiée.');
+        }
         [$label, $key, $queries] = match (true) {
             $configuration instanceof GameItem => ['item', $configuration->getKey(), [
                 ['SELECT 1 FROM rewards_inventory_item WHERE item_key = ? LIMIT 1', [$configuration->getKey()]],

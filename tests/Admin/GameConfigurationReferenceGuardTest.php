@@ -46,18 +46,21 @@ final class GameConfigurationReferenceGuardTest extends TestCase
         yield 'item, inventaire/loot/config/bataille' => [static function (): GameItem {
             $item = new GameItem();
             $item->setKey('FREE_ITEM');
+            $item->setActive(false);
 
             return $item;
         }, 4];
         yield 'titre, déblocage/sélection' => [static function (): GameTitle {
             $title = new GameTitle();
             $title->setKey('FREE_TITLE');
+            $title->setActive(false);
 
             return $title;
         }, 2];
         yield 'ennemi, bataille/table adversary' => [static function (): GameEnemy {
             $enemy = new GameEnemy();
             $enemy->setKey('FREE_ENEMY');
+            $enemy->setActive(false);
 
             return $enemy;
         }, 2];
@@ -65,8 +68,21 @@ final class GameConfigurationReferenceGuardTest extends TestCase
             $table = new GameLootTable();
             $table->setKind('workout');
             $table->setKey('FREE_TABLE');
+            $table->setActive(false);
 
             return $table;
         }, 1];
+    }
+
+    public function testActiveConfigurationMustBeDeactivatedBeforePhysicalDeletion(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('fetchOne');
+        $item = new GameItem();
+        $item->setKey('PUBLISHED_ITEM');
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('désactivez d’abord');
+        new GameConfigurationReferenceGuard($connection)->assertDeletable($item);
     }
 }
