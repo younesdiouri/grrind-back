@@ -6,6 +6,7 @@ namespace App\Tests\Admin;
 
 use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
+use App\Admin\Domain\GameLootTable;
 use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
 use App\Identity\Domain\Role;
@@ -18,6 +19,65 @@ use Symfony\Component\DomCrawler\Form;
 /** Le CRUD de configuration passe par les formulaires EasyAdmin réellement servis. */
 final class GameCrudHttpTest extends ApiTestCase
 {
+    public function testLootTableCanBeCreatedUpdatedDeactivatedAndDeletedThroughAdmin(): void
+    {
+        $this->loginAdmin('loot-crud-admin@grrind.app');
+        $key = 'http_loot_'.bin2hex(random_bytes(4));
+        $crawler = $this->client->request('GET', '/admin/loot-table/new');
+        self::assertResponseIsSuccessful();
+        $token = $crawler->filter('input[name="GameLootTable[_token]"]')->attr('value');
+        self::assertIsString($token);
+
+        // BrowserKit does not materialize an empty EasyAdmin collection. The HTTP payload
+        // nevertheless remains identical to the compound entry submitted by an administrator.
+        $this->client->request('POST', '/admin/loot-table/new', [
+            'GameLootTable' => [
+                'kind' => 'workout',
+                'key' => $key,
+                'active' => '1',
+                'sortOrder' => (string) random_int(4_000_001, 5_000_000),
+                'eligibility' => [
+                    'disciplines' => [],
+                    'minimum_duration_minutes' => '1',
+                    'minimum_level' => '1',
+                ],
+                'coinsMinimum' => '0',
+                'coinsMaximum' => '1',
+                'entries' => [
+                    ['weight' => '1'],
+                ],
+                '_token' => $token,
+            ],
+        ]);
+        self::assertResponseRedirects();
+
+        $tables = self::getContainer()->get('doctrine')->getRepository(GameLootTable::class);
+        $table = $tables->findOneBy(['key' => $key, 'kind' => 'workout']);
+        self::assertInstanceOf(GameLootTable::class, $table);
+        self::assertTrue($table->isActive());
+        self::assertSame([['item' => null, 'weight' => 1]], $table->getEntries());
+        self::assertSame(['disciplines' => [], 'minimum_duration_minutes' => 1, 'minimum_level' => 1], $table->getEligibility());
+
+        $crawler = $this->client->request('GET', '/admin/loot-table/'.$table->getId()->toRfc4122().'/edit');
+        self::assertResponseIsSuccessful();
+        $edit = $crawler->filter('form[name="GameLootTable"]')->form();
+        $active = $edit['GameLootTable[active]'];
+        self::assertInstanceOf(ChoiceFormField::class, $active);
+        $active->untick();
+        $edit->setValues(['GameLootTable[coinsMaximum]' => '2']);
+        $this->client->submit($edit);
+        self::assertResponseRedirects();
+        self::getContainer()->get('doctrine')->getManager()->clear();
+        $updated = $tables->findOneBy(['key' => $key, 'kind' => 'workout']);
+        self::assertInstanceOf(GameLootTable::class, $updated);
+        self::assertFalse($updated->isActive());
+        self::assertSame(2, $updated->getCoinsMaximum());
+
+        $this->delete('/admin/loot-table/'.$updated->getId()->toRfc4122().'/edit', '/admin/loot-table/'.$updated->getId()->toRfc4122().'/delete');
+        self::getContainer()->get('doctrine')->getManager()->clear();
+        self::assertNull($tables->findOneBy(['key' => $key, 'kind' => 'workout']));
+    }
+
     public function testTitleCanBeCreatedUpdatedDeactivatedAndDeletedThroughAdmin(): void
     {
         $this->loginAdmin();
