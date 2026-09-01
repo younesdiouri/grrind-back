@@ -23,4 +23,13 @@ final class GameRulesetMigrationSeedTest extends TestCase
         self::assertCount(6, $migrationSeed['enemies']);
         self::assertCount(10, $migrationSeed['loot']['adversary']);
     }
+
+    public function testRetiredCatalogYamlFilesCannotBecomeARuntimeSourceAgain(): void
+    {
+        $directory = \dirname(__DIR__, 2).'/config/game/v1';
+
+        foreach (['items.yaml', 'loot.yaml', 'titles.yaml', 'combat.yaml'] as $file) {
+            self::assertFileDoesNotExist($directory.'/'.$file);
+        }
+    }
 }
