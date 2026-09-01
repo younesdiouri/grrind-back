@@ -58,7 +58,7 @@ final class BattleLootTest extends ApiTestCase
 
     /**
      * Une victoire écrit la ligne d'audit rattachée **au combat** (`cause_id`), crédite une
-     * bande de pièces cohérente avec `loot.yaml` (2 à 8 pour `SAND_JACKAL`, toujours non
+     * bande de pièces cohérente avec le catalogue DB de loot (2 à 8 pour `SAND_JACKAL`, toujours non
      * nulle), et rend un avant/après lu sur le vrai solde.
      */
     public function testAVictoryRollsTheEligibleTableAndWritesTheAuditTrail(): void
@@ -77,7 +77,7 @@ final class BattleLootTest extends ApiTestCase
         self::assertSame('SAND_JACKAL', $rolls[0]['table_key']);
         self::assertSame($battleId->toRfc4122(), $rolls[0]['cause_id']);
 
-        // La bande de `SAND_JACKAL` dans `loot.yaml` : toujours entre 2 et 8 pièces, jamais
+        // La bande de `SAND_JACKAL` dans le catalogue DB de loot : toujours entre 2 et 8 pièces, jamais
         // zéro — voir le docblock de `LootRoller` pour pourquoi les pièces se tirent
         // indépendamment de l'objet.
         self::assertGreaterThanOrEqual(2, $drop->coinsGained);
@@ -109,7 +109,7 @@ final class BattleLootTest extends ApiTestCase
     }
 
     /**
-     * Un adversaire quelconque sans table dédiée dans `loot.yaml` ne tire rien — même
+     * Un adversaire quelconque sans table dédiée dans le catalogue DB de loot ne tire rien — même
      * comportement qu'une défaite, voir le docblock de `LootRoller::rollForAdversary()`.
      */
     public function testAVictoryAgainstAnAdversaryWithoutADedicatedTableRollsNothing(): void

@@ -27,7 +27,7 @@ use Symfony\Component\Uid\Uuid;
 final class EquippedItemsChangeTheFighterTest extends ApiTestCase
 {
     /**
-     * `IRON_GAUNTLETS` porte `{ type: STRENGTH_BONUS, value: 350 }` (`items.yaml`) : sur un
+     * `IRON_GAUNTLETS` porte `{ type: STRENGTH_BONUS, value: 350 }` (catalogue DB publié) : sur un
      * compte neuf (Strength à zéro), la dérivation vaut
      * `base_damage + intdiv(350 * damage_per_1000_strength, 1000)` — voir le docblock de
      * `FighterFactory`. Le calcul exact n'est pas recopié ici : c'est le baseline, tiré du

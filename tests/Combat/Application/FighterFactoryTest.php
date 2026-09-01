@@ -23,7 +23,7 @@ use Symfony\Component\Uid\Uuid;
  * La traduction caractéristique → combattant, seule et sans conteneur : voir le docblock de
  * {@see FighterFactory} pour la correspondance et pourquoi le socle + contribution est la
  * forme retenue. Ce que ces tests démontrent est indépendant des valeurs livrées dans
- * `combat.yaml` — {@see \App\Tests\Shared\Config\CombatCoverageTest} vérifie celles-là.
+ * snapshot DB publié — {@see \App\Tests\Shared\Config\CombatCoverageTest} vérifie celles-là.
  *
  * **Aucun objet, aucun contributeur réel (#224).** {@see modifiersOf()} force des
  * `Modifier` à la main — le seul moyen d'éprouver l'ordre de la dérivation avant que

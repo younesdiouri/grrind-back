@@ -28,7 +28,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le pipeline entier contre les vrais services du conteneur — `combat.yaml` chargé, la
+ * Le pipeline entier contre les vrais services du conteneur — snapshot DB publié chargé, la
  * vraie base. Ce qui compte ici ne se démontre pas en mémoire : que la ligne écrite
  * reproduit fidèlement ce que le moteur a produit, et que le `ruleset_version` qu'elle
  * porte est bien celui que le conteneur a chargé, pas une valeur écrite en dur dans le
@@ -94,7 +94,7 @@ final class FightBattleHandlerTest extends KernelTestCase
 
     /**
      * Le `ruleset_version` écrit est celui du conteneur, pas une constante recopiée dans
-     * le handler : le jour où `combat.yaml` change, cette ligne doit suivre sans qu'on
+     * le handler : le jour où le catalogue DB change, cette ligne doit suivre sans qu'on
      * touche à `FightBattleHandler`.
      */
     public function testTheWrittenRulesetVersionIsTheContainerS(): void
@@ -182,7 +182,7 @@ final class FightBattleHandlerTest extends KernelTestCase
     }
 
     /**
-     * Un boss nommé s'affronte dès que le `minimum_level` de `combat.yaml` est atteint, et
+     * Un boss nommé s'affronte dès que son `minimum_level` du catalogue DB est atteint, et
      * le combat s'écrit exactement comme n'importe quel autre (#219) — même pipeline, seule
      * la résolution de l'ennemi change. `DUNE_SOVEREIGN` exige le niveau 10, 3 060 XP à ce
      * seuil (`levels.yaml`) ; c'est le total minimal qui l'atteint, le cas le plus

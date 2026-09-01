@@ -67,8 +67,17 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
 
                     return $this->load($revision);
                 });
-            } catch (Throwable) {
-                $current = $this->load($revision);
+            } catch (Throwable $exception) {
+                if ($exception instanceof PublishedRulesetMoved) {
+                    // Le cache peut appeler son callback avant de relayer l'exception : ne
+                    // pas recharger N dans le catch, relire directement le pointeur N+1.
+                    continue;
+                }
+                try {
+                    $current = $this->load($revision);
+                } catch (PublishedRulesetMoved) {
+                    continue;
+                }
             }
             if ($current['revision'] === $revision) {
                 return $this->current = $current;
@@ -98,7 +107,7 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
         /** @var array{revision: int|string, version: string, snapshot: string|array<string, mixed>}|false $row */
         $row = $this->connection->fetchAssociative('SELECT revision, version, snapshot FROM game_ruleset WHERE id = 1 AND revision = :revision', ['revision' => $expectedRevision]);
         if (false === $row) {
-            throw new LogicException('La révision de jeu a changé pendant son chargement.');
+            throw new PublishedRulesetMoved('La révision de jeu a changé pendant son chargement.');
         }
         $revision = (int) $row['revision'];
         $snapshot = \is_array($row['snapshot']) ? $row['snapshot'] : json_decode($row['snapshot'], true, 512, \JSON_THROW_ON_ERROR);

@@ -222,6 +222,26 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertSame($snapshot, $rulesets->snapshot());
     }
 
+    public function testPublicationBetweenPointerAndLoadRetriesTheNewWholeRevision(): void
+    {
+        /** @var array{items: list<array{price_coins: int}>} $first */
+        $first = $this->rulesets()->snapshot();
+        $second = $first;
+        $second['items'][1]['price_coins'] = 42;
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))->method('fetchOne')->willReturn(4, 5);
+        $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            false,
+            ['revision' => 5, 'version' => 'ignored-at-runtime', 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+        );
+        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+
+        self::assertSame(5, $rulesets->revision());
+        /** @var array{items: list<array{price_coins: int}>} $snapshot */
+        $snapshot = $rulesets->snapshot();
+        self::assertSame(42, $snapshot['items'][1]['price_coins']);
+    }
+
     public function testLongLivedCatalogRebuildsOnlyWhenThePublishedRevisionChanges(): void
     {
         $first = $this->rulesets()->snapshot();

@@ -22,7 +22,7 @@ use Symfony\Component\Uid\Uuid;
  * `breakdown` d'une séance (#29) — même moteur, même port, un autre consommateur.
  *
  * `WORN_RUNNING_SHOES` porte `{ type: XP_MULTIPLIER, value: 5, discipline: RUNNING }`
- * (`items.yaml`) : une ligne `ITEM` doit apparaître dans le détail d'une séance de course,
+ * (catalogue DB publié) : une ligne `ITEM` doit apparaître dans le détail d'une séance de course,
  * jamais dans celui d'une autre discipline.
  */
 final class EquippedItemsChangeTheXpBreakdownTest extends ApiTestCase

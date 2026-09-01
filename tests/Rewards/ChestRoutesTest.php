@@ -17,7 +17,7 @@ use Symfony\Component\Uid\Uuid;
 /**
  * `POST /api/inventory/chests/{key}/open` (#230) — un coffre est un tirage qu'on ouvre.
  *
- * `WOODEN_CHEST` et `IRON_BOUND_CHEST` sont les deux coffres livrés — voir `items.yaml`.
+ * `WOODEN_CHEST` et `IRON_BOUND_CHEST` sont les deux coffres livrés par le catalogue DB publié.
  * Aucune route ne les grainant, chaque test qui a besoin d'un exemplaire le pose directement
  * par {@see InventoryItemRepository::grant()}, même geste que `credit()` sur `ShopRoutesTest`.
  */

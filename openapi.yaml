@@ -2120,7 +2120,7 @@ components:
               description: "Déjà possédé — l'achat serait refusé (`item-already-owned`)."
               type: boolean
             minimumLevel:
-              description: "Le niveau qui débloque l'achat — `shop.minimum_level` dans `items.yaml`."
+              description: "Le niveau qui débloque l'achat — `shop.minimum_level` du catalogue DB publié."
               type: integer
               example: 5
             unlocked:
@@ -2128,7 +2128,7 @@ components:
               type: boolean
           type: object
     Shop:
-      description: "`GET /api/shop` : l'étal entier — un objet par entrée d'`items.yaml` dont\n`shop.available` vaut `true`. Les EPIC et LEGENDARY n'y figurent jamais, voir le\ndocblock d'`ItemCatalog`. Le solde de pièces l'accompagne, comme sur `GET\n/api/inventory` : le même écran de bourse, il n'a pas à faire un second appel\npour savoir s'il peut payer.\n"
+      description: "`GET /api/shop` : l'étal entier — un objet par entrée du catalogue DB publié dont\n`shop.available` vaut `true`. Les EPIC et LEGENDARY n'y figurent jamais, voir le\ndocblock d'`ItemCatalog`. Le solde de pièces l'accompagne, comme sur `GET\n/api/inventory` : le même écran de bourse, il n'a pas à faire un second appel\npour savoir s'il peut payer.\n"
       required:
         - coins
         - items
@@ -2608,7 +2608,7 @@ components:
           example: 8
       type: object
     BattleEnemy:
-      description: "L'adversaire : les mêmes champs qu'un `BattleFighter`, plus son identité.\n\n**Le nom arrive traduit**, comme les titres : le client n'a pas de table de\ncorrespondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du\ncatalogue (`combat.yaml`), pas une donnée d'affichage.\n"
+      description: "L'adversaire : les mêmes champs qu'un `BattleFighter`, plus son identité.\n\n**Le nom arrive traduit**, comme les titres : le client n'a pas de table de\ncorrespondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du\ncatalogue DB publié, pas une donnée d'affichage.\n"
       required:
         - key
         - name
@@ -2689,7 +2689,7 @@ components:
             - DEFEAT
       type: object
     BattleReward:
-      description: "Ce qu'une victoire a rapporté (#227) — persisté sur la ligne du combat, jamais\nrejoué depuis la graine : le jour où `loot.yaml` est rééquilibré, rejouer un\nvieux tirage sous les tables courantes rendrait un butin différent de celui que\nle joueur a vu tomber.\n\n**Vide pour une défaite, ou une victoire tranchée par `max_turns` sans KO** —\n`loot: []` et `coins` à gain nul, jamais des clés absentes : une récompense de\nconsolation ferait du combat perdu la stratégie optimale, puisqu'il est plus\nrapide à jouer qu'à gagner.\n\nMême forme, mêmes clés, dans le même ordre que `loot`/`coins` sur\n`RewardSummary` — les objets d'abord, les pièces ensuite — pour que le client\nréutilise le composant qu'il a déjà écrit.\n"
+      description: "Ce qu'une victoire a rapporté (#227) — persisté sur la ligne du combat, jamais\nrejoué depuis la graine : le jour où le catalogue DB de loot est rééquilibré, rejouer un\nvieux tirage sous les tables courantes rendrait un butin différent de celui que\nle joueur a vu tomber.\n\n**Vide pour une défaite, ou une victoire tranchée par `max_turns` sans KO** —\n`loot: []` et `coins` à gain nul, jamais des clés absentes : une récompense de\nconsolation ferait du combat perdu la stratégie optimale, puisqu'il est plus\nrapide à jouer qu'à gagner.\n\nMême forme, mêmes clés, dans le même ordre que `loot`/`coins` sur\n`RewardSummary` — les objets d'abord, les pièces ensuite — pour que le client\nréutilise le composant qu'il a déjà écrit.\n"
       required:
         - loot
         - coins

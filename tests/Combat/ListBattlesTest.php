@@ -51,7 +51,7 @@ final class ListBattlesTest extends ApiTestCase
     /**
      * La décision du #209 : `result` n'a que deux valeurs, y compris pour un combat que
      * `max_turns` a interrompu sans KO — le meilleur ratio de PV tranche, un match nul n'a pas
-     * de mise en scène. Fabriqué exprès, `turns` au plafond de `combat.yaml`.
+     * de mise en scène. Fabriqué exprès, `turns` au plafond du catalogue DB publié.
      */
     public function testEveryEntryCarriesAResultEvenOneConcludedByMaxTurns(): void
     {

@@ -1118,13 +1118,13 @@ when@dev:
                               properties:
                                   affordable: { type: boolean, description: "Le solde actuel du joueur couvre `priceCoins`." }
                                   owned: { type: boolean, description: "Déjà possédé — l'achat serait refusé (`item-already-owned`)." }
-                                  minimumLevel: { type: integer, example: 5, description: "Le niveau qui débloque l'achat — `shop.minimum_level` dans `items.yaml`." }
+                                  minimumLevel: { type: integer, example: 5, description: "Le niveau qui débloque l'achat — `shop.minimum_level` du catalogue DB publié." }
                                   unlocked: { type: boolean, description: "Le joueur a atteint `minimumLevel`. Un objet verrouillé reste dans la liste : un étal qui cache ce qu'on ne peut pas encore acheter ne donne envie de rien." }
 
                     Shop:
                         type: object
                         description: |
-                            `GET /api/shop` : l'étal entier — un objet par entrée d'`items.yaml` dont
+                            `GET /api/shop` : l'étal entier — un objet par entrée du catalogue DB publié dont
                             `shop.available` vaut `true`. Les EPIC et LEGENDARY n'y figurent jamais, voir le
                             docblock d'`ItemCatalog`. Le solde de pièces l'accompagne, comme sur `GET
                             /api/inventory` : le même écran de bourse, il n'a pas à faire un second appel
@@ -1497,7 +1497,7 @@ when@dev:
 
                             **Le nom arrive traduit**, comme les titres : le client n'a pas de table de
                             correspondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du
-                            catalogue (`combat.yaml`), pas une donnée d'affichage.
+                            catalogue DB publié, pas une donnée d'affichage.
                         required: [key, name, hp, damage, mitigationPercent, extraTurnPercent, dodgePercent]
                         properties:
                             key: { type: string, example: SAND_JACKAL }
@@ -1546,7 +1546,7 @@ when@dev:
                         type: object
                         description: |
                             Ce qu'une victoire a rapporté (#227) — persisté sur la ligne du combat, jamais
-                            rejoué depuis la graine : le jour où `loot.yaml` est rééquilibré, rejouer un
+                            rejoué depuis la graine : le jour où le catalogue DB de loot est rééquilibré, rejouer un
                             vieux tirage sous les tables courantes rendrait un butin différent de celui que
                             le joueur a vu tomber.
 

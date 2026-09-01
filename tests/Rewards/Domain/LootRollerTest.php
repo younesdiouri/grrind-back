@@ -50,7 +50,7 @@ final class LootRollerTest extends TestCase
     {
         $roller = self::rollerOf();
         // `SAND_JACKAL` existe dans le catalogue d'adversaires mais n'a volontairement pas
-        // de table dans `loot.yaml` — le cas que `RewardsCoverageTest` ne rencontre jamais
+        // de table dans le catalogue DB publié — le cas que `RewardsCoverageTest` ne rencontre jamais
         // en production, mais que le roller doit couvrir (#28, ajouté après le #27).
         $tables = self::tablesOf([], [], ['SAND_JACKAL']);
 
@@ -86,7 +86,7 @@ final class LootRollerTest extends TestCase
     }
 
     /**
-     * Les seuils de `loot.yaml` se recouvrent volontairement : une séance peut être
+     * Les seuils du catalogue DB de loot se recouvrent volontairement : une séance peut être
      * éligible à plusieurs tables à la fois. Le roller retient la plus exigeante — le
      * niveau minimal le plus haut, puis à égalité la durée minimale la plus haute — voir le
      * docblock de {@see LootRoller}.
@@ -379,7 +379,7 @@ final class LootRollerTest extends TestCase
     /**
      * @param list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
-     * @param list<string>                                                                                                                                                                                                           $adversaryKeysWithoutTable clés d'adversaires connues du catalogue, sans table dans `loot.yaml` — voir `testAnAdversaryWithoutADedicatedTableRollsNothing`
+     * @param list<string>                                                                                                                                                                                                           $adversaryKeysWithoutTable clés d'adversaires connues du catalogue, sans table dans le snapshot DB publié — voir `testAnAdversaryWithoutADedicatedTableRollsNothing`
      */
     private static function tablesOf(array $workout, array $adversary, array $adversaryKeysWithoutTable = []): LootTables
     {
@@ -444,7 +444,7 @@ final class LootRollerTest extends TestCase
      * marqué `kind: CHEST`.
      *
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $chest
-     * @param list<string>                                                                                                         $chestKeysWithoutTable clés de coffre du catalogue sans table dans `loot.yaml` — voir `testAChestWithoutADedicatedTableRollsNothing`
+     * @param list<string>                                                                                                         $chestKeysWithoutTable clés de coffre du catalogue sans table dans le snapshot DB publié — voir `testAChestWithoutADedicatedTableRollsNothing`
      */
     private static function chestTablesOf(array $chest, array $chestKeysWithoutTable = []): LootTables
     {

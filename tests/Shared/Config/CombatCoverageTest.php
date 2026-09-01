@@ -32,7 +32,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * **Les deux derniers tests sont de l'équilibrage, pas de la formule** (relevé en revue du
  * #208, corrigé au #210). Ils rejouent un vrai combat, avec `FighterFactory` et
- * `BattleSimulator`, sur les valeurs *réellement livrées* dans `combat.yaml` — pas sur des
+ * `BattleSimulator`, sur les valeurs *réellement livrées* par le snapshot DB publié — pas sur des
  * valeurs de confort choisies dans le test. Ils sont censés tomber à chaque retouche du
  * fichier qui déséquilibre à nouveau un des deux bouts de la courbe : ce n'est pas un test
  * fragile à supprimer si ça arrive, c'est exactement ce qu'on lui demande de détecter.
@@ -118,7 +118,7 @@ final class CombatCoverageTest extends KernelTestCase
      * XP totale égale, une répartition parfaitement équilibrée maximise la Vitality (le
      * rapport moyenne géométrique / moyenne arithmétique de {@see
      * \App\Shared\Domain\Activity\Vitality} vaut 1 quand les quatre totaux sont égaux) —
-     * voir le calcul dans `combat.yaml`. Sur plusieurs graines, cet adversaire doit rester
+     * voir le calcul dans le catalogue DB publié. Sur plusieurs graines, cet adversaire doit rester
      * capable de gagner : une victoire garantie à 100 % serait une formalité, pas un combat.
      */
     public function testTheShippedTopTierEncounterIsNotAFormality(): void
@@ -168,7 +168,7 @@ final class CombatCoverageTest extends KernelTestCase
      * seulement qu'aucun palier livré n'est cassé — un combat qui se termine, qui rend un
      * vainqueur, où les deux camps portent au moins un coup. C'est ce qui manquait pour les
      * quatre paliers intermédiaires que #210 n'a délibérément pas retouchés — voir la note
-     * dans `combat.yaml`, au-dessus du catalogue, pour pourquoi ils restent tels quels en
+     * dans le snapshot DB publié, au-dessus du catalogue, pour pourquoi ils restent tels quels en
      * attendant une vraie partie.
      */
     public function testEveryShippedTierProducesAStandingFight(): void
@@ -250,7 +250,7 @@ final class CombatCoverageTest extends KernelTestCase
 
     /**
      * Le total d'XP au seuil de chaque palier (`levels.yaml`) — même table pour les ennemis
-     * ordinaires et les boss, puisque les `minimum_level` livrés dans `combat.yaml`
+     * ordinaires et les boss, puisque les `minimum_level` livrés dans le catalogue DB
      * recoupent volontairement des paliers déjà couverts ici, voir le commentaire au-dessus
      * du bloc `bosses:`. Une clé de plus dans l'un des deux catalogues sans entrée ici fait
      * échouer ce test plutôt que de laisser passer un adversaire non vérifié en silence.

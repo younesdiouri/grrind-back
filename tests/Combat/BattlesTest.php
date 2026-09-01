@@ -56,7 +56,7 @@ final class BattlesTest extends ApiTestCase
         self::assertArrayHasKey('dodgePercent', $player);
 
         // Un compte neuf est niveau 1 : `EnemyCatalog::forLevel(1)` rend toujours SAND_JACKAL
-        // (`combat.yaml`) — ça prouve que le contrôleur ne choisit rien lui-même.
+        // (catalogue DB publié) — ça prouve que le contrôleur ne choisit rien lui-même.
         $enemy = $body['enemy'];
         self::assertIsArray($enemy);
         self::assertSame('SAND_JACKAL', $enemy['key']);
@@ -224,7 +224,7 @@ final class BattlesTest extends ApiTestCase
     }
 
     /**
-     * Le catalogue est du config-as-code, fait pour être édité — `combat.yaml` annonce
+     * Le catalogue DB administrable est fait pour être édité et publié — il annonce
      * lui-même que des paliers s'ajouteront. Un combat déjà joué est un fait écrit : sa
      * lecture ne doit rien à l'état *courant* du catalogue, voir le docblock de
      * `BattleResource`. Retirer ou renommer une entrée ne doit donc jamais faire tomber

@@ -63,7 +63,7 @@ final class ImportLootTest extends ApiTestCase
         self::assertSame('WORKOUT', $rolls[0]['origin']);
         self::assertSame('STARTER_SESSION_DROP', $rolls[0]['table_key']);
 
-        // Une bande de 5 à 15 pièces pour `STARTER_SESSION_DROP` — voir `loot.yaml`.
+        // Une bande de 5 à 15 pièces pour `STARTER_SESSION_DROP` — catalogue DB publié.
         $coinRows = $this->connection()->fetchAllAssociative(
             'SELECT amount, reason FROM rewards_coin_transaction WHERE user_id = :id',
             ['id' => $bob->id->toRfc4122()],
