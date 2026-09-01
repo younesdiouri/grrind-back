@@ -93,6 +93,25 @@ final class AdminSecurityTest extends ApiTestCase
         self::assertContains(Role::Admin->value, $users->ofEmail('operator@grrind.app')?->getRoles() ?? []);
     }
 
+    public function testReadOnlyScreensRenderButTheirDirectMutationActionsAreDenied(): void
+    {
+        $this->openAccount('readonly@grrind.app');
+        $users = self::getContainer()->get(UserRepository::class);
+        $admin = $users->ofEmail('readonly@grrind.app');
+        self::assertNotNull($admin);
+        $admin->grant(Role::Admin);
+        $users->commit();
+        $this->login('readonly@grrind.app', 'un-mot-de-passe-assez-long');
+
+        foreach (['/admin/battle', '/admin/inventory'] as $index) {
+            $this->client->request('GET', $index);
+            self::assertResponseIsSuccessful();
+
+            $this->client->request('GET', $index.'/new');
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        }
+    }
+
     private function login(string $email, string $password): void
     {
         $crawler = $this->client->request('GET', '/admin/login');
