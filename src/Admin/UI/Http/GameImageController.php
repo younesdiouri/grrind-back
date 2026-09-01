@@ -25,7 +25,10 @@ final readonly class GameImageController
                 // Le volume Fly est vide à sa première création : la route reste atteignable
                 // avant le provisionnement documenté, sans écrire un effet filesystem hors
                 // transaction dans une migration.
-                return new Response(base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8ywAAAABJRU5ErkJggg==', true), Response::HTTP_OK, [
+                $placeholder = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8ywAAAABJRU5ErkJggg==', true);
+                \assert(false !== $placeholder);
+
+                return new Response($placeholder, Response::HTTP_OK, [
                     'Content-Type' => 'image/png',
                     'Cache-Control' => 'public, max-age=300',
                 ]);
