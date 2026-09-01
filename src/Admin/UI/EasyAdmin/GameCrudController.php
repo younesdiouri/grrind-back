@@ -98,7 +98,7 @@ abstract class GameCrudController extends AbstractCrudController
     }
 
     /** Déplace l'upload hors de la zone publique seulement quand l'écriture va être publiée. */
-    private function finalizeStagedImage(object $entity): void
+    protected function finalizeStagedImage(object $entity): void
     {
         if (!$entity instanceof GameItem || 'placeholder.png' === $entity->getImagePath()) {
             return;
@@ -118,7 +118,7 @@ abstract class GameCrudController extends AbstractCrudController
     }
 
     /** Retire seulement le nouveau fichier déplacé par EasyAdmin avant notre transaction. */
-    private function compensateImage(object $entity, ?string $previousPath): void
+    protected function compensateImage(object $entity, ?string $previousPath): void
     {
         if (!$entity instanceof GameItem || $entity->getImagePath() === $previousPath) {
             return;
