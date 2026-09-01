@@ -7,6 +7,7 @@ namespace App\Tests\Shared\Config;
 use App\Combat\Domain\EnemyCatalog;
 use App\Rewards\Domain\ItemCatalog;
 use App\Shared\Application\GameRulesets;
+use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use PHPUnit\Framework\TestCase;
 
 /** Les entrées retirées restent lisibles pour les faits, jamais sélectionnables à nouveau. */
@@ -27,6 +28,22 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertNotNull($catalog->findHistorical('OLD_ENEMY'));
         self::assertNull($catalog->findAvailable('OLD_ENEMY'));
         self::assertSame('ACTIVE_ENEMY', $catalog->forLevel(1)->key);
+    }
+
+    public function testHybridVersionChangesForGameplayButNotPresentation(): void
+    {
+        $snapshot = $this->rulesets()->snapshot();
+        /** @var array{items: list<array<string, mixed>>} $snapshot */
+        $version = GameRulesetVersion::of('v1-yaml', $snapshot);
+        $presentation = $snapshot;
+        $presentation['items'][0]['image_path'] = 'new.png';
+        $presentation['items'][0]['translations'] = ['fr' => ['name' => 'Nouveau']];
+        self::assertSame($version, GameRulesetVersion::of('v1-yaml', $presentation));
+
+        $gameplay = $snapshot;
+        $gameplay['items'][0]['price_coins'] = 2;
+        self::assertNotSame($version, GameRulesetVersion::of('v1-yaml', $gameplay));
+        self::assertNotSame($version, GameRulesetVersion::of('v1-other-yaml', $snapshot));
     }
 
     private function rulesets(): GameRulesets

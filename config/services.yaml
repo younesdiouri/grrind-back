@@ -24,6 +24,10 @@ services:
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
     App\Shared\Application\GameRulesets: '@App\Shared\Infrastructure\Config\DatabaseGameRulesets'
 
+    App\Shared\Infrastructure\Config\DatabaseGameRulesets:
+        arguments:
+            $yamlGameplayVersion: '%game.ruleset_version%'
+
     App\Admin\Infrastructure\GameRulesetPublisher:
         arguments:
             $yamlGameplayVersion: '%game.ruleset_version%'

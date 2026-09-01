@@ -16,6 +16,7 @@ use App\Progression\Domain\TitleCatalog;
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Domain\LootLuckRules;
 use App\Rewards\Domain\LootTables;
+use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
@@ -62,8 +63,7 @@ final readonly class GameRulesetPublisher
         }
         self::validate($snapshot);
 
-        $canonical = json_encode(self::canonicalize(['yaml_version' => $this->yamlGameplayVersion, 'database' => self::gameplay($snapshot)]), \JSON_THROW_ON_ERROR);
-        $ruleset->publish($snapshot, 'v1-'.substr(hash('sha256', $canonical), 0, 12));
+        $ruleset->publish($snapshot, GameRulesetVersion::of($this->yamlGameplayVersion, $snapshot));
         $manager->flush();
     }
 
@@ -207,63 +207,6 @@ final readonly class GameRulesetPublisher
                 throw new LogicException(\sprintf('Le coffre actif "%s" doit avoir une table de tirage active.', $key));
             }
         }
-    }
-
-    /**
-     * @param array<int|string, mixed> $values
-     *
-     * @return array<int|string, mixed>
-     */
-    private static function canonicalize(array $values): array
-    {
-        if (!array_is_list($values)) {
-            ksort($values);
-        }
-        foreach ($values as $key => $value) {
-            if (\is_array($value)) {
-                $values[$key] = self::canonicalize($value);
-            }
-        }
-
-        return $values;
-    }
-
-    /**
-     * La présentation reste dans le snapshot runtime, mais pas dans l'empreinte métier :
-     * renommer un objet ou remplacer son image ne réécrit pas l'historique de calcul.
-     *
-     * @param array<string, mixed> $snapshot
-     *
-     * @return array<string, mixed>
-     */
-    private static function gameplay(array $snapshot): array
-    {
-        /** @var list<array<string, mixed>> $items */
-        $items = $snapshot['items'];
-        /** @var list<array<string, mixed>> $titles */
-        $titles = $snapshot['titles'];
-        /** @var array{enemies: list<array<string, mixed>>, bosses: list<array<string, mixed>>} $combat */
-        $combat = $snapshot['combat'];
-        $snapshot['items'] = array_map(static function (array $item): array {
-            unset($item['image_path'], $item['translations']);
-
-            return $item;
-        }, $items);
-        $snapshot['titles'] = array_map(static function (array $title): array {
-            unset($title['translations']);
-
-            return $title;
-        }, $titles);
-        foreach (['enemies', 'bosses'] as $type) {
-            $combat[$type] = array_map(static function (array $enemy): array {
-                unset($enemy['translations']);
-
-                return $enemy;
-            }, $combat[$type]);
-        }
-        $snapshot['combat'] = $combat;
-
-        return $snapshot;
     }
 
     /**

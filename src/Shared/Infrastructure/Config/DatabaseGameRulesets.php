@@ -22,7 +22,7 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
     /** @var array{revision: int, version: string, snapshot: array<string, mixed>}|null */
     private ?array $current = null;
 
-    public function __construct(private readonly Connection $connection, private readonly CacheInterface $cache)
+    public function __construct(private readonly Connection $connection, private readonly CacheInterface $cache, private readonly string $yamlGameplayVersion)
     {
     }
 
@@ -59,7 +59,9 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
             throw new LogicException('Le snapshot de jeu est absent. Appliquer les migrations.');
         }
         $expectedRevision = (int) $revision['revision'];
-        $key = 'game.ruleset.'.$expectedRevision;
+        // Le YAML restant peut changer au déploiement sans révision DB : il appartient à
+        // la clé de cache afin qu'un ancien snapshot sérialisé ne conserve pas son hash.
+        $key = 'game.ruleset.'.$expectedRevision.'.'.$this->yamlGameplayVersion;
         try {
             /** @var array{revision: int, version: string, snapshot: array<string, mixed>} $current */
             $current = $this->cache->get($key, function (ItemInterface $item) use ($expectedRevision): array {
@@ -92,6 +94,6 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
         \assert(\is_array($snapshot));
         /** @var array<string, mixed> $snapshot */
 
-        return ['revision' => $revision, 'version' => $row['version'], 'snapshot' => $snapshot];
+        return ['revision' => $revision, 'version' => GameRulesetVersion::of($this->yamlGameplayVersion, $snapshot), 'snapshot' => $snapshot];
     }
 }
