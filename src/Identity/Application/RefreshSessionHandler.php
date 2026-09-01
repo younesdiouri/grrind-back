@@ -84,7 +84,7 @@ final readonly class RefreshSessionHandler
                 'presentedTokenId' => $presented->id()->toRfc4122(),
                 'familyId' => $familyId->toRfc4122(),
                 'successorId' => $presented->successorId()?->toRfc4122(),
-                'verdict' => $this->rejeuVerdict($presented, $now),
+                'verdict' => $this->replayVerdict($presented, $now),
             ]);
 
             $this->refreshTokens->transactional(function () use ($familyId, $now): void {
@@ -130,7 +130,7 @@ final readonly class RefreshSessionHandler
      * C'est la donnée qui a manqué le 2026-09-01 : reconstruire cette distinction a demandé
      * une requête SQL à la main après coup, pour un incident déjà passé.
      */
-    private function rejeuVerdict(RefreshToken $presented, DateTimeImmutable $now): string
+    private function replayVerdict(RefreshToken $presented, DateTimeImmutable $now): string
     {
         $successorId = $presented->successorId();
 
