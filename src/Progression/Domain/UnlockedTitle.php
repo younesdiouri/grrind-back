@@ -25,9 +25,9 @@ use Symfony\Component\Uid\Uuid;
  * primaire qui rend le déblocage idempotent — deux évaluations concurrentes ne peuvent pas
  * écrire deux fois le même titre.
  *
- * `titleId` n'est pas une clé étrangère : le catalogue est du config-as-code, il n'a pas de
- * table. Un titre retiré du YAML laisse donc des lignes orphelines — délibérément. Elles ne
- * s'affichent plus, et elles reviennent intactes le jour où l'on remet le titre.
+ * `titleId` n'est pas une clé étrangère : le fait historique doit survivre à la désactivation
+ * du titre dans le snapshot DB. Il reste résoluble pour l'historique, mais ne peut plus être
+ * attribué ni sélectionné tant qu'il est inactif.
  */
 #[ORM\Entity(repositoryClass: UnlockedTitleRepository::class)]
 #[ORM\Table(name: 'player_title')]

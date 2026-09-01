@@ -11,10 +11,10 @@ use InvalidArgumentException;
 /**
  * Le catalogue des titres, chargé depuis le snapshot de jeu publié.
  *
- * **Un catalogue, pas une table.** Les titres ne vivent pas en base : ce qui est persisté,
- * c'est *qui a débloqué quoi et quand*. Ajouter un titre est un déploiement, pas un INSERT
- * — et c'est ce qui permet à un titre d'être rétroactif sans migration de données : la
- * condition s'évalue sur le ledger, qui contient déjà tout l'historique.
+ * **Un catalogue runtime, pas une table éditable.** Les titres proviennent du snapshot DB
+ * publié, tandis que *qui a débloqué quoi et quand* reste persisté séparément. Un titre
+ * validé peut donc être rétroactif sans migration de faits : sa condition s'évalue sur le
+ * ledger, qui contient déjà tout l'historique.
  *
  * L'ordre de déclaration est **signifiant** : il départage les ex æquo quand il faut
  * désigner le prochain titre d'un joueur. Le chargeur d'équilibrage ne descend pas dans les

@@ -12,10 +12,10 @@ use InvalidArgumentException;
 /**
  * Le catalogue des objets, chargé depuis le snapshot de jeu publié.
  *
- * **Un catalogue, pas une table.** Les objets ne vivent pas en base — même geste que
- * {@see \App\Combat\Domain\EnemyCatalog} pour les ennemis, {@see
- * \App\Progression\Domain\TitleCatalog} pour les titres : ajouter un objet est un
- * déploiement, pas un INSERT.
+ * **Un catalogue runtime, pas une table éditable.** Les objets proviennent du snapshot DB
+ * publié par l'administration — même geste que {@see \App\Combat\Domain\EnemyCatalog} et
+ * {@see \App\Progression\Domain\TitleCatalog}. Une écriture n'est visible qu'après la
+ * validation atomique du snapshot ; cette classe ne consulte jamais les tables d'édition.
  *
  * Rien ici ne parle d'inventaire ni de tirage — ce ticket (#27) pose la matière que le
  * tirage (#28) et l'inventaire (#29) consomment. Un `Item` de ce catalogue n'appartient à

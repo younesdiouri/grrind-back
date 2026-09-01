@@ -19,11 +19,10 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * d'un vieux combat dépendant de l'état *courant* du catalogue. Voir le docblock de
  * `BattleResource` pour ce que ça a coûté.
  *
- * **Le seul endroit qui connaît les clés de traduction.** Elles se déduisent de la clé de
- * l'ennemi — `sand_jackal.name` — donc ajouter un ennemi ne demande rien ici : le YAML
- * d'équilibrage et les deux catalogues de traduction suffisent. Un test de couverture
- * refuse une clé manquante, sans quoi le repli du traducteur enverrait `sand_jackal.name`
- * au joueur, en silence et en production.
+ * **Le seul endroit qui lit les libellés publiés.** Les traductions FR/EN sont incluses dans
+ * le snapshot DB et indexées par clé d'ennemi ; l'affichage ne consulte donc aucun YAML de
+ * présentation. Un test de couverture refuse une clé manquante, sans quoi le repli enverrait
+ * `sand_jackal.name` au joueur, en silence et en production.
  *
  * La locale n'est pas un paramètre : le traducteur lit celle de la requête, négociée sur
  * `Accept-Language`.

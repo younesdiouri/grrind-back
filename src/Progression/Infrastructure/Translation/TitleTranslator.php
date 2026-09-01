@@ -17,10 +17,9 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * Met des mots sur un titre, et rend la forme unique que toute l'API sert.
  *
  * **Le seul endroit qui connaît les clés de traduction.** Elles se déduisent de
- * l'identifiant du titre — `veteran.name`, `veteran.hint` — donc ajouter un titre ne
- * demande rien ici : le YAML d'équilibrage et les deux catalogues de traduction suffisent.
- * `TitleTranslationsTest` refuse une clé manquante, sans quoi le repli du traducteur
- * enverrait `veteran.name` au joueur, en silence et en production.
+ * l'identifiant du titre — `veteran.name`, `veteran.hint` — et viennent du snapshot DB
+ * publié. `TitleTranslationsTest` refuse une clé manquante, sans quoi le repli du
+ * traducteur enverrait `veteran.name` au joueur, en silence et en production.
  *
  * La locale n'est pas un paramètre : le traducteur lit celle de la requête, que le framework
  * négocie sur `Accept-Language` (`set_locale_from_accept_language`). Le serveur n'a donc

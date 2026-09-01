@@ -11,9 +11,9 @@ use InvalidArgumentException;
  * Le catalogue des adversaires PvE, chargé depuis le snapshot de jeu publié — les ennemis
  * ordinaires **et**, depuis le #219, les boss.
  *
- * **Un catalogue, pas une table.** Les adversaires ne vivent pas en base — même geste que
- * {@see \App\Progression\Domain\TitleCatalog} pour les titres : ajouter un ennemi ou un boss
- * est un déploiement, pas un INSERT.
+ * **Un catalogue runtime, pas une table éditable.** Les adversaires viennent du snapshot DB
+ * publié par l'administration, comme les titres. Ajouter un ennemi ou un boss valide puis
+ * republie atomiquement ce snapshot ; le combat ne lit jamais les lignes administrables.
  *
  * ## Un ennemi par niveau, pas une courbe
  *
