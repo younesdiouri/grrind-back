@@ -149,7 +149,7 @@ final class ItemCatalogTest extends TestCase
 
     /**
      * Le pendant positif : les neuf types de combat restent parfaitement valides tant
-     * qu'aucune discipline ne les accompagne — c'est déjà ce que livre `items.yaml`.
+     * qu'aucune discipline ne les accompagne — c'est déjà ce que livre le catalogue DB publié.
      */
     public function testAccepteUnModificateurDeCombatSansDiscipline(): void
     {

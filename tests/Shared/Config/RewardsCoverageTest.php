@@ -24,23 +24,23 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Les tables livrées, celles de `config/game/v1/items.yaml` et `config/game/v1/loot.yaml`,
+ * Les tables publiées depuis l'administration,
  * contre ce que le domaine exige réellement — même geste que `CombatCoverageTest` et
  * `AttributeSplitCoverageTest`.
  *
  * **C'est ici, et pas dans `ItemsSection` ni `LootSection`, que le vrai croisement entre
- * les trois fichiers se prouve** — voir le docblock de `LootTables` pour pourquoi
+ * les trois catalogues DB se prouve** — voir le docblock de `LootTables` pour pourquoi
  * `GameBalanceLoader` ne peut pas le faire à la compilation de chaque section
  * indépendamment. Construire `LootTables` depuis les paramètres du conteneur, exactement
  * comme `services.yaml` le fait, est ce qui donne une vraie garantie : une clé d'objet ou
- * d'adversaire qui se serait glissée dans `loot.yaml` sans exister ailleurs fait échouer ce
+ * d'adversaire qui se serait glissée dans le catalogue DB de loot sans exister ailleurs fait échouer ce
  * test, pas une requête en production.
  */
 final class RewardsCoverageTest extends KernelTestCase
 {
     /**
      * Les quatre types dont la dérivation peut retomber à zéro sur un total trop petit —
-     * voir le docblock d'`items.yaml`. Les cinq stats de combat directes n'y sont pas :
+     * voir le docblock du catalogue DB d'objets. Les cinq stats de combat directes n'y sont pas :
      * elles n'ont pas de coefficient à traverser.
      *
      * @var list<ModifierType>
@@ -61,8 +61,8 @@ final class RewardsCoverageTest extends KernelTestCase
 
     /**
      * Le point que ni `ItemsSection` ni `LootSection` ne peuvent prouver seules : chaque
-     * entrée de `loot.yaml` qui référence un objet référence un objet qui existe
-     * réellement dans `items.yaml` — sinon cette construction aurait déjà jeté.
+     * entrée du catalogue DB de loot qui référence un objet référence un objet qui existe
+     * réellement dans le catalogue DB d'objets — sinon cette construction aurait déjà jeté.
      */
     public function testLesTablesDeTirageLivreesConstruisentSansErreur(): void
     {
@@ -72,7 +72,7 @@ final class RewardsCoverageTest extends KernelTestCase
     }
 
     /**
-     * Chaque ennemi et chaque boss de `combat.yaml` a sa table de tirage : un adversaire
+     * Chaque ennemi et chaque boss du catalogue DB a sa table de tirage : un adversaire
      * sans table ne ferait jamais tomber de récompense, un bug silencieux qu'aucune
      * exception ne signale — `forAdversary()` rend `null` en toute légitimité pour une clé
      * qui n'a simplement pas encore de table.
@@ -83,7 +83,7 @@ final class RewardsCoverageTest extends KernelTestCase
         $catalog = self::shippedEnemyCatalog();
 
         foreach ([...$catalog->all(), ...$catalog->bosses()] as $adversary) {
-            self::assertNotNull($tables->forAdversary($adversary->key), \sprintf('"%s" n\'a pas de table de tirage dans loot.yaml.', $adversary->key));
+            self::assertNotNull($tables->forAdversary($adversary->key), \sprintf('"%s" n\'a pas de table de tirage dans le catalogue DB.', $adversary->key));
         }
     }
 
@@ -105,7 +105,7 @@ final class RewardsCoverageTest extends KernelTestCase
                 continue;
             }
 
-            self::assertNotNull($tables->forChest($item->key), \sprintf('"%s" n\'a pas de table de tirage dans loot.yaml.', $item->key));
+            self::assertNotNull($tables->forChest($item->key), \sprintf('"%s" n\'a pas de table de tirage dans le catalogue DB.', $item->key));
         }
     }
 
@@ -123,7 +123,7 @@ final class RewardsCoverageTest extends KernelTestCase
      * dégât (`intdiv(100 × 6, 1000) == 0`) — un objet qui n'apporte rigoureusement rien au
      * joueur, alors que le client affichera son intitulé sans qu'il ne change jamais un
      * combat. Voir le docblock de `FighterFactory` pour l'ordre de la dérivation, et celui
-     * d'`items.yaml` pour pourquoi le seuil réel n'est pas figé là-bas mais prouvé ici.
+     * du catalogue DB d'objets pour pourquoi le seuil réel n'est pas figé là-bas mais prouvé ici.
      *
      * Chaque objet livré qui porte un bonus de caractéristique pure (`STRENGTH_BONUS`,
      * `ENDURANCE_BONUS`, `MOBILITY_BONUS`, `DEXTERITY_BONUS`) doit, équipé seul sur un
@@ -149,7 +149,7 @@ final class RewardsCoverageTest extends KernelTestCase
                 self::assertNotSame(
                     self::derivedStatOf($baseline, $modifier->type),
                     self::derivedStatOf($equipped, $modifier->type),
-                    \sprintf('"%s" porte un %s qui dérive à zéro sur un compte neuf — voir le docblock d\'items.yaml.', $item->key, $modifier->type->value),
+                    \sprintf('"%s" porte un %s qui dérive à zéro sur un compte neuf — voir le docblock du catalogue DB.', $item->key, $modifier->type->value),
                 );
             }
         }
@@ -238,7 +238,7 @@ final class RewardsCoverageTest extends KernelTestCase
     }
 
     /**
-     * Une `FighterFactory` construite sur les vraies règles de `combat.yaml`, avec un
+     * Une `FighterFactory` construite sur les vraies règles du catalogue DB, avec un
      * resolver qui force les modificateurs passés — jamais un vrai contributeur, aucun
      * n'existe encore (#224) — même geste que `FighterFactoryTest`.
      *

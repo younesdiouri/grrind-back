@@ -28,9 +28,9 @@ use Symfony\Component\Uid\Uuid;
  * `SWIFT_TRAIL_LEGGINGS`, `EMBER_OF_THE_ANCESTORS` — niveau 10 —, et les deux coffres du #230,
  * `WOODEN_CHEST` — niveau 1 — et `IRON_BOUND_CHEST` — niveau 10) et trois hors étal
  * (`OBSIDIAN_WARBLADE`, `STORMCALLERS_BOOTS`, `CROWN_OF_THE_TIRELESS`, les trois EPIC ou
- * LEGENDARY) — voir `items.yaml`.
+ * LEGENDARY) — publiés depuis le snapshot DB administrable.
  *
- * @phpstan-type ShopLine array{key: string, kind: string, name: string, rarity: string, slot: string|null, modifiers: list<array<string, mixed>>, priceCoins: int, affordable: bool, owned: bool, minimumLevel: int, unlocked: bool}
+ * @phpstan-type ShopLine array{key: string, kind: string, name: string, rarity: string, slot: string|null, modifiers: list<array<string, mixed>>, priceCoins: int, imageUrl: string, affordable: bool, owned: bool, minimumLevel: int, unlocked: bool}
  * @phpstan-type ShopBody array{coins: int, items: list<ShopLine>}
  * @phpstan-type InventoryBody array{coins: int, equipment: array<string, mixed>, items: list<array<string, mixed>>}
  */
@@ -61,9 +61,36 @@ final class ShopRoutesTest extends ApiTestCase
 
         $item = $body['items'][0];
         self::assertSame(
-            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
             array_keys($item),
         );
+    }
+
+    public function testEveryCatalogImageIsAnAbsolutePublicUrl(): void
+    {
+        $bob = $this->openAccount();
+        $item = $this->shop($bob)['items'][0];
+        self::assertIsString($item['imageUrl']);
+        self::assertMatchesRegularExpression('#^https?://#', $item['imageUrl']);
+        $path = parse_url($item['imageUrl'], \PHP_URL_PATH);
+        self::assertIsString($path);
+
+        $this->client->request('GET', $path);
+
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'image/png');
+    }
+
+    public function testAHotCatalogReadOnlyQueriesTheMonotonicRevisionPointer(): void
+    {
+        $bob = $this->openAccount('hot-cache@grrind.app');
+        $this->client->disableReboot();
+        $this->shop($bob);
+
+        $this->client->enableProfiler();
+        $response = $this->get('/api/shop', $bob->headers);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertOnlyRulesetRevisionPointerSql();
     }
 
     public function testNoEpicOrLegendaryItemEverAppearsOnTheStall(): void

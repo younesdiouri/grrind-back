@@ -22,7 +22,7 @@ use Symfony\Component\Uid\Uuid;
  * Le réflexe serait de ne garder que la graine et de rejouer le combat à la demande.
  * C'est faux ici, pour la raison exacte qui fait que {@see \App\Progression\Domain\XpTransaction}
  * stocke le montant *et* la version du ruleset *et* le détail du calcul : le jour où
- * `combat.yaml` est rééquilibré, rejouer une vieille graine sous les règles courantes
+ * le snapshot publié est rééquilibré, rejouer une vieille graine sous les règles courantes
  * produirait un **autre** combat que celui que le joueur a regardé. L'historique mentirait.
  *
  * La `$timeline` est donc la vérité de ce qui a été montré ; `$seed` et les deux snapshots
@@ -72,7 +72,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * ## `$reward` est persisté sur la ligne, jamais rejoué depuis la graine (#227)
  *
- * Même raisonnement, exactement, que pour `$timeline` : le jour où `loot.yaml` est
+ * Même raisonnement, exactement, que pour `$timeline` : le jour où le snapshot publié est
  * rééquilibré, rejouer une vieille graine de tirage sous les tables courantes rendrait un
  * **autre** butin que celui que le joueur a vu tomber. `$reward` est donc écrit une fois, à
  * la construction, sous la forme `{loot: [...], coins: {gained, before, after}}` — les

@@ -12,7 +12,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 /**
  * Le filet sous le catalogue de traduction.
  *
- * Un titre ajouté à `config/game/v1/titles.yaml` sans ses libellés ne casse rien : le
+ * Un titre ajouté au snapshot publié depuis l'administration sans ses libellés ne casse rien : le
  * traducteur rend la clé, et `first_steps.name` part sur le réseau. C'est un bug silencieux,
  * qui ne se voit qu'en production et seulement par les joueurs d'une des deux langues — donc
  * exactement le genre que la suite doit attraper. Ce test est la contrepartie du choix

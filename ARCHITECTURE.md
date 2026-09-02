@@ -581,8 +581,9 @@ Ce qui compte, et qui n'est pas visible dans le code parce que c'est le framewor
 
 ## 6. La balance du jeu est du code, pas de la donnée
 
-Courbe de niveaux, barème d'XP, garde-fous, catalogue de titres : tout vit en YAML versionné
-sous `config/game/v1/`, **lu une seule fois, à la compilation du conteneur**.
+Courbe de niveaux, barème d'XP et garde-fous restent en YAML versionné sous
+`config/game/v1/`, **lus une seule fois à la compilation du conteneur**. Le catalogue
+d'items, loot, titres et combat est le snapshot publié en base, administré dans EasyAdmin.
 
 ```mermaid
 flowchart TB
@@ -590,7 +591,7 @@ flowchart TB
         y1["training.yaml"]
         y2["xp.yaml"]
         y3["levels.yaml"]
-        y4["titles.yaml"]
+        y4["autres YAML gameplay"]
     end
 
     yaml --> pass["<b>GameBalancePass</b><br/><i>compilation du conteneur</i>"]
@@ -599,10 +600,12 @@ flowchart TB
     pass -->|"valide, ou casse le build"| params["paramètres scalaires<br/>game.xp.disciplines …"]
     pass -->|"SHA-256 de la config normalisée"| version["rulesetVersion<br/>v1-fe4edd019948"]
 
-    params --> objs["objets typés du domaine<br/>XpRates · LevelCurve · TitleCatalog<br/>DiminishingReturns · TrainingRules"]
-    version --> tx["stocké sur <b>chaque</b> XpTransaction"]
+    params --> ruleset["<b>GameRulesets</b><br/>YAML restant + snapshot DB publié"]
+    ruleset --> objs["objets typés du domaine<br/>XpRates · LevelCurve · TitleCatalog<br/>DiminishingReturns · TrainingRules"]
+    version --> ruleset
+    ruleset --> tx["version hybride stockée sur les faits"]
 
-    trad["translations/titles.fr.yaml<br/>translations/titles.en.yaml"] -.->|"hors du hash — les mots<br/>ne sont pas de l'équilibrage"| objs
+    trad["traductions DB FR/EN"] -.->|"hors du hash — les mots<br/>ne sont pas de l'équilibrage"| objs
 ```
 
 **Trois conséquences voulues :**
@@ -807,3 +810,29 @@ Les pièges qui se reproduisent. Les autres sont datés, corrigés, et vivent da
   autoconfiguration coupée, service retiré parce qu'inutilisé : l'itérateur est simplement
   vide. Un contributeur de modificateurs qui se tait sous-paie un joueur en silence, et
   l'écriture est au ledger — donc chaque port en éventail se prouve contre le vrai conteneur.
+
+## Back-office et configuration jouable
+
+`/admin` est un firewall Symfony stateful distinct du JWT mobile. Seul `ROLE_ADMIN` y entre ;
+la commande `app:user:grant-admin <email>` promeut un compte local existant et refuse un compte
+social sans mot de passe. Les données de balance éditables sont importées une fois dans les tables
+`game_*`. Toute mutation EasyAdmin reconstruit le snapshot dans une transaction et rejoue les
+constructeurs métier : une configuration incohérente ne devient jamais visible partiellement.
+Le cache taggé n'est qu'une accélération : il est invalidé après le commit et toute panne
+retombe sur PostgreSQL. Le snapshot est indexé par sa révision dans les workers longs ; aucun
+catalogue ne rescane ni ne mélange une ancienne et une nouvelle publication. L'empreinte hybride
+inclut le gameplay YAML restant et le snapshot DB canonique, mais jamais les traductions ni les
+chemins d'images.
+
+Les images d'items vivent provisoirement hors webroot dans `GAME_IMAGES_DIR` (`/data/game-images`
+sur Fly) et sont servies via une route à nom strict. Le volume Fly est mono-machine et non
+répliqué : le process `app` ne doit pas être scalé horizontalement avant migration vers un
+stockage objet.
+
+Créer le volume dans la région de la machine applicative, avant le premier déploiement :
+`fly volumes create game_images --app grrind-back --region cdg --size 1`. Vérifier ensuite
+`fly volumes list --app grrind-back`; `fly.toml` le monte exclusivement pour `app` sur
+`/data/game-images`. Une seule machine peut monter ce volume à la fois : ne pas augmenter le
+compte du process `app` au-delà de un tant que les images ne sont pas sorties vers un stockage
+objet. `placeholder.png` est servi même sur un volume fraîchement créé ; les uploads sont reçus
+dans `/data/game-images/.staging`, puis promus seulement avec la publication transactionnelle.

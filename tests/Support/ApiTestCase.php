@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Support;
 
 use Doctrine\DBAL\Connection;
+use Symfony\Bridge\Doctrine\DataCollector\DoctrineDataCollector;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Profiler\Profile;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -110,6 +112,51 @@ abstract class ApiTestCase extends WebTestCase
         return $decoded;
     }
 
+    /**
+     * Un worker chaud ne réhydrate jamais le graphe : il relit uniquement le pointeur monotone.
+     * Cette lecture scalaire rend son cache filesystem cohérent avec les autres machines Fly.
+     */
+    protected function assertOnlyRulesetRevisionPointerSql(): void
+    {
+        $profile = $this->client->getProfile();
+        self::assertInstanceOf(Profile::class, $profile);
+        $collector = $profile->getCollector('db');
+        self::assertInstanceOf(DoctrineDataCollector::class, $collector);
+        $rulesetQueries = [];
+        foreach ($collector->getQueries() as $queries) {
+            self::assertIsArray($queries);
+            foreach ($queries as $query) {
+                self::assertIsArray($query);
+                $sql = $query['sql'] ?? '';
+                self::assertIsString($sql);
+                if (preg_match('/\bgame_ruleset\b/i', $sql)) {
+                    $rulesetQueries[] = $sql;
+                }
+            }
+        }
+
+        self::assertCount(1, $rulesetQueries);
+        self::assertMatchesRegularExpression('/^SELECT revision FROM game_ruleset WHERE id = 1$/i', $rulesetQueries[0]);
+    }
+
+    /** Une réponse qui ne consulte aucun catalogue ne touche pas même le pointeur. */
+    protected function assertNoRulesetSql(): void
+    {
+        $profile = $this->client->getProfile();
+        self::assertInstanceOf(Profile::class, $profile);
+        $collector = $profile->getCollector('db');
+        self::assertInstanceOf(DoctrineDataCollector::class, $collector);
+        foreach ($collector->getQueries() as $queries) {
+            self::assertIsArray($queries);
+            foreach ($queries as $query) {
+                self::assertIsArray($query);
+                $sql = $query['sql'] ?? '';
+                self::assertIsString($sql);
+                self::assertDoesNotMatchRegularExpression('/\bgame_ruleset\b/i', $sql);
+            }
+        }
+    }
+
     private function truncateEverything(): void
     {
         $connection = self::getContainer()->get('doctrine.dbal.default_connection');
@@ -117,7 +164,9 @@ abstract class ApiTestCase extends WebTestCase
 
         $tables = array_filter(
             $connection->createSchemaManager()->listTableNames(),
-            static fn (string $table): bool => 'doctrine_migration_versions' !== $table,
+            // Les rulesets sont des données de référence migrées, pas des faits du scénario.
+            // Les vider rendrait chaque API test incapable d'exercer le runtime DB qu'il vise.
+            static fn (string $table): bool => !\in_array($table, ['doctrine_migration_versions', 'game_enemy', 'game_item', 'game_loot_table', 'game_ruleset', 'game_settings', 'game_title'], true),
         );
 
         if ([] === $tables) {

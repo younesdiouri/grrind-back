@@ -48,6 +48,8 @@ final readonly class DroppedItem
         public array $modifiers,
         /** En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue. */
         public int $priceCoins,
+        /** URL publique absolue, résolue par le serveur depuis le snapshot publié. */
+        public string $imageUrl,
     ) {
     }
 
@@ -67,6 +69,7 @@ final readonly class DroppedItem
                 $this->modifiers,
             ),
             'priceCoins' => $this->priceCoins,
+            'imageUrl' => $this->imageUrl,
         ];
     }
 }

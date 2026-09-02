@@ -17,7 +17,7 @@ use Symfony\Component\Uid\Uuid;
 /**
  * `POST /api/inventory/chests/{key}/open` (#230) — un coffre est un tirage qu'on ouvre.
  *
- * `WOODEN_CHEST` et `IRON_BOUND_CHEST` sont les deux coffres livrés — voir `items.yaml`.
+ * `WOODEN_CHEST` et `IRON_BOUND_CHEST` sont les deux coffres livrés par le catalogue DB publié.
  * Aucune route ne les grainant, chaque test qui a besoin d'un exemplaire le pose directement
  * par {@see InventoryItemRepository::grant()}, même geste que `credit()` sur `ShopRoutesTest`.
  */
@@ -62,7 +62,7 @@ final class ChestRoutesTest extends ApiTestCase
 
         $shopEntry = self::itemNamed($this->shop($bob)['items'], 'WOODEN_CHEST');
         self::assertSame(
-            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
             array_keys($shopEntry),
         );
         self::assertSame('CHEST', $shopEntry['kind']);
@@ -71,7 +71,7 @@ final class ChestRoutesTest extends ApiTestCase
 
         $inventoryEntry = self::itemNamed($this->inventory($bob)['items'], 'WOODEN_CHEST');
         self::assertSame(
-            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'quantity'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'quantity'],
             array_keys($inventoryEntry),
         );
         self::assertSame('CHEST', $inventoryEntry['kind']);

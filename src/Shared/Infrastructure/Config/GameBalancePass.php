@@ -48,6 +48,9 @@ final readonly class GameBalancePass implements CompilerPassInterface
         // qui permet de rééquilibrer sans corrompre l'historique. Disponible partout par
         // le bind `string $rulesetVersion` de services.yaml.
         $container->setParameter('game.ruleset_version', $balance->version);
+        // Les YAML restants font partie de l'empreinte hybride publiée avec les données
+        // administrables. Les quatre catalogues DB ne peuvent plus réapparaître ici.
+        $container->setParameter('game.yaml_gameplay', $balance->sections);
 
         foreach ($balance->sections as $section => $values) {
             $this->expose($container, 'game.'.$section, $values);

@@ -33,7 +33,7 @@ final class ItemModifiersTest extends ApiTestCase
     }
 
     /**
-     * `WORN_RUNNING_SHOES` porte deux modificateurs dans `items.yaml` : un `XP_MULTIPLIER`
+     * `WORN_RUNNING_SHOES` porte deux modificateurs dans le catalogue DB publié : un `XP_MULTIPLIER`
      * scopé à `RUNNING`, et un `MOBILITY_BONUS` global — les deux doivent traverser, chacun
      * avec sa portée d'origine et `ModifierSource::Item`.
      */

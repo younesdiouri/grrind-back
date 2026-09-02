@@ -12,7 +12,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 /**
  * Le filet sous le catalogue de traduction — même geste que `TitleTranslationsTest`.
  *
- * Un ennemi ou un boss ajouté à `config/game/v1/combat.yaml` sans son nom ne casse rien : le
+ * Un ennemi ou un boss ajouté au snapshot publié depuis l'administration sans son nom ne casse rien : le
  * traducteur rend la clé, et `sand_jackal.name` part sur le réseau. C'est un bug silencieux,
  * qui ne se voit qu'en production et seulement par les joueurs d'une des deux langues.
  */

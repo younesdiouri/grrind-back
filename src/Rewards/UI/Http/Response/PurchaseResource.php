@@ -81,6 +81,7 @@ final readonly class PurchaseResource
                 $item->modifiers,
             ),
             $item->priceCoins,
+            $translator->imageUrlOf($item->key),
         )->toArray();
     }
 }

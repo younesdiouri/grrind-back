@@ -9,6 +9,7 @@ use App\Combat\Application\ListBattlesHandler;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Request\BattleHistoryQuery;
 use App\Combat\UI\Http\Response\BattlePageResource;
+use App\Shared\Application\ItemImageUrlResolver;
 use App\Shared\UI\Http\Cursor;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -47,6 +48,7 @@ final readonly class ListBattlesController
     public function __construct(
         private ListBattlesHandler $listBattles,
         private EnemyTranslator $enemyNames,
+        private ItemImageUrlResolver $items,
     ) {
     }
 
@@ -71,6 +73,6 @@ final readonly class ListBattlesController
             $query->limit,
         ));
 
-        return new JsonResponse(BattlePageResource::from($page, $this->enemyNames)->toArray());
+        return new JsonResponse(BattlePageResource::from($page, $this->enemyNames, $this->items)->toArray());
     }
 }

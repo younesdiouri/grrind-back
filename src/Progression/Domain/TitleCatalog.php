@@ -4,38 +4,52 @@ declare(strict_types=1);
 
 namespace App\Progression\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use InvalidArgumentException;
 
 /**
- * Le catalogue des titres, chargé depuis `config/game/v1/titles.yaml`.
+ * Le catalogue des titres, chargé depuis le snapshot de jeu publié.
  *
- * **Un catalogue, pas une table.** Les titres ne vivent pas en base : ce qui est persisté,
- * c'est *qui a débloqué quoi et quand*. Ajouter un titre est un déploiement, pas un INSERT
- * — et c'est ce qui permet à un titre d'être rétroactif sans migration de données : la
- * condition s'évalue sur le ledger, qui contient déjà tout l'historique.
+ * **Un catalogue runtime, pas une table éditable.** Les titres proviennent du snapshot DB
+ * publié, tandis que *qui a débloqué quoi et quand* reste persisté séparément. Un titre
+ * validé peut donc être rétroactif sans migration de faits : sa condition s'évalue sur le
+ * ledger, qui contient déjà tout l'historique.
  *
  * L'ordre de déclaration est **signifiant** : il départage les ex æquo quand il faut
  * désigner le prochain titre d'un joueur. Le chargeur d'équilibrage ne descend pas dans les
  * listes, donc `game.titles.titles` reste un paramètre unique et cet ordre survit au
  * conteneur compilé.
  */
-final readonly class TitleCatalog
+final class TitleCatalog
 {
     /** @var array<string, Title> par identifiant, dans l'ordre de déclaration */
     private array $titles;
+
+    private ?GameRulesets $rulesets;
+
+    private ?self $historical = null;
+
+    private ?self $available = null;
+
+    private ?int $runtimeRevision = null;
 
     /**
      * @param list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
-    public function __construct(array $titles)
+    public function __construct(array $titles, ?GameRulesets $rulesets = null, bool $allowEmpty = false)
     {
-        if ([] === $titles) {
+        $this->rulesets = $rulesets;
+        if (null !== $rulesets) {
+            $this->titles = [];
+
+            return;
+        }
+        if ([] === $titles && !$allowEmpty) {
             throw new InvalidArgumentException('Un catalogue sans titre ne récompense personne.');
         }
-
         $catalog = [];
 
         foreach ($titles as $entry) {
@@ -53,15 +67,44 @@ final readonly class TitleCatalog
         $this->titles = $catalog;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return new self([], $rulesets);
+    }
+
     /** @return list<Title> */
     public function all(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->all();
+        }
+
         return array_values($this->titles);
     }
 
     public function find(string $id): ?Title
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->find($id);
+        }
+
         return $this->titles[$id] ?? null;
+    }
+
+    /** Résolution historique d'un titre déjà acquis. */
+    public function findHistorical(string $id): ?Title
+    {
+        return $this->find($id);
+    }
+
+    /** Sélection d'un titre actif uniquement. */
+    public function findAvailable(string $id): ?Title
+    {
+        if (null !== $this->rulesets) {
+            return $this->active()->find($id);
+        }
+
+        return $this->find($id);
     }
 
     /**
@@ -70,10 +113,23 @@ final readonly class TitleCatalog
      * Tous les titres, débloqués ou non : un catalogue qui ne montrerait que l'atteint ne
      * donnerait rien à viser, et c'est précisément ce qu'on attend d'un mur de titres.
      *
+     * @param list<string> $historicallyUnlocked
+     *
      * @return list<TitleProgress>
      */
-    public function progressOf(PlayerRecord $record): array
+    public function progressOf(PlayerRecord $record, array $historicallyUnlocked = []): array
     {
+        if (null !== $this->rulesets) {
+            $progress = $this->active()->progressOf($record);
+            foreach ($historicallyUnlocked as $id) {
+                if (null === $this->active()->find($id) && null !== ($title = $this->current()->find($id))) {
+                    $progress[] = TitleProgress::of($title, $record);
+                }
+            }
+
+            return $progress;
+        }
+
         return array_map(
             static fn (Title $title): TitleProgress => TitleProgress::of($title, $record),
             $this->all(),
@@ -89,6 +145,10 @@ final readonly class TitleCatalog
      */
     public function newlyUnlockedBy(PlayerRecord $record, array $alreadyUnlocked): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->newlyUnlockedBy($record, $alreadyUnlocked);
+        }
+
         return array_values(array_filter(
             $this->all(),
             static fn (Title $title): bool => !\in_array($title->id, $alreadyUnlocked, true)
@@ -110,6 +170,9 @@ final readonly class TitleCatalog
      */
     public function nextFor(PlayerRecord $record, array $alreadyUnlocked): ?TitleProgress
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->nextFor($record, $alreadyUnlocked);
+        }
         $next = null;
 
         foreach ($this->all() as $title) {
@@ -125,6 +188,38 @@ final readonly class TitleCatalog
         }
 
         return $next;
+    }
+
+    private function current(): self
+    {
+        $revision = $this->rulesets?->revision();
+        \assert(\is_int($revision));
+        if (null !== $this->historical && $revision === $this->runtimeRevision) {
+            return $this->historical;
+        }
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */
+        $titles = $snapshot['titles'];
+
+        $this->runtimeRevision = $revision;
+        $this->available = null;
+
+        return $this->historical = new self($titles);
+    }
+
+    private function active(): self
+    {
+        $this->current();
+        if (null !== $this->available) {
+            return $this->available;
+        }
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var list<array{id: string, active?: bool, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */
+        $titles = $snapshot['titles'];
+
+        return $this->available = new self(array_values(array_filter($titles, static fn (array $title): bool => $title['active'] ?? true)), null, true);
     }
 
     /**

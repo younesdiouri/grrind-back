@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Combat\Domain;
 
+use App\Shared\Application\GameRulesets;
 use Random\Randomizer;
 
 /**
@@ -74,12 +75,13 @@ use Random\Randomizer;
 final readonly class BattleSimulator
 {
     public function __construct(
-        private CombatRules $rules,
+        private CombatRules|GameRulesets $rules,
     ) {
     }
 
     public function fight(Fighter $player, Fighter $enemy, Randomizer $rng): BattleOutcome
     {
+        $rules = $this->rules();
         $playerHp = $player->hp;
         $enemyHp = $enemy->hp;
 
@@ -88,7 +90,7 @@ final readonly class BattleSimulator
         $actor = Actor::Player;
         $turns = 0;
 
-        while ($playerHp > 0 && $enemyHp > 0 && $turns < $this->rules->maxTurns) {
+        while ($playerHp > 0 && $enemyHp > 0 && $turns < $rules->maxTurns) {
             ++$turns;
 
             $attacker = Actor::Player === $actor ? $player : $enemy;
@@ -101,7 +103,7 @@ final readonly class BattleSimulator
                 $timeline[] = new Dodge($actor);
             } else {
                 $reduction = intdiv($attacker->damage * $target->mitigationPermille, 1000);
-                $damage = max($this->rules->minimumDamage, $attacker->damage - $reduction);
+                $damage = max($rules->minimumDamage, $attacker->damage - $reduction);
 
                 if (Actor::Player === $actor) {
                     $enemyHp = max(0, $enemyHp - $damage);
@@ -133,7 +135,7 @@ final readonly class BattleSimulator
             // autorisé, la boucle va sortir juste après quoi qu'il arrive, et émettre
             // `ExtraTurn` ici laisserait un tour bonus annoncé sans l'attaque qu'il promet —
             // le client jouerait « tour bonus ! » suivi de rien.
-            if ($turns < $this->rules->maxTurns && $rng->getInt(0, 999) < $attacker->extraTurnPermille) {
+            if ($turns < $rules->maxTurns && $rng->getInt(0, 999) < $attacker->extraTurnPermille) {
                 $timeline[] = new ExtraTurn($actor);
 
                 continue;
@@ -168,5 +170,19 @@ final readonly class BattleSimulator
         return $playerHp * $enemyMaxHp >= $enemyHp * $playerMaxHp
             ? BattleResult::Victory
             : BattleResult::Defeat;
+    }
+
+    private function rules(): CombatRules
+    {
+        if ($this->rules instanceof CombatRules) {
+            return $this->rules;
+        }
+
+        $snapshot = $this->rules->snapshot();
+        /** @var array{combat: array{fighter: array<string, int>}} $snapshot */
+        /** @var array<string, int> $fighter */
+        $fighter = $snapshot['combat']['fighter'];
+
+        return CombatRules::fromSnapshot($fighter);
     }
 }

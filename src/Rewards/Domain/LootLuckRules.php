@@ -10,7 +10,7 @@ use InvalidArgumentException;
  * Le plancher et le plafond du `LOOT_LUCK` **effectif** — la somme de tous les
  * modificateurs `LOOT_LUCK` actifs d'un joueur, avant qu'{@see LootRoller} ne l'applique
  * aux poids d'une table. Ni l'un ni l'autre n'est énoncé par le ticket #28 : c'est cette
- * classe qui les porte, chargée depuis `loot_luck` dans `config/game/v1/loot.yaml` — de
+ * classe qui les porte, chargée depuis `loot_luck` dans le snapshot de jeu publié — de
  * l'équilibrage, pas des constantes de classe, même geste que {@see
  * \App\Combat\Domain\CombatRules} pour les plafonds de combat.
  *
@@ -18,7 +18,7 @@ use InvalidArgumentException;
  *
  * `LootRoller` ne scale que les entrées à objet, jamais l'entrée « rien » — voir son
  * docblock. Un `LOOT_LUCK` composé toujours positif ou nul garantit que le poids d'une
- * entrée à objet ne descend jamais sous son poids déclaré dans `loot.yaml`, donc que le
+ * entrée à objet ne descend jamais sous son poids déclaré dans le snapshot publié, donc que le
  * poids total d'une table ne peut jamais tomber sous celui, déjà positif, qu'{@see
  * LootTable} a validé à sa construction — aucune division par une somme de poids nulle
  * n'est donc possible. Une malédiction qui réduirait la chance de loot est un objet qui
@@ -35,7 +35,7 @@ use InvalidArgumentException;
  * tirer un objet à chaque séance.
  *
  * `200` est la valeur livrée : personne n'a encore joué à ce jeu, et rien ici ne prétend
- * à un équilibrage définitif — même réserve que les tables de `loot.yaml` elles-mêmes. Elle
+ * à un équilibrage définitif — même réserve que les tables de le snapshot publié elles-mêmes. Elle
  * se patche dans le fichier, sans migration.
  */
 final readonly class LootLuckRules

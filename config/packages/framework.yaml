@@ -1,5 +1,9 @@
 framework:
     secret: '%env(APP_SECRET)%'
+    # Fly relaie les requêtes depuis son réseau privé IPv6 ; on ne lit Forwarded que de
+    # ces proxies explicitement déclarés, jamais d'un client qui pourrait usurper son IP.
+    trusted_proxies: '%env(default::TRUSTED_PROXIES)%'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-port', 'x-forwarded-proto']
 
     # ————— Un refus métier n'est pas un incident (#247) —————————————————————————————————
     #
@@ -30,14 +34,19 @@ framework:
         App\Shared\Domain\Exception\DomainError:
             log_level: warning
 
-    # L'API est stateless de bout en bout : tous les firewalls le sont ou n'en ont pas,
-    # et rien ne lit la session. En mode worker FrankenPHP, un composant à état qui ne
-    # sert à personne est un risque pour rien.
-    session: false
+    # L'API reste stateless ; le back-office, lui, utilise le firewall Symfony stateful.
+    # Une session n'est donc activée que parce que `/admin` en a réellement besoin.
+    session:
+        cookie_secure: auto
+        cookie_httponly: true
+        cookie_samesite: lax
 
 when@test:
     framework:
         test: true
+        # Le client BrowserKit arrive depuis localhost : il simule le seul proxy autorisé afin
+        # de vérifier X-Forwarded-For sans rendre les clients ordinaires dignes de confiance.
+        trusted_proxies: ['127.0.0.1']
 
         # `collect: false` : le profiler est branché mais ne collecte rien tant qu'un test
         # ne le demande pas par `enableProfiler()`. Il ne sert qu'à une chose ici —

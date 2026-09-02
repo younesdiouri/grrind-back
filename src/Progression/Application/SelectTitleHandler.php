@@ -36,7 +36,7 @@ final readonly class SelectTitleHandler
             return;
         }
 
-        $title = $this->catalog->find($command->titleId) ?? throw new TitleIsUnknown($command->titleId);
+        $title = $this->catalog->findAvailable($command->titleId) ?? throw new TitleIsUnknown($command->titleId);
 
         if (!$this->unlockedTitles->holds($command->userId, $title->id)) {
             throw new TitleIsNotUnlocked($title->id);

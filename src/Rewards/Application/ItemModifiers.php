@@ -46,7 +46,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * ## La composition de plusieurs `STREAK_SHIELD` n'est pas tranchée ici
  *
- * `items.yaml` pose déjà un objet à une seule charge et renvoie la question à ce ticket.
+ * le snapshot publié pose déjà un objet à une seule charge et renvoie la question à ce ticket.
  * Cette classe ne la tranche pas : elle rend les charges **telles quelles**, une par objet
  * équipé qui en porte, sans les sommer ni les dédupliquer — exactement comme elle le ferait
  * pour n'importe quel autre type. Sommer plusieurs boucliers, ou n'en compter qu'un, est une

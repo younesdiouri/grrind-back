@@ -9,6 +9,7 @@ use App\Combat\Application\FightBattleHandler;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Request\FightBattleRequest;
 use App\Combat\UI\Http\Response\BattleResource;
+use App\Shared\Application\ItemImageUrlResolver;
 use App\Shared\UI\Http\Idempotent;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -40,6 +41,7 @@ final readonly class FightController
     public function __construct(
         private FightBattleHandler $fight,
         private EnemyTranslator $enemyNames,
+        private ItemImageUrlResolver $items,
     ) {
     }
 
@@ -73,7 +75,7 @@ final readonly class FightController
         $battle = ($this->fight)(new FightBattle(Uuid::fromString($user->getUserIdentifier()), $request?->enemy));
 
         return new JsonResponse(
-            BattleResource::from($battle, $this->enemyNames)->toArray(),
+            BattleResource::from($battle, $this->enemyNames, $this->items)->toArray(),
             Response::HTTP_CREATED,
         );
     }

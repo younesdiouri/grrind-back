@@ -11,7 +11,7 @@ RUN_DB  := $(DC) run --rm php
 RUN_TEST := $(DC) run --rm -e APP_ENV=test php
 
 .DEFAULT_GOAL := help
-.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset openapi test qa phpstan cs cs-fix deptrac install
+.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset test-db-reset openapi test perf-ruleset audit qa phpstan cs cs-fix deptrac install
 
 help: ## Liste les commandes disponibles
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -89,6 +89,11 @@ db-reset: ## Recrée la base et rejoue toutes les migrations
 	$(RUN_DB) bin/console doctrine:database:create
 	$(RUN_DB) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
+test-db-reset: ## Recrée la base de test et rejoue toutes les migrations
+	$(RUN_TEST) bin/console doctrine:database:drop --if-exists --force
+	$(RUN_TEST) bin/console doctrine:database:create
+	$(RUN_TEST) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+
 # La migration du déploiement. Elle ne tourne pas dans l'image de dev mais dans
 # l'image de prod — celle qui partira sur ECS — pour que ce qui migre la base soit
 # exactement le code qui va la lire. Voir README, « Déploiement ».
@@ -122,6 +127,14 @@ test: ## Suite de tests (base de test créée/migrée au passage)
 	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \
 		&& bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration \
 		&& vendor/bin/phpunit $(c)"
+
+perf-ruleset: ## Mesure froide/chaude des quatre endpoints de règles (#260)
+	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \
+		&& bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration \
+		&& GRRIND_PERF_HOT_SAMPLES=$(or $(PERF_SAMPLES),10) vendor/bin/phpunit --group performance"
+
+audit: ## Vérifie les dépendances verrouillées contre les avis Composer
+	$(RUN) composer audit --locked
 
 qa: phpstan cs deptrac ## Toutes les barrières qualité
 

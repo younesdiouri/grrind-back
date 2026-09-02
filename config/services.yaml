@@ -16,14 +16,43 @@ services:
             # Même source que lexik_jwt_authentication.token_ttl : la durée annoncée
             # au client ne peut pas diverger de celle réellement signée.
             int $accessTokenTtl: '%env(int:JWT_TTL)%'
-            # Le hash de l'équilibrage chargé. Il se stocke avec chaque transaction d'XP :
-            # c'est ce qui permet de rééquilibrer sans corrompre l'historique.
-            string $rulesetVersion: '%game.ruleset_version%'
+            string $gameImageDirectory: '%env(resolve:GAME_IMAGES_DIR)%'
 
     App\:
         resource: '../src/'
 
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
+    App\Shared\Application\GameRulesets: '@App\Shared\Infrastructure\Config\DatabaseGameRulesets'
+    App\Shared\Application\ItemImageUrlResolver: '@App\Rewards\Infrastructure\Translation\ItemTranslator'
+
+    App\Shared\Infrastructure\Config\DatabaseGameRulesets:
+        arguments:
+            $cache: '@game.ruleset'
+            $yamlGameplayVersion: '%game.ruleset_version%'
+
+    App\Admin\Infrastructure\GameRulesetPublisher:
+        arguments:
+            $yamlGameplayVersion: '%game.ruleset_version%'
+
+    App\Progression\Domain\XpCalculator:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
+    App\Combat\Application\FightBattleHandler:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
+    App\Training\UI\Http\ImportWorkoutsController:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
+    App\Progression\Application\ProgressionStateProvider:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
+    App\Progression\Infrastructure\Reward\LedgerSessionRewards:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
 
     # Sonde du #155 : `event.bus` n'est référencé nulle part par son id de service —
     # seulement par le type `MessageBusInterface` avec `#[Target]` — donc le compilateur
@@ -122,40 +151,29 @@ services:
     # liste, et son ordre — qui départage les ex æquo au moment de désigner le prochain
     # titre — doit survivre au conteneur compilé.
     App\Progression\Domain\TitleCatalog:
-        arguments:
-            $titles: '%game.titles.titles%'
+        factory: ['App\Progression\Domain\TitleCatalog', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
-    # Les socles d'un combattant (#208), tirés de `game/v1/combat.yaml`. Même raison que
-    # `WorkoutRules` : le domaine reçoit un objet validé, pas dix entiers venus tel quels
-    # du YAML. La dérivation caractéristique → combattant elle-même arrive au #210.
-    App\Combat\Domain\CombatRules:
+    App\Combat\Application\FighterFactory:
         arguments:
-            $baseHp: '%game.combat.fighter.base_hp%'
-            $hpPer1000Vitality: '%game.combat.fighter.hp_per_1000_vitality%'
-            $baseDamage: '%game.combat.fighter.base_damage%'
-            $damagePer1000Strength: '%game.combat.fighter.damage_per_1000_strength%'
-            $mitigationPermillePer1000Endurance: '%game.combat.fighter.mitigation_permille_per_1000_endurance%'
-            $mitigationCapPermille: '%game.combat.fighter.mitigation_cap_permille%'
-            $extraTurnPermillePer1000Dexterity: '%game.combat.fighter.extra_turn_permille_per_1000_dexterity%'
-            $extraTurnCapPermille: '%game.combat.fighter.extra_turn_cap_permille%'
-            $dodgePermillePer1000Mobility: '%game.combat.fighter.dodge_permille_per_1000_mobility%'
-            $dodgeCapPermille: '%game.combat.fighter.dodge_cap_permille%'
-            $minimumDamage: '%game.combat.fighter.minimum_damage%'
-            $maxTurns: '%game.combat.fighter.max_turns%'
+            $rules: '@App\Shared\Application\GameRulesets'
+
+    App\Combat\Domain\BattleSimulator:
+        arguments:
+            $rules: '@App\Shared\Application\GameRulesets'
 
     # Le catalogue d'ennemis (#208), d'un bloc pour la même raison que le barème de titres :
     # c'est une liste, et son ordre de déclaration doit survivre au conteneur compilé.
     # `$bosses` (#219) suit le même geste, en bloc séparé — voir le docblock d'`EnemyCatalog`.
     App\Combat\Domain\EnemyCatalog:
-        arguments:
-            $enemies: '%game.combat.enemies%'
-            $bosses: '%game.combat.bosses%'
+        factory: ['App\Combat\Domain\EnemyCatalog', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Le catalogue d'objets (#27), d'un bloc pour la même raison que le barème de titres :
     # une liste, et son ordre de déclaration doit survivre au conteneur compilé.
     App\Rewards\Domain\ItemCatalog:
-        arguments:
-            $items: '%game.items.items%'
+        factory: ['App\Rewards\Domain\ItemCatalog', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Les tables de tirage (#27, coffres au #230). `$items`, `$enemies` et `$bosses` sont les
     # paramètres bruts de trois fichiers différents — voir le docblock de `LootTables` pour
@@ -164,22 +182,13 @@ services:
     # interdit à `Rewards` d'importer quoi que ce soit de `Combat`, et ces tableaux ne sont
     # que de la donnée, jamais un objet de leur domaine.
     App\Rewards\Domain\LootTables:
-        arguments:
-            $version: '%game.loot.version%'
-            $workout: '%game.loot.workout%'
-            $adversary: '%game.loot.adversary%'
-            $chest: '%game.loot.chest%'
-            $items: '%game.items.items%'
-            $enemies: '%game.combat.enemies%'
-            $bosses: '%game.combat.bosses%'
+        factory: ['App\Rewards\Domain\LootTables', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
-    # Le plancher et le plafond du LOOT_LUCK effectif (#28) — voir le docblock de
-    # `LootLuckRules` pour ce que chacun garantit. `LootRoller` les reçoit par ce service,
-    # jamais des constantes de classe : c'est de l'équilibrage.
-    App\Rewards\Domain\LootLuckRules:
+    App\Rewards\Domain\LootRoller:
         arguments:
-            $floorPercent: '%game.loot.loot_luck.floor_percent%'
-            $capPercent: '%game.loot.loot_luck.cap_percent%'
+            $luck: '@App\Shared\Application\GameRulesets'
+
 
     App\Progression\Domain\DiminishingReturns:
         arguments:
@@ -468,32 +477,32 @@ when@test:
         App\Tests\Support\Messaging\:
             resource: '../tests/Support/Messaging/'
 
-        # Publics pour que `FightBattleHandlerTest` (#211) appelle le pipeline de combat
-        # directement, avec les mêmes collaborateurs — chargés depuis le vrai `combat.yaml`
-        # — que ceux que le handler emploie. `FightController` (#212) les consomme
+        # Publics pour que `FightBattleHandlerTest` appelle le pipeline de combat
+        # directement, avec les mêmes collaborateurs du snapshot publié que ceux du handler.
+        # `FightController` les consomme
         # désormais aussi, mais par injection de constructeur : ça ne rend pas la
         # déclaration publique inutile, `container->get()` continue d'exiger `public: true`
         # — même besoin que `GrantXpHandler` plus haut.
-        # `$rulesetVersion` répété : la redéclaration ci-dessous ne fusionne pas avec le
-        # bind global de `_defaults` plus haut, elle le remplace — même geste que
-        # `$expoDsn` sur `CheckExpoPushReceiptsHandler` plus haut.
         App\Combat\Application\FightBattleHandler:
             public: true
             arguments:
-                $rulesetVersion: '%game.ruleset_version%'
+                $rulesetVersion: '@App\Shared\Application\GameRulesets'
 
         App\Combat\Application\FighterFactory:
             public: true
+            arguments:
+                $rules: '@App\Shared\Application\GameRulesets'
 
         # `$enemies` et `$bosses` répétés, pour la même raison que `$rulesetVersion` ci-dessus.
         App\Combat\Domain\EnemyCatalog:
             public: true
-            arguments:
-                $enemies: '%game.combat.enemies%'
-                $bosses: '%game.combat.bosses%'
+            factory: ['App\Combat\Domain\EnemyCatalog', 'runtime']
+            arguments: ['@App\Shared\Application\GameRulesets']
 
         App\Combat\Domain\BattleSimulator:
             public: true
+            arguments:
+                $rules: '@App\Shared\Application\GameRulesets'
 
         App\Combat\Infrastructure\Doctrine\BattleRepository:
             public: true

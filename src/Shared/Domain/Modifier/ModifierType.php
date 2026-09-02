@@ -31,10 +31,10 @@ namespace App\Shared\Domain\Modifier;
  * - les **quatre caractéristiques pures** (`*_BONUS` sur Strength/Endurance/Mobility/
  *   Dexterity) s'ajoutent au total lu du snapshot *avant* la dérivation par les coefficients
  *   de `CombatRules` — même unité que le ledger, des centaines ou des milliers, jamais des
- *   unités (voir `items.yaml`) ;
+ *   unités (voir le snapshot publié) ;
  * - les **cinq stats de combat directes** (HP, dégâts, mitigation, tour supplémentaire,
  *   esquive) s'ajoutent *après* cette dérivation, avant les plafonds de `CombatRules` — les
- *   trois dernières en millièmes, comme partout dans `combat.yaml`.
+ *   trois dernières en millièmes, comme partout dans le snapshot publié.
  *
  * **Vitality n'a pas son type ici, et ce n'est pas un oubli** : elle est entièrement dérivée
  * des quatre autres et mesure l'équilibre d'une pratique, pas un inventaire — voir le

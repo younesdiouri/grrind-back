@@ -46,6 +46,13 @@ deptrac:
         - type: directory
           value: src/Combat/.*
 
+    # Le back-office est une couche d'adaptation volontairement au-dessus des modules :
+    # EasyAdmin ne remonte jamais dans leurs domaines, l'inverse n'existe pas non plus.
+    - name: Admin
+      collectors:
+        - type: directory
+          value: src/Admin/.*
+
   ruleset:
     # Shared ne dépend d'aucun module métier : c'est ce qui le garde partageable.
     Shared: ~
@@ -67,3 +74,10 @@ deptrac:
     # module métier n'a encore à y contribuer.
     Combat:
       - Shared
+    Admin:
+      - Shared
+      - Identity
+      - Training
+      - Progression
+      - Rewards
+      - Combat

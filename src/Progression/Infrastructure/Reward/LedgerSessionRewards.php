@@ -15,6 +15,7 @@ use App\Progression\Domain\XpBreakdownLine;
 use App\Progression\Domain\XpRates;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Translation\TitleTranslator;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionReward;
 use App\Shared\Application\SessionRewards;
@@ -68,7 +69,7 @@ final readonly class LedgerSessionRewards implements SessionRewards
         // refuse déjà pour la même raison.
         private ProgressionSnapshotRepository $snapshots,
         private LevelCurve $curve,
-        private string $rulesetVersion,
+        private string|GameRulesets $rulesetVersion,
         // `event.bus` explicitement (#155) : `WorkoutCredited` est un `DomainEvent`, voir
         // le docblock de `messenger.yaml` pour pourquoi ce bus-là tolère l'absence
         // d'abonné et pourquoi `#[Target]` n'est pas optionnel ici.
@@ -205,8 +206,13 @@ final readonly class LedgerSessionRewards implements SessionRewards
             attributesAfter: $attributes,
             vitalityBefore: $vitality,
             vitalityAfter: $vitality,
-            rulesetVersion: $this->rulesetVersion,
+            rulesetVersion: $this->version(),
             reason: XpAwardReason::NoXpFeedsVitality->value,
         );
+    }
+
+    private function version(): string
+    {
+        return \is_string($this->rulesetVersion) ? $this->rulesetVersion : $this->rulesetVersion->version();
     }
 }

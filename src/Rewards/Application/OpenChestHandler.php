@@ -110,7 +110,7 @@ final readonly class OpenChestHandler
             // encore écrite : c'est une configuration incohérente que ce ticket refuse
             // d'absorber en silence.
             if (null === $outcome) {
-                throw new LogicException(\sprintf('"%s" est un coffre du catalogue sans table de tirage dans loot.yaml.', $item->key));
+                throw new LogicException(\sprintf('"%s" est un coffre du catalogue sans table de tirage dans le snapshot publié.', $item->key));
             }
 
             $roll = LootRoll::record(

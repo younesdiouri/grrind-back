@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Training\UI\Http;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\UI\Http\Idempotent;
 use App\Training\Application\ImportedWorkout;
 use App\Training\Application\ImportWorkouts;
@@ -50,8 +51,8 @@ final readonly class ImportWorkoutsController
 {
     public function __construct(
         private ImportWorkoutsHandler $import,
-        /** Lié globalement dans `services.yaml` : le hash de l'équilibrage chargé au boot. */
-        private string $rulesetVersion,
+        /** Le snapshot lu pendant l'import est aussi celui annoncé à son client. */
+        private string|GameRulesets $rulesetVersion,
     ) {
     }
 
@@ -83,7 +84,12 @@ final readonly class ImportWorkoutsController
         // 200 et non 201 : un lot n'est pas une ressource. Il peut n'en créer aucune — le
         // cas le plus fréquent, un client qui resynchronise sans rien de neuf — et quand il
         // en crée trois, il n'y a pas d'URL unique à mettre dans `Location`.
-        return new JsonResponse(SyncSummaryResource::from($import, $this->rulesetVersion)->toArray());
+        return new JsonResponse(SyncSummaryResource::from($import, $this->version())->toArray());
+    }
+
+    private function version(): string
+    {
+        return \is_string($this->rulesetVersion) ? $this->rulesetVersion : $this->rulesetVersion->version();
     }
 
     /**

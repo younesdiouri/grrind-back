@@ -91,6 +91,7 @@ final readonly class ShopResource
                 $item->modifiers,
             ),
             $item->priceCoins,
+            $translator->imageUrlOf($item->key),
         );
 
         return [

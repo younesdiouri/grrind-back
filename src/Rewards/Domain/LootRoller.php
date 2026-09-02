@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rewards\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierType;
@@ -27,7 +28,7 @@ use Random\Randomizer;
  *
  * ## Départager les tables de séance éligibles (#28, après le #27)
  *
- * `loot.yaml` laisse volontairement les seuils de plusieurs tables se recouvrir — voir son
+ * le snapshot publié laisse volontairement les seuils de plusieurs tables se recouvrir — voir son
  * docblock — et ne tranche pas laquelle s'applique quand plusieurs le sont à la fois.
  * {@see rollForWorkout()} retient **la plus exigeante des tables éligibles** : celle dont
  * `minimumLevel` est le plus haut, et à égalité, celle dont `minimumDurationMinutes` est le
@@ -49,8 +50,8 @@ use Random\Randomizer;
  *
  * {@see LootTables::forAdversary()} rend `null` pour une clé sans table — aucun adversaire
  * livré n'est dans ce cas, {@see \App\Tests\Shared\Config\RewardsCoverageTest} le prouve —
- * mais {@see rollForAdversary()} doit s'en accommoder proprement le jour où `combat.yaml`
- * ouvre un adversaire avant que sa table n'existe dans `loot.yaml` : `null` en retour,
+ * mais {@see rollForAdversary()} doit s'en accommoder proprement le jour où le snapshot publié
+ * ouvre un adversaire avant que sa table n'existe dans le snapshot publié : `null` en retour,
  * jamais une exception pour un cas que le catalogue autorise déjà.
  *
  * ## `LOOT_LUCK` déplace les poids, jamais le nombre de tirages
@@ -95,7 +96,7 @@ use Random\Randomizer;
 final readonly class LootRoller
 {
     public function __construct(
-        private LootLuckRules $luck,
+        private LootLuckRules|GameRulesets $luck,
     ) {
     }
 
@@ -112,9 +113,9 @@ final readonly class LootRoller
             return null;
         }
 
-        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckForDiscipline($modifiers, $discipline));
+        $effectiveLootLuckPercent = $this->luck()->clamp(self::lootLuckForDiscipline($modifiers, $discipline));
 
-        return $this->roll($table->key, $tables->version, $table->table, $effectiveLootLuckPercent, $randomizer);
+        return $this->roll($table->key, $tables->version(), $table->table, $effectiveLootLuckPercent, $randomizer);
     }
 
     /**
@@ -130,9 +131,9 @@ final readonly class LootRoller
             return null;
         }
 
-        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckGlobalOnly($modifiers));
+        $effectiveLootLuckPercent = $this->luck()->clamp(self::lootLuckGlobalOnly($modifiers));
 
-        return $this->roll($adversaryKey, $tables->version, $table, $effectiveLootLuckPercent, $randomizer);
+        return $this->roll($adversaryKey, $tables->version(), $table, $effectiveLootLuckPercent, $randomizer);
     }
 
     /**
@@ -159,9 +160,9 @@ final readonly class LootRoller
             return null;
         }
 
-        $effectiveLootLuckPercent = $this->luck->clamp(self::lootLuckGlobalOnly($modifiers));
+        $effectiveLootLuckPercent = $this->luck()->clamp(self::lootLuckGlobalOnly($modifiers));
 
-        return $this->roll($chestKey, $tables->version, $table, $effectiveLootLuckPercent, $randomizer);
+        return $this->roll($chestKey, $tables->version(), $table, $effectiveLootLuckPercent, $randomizer);
     }
 
     /**
@@ -188,6 +189,20 @@ final readonly class LootRoller
         }
 
         return $best;
+    }
+
+    private function luck(): LootLuckRules
+    {
+        if ($this->luck instanceof LootLuckRules) {
+            return $this->luck;
+        }
+
+        $snapshot = $this->luck->snapshot();
+        /** @var array{loot: array{loot_luck: array{floor_percent: int, cap_percent: int}}} $snapshot */
+        /** @var array{floor_percent: int, cap_percent: int} $luck */
+        $luck = $snapshot['loot']['loot_luck'];
+
+        return new LootLuckRules($luck['floor_percent'], $luck['cap_percent']);
     }
 
     private function roll(string $tableKey, int $tableVersion, LootTable $table, int $effectiveLootLuckPercent, Randomizer $randomizer): LootRollOutcome

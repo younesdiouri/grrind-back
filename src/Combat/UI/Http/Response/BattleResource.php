@@ -6,6 +6,7 @@ namespace App\Combat\UI\Http\Response;
 
 use App\Combat\Domain\Battle;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
+use App\Shared\Application\ItemImageUrlResolver;
 use DateTimeInterface;
 
 /**
@@ -28,7 +29,7 @@ use DateTimeInterface;
  * snapshot lui-même ne re-dérive pas les stats de l'ennemi au moment de la lecture (voir le
  * docblock de `Battle`). Consulter le catalogue ici forçait, en plus, un cas d'erreur qui
  * n'existait nulle part ailleurs dans le module : retirer ou renommer une entrée de
- * `combat.yaml` — un geste que ce fichier annonce lui-même comme normal — rendait alors
+ * le snapshot publié — un geste que ce fichier annonce lui-même comme normal — rendait alors
  * illisible tout combat déjà joué contre cet ennemi. Le pire cas est désormais un nom qui
  * s'affiche comme sa clé de traduction si l'entrée disparaît aussi de
  * `translations/enemies.*.yaml` — dégradé et lisible, jamais un 500. Même principe que
@@ -40,12 +41,13 @@ final readonly class BattleResource
     private function __construct(
         private Battle $battle,
         private string $enemyName,
+        private ?ItemImageUrlResolver $items,
     ) {
     }
 
-    public static function from(Battle $battle, EnemyTranslator $translator): self
+    public static function from(Battle $battle, EnemyTranslator $translator, ?ItemImageUrlResolver $items = null): self
     {
-        return new self($battle, $translator->nameOf($battle->enemySnapshot()['key']));
+        return new self($battle, $translator->nameOf($battle->enemySnapshot()['key']), $items);
     }
 
     /**
@@ -69,7 +71,24 @@ final readonly class BattleResource
                 FighterResource::from($enemySnapshot['fighter'])->toArray(),
             ),
             'events' => BattleEventResource::listOf($this->battle->timeline()),
-            'rewards' => $this->battle->reward(),
+            'rewards' => $this->rewards(),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function rewards(): array
+    {
+        $rewards = $this->battle->reward();
+        if (null === $this->items || !isset($rewards['loot']) || !\is_array($rewards['loot'])) {
+            return $rewards;
+        }
+        foreach ($rewards['loot'] as &$item) {
+            if (\is_array($item) && !isset($item['imageUrl']) && \is_string($item['key'] ?? null)) {
+                $item['imageUrl'] = $this->items->imageUrlOf($item['key']);
+            }
+        }
+        unset($item);
+
+        return $rewards;
     }
 }

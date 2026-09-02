@@ -14,6 +14,16 @@ primary_region = 'cdg'
   # le fixe déjà pour le dev, il manquait ici. fly-proxy termine le TLS lui-même et
   # attend du HTTP en clair sur `internal_port`.
   SERVER_NAME = ':80'
+  # Les images sont provisoirement locales : le volume est mono-machine et non répliqué.
+  # Ne pas scaler `app` horizontalement avant la migration vers un stockage objet.
+  GAME_IMAGES_DIR = '/data/game-images'
+  # Unique plage qui porte les headers déposés par fly-proxy dans le réseau privé.
+  TRUSTED_PROXIES = 'fdaa::/16,127.0.0.1,::1'
+
+[[mounts]]
+  source = 'game_images'
+  destination = '/data/game-images'
+  processes = ['app']
 
 # `scheduler_risala` (#191) est consommé par le **même** worker que l'outbox, et pas par un
 # groupe à part : le transport du composant Scheduler ne fait que produire un message à

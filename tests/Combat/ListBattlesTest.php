@@ -51,7 +51,7 @@ final class ListBattlesTest extends ApiTestCase
     /**
      * La décision du #209 : `result` n'a que deux valeurs, y compris pour un combat que
      * `max_turns` a interrompu sans KO — le meilleur ratio de PV tranche, un match nul n'a pas
-     * de mise en scène. Fabriqué exprès, `turns` au plafond de `combat.yaml`.
+     * de mise en scène. Fabriqué exprès, `turns` au plafond du catalogue DB publié.
      */
     public function testEveryEntryCarriesAResultEvenOneConcludedByMaxTurns(): void
     {
@@ -201,8 +201,8 @@ final class ListBattlesTest extends ApiTestCase
     }
 
     /**
-     * `rewards` rend `Battle.rewards` à l'identique de `POST /api/battles` (#227) — c'est
-     * une ligne déjà écrite, il n'y a rien à recalculer pour l'afficher dans la liste.
+     * Les lignes historiques antérieures à l'ajout de `imageUrl` sont enrichies à la lecture :
+     * l'archive reste inchangée, mais le contrat actuel ne livre jamais un loot sans image.
      */
     public function testRewardsIsRenderedAsRecorded(): void
     {
@@ -212,9 +212,15 @@ final class ListBattlesTest extends ApiTestCase
 
         $battle = $this->history($bob)['battles'][0];
         self::assertIsArray($battle);
-        // `assertEquals`, pas `assertSame` : PostgreSQL réordonne les clés d'un objet JSONB
-        // au stockage — voir le docblock de `Battle`.
-        self::assertEquals($reward, $battle['rewards']);
+        self::assertIsArray($battle['rewards']);
+        self::assertIsArray($battle['rewards']['coins']);
+        self::assertIsArray($battle['rewards']['loot']);
+        self::assertIsArray($battle['rewards']['loot'][0]);
+        $loot = $battle['rewards']['loot'][0];
+        self::assertSame(8, $battle['rewards']['coins']['gained']);
+        self::assertSame('WORN_RUNNING_SHOES', $loot['key']);
+        self::assertIsString($loot['imageUrl']);
+        self::assertMatchesRegularExpression('#^http://localhost/game-images/[a-z0-9._-]+$#', $loot['imageUrl']);
     }
 
     /**

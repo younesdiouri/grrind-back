@@ -50,7 +50,7 @@ final class RewardSummaryPayloadTest extends TestCase
         $loot = $payload['loot'];
         self::assertIsArray($loot);
         self::assertIsArray($loot[0]);
-        self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins'], array_keys($loot[0]));
+        self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl'], array_keys($loot[0]));
 
         // `attributes` entre `xp` et `level`, jamais ailleurs (#162) : les caractéristiques
         // sont la conséquence directe de l'XP qui vient de tomber, le niveau celle du total
@@ -198,6 +198,7 @@ final class RewardSummaryPayloadTest extends TestCase
                 'FEET',
                 [new DroppedItemModifier('XP_MULTIPLIER', 5, 'RUNNING')],
                 30,
+                'https://api.grrind.test/game-images/placeholder.png',
             )],
             coinsGained: 12,
             coinsBefore: 40,

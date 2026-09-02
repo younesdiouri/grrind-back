@@ -112,7 +112,7 @@ final class BattleResourcePayloadTest extends TestCase
 
     /**
      * Le pire cas d'une clé absente du catalogue de traduction (ennemi retiré ou renommé de
-     * `combat.yaml` après que le combat a été joué) est un nom qui s'affiche comme sa clé —
+     * catalogue DB après que le combat a été joué) est un nom qui s'affiche comme sa clé —
      * dégradé et lisible — jamais une exception : la ressource ne consulte pas `EnemyCatalog`,
      * voir son docblock.
      */

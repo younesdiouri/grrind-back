@@ -16,6 +16,7 @@ use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use App\Tests\Support\Battles;
 use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
@@ -29,6 +30,8 @@ use Symfony\Component\Uid\Uuid;
  */
 final class BattlesTest extends ApiTestCase
 {
+    use Battles;
+
     public function testFightingCreatesABattleAndRendersItsTimeline(): void
     {
         $bob = $this->openAccount();
@@ -53,7 +56,7 @@ final class BattlesTest extends ApiTestCase
         self::assertArrayHasKey('dodgePercent', $player);
 
         // Un compte neuf est niveau 1 : `EnemyCatalog::forLevel(1)` rend toujours SAND_JACKAL
-        // (`combat.yaml`) — ça prouve que le contrôleur ne choisit rien lui-même.
+        // (catalogue DB publié) — ça prouve que le contrôleur ne choisit rien lui-même.
         $enemy = $body['enemy'];
         self::assertIsArray($enemy);
         self::assertSame('SAND_JACKAL', $enemy['key']);
@@ -90,6 +93,17 @@ final class BattlesTest extends ApiTestCase
             self::assertSame(0, $coins['gained']);
             self::assertSame($coins['before'], $coins['after']);
         }
+    }
+
+    public function testAHotBattleOnlyReadsTheRulesetRevisionPointer(): void
+    {
+        $bob = $this->openAccount('battle-hot@grrind.app');
+        $this->client->disableReboot();
+        $this->fight($bob, 'battle-warmup');
+
+        $this->client->enableProfiler();
+        self::assertSame(Response::HTTP_CREATED, $this->fight($bob, 'battle-hot')->getStatusCode());
+        $this->assertOnlyRulesetRevisionPointerSql();
     }
 
     /**
@@ -151,6 +165,31 @@ final class BattlesTest extends ApiTestCase
         self::assertEquals($fought, self::decode($response));
     }
 
+    public function testAnOldPersistedLootRewardGetsAnAbsoluteReachableImageUrl(): void
+    {
+        $bob = $this->openAccount();
+        $id = $this->recordBattle(
+            $bob,
+            new DateTimeImmutable('2026-07-15T08:00:00+00:00'),
+            reward: ['loot' => [['key' => 'WORN_RUNNING_SHOES']], 'coins' => ['gained' => 8, 'before' => 40, 'after' => 48]],
+        );
+
+        $response = $this->get('/api/battles/'.$id, $bob->headers);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+
+        $body = self::decode($response);
+        self::assertIsArray($body['rewards']);
+        self::assertIsArray($body['rewards']['loot']);
+        $loot = $body['rewards']['loot'][0];
+        self::assertIsArray($loot);
+        self::assertIsString($loot['imageUrl']);
+        self::assertMatchesRegularExpression('#^http://localhost/game-images/[a-z0-9._-]+$#', $loot['imageUrl']);
+
+        $path = parse_url($loot['imageUrl'], \PHP_URL_PATH);
+        self::assertIsString($path);
+        self::assertSame(Response::HTTP_OK, $this->get($path)->getStatusCode());
+    }
+
     /**
      * Le test qui porte la décision du ticket : un combat qui ne m'appartient pas et un UUID
      * qui ne désigne personne doivent rendre la même réponse au champ près. Les vérifier
@@ -185,7 +224,7 @@ final class BattlesTest extends ApiTestCase
     }
 
     /**
-     * Le catalogue est du config-as-code, fait pour être édité — `combat.yaml` annonce
+     * Le catalogue DB administrable est fait pour être édité et publié — il annonce
      * lui-même que des paliers s'ajouteront. Un combat déjà joué est un fait écrit : sa
      * lecture ne doit rien à l'état *courant* du catalogue, voir le docblock de
      * `BattleResource`. Retirer ou renommer une entrée ne doit donc jamais faire tomber

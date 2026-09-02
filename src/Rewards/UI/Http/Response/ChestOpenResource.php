@@ -83,6 +83,7 @@ final readonly class ChestOpenResource
                 $item->modifiers,
             ),
             $item->priceCoins,
+            $translator->imageUrlOf($item->key),
         )->toArray();
     }
 }

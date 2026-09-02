@@ -1,0 +1,5 @@
+{% if field.value is iterable %}
+    <pre class="mb-0 text-wrap">{{ field.value|json_encode(constant('JSON_PRETTY_PRINT')) }}</pre>
+{% elseif field.formattedValue is not null %}
+    {{ field.formattedValue }}
+{% endif %}

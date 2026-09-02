@@ -48,26 +48,30 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Community/Domain'
                 prefix: 'App\Community\Domain'
                 alias: Community
-            # Pas encore d'entité : `Enemy` et `EnemyCatalog` sont des objets de domaine
-            # purs, chargés depuis `combat.yaml`, jamais persistés (#208). Déclaré dès
-            # maintenant — même règle que Deptrac — pour que `Battle`, au #211, n'ait rien
-            # d'autre à câbler ici.
+            # `Enemy` et `EnemyCatalog` restent des objets de domaine purs, résolus depuis
+            # le snapshot publié administrable. Déclaré explicitement pour que `Battle`
+            # n'ait pas de mapping transverse à câbler.
             Combat:
                 type: attribute
                 is_bundle: false
                 dir: '%kernel.project_dir%/src/Combat/Domain'
                 prefix: 'App\Combat\Domain'
                 alias: Combat
-            # Pas encore d'entité : `Item`, `ItemCatalog` et les tables de tirage sont des
-            # objets de domaine purs, chargés depuis `items.yaml`/`loot.yaml`, jamais
-            # persistés (#27). Déclaré dès maintenant — même règle que Deptrac — pour que
-            # l'inventaire (#29) n'ait rien d'autre à câbler ici.
+            # `Item`, `ItemCatalog` et les tables de tirage sont des objets de domaine purs,
+            # résolus depuis le snapshot publié ; les entités administrables vivent dans
+            # `Admin`, sans fuite de mapping dans `Rewards`.
             Rewards:
                 type: attribute
                 is_bundle: false
                 dir: '%kernel.project_dir%/src/Rewards/Domain'
                 prefix: 'App\Rewards\Domain'
                 alias: Rewards
+            Admin:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Admin/Domain'
+                prefix: 'App\Admin\Domain'
+                alias: Admin
 
 when@test:
     doctrine:

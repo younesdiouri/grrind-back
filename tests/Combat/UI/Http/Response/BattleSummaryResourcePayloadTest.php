@@ -80,7 +80,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
     }
 
     /**
-     * Même dégradé que sur `BattleResource` : un ennemi retiré ou renommé de `combat.yaml`
+     * Même dégradé que sur `BattleResource` : un ennemi retiré ou renommé du catalogue DB publié
      * après que le combat a été joué ne doit jamais faire tomber la ligne d'historique.
      */
     public function testAnEnemyMissingFromTheCatalogueDegradesInsteadOfCrashing(): void
@@ -138,7 +138,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
             new BattleOutcome(
                 $result,
                 [new BattleStarted(150, 120), new BattleFinished($result)],
-                // Le plafond de `combat.yaml` — voir CombatRulesTest pour sa lecture depuis la
+                // Le plafond du catalogue DB publié — voir CombatRulesTest pour sa lecture depuis la
                 // config. Aucun KO ne s'est produit : c'est le ratio de PV qui a tranché.
                 200,
             ),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Progression\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeSplit;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\Modifier;
@@ -97,7 +98,7 @@ final readonly class XpCalculator
         private XpRates $rates,
         private DiminishingReturns $diminishing,
         private AttributeSplit $attributes,
-        private string $rulesetVersion,
+        private string|GameRulesets $rulesetVersion,
     ) {
     }
 
@@ -165,7 +166,12 @@ final readonly class XpCalculator
         // rendu, et pourquoi elle ne peut pas se déplacer avant l'écrêtage.
         $gains = $this->attributes->distribute($discipline, $breakdown->total());
 
-        return new XpAward($breakdown, $gains, $this->rulesetVersion);
+        return new XpAward($breakdown, $gains, $this->rulesetVersion());
+    }
+
+    private function rulesetVersion(): string
+    {
+        return \is_string($this->rulesetVersion) ? $this->rulesetVersion : $this->rulesetVersion->version();
     }
 
     /**

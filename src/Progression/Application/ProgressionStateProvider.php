@@ -12,6 +12,7 @@ use App\Progression\Domain\TitleProgress;
 use App\Progression\Infrastructure\Doctrine\ActiveTitleRepository;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\UnlockedTitleRepository;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerTimezones;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\LocalDay;
@@ -51,7 +52,7 @@ final readonly class ProgressionStateProvider
         private VitalityBonusProvider $vitalityBonus,
         private PlayerTimezones $timezones,
         private ClockInterface $clock,
-        private string $rulesetVersion,
+        private string|GameRulesets $rulesetVersion,
     ) {
     }
 
@@ -89,9 +90,14 @@ final readonly class ProgressionStateProvider
             $this->acquiredBy($unlockedAt),
             $unlockedAt,
             $this->activeTitles->titleIdOf($userId),
-            $this->rulesetVersion,
+            $this->version(),
             $snapshot?->updatedAt(),
         );
+    }
+
+    private function version(): string
+    {
+        return \is_string($this->rulesetVersion) ? $this->rulesetVersion : $this->rulesetVersion->version();
     }
 
     /**

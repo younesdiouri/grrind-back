@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace App\Rewards\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\ModifierType;
 use InvalidArgumentException;
 
 /**
- * Le catalogue des objets, chargé depuis `config/game/v1/items.yaml`.
+ * Le catalogue des objets, chargé depuis le snapshot de jeu publié.
  *
- * **Un catalogue, pas une table.** Les objets ne vivent pas en base — même geste que
- * {@see \App\Combat\Domain\EnemyCatalog} pour les ennemis, {@see
- * \App\Progression\Domain\TitleCatalog} pour les titres : ajouter un objet est un
- * déploiement, pas un INSERT.
+ * **Un catalogue runtime, pas une table éditable.** Les objets proviennent du snapshot DB
+ * publié par l'administration — même geste que {@see \App\Combat\Domain\EnemyCatalog} et
+ * {@see \App\Progression\Domain\TitleCatalog}. Une écriture n'est visible qu'après la
+ * validation atomique du snapshot ; cette classe ne consulte jamais les tables d'édition.
  *
  * Rien ici ne parle d'inventaire ni de tirage — ce ticket (#27) pose la matière que le
  * tirage (#28) et l'inventaire (#29) consomment. Un `Item` de ce catalogue n'appartient à
@@ -39,8 +40,8 @@ use InvalidArgumentException;
  * `MITIGATION_BONUS`, `EXTRA_TURN_BONUS`, `DODGE_BONUS`) comme globaux, sans jamais regarder
  * {@see \App\Shared\Domain\Modifier\Modifier::$discipline} — voir son docblock : « un combat
  * n'a lieu dans aucune discipline ». Écrire `{ type: STRENGTH_BONUS, value: 350, discipline:
- * RUNNING }` dans `items.yaml` produirait donc un objet qui s'applique **partout**, alors que
- * le fichier prétend le contraire de ce que le moteur fait. Une config qui ment se refuse au
+ * RUNNING }` dans le snapshot publié produirait donc un objet qui s'applique **partout**, alors que
+ * la configuration prétend le contraire de ce que le moteur fait. Une config qui ment se refuse au
  * démarrage plutôt que de se documenter : voir {@see self::COMBAT_MODIFIER_TYPES} et le refus
  * dans {@see modifiers()}.
  *
@@ -54,7 +55,7 @@ use InvalidArgumentException;
  *     pour un objet qui prétend ne pas être vendu ne veut rien dire ;
  *   - un objet EPIC ou LEGENDARY listé à l'étal : ces deux raretés ne se vendent jamais — un
  *     objet qui s'achète n'est plus une récompense de tirage, et si les meilleurs objets
- *     s'achètent, le loot ne récompense plus rien. `items.yaml` n'en pose aucun aujourd'hui ;
+ *     s'achètent, le loot ne récompense plus rien. Le snapshot publié n'en pose aucun aujourd'hui ;
  *     ce refus protège la décision plutôt que de compter sur ce qu'un futur contributeur se
  *     souvienne de la prose du fichier.
  *
@@ -70,12 +71,12 @@ use InvalidArgumentException;
  *   - un modificateur posé sur un coffre : un coffre ne s'équipe pas, il n'a rien à modifier.
  *
  * **Une table de coffre est exigée, mais pas ici.** `ItemsSection` ne voit que ce fichier —
- * même limite que documentée sur `LootTables` pour `loot.yaml` — donc « un coffre doit avoir
+ * même limite que documentée sur `LootTables` pour le snapshot publié — donc « un coffre doit avoir
  * une table, un `EQUIPMENT` ne peut pas en avoir » se prouve à la construction réelle de
  * {@see LootTables}, câblée par `services.yaml`, et par `RewardsCoverageTest` : le geste exact
  * que `testChaqueAdversaireDuCatalogueALivreATableDeTirage()` fait déjà pour les adversaires.
  */
-final readonly class ItemCatalog
+final class ItemCatalog
 {
     /**
      * Les neuf types de combat du #224 — voir le docblock de la classe pour pourquoi aucun
@@ -101,13 +102,27 @@ final readonly class ItemCatalog
     /** @var array<string, Item> */
     private array $byKey;
 
+    private ?GameRulesets $rulesets;
+
+    private ?self $historical = null;
+
+    private ?self $available = null;
+
+    private ?int $runtimeRevision = null;
+
     /**
      * @param list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
-    public function __construct(array $items)
+    public function __construct(array $items, ?GameRulesets $rulesets = null)
     {
+        $this->rulesets = $rulesets;
+        if (null !== $rulesets) {
+            $this->byKey = [];
+
+            return;
+        }
         // Un catalogue vide ne propose aucune récompense : mieux vaut refuser de démarrer
         // que de laisser le #28 n'avoir rien à tirer.
         if ([] === $items) {
@@ -132,7 +147,7 @@ final readonly class ItemCatalog
                 $rarity,
                 $slot,
                 $entry['price_coins'],
-                self::modifiers($entry['key'], $kind, $entry['modifiers']),
+                self::modifiers($entry['key'], $kind, $entry['modifiers'] ?? []),
                 $kind,
                 $shop['available'],
                 $shop['minimumLevel'],
@@ -148,9 +163,34 @@ final readonly class ItemCatalog
         $this->byKey = $byKey;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return new self([], $rulesets);
+    }
+
     public function find(string $key): ?Item
     {
+        if (null !== $this->rulesets) {
+            return $this->current()->find($key);
+        }
+
         return $this->byKey[$key] ?? null;
+    }
+
+    /** Résolution historique : un inventaire déjà écrit reste toujours affichable. */
+    public function findHistorical(string $key): ?Item
+    {
+        return $this->find($key);
+    }
+
+    /** Résolution pour une nouvelle opération de jeu : les objets inactifs sont exclus. */
+    public function findAvailable(string $key): ?Item
+    {
+        if (null !== $this->rulesets) {
+            return $this->active()->find($key);
+        }
+
+        return $this->find($key);
     }
 
     /**
@@ -162,6 +202,10 @@ final readonly class ItemCatalog
      */
     public function all(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->all();
+        }
+
         return array_values($this->byKey);
     }
 
@@ -174,7 +218,43 @@ final readonly class ItemCatalog
      */
     public function shopItems(): array
     {
+        if (null !== $this->rulesets) {
+            return $this->active()->shopItems();
+        }
+
         return array_values(array_filter($this->byKey, static fn (Item $item): bool => $item->shopAvailable));
+    }
+
+    private function current(): self
+    {
+        $revision = $this->rulesets?->revision();
+        \assert(\is_int($revision));
+        if (null !== $this->historical && $revision === $this->runtimeRevision) {
+            return $this->historical;
+        }
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        $items = $snapshot['items'];
+
+        $this->runtimeRevision = $revision;
+        $this->available = null;
+
+        return $this->historical = new self($items);
+    }
+
+    private function active(): self
+    {
+        $this->current();
+        if (null !== $this->available) {
+            return $this->available;
+        }
+        $snapshot = $this->rulesets?->snapshot();
+        \assert(\is_array($snapshot));
+        /** @var list<array{key: string, active?: bool, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        $items = $snapshot['items'];
+
+        return $this->available = new self(array_values(array_filter($items, static fn (array $item): bool => $item['active'] ?? true)));
     }
 
     /**
