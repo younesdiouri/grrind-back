@@ -1,9 +1,9 @@
 framework:
     secret: '%env(APP_SECRET)%'
-    # Fly relaie les requêtes depuis son réseau privé IPv6 ; on ne lit Forwarded que de
-    # ces proxies explicitement déclarés, jamais d'un client qui pourrait usurper son IP.
+    # Fly termine TLS puis relaie la requête HTTP ; seuls les headers requis pour retrouver
+    # l'IP du client et le protocole d'origine sont lus depuis son proxy de confiance.
     trusted_proxies: '%env(default::TRUSTED_PROXIES)%'
-    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-port', 'x-forwarded-proto']
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-proto']
 
     # ————— Un refus métier n'est pas un incident (#247) —————————————————————————————————
     #

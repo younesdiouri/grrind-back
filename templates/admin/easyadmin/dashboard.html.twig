@@ -1,0 +1,24 @@
+{% extends '@EasyAdmin/layout.html.twig' %}
+
+{% block main %}
+    <div id="grrind-admin-dashboard">
+        <h1>GRRIND · Administration</h1>
+        <p>Choisissez une ressource à administrer ou à consulter.</p>
+
+        {% for title, links in sections %}
+            <section class="mb-5">
+                <h2>{{ title }}</h2>
+                <div class="row g-3">
+                    {% for link in links %}
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <a class="btn btn-secondary w-100 text-start" href="{{ link.url }}">
+                                <i class="{{ link.icon }}" aria-hidden="true"></i>
+                                {{ link.label }}
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+{% endblock main %}
