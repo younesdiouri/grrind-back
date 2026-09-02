@@ -4,14 +4,39 @@ declare(strict_types=1);
 
 namespace App\Tests\Admin;
 
+use App\Admin\UI\EasyAdmin\BattleCrudController;
+use App\Admin\UI\EasyAdmin\CoinTransactionCrudController;
+use App\Admin\UI\EasyAdmin\EnemyCrudController;
+use App\Admin\UI\EasyAdmin\InventoryCrudController;
+use App\Admin\UI\EasyAdmin\ItemCrudController;
+use App\Admin\UI\EasyAdmin\LootTableCrudController;
+use App\Admin\UI\EasyAdmin\SettingsCrudController;
+use App\Admin\UI\EasyAdmin\TitleCrudController;
+use App\Admin\UI\EasyAdmin\UserCrudController;
+use App\Admin\UI\EasyAdmin\XpTransactionCrudController;
 use App\Identity\Domain\Role;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
 use App\Tests\Support\ApiTestCase;
 use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\Routing\Matcher\UrlMatcherInterface;
 
 /** Le tableau de bord est le point d'entrée opérable des dix CRUD administratifs. */
 final class DashboardTest extends ApiTestCase
 {
+    /** @var array<string, class-string> */
+    private const array CRUDS = [
+        'Items' => ItemCrudController::class,
+        'Titres' => TitleCrudController::class,
+        'Ennemis et boss' => EnemyCrudController::class,
+        'Tables de loot' => LootTableCrudController::class,
+        'Réglages globaux' => SettingsCrudController::class,
+        'Comptes' => UserCrudController::class,
+        'Batailles' => BattleCrudController::class,
+        'Inventaires' => InventoryCrudController::class,
+        'Transactions XP' => XpTransactionCrudController::class,
+        'Transactions pièces' => CoinTransactionCrudController::class,
+    ];
+
     public function testTrustedFlyProxyKeepsTheAdminLoginRedirectOnHttps(): void
     {
         $this->client->request('GET', '/admin', [], [], [
@@ -36,21 +61,10 @@ final class DashboardTest extends ApiTestCase
         $dashboard = $crawler->filter('#grrind-admin-dashboard');
         self::assertCount(1, $dashboard);
 
-        foreach ([
-            'Items',
-            'Titres',
-            'Ennemis et boss',
-            'Tables de loot',
-            'Réglages globaux',
-            'Comptes',
-            'Batailles',
-            'Inventaires',
-            'Transactions XP',
-            'Transactions pièces',
-        ] as $label) {
+        foreach (self::CRUDS as $label => $controller) {
             $link = $dashboard->selectLink($label);
             self::assertCount(1, $link, \sprintf('Le dashboard doit lier « %s ». ', $label));
-            $this->assertCrudLinkWorks($link);
+            $this->assertCrudLinkWorks($link, $controller);
         }
     }
 
@@ -75,13 +89,22 @@ final class DashboardTest extends ApiTestCase
         self::assertResponseRedirects('/admin');
     }
 
-    private function assertCrudLinkWorks(Crawler $link): void
+    /** @param class-string $controller */
+    private function assertCrudLinkWorks(Crawler $link, string $controller): void
     {
         $uri = $link->link()->getUri();
         $path = parse_url($uri, \PHP_URL_PATH);
         self::assertIsString($path);
+        $matcher = self::getContainer()->get('router.default');
+        self::assertInstanceOf(UrlMatcherInterface::class, $matcher);
+        $route = $matcher->match($path);
+        self::assertSame($controller.'::index', $route['_controller'] ?? null);
 
-        $this->client->request('GET', $path);
+        $query = parse_url($uri, \PHP_URL_QUERY);
+        self::assertTrue(null === $query || \is_string($query));
+        $requestUri = $path.(\is_string($query) && '' !== $query ? '?'.$query : '');
+
+        $this->client->request('GET', $requestUri);
         self::assertResponseIsSuccessful();
     }
 }
