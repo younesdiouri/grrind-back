@@ -82,6 +82,28 @@ final class InventoryRoutesTest extends ApiTestCase
         self::assertNotEmpty($item['modifiers']);
     }
 
+    public function testATrustedFlyProxyMakesItemUrlsUseTheOriginalHttpsScheme(): void
+    {
+        $bob = $this->openAccount('https-proxy@grrind.app');
+        $this->grant($bob->id, 'WORN_RUNNING_SHOES');
+
+        $this->client->request('GET', '/api/inventory', [], [], [
+            'HTTP_AUTHORIZATION' => $bob->headers['Authorization'],
+            'HTTP_HOST' => 'grrind-back.fly.dev',
+            'HTTP_X_FORWARDED_PROTO' => 'https',
+            'REMOTE_ADDR' => '127.0.0.1',
+        ]);
+
+        $body = self::decode($this->client->getResponse());
+        $items = $body['items'] ?? null;
+        self::assertIsArray($items);
+        $item = $items[0] ?? null;
+        self::assertIsArray($item);
+        $imageUrl = $item['imageUrl'] ?? null;
+        self::assertIsString($imageUrl);
+        self::assertStringStartsWith('https://grrind-back.fly.dev/game-images/', $imageUrl);
+    }
+
     public function testGrantingTheSameItemTwiceIsReflectedAsAQuantity(): void
     {
         $bob = $this->openAccount();
