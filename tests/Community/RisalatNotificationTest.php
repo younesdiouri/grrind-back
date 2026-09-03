@@ -100,7 +100,25 @@ final class RisalatNotificationTest extends ApiTestCase
         );
 
         self::assertSame(NotificationCategory::RisalaRevealed, SpyingPushSender::$sent[0]['notification']->category);
-        self::assertStringContainsString('Escalade', SpyingPushSender::$sent[0]['notification']->body);
+        self::assertStringContainsString('Climbing', SpyingPushSender::$sent[0]['notification']->body);
+    }
+
+    /** Une même annonce est rendue dans la langue stockée de chacun des membres. */
+    public function testTheRevealUsesEachMembersPersistedLocale(): void
+    {
+        $members = $this->guildOfThree(self::AWAKE);
+        self::assertSame(Response::HTTP_OK, $this->send('PATCH', '/api/me', ['locale' => 'fr'], $members[1]->headers)->getStatusCode());
+        $risala = $this->revealedRisala(Discipline::Climbing);
+
+        ($this->announceRisala)(new AnnounceRisala($risala->id()));
+
+        $bodies = [];
+        foreach (SpyingPushSender::$sent as $sent) {
+            $bodies[$sent['recipientId']->toRfc4122()] = $sent['notification']->body;
+        }
+
+        self::assertStringContainsString('Escalade', $bodies[$members[1]->id->toRfc4122()]);
+        self::assertStringContainsString('Climbing', $bodies[$members[2]->id->toRfc4122()]);
     }
 
     public function testAMemberInQuietHoursMissesTheReveal(): void

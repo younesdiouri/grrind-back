@@ -1,0 +1,10 @@
+guild_activity:
+    title: 'Guild activity'
+    single: '⚔️ %author%: %minutes% min of %discipline%, +%xp% XP'
+    multiple: '⚔️ %author% logged %sessions% workouts, +%xp% XP'
+risala_revealed:
+    title: 'Weekly Risāla'
+    body: '📜 %author% sends %discipline% to the guild — +%bonus%% for two weeks'
+risala_turn:
+    title: 'Your turn'
+    body: '📜 Choose your guild’s Risāla before %deadline%'

@@ -84,7 +84,7 @@ final class GuildActivityNotifierTest extends ApiTestCase
         foreach (SpyingPushSender::$sent as $sent) {
             self::assertContains($sent['recipientId']->toRfc4122(), $recipientIds, 'Aucun push ne doit viser l\'auteur lui-même ni un joueur d\'une autre guilde.');
             self::assertSame('GUILD_ACTIVITY', $sent['notification']->category->value);
-            self::assertStringContainsString('3 séances', $sent['notification']->body);
+            self::assertStringContainsString('3 workouts', $sent['notification']->body);
             self::assertStringContainsString('+'.$totalXp.' XP', $sent['notification']->body);
 
             // #144 : le tap doit mener au profil de l'auteur de la séance, pas à celui du
@@ -135,9 +135,28 @@ final class GuildActivityNotifierTest extends ApiTestCase
         self::assertNotCount(0, SpyingPushSender::$sent);
 
         foreach (SpyingPushSender::$sent as $sent) {
-            self::assertStringContainsString('45 min de course', $sent['notification']->body);
+            self::assertStringContainsString('45 min of Running', $sent['notification']->body);
             self::assertStringContainsString('+'.$xp.' XP', $sent['notification']->body);
         }
+    }
+
+    /** Un worker ne porte pas de requête : la langue sort donc du compte du destinataire. */
+    public function testEachRecipientReceivesTheActivityInTheirPersistedLocale(): void
+    {
+        [$author, $recipients] = $this->guildOfFour();
+        self::assertSame(Response::HTTP_OK, $this->send('PATCH', '/api/me', ['locale' => 'fr'], $recipients[0]->headers)->getStatusCode());
+
+        $this->import($author, [self::freshCandidate(durationSeconds: 2700)]);
+        $this->consumeTheOutbox();
+        $this->flushPendingAnnouncement($author);
+
+        $bodies = [];
+        foreach (SpyingPushSender::$sent as $sent) {
+            $bodies[$sent['recipientId']->toRfc4122()] = $sent['notification']->body;
+        }
+
+        self::assertStringContainsString('45 min de Course', $bodies[$recipients[0]->id->toRfc4122()]);
+        self::assertStringContainsString('45 min of Running', $bodies[$recipients[1]->id->toRfc4122()]);
     }
 
     /** Pas de guilde, pas de destinataire — et surtout, aucune erreur. */

@@ -9,6 +9,7 @@ use App\Community\Domain\QuietHours;
 use App\Community\Domain\Risala;
 use App\Community\Domain\RisalaRules;
 use App\Community\Infrastructure\Doctrine\RisalaRepository;
+use App\Shared\Application\PlayerLocales;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerTimezones;
 use App\Shared\Application\PushNotification;
@@ -18,10 +19,12 @@ use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
+use App\Shared\Infrastructure\Translation\DisciplineTranslator;
 use DateTimeImmutable;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * L'annonce de la semaine, à toute la guilde : « Younes envoie Escalade ».
@@ -53,12 +56,15 @@ final readonly class AnnounceRisalaHandler
     public function __construct(
         private RisalaRepository $risalat,
         private PlayerProfiles $profiles,
+        private PlayerLocales $locales,
         private PlayerTimezones $timezones,
         private PushSender $pushSender,
         private NotificationAttemptRepository $attempts,
         private QuietHours $quietHours,
         private RisalaRules $rules,
         private ClockInterface $clock,
+        private TranslatorInterface $translator,
+        private DisciplineTranslator $disciplines,
     ) {
     }
 
@@ -87,25 +93,14 @@ final readonly class AnnounceRisalaHandler
             return;
         }
 
-        $notification = new PushNotification(
-            'Risāla de la semaine',
-            \sprintf('📜 %s envoie %s à la guilde — +%d %% pendant deux semaines', $sender->displayName, self::disciplineLabel($discipline), $this->rules->recipientBonusPercent()),
-            NotificationCategory::RisalaRevealed,
-            // Une seule Risāla par semaine et par guilde : la clé de regroupement est celle
-            // de la guilde, donc l'annonce de la semaine remplace celle de la précédente sur
-            // l'appareil plutôt que de s'empiler à côté.
-            'risala:'.$risala->guild()->id()->toRfc4122(),
-            new PushRoute(PushRouteType::GuildRisalat, $risala->guild()->id()),
-        );
-
         $now = $this->clock->now();
 
         foreach ($risala->guild()->members() as $member) {
-            $this->announceTo($member, $notification, $risala->id(), $now);
+            $this->announceTo($member, $sender->displayName, $discipline, $risala, $now);
         }
     }
 
-    private function announceTo(GuildMembership $member, PushNotification $notification, Uuid $risalaId, DateTimeImmutable $now): void
+    private function announceTo(GuildMembership $member, string $senderName, Discipline $discipline, Risala $risala, DateTimeImmutable $now): void
     {
         $recipientId = $member->playerId();
 
@@ -116,33 +111,27 @@ final readonly class AnnounceRisalaHandler
             return;
         }
 
-        if (!$this->attempts->claim($risalaId, $recipientId, $notification->category, $now)) {
+        if (!$this->attempts->claim($risala->id(), $recipientId, NotificationCategory::RisalaRevealed, $now)) {
             return;
         }
 
-        $this->pushSender->send($recipientId, $notification);
+        $this->pushSender->send($recipientId, $this->notificationFor($recipientId, $senderName, $discipline, $risala));
     }
 
-    /**
-     * Une traduction en dur, pour la même raison qu'à {@see AnnounceGuildActivityHandler} :
-     * c'est le texte d'un push, pas une donnée du contrat API, et un worker asynchrone n'a
-     * pas de requête HTTP dont tirer une locale.
-     */
-    private static function disciplineLabel(Discipline $discipline): string
+    private function notificationFor(Uuid $recipientId, string $senderName, Discipline $discipline, Risala $risala): PushNotification
     {
-        return match ($discipline) {
-            Discipline::Running => 'la Course',
-            Discipline::Walking => 'la Marche',
-            Discipline::Cycling => 'le Vélo',
-            Discipline::Swimming => 'la Natation',
-            Discipline::Strength => 'la Musculation',
-            Discipline::Hiit => 'le HIIT',
-            Discipline::Hiking => 'la Randonnée',
-            Discipline::Mobility => 'la Mobilité',
-            Discipline::Climbing => 'l\'Escalade',
-            Discipline::Football => 'le Football',
-            Discipline::CourtSports => 'les Sports de terrain',
-            Discipline::RacketSports => 'les Sports de raquette',
-        };
+        $locale = $this->locales->localeOf($recipientId)->value;
+
+        return new PushNotification(
+            $this->translator->trans('risala_revealed.title', domain: 'messages', locale: $locale),
+            $this->translator->trans('risala_revealed.body', [
+                '%author%' => $senderName,
+                '%discipline%' => $this->disciplines->labelOf($discipline, $locale),
+                '%bonus%' => $this->rules->recipientBonusPercent(),
+            ], 'messages', $locale),
+            NotificationCategory::RisalaRevealed,
+            'risala:'.$risala->guild()->id()->toRfc4122(),
+            new PushRoute(PushRouteType::GuildRisalat, $risala->guild()->id()),
+        );
     }
 }

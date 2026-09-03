@@ -9,19 +9,21 @@ use App\Community\Domain\PendingGuildActivity;
 use App\Community\Domain\QuietHours;
 use App\Community\Infrastructure\Doctrine\GuildMembershipRepository;
 use App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository;
+use App\Shared\Application\PlayerLocales;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerTimezones;
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRoute;
 use App\Shared\Application\PushSender;
-use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
+use App\Shared\Infrastructure\Translation\DisciplineTranslator;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * L'envoi proprement dit (#133) — jamais avant que la fenêtre soit lue via
@@ -51,6 +53,7 @@ final readonly class AnnounceGuildActivityHandler
         private PendingGuildActivityRepository $pending,
         private GuildMembershipRepository $memberships,
         private PlayerProfiles $profiles,
+        private PlayerLocales $locales,
         private PlayerTimezones $timezones,
         private PushSender $pushSender,
         private NotificationAttemptRepository $attempts,
@@ -62,6 +65,8 @@ final readonly class AnnounceGuildActivityHandler
          * `symfony/rate-limiter`, pas un choix de ce fichier.
          */
         private RateLimiterFactoryInterface $guildActivityPushLimiter,
+        private TranslatorInterface $translator,
+        private DisciplineTranslator $disciplines,
     ) {
     }
 
@@ -109,20 +114,6 @@ final readonly class AnnounceGuildActivityHandler
             return;
         }
 
-        $notification = new PushNotification(
-            'Activité de guilde',
-            self::body($profile->displayName, $activity),
-            NotificationCategory::GuildActivity,
-            // Stable par auteur, pas par fenêtre : la prochaine activité du même joueur
-            // remplace celle-ci sur l'appareil du destinataire plutôt que de s'empiler à
-            // côté. Ne pas confondre avec `windowId`, qui sert à l'idempotence du #134 en
-            // dessous — l'un fusionne l'affichage, l'autre empêche un double envoi.
-            'guild-activity:'.$message->authorId->toRfc4122(),
-            // #144 : la cible du tap est l'auteur de la séance, dont le profil se relit
-            // par `GET /api/players/{id}` — jamais l'XP ou la discipline transportées ici.
-            new PushRoute(PushRouteType::PlayerProfile, $message->authorId),
-        );
-
         $now = $this->clock->now();
 
         foreach ($recipientIds as $recipientId) {
@@ -133,6 +124,8 @@ final readonly class AnnounceGuildActivityHandler
             if (!$this->guildActivityPushLimiter->create($recipientId->toRfc4122())->consume()->isAccepted()) {
                 continue;
             }
+
+            $notification = $this->notificationFor($recipientId, $message->authorId, $profile->displayName, $activity);
 
             // Écrite avant l'appel réseau, en contrainte d'unicité (#134) : l'outbox livre
             // au moins une fois, donc c'est cette réservation — pas un espoir que ce
@@ -167,49 +160,31 @@ final readonly class AnnounceGuildActivityHandler
         return $recipients;
     }
 
-    private static function body(string $authorName, PendingGuildActivity $activity): string
+    private function notificationFor(Uuid $recipientId, Uuid $authorId, string $authorName, PendingGuildActivity $activity): PushNotification
     {
+        $locale = $this->locales->localeOf($recipientId)->value;
+
         if (1 === $activity->sessionsCount()) {
-            return \sprintf(
-                '⚔️ %s : %d min de %s, +%d XP',
-                $authorName,
-                intdiv($activity->lastDurationSeconds(), 60),
-                self::disciplineLabel($activity->lastDiscipline()),
-                $activity->totalXpGranted(),
-            );
+            $body = $this->translator->trans('guild_activity.single', [
+                '%author%' => $authorName,
+                '%minutes%' => intdiv($activity->lastDurationSeconds(), 60),
+                '%discipline%' => $this->disciplines->labelOf($activity->lastDiscipline(), $locale),
+                '%xp%' => $activity->totalXpGranted(),
+            ], 'messages', $locale);
+        } else {
+            $body = $this->translator->trans('guild_activity.multiple', [
+                '%author%' => $authorName,
+                '%sessions%' => $activity->sessionsCount(),
+                '%xp%' => $activity->totalXpGranted(),
+            ], 'messages', $locale);
         }
 
-        return \sprintf(
-            '⚔️ %s a enregistré %d séances, +%d XP',
-            $authorName,
-            $activity->sessionsCount(),
-            $activity->totalXpGranted(),
+        return new PushNotification(
+            $this->translator->trans('guild_activity.title', domain: 'messages', locale: $locale),
+            $body,
+            NotificationCategory::GuildActivity,
+            'guild-activity:'.$authorId->toRfc4122(),
+            new PushRoute(PushRouteType::PlayerProfile, $authorId),
         );
-    }
-
-    /**
-     * Une traduction en dur, et volontairement : c'est le texte d'un push, pas une donnée
-     * du contrat API — contrairement à {@see Discipline} lui-même, qui reste anglais et
-     * stable pour le client. Le jour où l'app se traduit, ce sera par le même mécanisme
-     * que {@see \App\Progression\Infrastructure\Translation\TitleTranslator}, mais un
-     * worker asynchrone n'a pas de requête HTTP dont tirer une locale — poser
-     * l'infrastructure de traduction ici attendrait un besoin qui n'existe pas encore.
-     */
-    private static function disciplineLabel(Discipline $discipline): string
-    {
-        return match ($discipline) {
-            Discipline::Running => 'course',
-            Discipline::Walking => 'marche',
-            Discipline::Cycling => 'vélo',
-            Discipline::Swimming => 'natation',
-            Discipline::Strength => 'musculation',
-            Discipline::Hiit => 'HIIT',
-            Discipline::Hiking => 'randonnée',
-            Discipline::Mobility => 'mobilité',
-            Discipline::Climbing => 'escalade',
-            Discipline::Football => 'football',
-            Discipline::CourtSports => 'sport de salle',
-            Discipline::RacketSports => 'sport de raquette',
-        };
     }
 }
