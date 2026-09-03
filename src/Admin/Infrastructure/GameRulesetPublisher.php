@@ -186,6 +186,7 @@ final readonly class GameRulesetPublisher
         $xp = $snapshot['xp'];
         /** @var list<array{discipline: string, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int, split: ?array<string, int>}> $disciplines */
         $disciplines = $snapshot['disciplines'];
+        self::validateActiveDisciplineReferences($titles, $workout, $disciplines);
         $rates = array_map(static function (array $discipline): array {
             $rate = ['discipline' => $discipline['discipline']];
             if (!$discipline['credits_xp']) {
@@ -327,6 +328,48 @@ final readonly class GameRulesetPublisher
         foreach ($activeTableKeys['chest'] as $key => $_) {
             if (!isset($activeChests[$key])) {
                 throw new LogicException(\sprintf('La table coffre active "%s" doit référencer un coffre actif.', $key));
+            }
+        }
+    }
+
+    /**
+     * Une discipline inactive reste lisible dans les faits historiques, mais aucun contenu
+     * actif ne peut encore la proposer : sinon une publication rendrait un titre ou un loot
+     * impossible sans que l'administration le voie.
+     *
+     * @param list<array<string, mixed>> $titles
+     * @param list<array<string, mixed>> $workout
+     * @param list<array<string, mixed>> $disciplines
+     */
+    private static function validateActiveDisciplineReferences(array $titles, array $workout, array $disciplines): void
+    {
+        $active = [];
+        foreach ($disciplines as $discipline) {
+            if (($discipline['active'] ?? true) === true && \is_string($discipline['discipline'] ?? null)) {
+                $active[$discipline['discipline']] = true;
+            }
+        }
+        foreach ($titles as $title) {
+            $condition = $title['condition'] ?? [];
+            if (($title['active'] ?? true) === true && \is_array($condition) && \is_string($condition['discipline'] ?? null) && !isset($active[$condition['discipline']])) {
+                $titleId = $title['id'] ?? null;
+                \assert(\is_string($titleId));
+                throw new LogicException(\sprintf('Le titre actif "%s" référence la discipline inactive "%s".', $titleId, $condition['discipline']));
+            }
+        }
+        foreach ($workout as $table) {
+            $eligibility = $table['eligibility'] ?? [];
+            if (($table['active'] ?? true) !== true || !\is_array($eligibility)) {
+                continue;
+            }
+            $eligibleDisciplines = $eligibility['disciplines'] ?? [];
+            \assert(\is_array($eligibleDisciplines));
+            foreach ($eligibleDisciplines as $discipline) {
+                if (\is_string($discipline) && !isset($active[$discipline])) {
+                    $tableKey = $table['key'] ?? null;
+                    \assert(\is_string($tableKey));
+                    throw new LogicException(\sprintf('La table active "%s" référence la discipline inactive "%s".', $tableKey, $discipline));
+                }
             }
         }
     }
