@@ -162,7 +162,7 @@ final readonly class AnnounceGuildActivityHandler
 
     private function notificationFor(Uuid $recipientId, Uuid $authorId, string $authorName, PendingGuildActivity $activity): PushNotification
     {
-        $locale = $this->locales->localeOf($recipientId)->value;
+        $locale = $this->locales->localeOf($recipientId);
 
         if (1 === $activity->sessionsCount()) {
             $body = $this->translator->trans('guild_activity.single', [

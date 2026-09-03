@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Identity\Domain;
 
 use App\Identity\Infrastructure\Doctrine\UserRepository;
-use App\Shared\Domain\Locale;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\Timezone;
 use DateTimeImmutable;

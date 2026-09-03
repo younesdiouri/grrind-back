@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Identity\Infrastructure\Doctrine;
 
 use App\Identity\Domain\Exception\EmailAlreadyUsed;
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\User;
 use App\Shared\Application\PlayerLocales;
 use App\Shared\Application\PlayerTimezones;
-use App\Shared\Domain\Locale;
 use App\Shared\Domain\Timezone;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -89,7 +89,7 @@ class UserRepository extends ServiceEntityRepository implements UserLoaderInterf
         return $timezone instanceof Timezone ? $timezone : Timezone::utc();
     }
 
-    public function localeOf(Uuid $userId): Locale
+    public function localeOf(Uuid $userId): string
     {
         $row = $this->createQueryBuilder('u')
             ->select('u.locale')
@@ -100,7 +100,7 @@ class UserRepository extends ServiceEntityRepository implements UserLoaderInterf
 
         $locale = \is_array($row) ? $row['locale'] : null;
 
-        return $locale instanceof Locale ? $locale : Locale::English;
+        return ($locale instanceof Locale ? $locale : Locale::English)->value;
     }
 
     /**

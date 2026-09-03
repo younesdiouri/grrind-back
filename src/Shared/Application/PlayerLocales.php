@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Shared\Application;
 
-use App\Shared\Domain\Locale;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -14,5 +13,5 @@ use Symfony\Component\Uid\Uuid;
 interface PlayerLocales
 {
     /** Retourne l'anglais pour un compte inconnu : un échec de traduction ne doit pas perdre une notification. */
-    public function localeOf(Uuid $userId): Locale;
+    public function localeOf(Uuid $userId): string;
 }

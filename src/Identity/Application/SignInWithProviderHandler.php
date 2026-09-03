@@ -7,11 +7,11 @@ namespace App\Identity\Application;
 use App\Identity\Domain\Exception\EmailBelongsToAnotherAccount;
 use App\Identity\Domain\Exception\SocialProfileIncomplete;
 use App\Identity\Domain\Exception\SocialSignInRejected;
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\SocialIdentity;
 use App\Identity\Domain\User;
 use App\Identity\Infrastructure\Doctrine\SocialIdentityRepository;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
-use App\Shared\Domain\Locale;
 use App\Shared\Domain\Timezone;
 use Psr\Clock\ClockInterface;
 

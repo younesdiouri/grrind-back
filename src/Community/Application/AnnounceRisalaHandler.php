@@ -122,7 +122,7 @@ final readonly class AnnounceRisalaHandler
 
     private function notificationFor(Uuid $recipientId, string $senderName, Discipline $discipline, Risala $risala): PushNotification
     {
-        $locale = $this->locales->localeOf($recipientId)->value;
+        $locale = $this->locales->localeOf($recipientId);
 
         return new PushNotification(
             $this->translator->trans('risala_revealed.title', domain: 'messages', locale: $locale),

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\User;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
-use App\Shared\Domain\Locale;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\Timezone;
 

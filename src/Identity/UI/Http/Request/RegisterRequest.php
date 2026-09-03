@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Identity\UI\Http\Request;
 
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\User;
-use App\Shared\Domain\Locale;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**

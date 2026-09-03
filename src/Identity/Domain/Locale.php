@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Domain;
+namespace App\Identity\Domain;
 
-/**
- * Langues que le produit livre réellement. Le choix vit sur le compte afin qu'une
- * notification asynchrone garde la langue du destinataire, sans dépendre du téléphone qui
- * l'a créée.
- */
+/** Langues réellement livrées, persistées sur le profil du joueur. */
 enum Locale: string
 {
     case English = 'en';

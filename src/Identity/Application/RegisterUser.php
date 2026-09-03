@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
-use App\Shared\Domain\Locale;
+use App\Identity\Domain\Locale;
 
 /**
  * Commande d'inscription. La locale est déjà résolue par l'interface HTTP : elle ne doit pas

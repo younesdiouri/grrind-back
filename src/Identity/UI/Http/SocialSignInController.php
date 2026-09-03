@@ -6,11 +6,11 @@ namespace App\Identity\UI\Http;
 
 use App\Identity\Application\SignInWithProvider;
 use App\Identity\Application\SignInWithProviderHandler;
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\SocialProvider;
 use App\Identity\UI\Http\Request\SocialSignInRequest;
 use App\Identity\UI\Http\Response\AuthResource;
 use App\Shared\Application\PlayerTitles;
-use App\Shared\Domain\Locale;
 use Nelmio\ApiDocBundle\Attribute\Security;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;

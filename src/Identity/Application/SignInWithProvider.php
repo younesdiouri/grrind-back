@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\SocialProvider;
-use App\Shared\Domain\Locale;
 
 final readonly class SignInWithProvider
 {

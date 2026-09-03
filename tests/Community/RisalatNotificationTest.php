@@ -19,7 +19,6 @@ use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerTimezones;
 use App\Shared\Domain\Activity\CreditingDisciplines;
 use App\Shared\Domain\Activity\Discipline;
-use App\Shared\Domain\Locale;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
@@ -371,14 +370,14 @@ final class RisalatNotificationTest extends ApiTestCase
         return new class implements PlayerLocales {
             private bool $first = true;
 
-            public function localeOf(Uuid $userId): Locale
+            public function localeOf(Uuid $userId): string
             {
                 if ($this->first) {
                     $this->first = false;
                     throw new RuntimeException('Catalogue de langues momentanément indisponible.');
                 }
 
-                return Locale::English;
+                return 'en';
             }
         };
     }

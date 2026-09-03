@@ -94,7 +94,7 @@ final readonly class AnnounceRisalaTurnHandler
             return;
         }
 
-        $locale = $this->locales->localeOf($risala->senderId())->value;
+        $locale = $this->locales->localeOf($risala->senderId());
         $deadline = $risala->deadline()->setTimezone($timezone->toDateTimeZone())->format('fr' === $locale ? 'd/m \à H\hi' : 'M j \a\t H:i');
         $notification = new PushNotification(
             $this->translator->trans('risala_turn.title', domain: 'messages', locale: $locale),
