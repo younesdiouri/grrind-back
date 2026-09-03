@@ -16,6 +16,7 @@ use App\Combat\Domain\ExtraTurn;
 use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Response\BattleResource;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
@@ -98,7 +99,7 @@ final class BattleResourcePayloadTest extends TestCase
 
         $battle = self::battleAgainst('SAND_JACKAL', $reward);
 
-        self::assertSame($reward, BattleResource::from($battle, new EnemyTranslator(self::stubTranslator()))->toArray()['rewards']);
+        self::assertSame($reward, BattleResource::from($battle, new EnemyTranslator(self::stubTranslator(), self::rulesets()))->toArray()['rewards']);
     }
 
     /** Le nom vient du traducteur, jamais de la clé brute stockée dans le snapshot. */
@@ -120,7 +121,7 @@ final class BattleResourcePayloadTest extends TestCase
     {
         $battle = self::battleAgainst('GHOST_ENEMY');
 
-        $payload = BattleResource::from($battle, new EnemyTranslator(self::stubTranslator()))->toArray();
+        $payload = BattleResource::from($battle, new EnemyTranslator(self::stubTranslator(), self::rulesets()))->toArray();
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
@@ -132,7 +133,7 @@ final class BattleResourcePayloadTest extends TestCase
 
     private static function resource(): BattleResource
     {
-        return BattleResource::from(self::battleAgainst('SAND_JACKAL'), new EnemyTranslator(self::stubTranslator()));
+        return BattleResource::from(self::battleAgainst('SAND_JACKAL'), new EnemyTranslator(self::stubTranslator(), self::rulesets()));
     }
 
     /**
@@ -180,6 +181,26 @@ final class BattleResourcePayloadTest extends TestCase
             public function getLocale(): string
             {
                 return 'fr';
+            }
+        };
+    }
+
+    private static function rulesets(): GameRulesets
+    {
+        return new class implements GameRulesets {
+            public function snapshot(): array
+            {
+                return ['combat' => ['enemies' => [['key' => 'SAND_JACKAL', 'translations' => ['fr' => ['name' => 'Chacal des sables'], 'en' => ['name' => 'Sand jackal']]]], 'bosses' => []]];
+            }
+
+            public function version(): string
+            {
+                return 'v1-test';
+            }
+
+            public function revision(): int
+            {
+                return 1;
             }
         };
     }

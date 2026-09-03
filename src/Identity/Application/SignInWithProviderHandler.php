@@ -7,6 +7,7 @@ namespace App\Identity\Application;
 use App\Identity\Domain\Exception\EmailBelongsToAnotherAccount;
 use App\Identity\Domain\Exception\SocialProfileIncomplete;
 use App\Identity\Domain\Exception\SocialSignInRejected;
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\SocialIdentity;
 use App\Identity\Domain\User;
 use App\Identity\Infrastructure\Doctrine\SocialIdentityRepository;
@@ -51,7 +52,7 @@ final readonly class SignInWithProviderHandler
             $command->codeVerifier,
         );
 
-        $user = $this->existing($profile) ?? $this->create($profile, $command->timezone);
+        $user = $this->existing($profile) ?? $this->create($profile, $command->timezone, $command->locale);
 
         return new AuthenticatedUser($user, ($this->issueTokens)($user));
     }
@@ -89,7 +90,7 @@ final readonly class SignInWithProviderHandler
     /**
      * @throws SocialProfileIncomplete
      */
-    private function create(SocialProfile $profile, string $timezone): User
+    private function create(SocialProfile $profile, string $timezone, Locale $locale): User
     {
         if (null === $profile->email) {
             throw new SocialProfileIncomplete($profile->provider);
@@ -100,6 +101,7 @@ final readonly class SignInWithProviderHandler
             self::displayNameFor($profile),
             Timezone::fromString($timezone),
             $this->clock->now(),
+            $locale,
         );
 
         // Pas de setPassword() : `/api/auth/login` refusera ce compte, c'est voulu.

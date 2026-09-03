@@ -53,7 +53,7 @@ final class ProgressionStateTest extends ApiTestCase
         );
         // Aucune journée envoyée : le bonus (#165) reste nul, comme la base.
         self::assertSame(
-            ['windowAverageActiveKcal' => 0, 'targetActiveKcal' => self::getContainer()->getParameter('game.attributes.vitality.target_active_kcal'), 'bonusPermille' => 0],
+            ['windowAverageActiveKcal' => 0, 'targetActiveKcal' => self::vitalityTarget(), 'bonusPermille' => 0],
             $state['vitalityBreakdown'],
         );
         self::assertNull($state['activeTitle']);
@@ -108,7 +108,7 @@ final class ProgressionStateTest extends ApiTestCase
         );
         // Toujours aucune journée envoyée dans ce test : le bonus (#165) reste nul.
         self::assertSame(
-            ['windowAverageActiveKcal' => 0, 'targetActiveKcal' => self::getContainer()->getParameter('game.attributes.vitality.target_active_kcal'), 'bonusPermille' => 0],
+            ['windowAverageActiveKcal' => 0, 'targetActiveKcal' => self::vitalityTarget(), 'bonusPermille' => 0],
             $state['vitalityBreakdown'],
         );
         self::assertIsString($state['lastProgressionAt']);
@@ -183,5 +183,13 @@ final class ProgressionStateTest extends ApiTestCase
     public function testRequiresAToken(): void
     {
         self::assertSame(Response::HTTP_UNAUTHORIZED, $this->get('/api/progression')->getStatusCode());
+    }
+
+    private static function vitalityTarget(): int
+    {
+        $vitality = self::getContainer()->get(\App\Shared\Domain\Activity\Vitality::class);
+        self::assertInstanceOf(\App\Shared\Domain\Activity\Vitality::class, $vitality);
+
+        return $vitality->explain(0)->targetActiveKcal;
     }
 }

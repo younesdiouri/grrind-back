@@ -60,7 +60,7 @@ final readonly class RisalaModifiers implements ModifierContributor
         return array_map(
             fn (Risala $risala): Modifier => new Modifier(
                 ModifierType::XpMultiplier,
-                $risala->senderId()->equals($userId) ? $this->rules->senderBonusPercent : $this->rules->recipientBonusPercent,
+                $risala->senderId()->equals($userId) ? $this->rules->senderBonusPercent() : $this->rules->recipientBonusPercent(),
                 ModifierSource::Guild,
                 // Une Risāla révélée porte toujours sa discipline — `Risala::seal()` efface
                 // celle d'un tour manqué et ne révèle jamais sans elle. Un `??` silencieux

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Admin;
 
+use App\Admin\Domain\GameActivityType;
+use App\Admin\Domain\GameDiscipline;
 use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
+use App\Admin\Domain\GameLevel;
 use App\Admin\Domain\GameLootTable;
 use App\Admin\Domain\GameRuleset;
 use App\Admin\Domain\GameSettings;
@@ -101,6 +104,65 @@ final class GameCrudHttpTest extends ApiTestCase
         $settings = $this->client->request('GET', '/admin/settings');
         self::assertResponseIsSuccessful();
         self::assertGreaterThan(0, $settings->filter('th[data-column="id"] a')->count());
+    }
+
+    public function testRemainingBalanceCrudRoutesSupportTheirSafeLifecycle(): void
+    {
+        $this->loginAdmin('remaining-balance-crud-admin@grrind.app');
+        $doctrine = self::getContainer()->get('doctrine');
+        $discipline = $doctrine->getRepository(GameDiscipline::class)->findOneBy(['active' => true]);
+        $level = $doctrine->getRepository(GameLevel::class)->findOneBy(['level' => 1]);
+        self::assertInstanceOf(GameDiscipline::class, $discipline);
+        self::assertInstanceOf(GameLevel::class, $level);
+        $disciplineId = $discipline->getId()->toRfc4122();
+        $levelId = $level->getId()->toRfc4122();
+
+        foreach ([
+            ['discipline', $disciplineId],
+            ['level', $levelId],
+        ] as [$path, $id]) {
+            $this->client->request('GET', '/admin/'.$path);
+            self::assertResponseIsSuccessful();
+            $this->client->request('GET', '/admin/'.$path.'/new');
+            self::assertResponseIsSuccessful();
+            $this->client->request('GET', '/admin/'.$path.'/'.$id.'/edit');
+            self::assertResponseIsSuccessful();
+        }
+
+        $this->delete('/admin/discipline/'.$disciplineId.'/edit', '/admin/discipline/'.$disciplineId.'/delete');
+        $this->delete('/admin/level/'.$levelId.'/edit', '/admin/level/'.$levelId.'/delete');
+        self::getContainer()->get('doctrine')->getManager()->clear();
+        self::assertNotNull(self::getContainer()->get('doctrine')->getRepository(GameDiscipline::class)->find($disciplineId));
+        self::assertNotNull(self::getContainer()->get('doctrine')->getRepository(GameLevel::class)->find($levelId));
+
+        $providerType = 'HTTP_INACTIVE_'.bin2hex(random_bytes(4));
+        $this->client->request('GET', '/admin/activity-type');
+        self::assertResponseIsSuccessful();
+        $crawler = $this->client->request('GET', '/admin/activity-type/new');
+        self::assertResponseIsSuccessful();
+        $form = $crawler->filter('form[name="GameActivityType"]')->form();
+        $active = $form['GameActivityType[active]'];
+        self::assertInstanceOf(ChoiceFormField::class, $active);
+        $active->untick();
+        $form->setValues([
+            'GameActivityType[source]' => '0',
+            'GameActivityType[providerType]' => $providerType,
+            'GameActivityType[discipline]' => '0',
+        ]);
+        $this->client->submit($form);
+        self::assertResponseRedirects();
+
+        $mapping = self::getContainer()->get('doctrine')->getRepository(GameActivityType::class)->findOneBy(['providerType' => $providerType]);
+        self::assertInstanceOf(GameActivityType::class, $mapping);
+        $mappingId = $mapping->getId()->toRfc4122();
+        $edit = $this->client->request('GET', '/admin/activity-type/'.$mappingId.'/edit')->filter('form[name="GameActivityType"]')->form();
+        $editedProviderType = $providerType.'_EDITED';
+        $edit->setValues(['GameActivityType[providerType]' => $editedProviderType]);
+        $this->client->submit($edit);
+        self::assertResponseRedirects();
+        $this->delete('/admin/activity-type/'.$mappingId.'/edit', '/admin/activity-type/'.$mappingId.'/delete');
+        self::getContainer()->get('doctrine')->getManager()->clear();
+        self::assertNull(self::getContainer()->get('doctrine')->getRepository(GameActivityType::class)->find($mappingId));
     }
 
     public function testTitleCanBeCreatedUpdatedDeactivatedAndDeletedThroughAdmin(): void
@@ -289,6 +351,15 @@ final class GameCrudHttpTest extends ApiTestCase
 
         $crawler = $this->client->request('GET', '/admin/settings/1/edit');
         self::assertResponseIsSuccessful();
+        foreach ([
+            'GameSettings[training][minimum_duration_seconds]',
+            'GameSettings[xp][base_xp_per_hour]',
+            'GameSettings[attributes][vitality][floor_permille]',
+            'GameSettings[community][risala][week_timezone]',
+            'GameSettings[notifications][quiet_hours_start_hour]',
+        ] as $name) {
+            self::assertCount(1, $crawler->filter(\sprintf('input[name="%s"]', $name)));
+        }
         $form = $crawler->filter('form[name="GameSettings"]')->form();
         $form->setValues(['GameSettings[lootLuck][floor_percent]' => (string) $newFloor]);
         $this->client->submit($form);

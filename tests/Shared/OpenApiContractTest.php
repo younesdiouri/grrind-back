@@ -215,6 +215,19 @@ final class OpenApiContractTest extends KernelTestCase
         );
     }
 
+    public function testUserProfileDeclaresThePersistedLocale(): void
+    {
+        $profile = $this->schema('UserProfile');
+        $required = $profile['required'];
+        $properties = $profile['properties'];
+        self::assertIsArray($required);
+        self::assertIsArray($properties);
+        $locale = $properties['locale'];
+        self::assertIsArray($locale);
+        self::assertContains('locale', $required);
+        self::assertSame(['en', 'fr'], $locale['enum']);
+    }
+
     /**
      * Une opération sans réponse décrite passerait le test ci-dessus tout en ne disant
      * rien au client : elle est documentée « pour la forme ».

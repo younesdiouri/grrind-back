@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Community\Domain;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use App\Shared\Domain\Timezone;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -33,8 +35,10 @@ use InvalidArgumentException;
  * qu'il n'existe jamais de fenêtre où le choix est encore possible alors que la révélation
  * a déjà eu lieu — ni l'inverse.
  */
-final readonly class RisalaRules
+final class RisalaRules
 {
+    use RuntimeRuleset;
+
     public Timezone $weekTimezone;
 
     /**
@@ -51,7 +55,9 @@ final readonly class RisalaRules
         public int $recipientBonusPercent,
         /** Ce que touche celui qui l'a envoyée, sur la même discipline. */
         public int $senderBonusPercent,
+        ?GameRulesets $rulesets = null,
     ) {
+        $this->useRuntimeRulesets($rulesets);
         $this->weekTimezone = Timezone::fromString($weekTimezone);
 
         // Une Risāla d'une seule semaine expirerait à l'instant même où la suivante est
@@ -84,6 +90,21 @@ final readonly class RisalaRules
         }
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
+    public function recipientBonusPercent(): int
+    {
+        return $this->isRuntimeRuleset() ? $this->runtimeValue()->recipientBonusPercent() : $this->recipientBonusPercent;
+    }
+
+    public function senderBonusPercent(): int
+    {
+        return $this->isRuntimeRuleset() ? $this->runtimeValue()->senderBonusPercent() : $this->senderBonusPercent;
+    }
+
     /**
      * Le prochain rendez-vous hebdomadaire, **strictement après** `$instant`.
      *
@@ -97,6 +118,10 @@ final readonly class RisalaRules
      */
     public function nextRevealAfter(DateTimeImmutable $instant): DateTimeImmutable
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->nextRevealAfter($instant);
+        }
+
         $local = $instant->setTimezone($this->weekTimezone->toDateTimeZone());
 
         $candidate = $local->setTime($this->revealHour, 0);
@@ -119,6 +144,20 @@ final readonly class RisalaRules
      */
     public function expiryOf(DateTimeImmutable $revealedAt): DateTimeImmutable
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->expiryOf($revealedAt);
+        }
+
         return $revealedAt->modify(\sprintf('+%d weeks', $this->activeWeeks));
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var array{risala: array{active_weeks: int, reveal_day: int, reveal_hour: int, week_timezone: string, recipient_bonus_percent: int, sender_bonus_percent: int}} $community */
+        $community = $snapshot['community'];
+        $risala = $community['risala'];
+
+        return new self($risala['active_weeks'], $risala['reveal_day'], $risala['reveal_hour'], $risala['week_timezone'], $risala['recipient_bonus_percent'], $risala['sender_bonus_percent'], $rulesets);
     }
 }

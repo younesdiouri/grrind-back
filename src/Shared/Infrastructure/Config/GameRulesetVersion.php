@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Config;
 
 /**
- * L'empreinte d'une révision est calculable côté lecture comme côté publication. Ainsi un
- * déploiement qui change un YAML restant ne continue jamais à annoncer l'ancienne version
- * tant qu'aucune édition EasyAdmin n'a lieu.
+ * L'empreinte est celle du snapshot publié : la même forme est calculable à l'écriture et à la
+ * lecture, sans faire dépendre une révision éditable d'un fichier livré avec l'image.
  */
 final class GameRulesetVersion
 {
     /** @param array<string, mixed> $snapshot */
-    public static function of(string $yamlVersion, array $snapshot): string
+    public static function of(array $snapshot): string
     {
         $snapshot = self::gameplay($snapshot);
-        $canonical = json_encode(self::canonicalize(['yaml_version' => $yamlVersion, 'database' => $snapshot]), \JSON_THROW_ON_ERROR);
+        $canonical = json_encode(self::canonicalize($snapshot), \JSON_THROW_ON_ERROR);
 
         return 'v1-'.substr(hash('sha256', $canonical), 0, 12);
     }
@@ -75,6 +74,24 @@ final class GameRulesetVersion
             $combat[$type] = $enemies;
         }
         $snapshot['combat'] = $combat;
+        $disciplines = $snapshot['disciplines'] ?? [];
+        \assert(\is_array($disciplines));
+        foreach ($disciplines as &$discipline) {
+            \assert(\is_array($discipline));
+            unset($discipline['translations']);
+        }
+        unset($discipline);
+        $snapshot['disciplines'] = $disciplines;
+        $activityTypes = $snapshot['activity_types'] ?? [];
+        \assert(\is_array($activityTypes));
+        usort($activityTypes, static fn (mixed $left, mixed $right): int => [
+            \is_array($left) ? $left['source'] ?? '' : '',
+            \is_array($left) ? $left['provider_type'] ?? '' : '',
+        ] <=> [
+            \is_array($right) ? $right['source'] ?? '' : '',
+            \is_array($right) ? $right['provider_type'] ?? '' : '',
+        ]);
+        $snapshot['activity_types'] = $activityTypes;
 
         return $snapshot;
     }

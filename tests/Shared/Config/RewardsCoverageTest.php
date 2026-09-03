@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared\Config;
 
+use App\Admin\Infrastructure\GameRulesetSeed;
 use App\Combat\Application\FighterFactory;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\EnemyCatalog;
@@ -20,7 +21,6 @@ use App\Shared\Domain\Modifier\ModifierType;
 use DateTimeImmutable;
 use LogicException;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -112,10 +112,15 @@ final class RewardsCoverageTest extends KernelTestCase
     public function testLaVersionDesTablesEstExposeeIndependammentDuRulesetVersion(): void
     {
         self::bootKernel();
-        $container = self::getContainer();
-
-        self::assertSame(1, $container->getParameter('game.loot.version'));
-        self::assertIsString($container->getParameter('game.ruleset_version'));
+        $ruleset = self::getContainer()->get(\App\Shared\Application\GameRulesets::class);
+        self::assertInstanceOf(\App\Shared\Application\GameRulesets::class, $ruleset);
+        /** @var array{loot: array{version: int}} $snapshot */
+        $snapshot = $ruleset->snapshot();
+        $seedLoot = GameRulesetSeed::data()['loot'];
+        self::assertIsArray($seedLoot);
+        self::assertSame(1, $seedLoot['version']);
+        self::assertSame($snapshot['loot']['version'], self::shippedTables()->version());
+        self::assertNotSame('', $ruleset->version());
     }
 
     /**
@@ -173,68 +178,28 @@ final class RewardsCoverageTest extends KernelTestCase
     private static function shippedCatalog(): ItemCatalog
     {
         self::bootKernel();
-        $container = self::getContainer();
+        $catalog = self::getContainer()->get(ItemCatalog::class);
+        self::assertInstanceOf(ItemCatalog::class, $catalog);
 
-        $items = $container->getParameter('game.items.items');
-        self::assertIsArray($items);
-
-        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
-        return new ItemCatalog($items);
+        return $catalog;
     }
 
     private static function shippedTables(): LootTables
     {
         self::bootKernel();
-        $container = self::getContainer();
+        $tables = self::getContainer()->get(LootTables::class);
+        self::assertInstanceOf(LootTables::class, $tables);
 
-        $version = self::intParameter($container, 'game.loot.version');
-
-        $workout = $container->getParameter('game.loot.workout');
-        $adversary = $container->getParameter('game.loot.adversary');
-        $chest = $container->getParameter('game.loot.chest');
-        $items = $container->getParameter('game.items.items');
-        $enemies = $container->getParameter('game.combat.enemies');
-        $bosses = $container->getParameter('game.combat.bosses');
-
-        self::assertIsArray($workout);
-        self::assertIsArray($adversary);
-        self::assertIsArray($chest);
-        self::assertIsArray($items);
-        self::assertIsArray($enemies);
-        self::assertIsArray($bosses);
-
-        /**
-         * @var list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout
-         * @var list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
-         * @var list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $chest
-         * @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}>   $items
-         * @var list<array{key: string}>                                                                                                                                                                                               $enemies
-         * @var list<array{key: string}>                                                                                                                                                                                               $bosses
-         */
-        return new LootTables($version, $workout, $adversary, $chest, $items, $enemies, $bosses);
+        return $tables;
     }
 
     private static function shippedEnemyCatalog(): EnemyCatalog
     {
         self::bootKernel();
-        $container = self::getContainer();
+        $catalog = self::getContainer()->get(EnemyCatalog::class);
+        self::assertInstanceOf(EnemyCatalog::class, $catalog);
 
-        $enemies = $container->getParameter('game.combat.enemies');
-        $bosses = $container->getParameter('game.combat.bosses');
-        self::assertIsArray($enemies);
-        self::assertIsArray($bosses);
-
-        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */
-        /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses */
-        return new EnemyCatalog($enemies, $bosses);
-    }
-
-    private static function intParameter(ContainerInterface $container, string $name): int
-    {
-        $value = $container->getParameter($name);
-        self::assertIsInt($value);
-
-        return $value;
+        return $catalog;
     }
 
     /**
@@ -247,21 +212,23 @@ final class RewardsCoverageTest extends KernelTestCase
     private static function shippedFighterFactory(array $modifiers = []): FighterFactory
     {
         self::bootKernel();
-        $container = self::getContainer();
-
+        /** @var array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_turns: int}}} $snapshot */
+        $snapshot = self::getContainer()->get(\App\Shared\Application\GameRulesets::class)->snapshot();
+        $fighter = $snapshot['combat']['fighter'];
+        self::assertIsArray($fighter);
         $rules = new CombatRules(
-            self::intParameter($container, 'game.combat.fighter.base_hp'),
-            self::intParameter($container, 'game.combat.fighter.hp_per_1000_vitality'),
-            self::intParameter($container, 'game.combat.fighter.base_damage'),
-            self::intParameter($container, 'game.combat.fighter.damage_per_1000_strength'),
-            self::intParameter($container, 'game.combat.fighter.mitigation_permille_per_1000_endurance'),
-            self::intParameter($container, 'game.combat.fighter.mitigation_cap_permille'),
-            self::intParameter($container, 'game.combat.fighter.extra_turn_permille_per_1000_dexterity'),
-            self::intParameter($container, 'game.combat.fighter.extra_turn_cap_permille'),
-            self::intParameter($container, 'game.combat.fighter.dodge_permille_per_1000_mobility'),
-            self::intParameter($container, 'game.combat.fighter.dodge_cap_permille'),
-            self::intParameter($container, 'game.combat.fighter.minimum_damage'),
-            self::intParameter($container, 'game.combat.fighter.max_turns'),
+            $fighter['base_hp'],
+            $fighter['hp_per_1000_vitality'],
+            $fighter['base_damage'],
+            $fighter['damage_per_1000_strength'],
+            $fighter['mitigation_permille_per_1000_endurance'],
+            $fighter['mitigation_cap_permille'],
+            $fighter['extra_turn_permille_per_1000_dexterity'],
+            $fighter['extra_turn_cap_permille'],
+            $fighter['dodge_permille_per_1000_mobility'],
+            $fighter['dodge_cap_permille'],
+            $fighter['minimum_damage'],
+            $fighter['max_turns'],
         );
 
         return new FighterFactory($rules, new ModifierResolver([

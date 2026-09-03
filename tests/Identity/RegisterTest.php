@@ -28,6 +28,7 @@ final class RegisterTest extends ApiTestCase
         self::assertSame('bob@grrind.app', $user['email']);
         self::assertSame('Bob', $user['displayName']);
         self::assertSame('Europe/Paris', $user['timezone']);
+        self::assertSame('en', $user['locale']);
         self::assertIsString($user['id']);
         self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $user['id']);
         self::assertArrayNotHasKey('password', $user);
@@ -82,6 +83,7 @@ final class RegisterTest extends ApiTestCase
         yield 'pseudo vide' => [[...self::VALID, 'displayName' => ''], 'displayName'];
         yield 'pseudo trop long' => [[...self::VALID, 'displayName' => str_repeat('a', 41)], 'displayName'];
         yield 'fuseau inconnu' => [[...self::VALID, 'timezone' => 'Europe/Atlantis'], 'timezone'];
+        yield 'locale inconnue' => [[...self::VALID, 'locale' => 'es'], 'locale'];
     }
 
     public function testRegistrationIsReachableWithoutAuthentication(): void
@@ -89,5 +91,20 @@ final class RegisterTest extends ApiTestCase
         // Le firewall ^/api est stateless : sans la règle PUBLIC_ACCESS sur
         // ^/api/auth, personne ne pourrait jamais créer de compte.
         self::assertSame(Response::HTTP_CREATED, $this->post('/api/auth/register', self::VALID)->getStatusCode());
+    }
+
+    public function testStoresTheRequestedLocaleOrNegotiatesTheRequestLanguage(): void
+    {
+        $explicit = self::decode($this->post('/api/auth/register', [...self::VALID, 'locale' => 'fr']));
+        self::assertIsArray($explicit['user']);
+        self::assertSame('fr', $explicit['user']['locale']);
+
+        $negotiated = self::decode($this->post(
+            '/api/auth/register',
+            [...self::VALID, 'email' => 'alice@grrind.app'],
+            ['Accept-Language' => 'fr-FR,fr;q=0.9,en;q=0.8'],
+        ));
+        self::assertIsArray($negotiated['user']);
+        self::assertSame('fr', $negotiated['user']['locale']);
     }
 }

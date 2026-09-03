@@ -48,7 +48,7 @@ final readonly class SyncStateController
 
         return new JsonResponse(new SyncStateResource(
             $this->workouts->lastImportedAt($userId),
-            $this->rules->importWindowDays,
+            $this->rules->importWindowDays(),
         )->toArray());
     }
 }

@@ -1,10 +1,5 @@
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
-# L'équilibrage du jeu est du config-as-code, sous `config/game/v1/`. Il n'est pas importé
-# ici : ce n'est pas de la configuration Symfony mais de la donnée, lue et validée à la
-# compilation par App\Shared\Infrastructure\Config\GameBalancePass, qui en tire les
-# paramètres `game.*` utilisés plus bas et le `rulesetVersion` du dossier.
-
 parameters:
 
 services:
@@ -28,11 +23,6 @@ services:
     App\Shared\Infrastructure\Config\DatabaseGameRulesets:
         arguments:
             $cache: '@game.ruleset'
-            $yamlGameplayVersion: '%game.ruleset_version%'
-
-    App\Admin\Infrastructure\GameRulesetPublisher:
-        arguments:
-            $yamlGameplayVersion: '%game.ruleset_version%'
 
     App\Progression\Domain\XpCalculator:
         arguments:
@@ -72,61 +62,50 @@ services:
     # nommant ce service : l'équilibrage se valide au démarrage, pas à la première
     # requête d'un joueur.
     App\Training\Domain\WorkoutRules:
-        arguments:
-            $minimumDurationSeconds: '%game.training.minimum_duration_seconds%'
-            $maximumDurationSeconds: '%game.training.maximum_duration_seconds%'
-            $importWindowDays: '%game.training.import_window_days%'
+        factory: ['App\Training\Domain\WorkoutRules', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # La traduction des types de séance des fournisseurs santé, une liste par source. Ajouter
     # un sport ou corriger une correspondance se fait dans le YAML, sans publier sur l'App
     # Store et sans revenir ici.
     App\Shared\Domain\Activity\ActivityTypeMap:
-        arguments:
-            $appleHealth: '%game.activity_types.apple_health%'
-            $healthConnect: '%game.activity_types.health_connect%'
+        factory: ['App\Shared\Domain\Activity\ActivityTypeMap', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Le barème de base. `disciplines` est une liste dans le YAML, donc le chargeur n'y
     # descend pas et le paramètre reste unique : ouvrir une discipline, ou lui donner un
     # bonus de distance, se fait dans le YAML sans revenir ici. Le socle, lui, est un
     # scalaire et se câble explicitement — il ne dépend plus de la discipline (#90).
     App\Progression\Domain\XpRates:
-        arguments:
-            $baseXpPerHour: '%game.xp.base_xp_per_hour%'
-            $disciplines: '%game.xp.disciplines%'
+        factory: ['App\Progression\Domain\XpRates', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # La taille d'une guilde, tirée de `game/v1/community.yaml`. Même raison que
     # `WorkoutRules` : le domaine reçoit un objet validé, pas un entier venu d'un YAML.
     App\Community\Domain\GuildRules:
-        arguments:
-            $maximumMembers: '%game.community.maximum_members%'
-            $inviteCodeLifetimeHours: '%game.community.invite_code_lifetime_hours%'
+        factory: ['App\Community\Domain\GuildRules', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Le calendrier des Risālāt (#191), tiré du même fichier que la taille des guildes.
     # `week_timezone` est le fuseau de la *semaine de jeu*, pas celui d'un joueur — voir le
     # docblock de `RisalaRules` pour pourquoi c'est la seule date du projet qui échappe au
     # fuseau de celui qu'elle concerne.
     App\Community\Domain\RisalaRules:
-        arguments:
-            $activeWeeks: '%game.community.risala.active_weeks%'
-            $revealWeekday: '%game.community.risala.reveal_day%'
-            $revealHour: '%game.community.risala.reveal_hour%'
-            $weekTimezone: '%game.community.risala.week_timezone%'
-            $recipientBonusPercent: '%game.community.risala.recipient_bonus_percent%'
-            $senderBonusPercent: '%game.community.risala.sender_bonus_percent%'
+        factory: ['App\Community\Domain\RisalaRules', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Les disciplines qui créditent, lues une seule fois depuis la **même** liste brute que
     # `XpRates` et `AttributeSplit` consomment (#191). `Community` en a besoin pour refuser
     # une Risāla sur une discipline qui ne rapporte rien, et Deptrac lui interdit de lire
     # quoi que ce soit de `Progression` — d'où l'objet, dans `Shared`.
     App\Shared\Domain\Activity\CreditingDisciplines:
-        arguments:
-            $disciplines: '%game.xp.disciplines%'
+        factory: ['App\Shared\Domain\Activity\CreditingDisciplines', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Les heures calmes d'un destinataire (#133), tirées de `game/v1/notifications.yaml`.
     App\Community\Domain\QuietHours:
-        arguments:
-            $startHour: '%game.notifications.quiet_hours_start_hour%'
-            $endHour: '%game.notifications.quiet_hours_end_hour%'
+        factory: ['App\Community\Domain\QuietHours', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # La fraîcheur d'une séance créditée : au-delà, c'est de l'historique, pas une raison
     # de réveiller la guilde. Le délai, lui, n'est pas de l'équilibrage au sens des autres
@@ -134,18 +113,17 @@ services:
     # réellement.
     App\Community\Application\GuildActivityNotifier:
         arguments:
-            $freshnessWindowMinutes: '%game.notifications.freshness_window_minutes%'
-            $announcementDelaySeconds: '%game.notifications.announcement_delay_seconds%'
+            $rulesets: '@App\Shared\Application\GameRulesets'
 
     # Le seuil d'abandon d'une fenêtre (#134), tiré du même fichier — voir le docblock de
     # `PendingGuildActivityRepository::recordSession()` pour ce qu'il déclenche.
     App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository:
         arguments:
-            $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
+            $rulesets: '@App\Shared\Application\GameRulesets'
 
     App\Progression\Domain\LevelCurve:
-        arguments:
-            $levels: '%game.levels.levels%'
+        factory: ['App\Progression\Domain\LevelCurve', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Le catalogue des titres, d'un bloc pour la même raison que le barème : c'est une
     # liste, et son ordre — qui départage les ex æquo au moment de désigner le prochain
@@ -191,9 +169,8 @@ services:
 
 
     App\Progression\Domain\DiminishingReturns:
-        arguments:
-            $brackets: '%game.xp.diminishing_returns%'
-            $beyondWeightPercent: '%game.xp.diminishing_returns_beyond_percent%'
+        factory: ['App\Progression\Domain\DiminishingReturns', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # La table de répartition de l'XP entre les quatre caractéristiques (#158), tirée de
     # `game/v1/attributes.yaml`. Une liste, comme `disciplines` de `XpRates` juste
@@ -205,25 +182,22 @@ services:
     # avoir une ligne ici. Les deux tables ne peuvent pas diverger sur « qui crédite »
     # sans qu'un seul fichier — `xp.yaml` — bouge.
     App\Shared\Domain\Activity\AttributeSplit:
-        arguments:
-            $splits: '%game.attributes.splits%'
-            $disciplines: '%game.xp.disciplines%'
+        factory: ['App\Shared\Domain\Activity\AttributeSplit', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Vitality (#161), dérivée des quatre caractéristiques ci-dessus — même fichier, même
     # geste : le domaine reçoit un objet validé, pas un entier venu tel quel du YAML.
     # `$targetActiveKcal` et `$bonusCapPermille` sont le bonus quotidien du #165 ; voir le
     # docblock de la classe pour pourquoi ils voyagent avec le plancher plutôt qu'à part.
     App\Shared\Domain\Activity\Vitality:
-        arguments:
-            $floorPermille: '%game.attributes.vitality.floor_permille%'
-            $targetActiveKcal: '%game.attributes.vitality.target_active_kcal%'
-            $bonusCapPermille: '%game.attributes.vitality.bonus_cap_permille%'
+        factory: ['App\Shared\Domain\Activity\Vitality', 'runtime']
+        arguments: ['@App\Shared\Application\GameRulesets']
 
     # Le #165 : la largeur de la fenêtre glissante du bonus de Vitality, seul réglage que
     # `Vitality` elle-même n'a pas à connaître — voir le docblock d'`AttributeSplitSection`.
     App\Progression\Application\VitalityBonusProvider:
         arguments:
-            $windowDays: '%game.attributes.vitality.window_days%'
+            $rulesets: '@App\Shared\Application\GameRulesets'
 
     # Le pendant du #165, dans l'autre sens : `Training` possède `daily_activity`,
     # `Progression` ne connaît que l'interface — voir le docblock du port.
@@ -232,6 +206,7 @@ services:
     # Le fuseau du joueur traverse la frontière des modules par ce seul point : `Identity`
     # implémente le port, `Progression` et `Engagement` ne connaissent que l'interface.
     App\Shared\Application\PlayerTimezones: '@App\Identity\Infrastructure\Doctrine\UserRepository'
+    App\Shared\Application\PlayerLocales: '@App\Identity\Infrastructure\Doctrine\UserRepository'
 
     # Le pendant exact, dans l'autre sens : `Progression` possède les titres, `Identity` les
     # affiche dans le profil sans jamais connaître ni le catalogue ni la table.
@@ -391,7 +366,7 @@ when@test:
         App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository:
             public: true
             arguments:
-                $staleWindowMinutes: '%game.notifications.stale_window_minutes%'
+                $rulesets: '@App\Shared\Application\GameRulesets'
 
         App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository:
             public: true
@@ -468,8 +443,9 @@ when@test:
         # fusionne pas ses arguments, elle les remplace.
         App\Shared\Domain\Activity\CreditingDisciplines:
             public: true
+            factory: ['App\Shared\Domain\Activity\CreditingDisciplines', 'runtime']
             arguments:
-                $disciplines: '%game.xp.disciplines%'
+                $rulesets: '@App\Shared\Application\GameRulesets'
 
         # L'abonné qui prouve qu'un module tiers réagit à un workout importé sans être
         # nommé nulle part. Il n'est pas autoconfiguré par le `App\Tests\` du dessus — il

@@ -8,6 +8,7 @@ use App\Community\Domain\QuietHours;
 use App\Community\Domain\Risala;
 use App\Community\Domain\RisalaStatus;
 use App\Community\Infrastructure\Doctrine\RisalaRepository;
+use App\Shared\Application\PlayerLocales;
 use App\Shared\Application\PlayerTimezones;
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRoute;
@@ -19,6 +20,7 @@ use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * « C'est ton tour, choisis avant l'échéance » — à la seule personne que la rotation a tirée.
@@ -54,6 +56,7 @@ final readonly class AnnounceRisalaTurnHandler
     public function __construct(
         private RisalaRepository $risalat,
         private PlayerTimezones $timezones,
+        private PlayerLocales $locales,
         private PushSender $pushSender,
         private NotificationAttemptRepository $attempts,
         private QuietHours $quietHours,
@@ -61,6 +64,7 @@ final readonly class AnnounceRisalaTurnHandler
         // doit rester sur le bus strict — celui que `MessageBusInterface` résout par défaut.
         private MessageBusInterface $bus,
         private ClockInterface $clock,
+        private TranslatorInterface $translator,
     ) {
     }
 
@@ -90,16 +94,20 @@ final readonly class AnnounceRisalaTurnHandler
             return;
         }
 
+        $locale = $this->locales->localeOf($risala->senderId());
+        $deadline = $risala->deadline()->setTimezone($timezone->toDateTimeZone())->format('fr' === $locale ? 'd/m \à H\hi' : 'M j \a\t H:i');
+        $notification = new PushNotification(
+            $this->translator->trans('risala_turn.title', domain: 'messages', locale: $locale),
+            $this->translator->trans('risala_turn.body', ['%deadline%' => $deadline], 'messages', $locale),
+            NotificationCategory::RisalaTurn,
+            'risala-turn:'.$risala->guild()->id()->toRfc4122(),
+            new PushRoute(PushRouteType::GuildRisalat, $risala->guild()->id()),
+        );
+
         if (!$this->attempts->claim($risala->id(), $risala->senderId(), NotificationCategory::RisalaTurn, $now)) {
             return;
         }
 
-        $this->pushSender->send($risala->senderId(), new PushNotification(
-            'À toi de jouer',
-            \sprintf('📜 Choisis la Risāla de ta guilde avant le %s', $risala->deadline()->setTimezone($timezone->toDateTimeZone())->format('d/m à H\hi')),
-            NotificationCategory::RisalaTurn,
-            'risala-turn:'.$risala->guild()->id()->toRfc4122(),
-            new PushRoute(PushRouteType::GuildRisalat, $risala->guild()->id()),
-        ));
+        $this->pushSender->send($risala->senderId(), $notification);
     }
 }

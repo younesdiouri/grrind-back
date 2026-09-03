@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Training\Domain;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
@@ -30,13 +32,17 @@ use InvalidArgumentException;
  *
  * Valeurs et justification de chaque seuil : `config/game/v1/training.yaml`.
  */
-final readonly class WorkoutRules
+final class WorkoutRules
 {
+    use RuntimeRuleset;
+
     public function __construct(
         public int $minimumDurationSeconds,
         public int $maximumDurationSeconds,
         public int $importWindowDays,
+        ?GameRulesets $rulesets = null,
     ) {
+        $this->useRuntimeRulesets($rulesets);
         // Une configuration incohérente tombe au démarrage, pas le jour où un joueur
         // croise le cas.
         if ($minimumDurationSeconds < 0) {
@@ -54,9 +60,28 @@ final readonly class WorkoutRules
         }
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
+    public function maximumDurationSeconds(): int
+    {
+        return $this->isRuntimeRuleset() ? $this->runtimeValue()->maximumDurationSeconds() : $this->maximumDurationSeconds;
+    }
+
+    public function importWindowDays(): int
+    {
+        return $this->isRuntimeRuleset() ? $this->runtimeValue()->importWindowDays() : $this->importWindowDays;
+    }
+
     /** Sous le plancher, ce n'est pas une séance courte : c'est un faux départ. */
     public function isTooShort(int $durationSeconds): bool
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->isTooShort($durationSeconds);
+        }
+
         return $durationSeconds < $this->minimumDurationSeconds;
     }
 
@@ -67,6 +92,10 @@ final readonly class WorkoutRules
      */
     public function retainedDuration(int $durationSeconds): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->retainedDuration($durationSeconds);
+        }
+
         return min($durationSeconds, $this->maximumDurationSeconds);
     }
 
@@ -79,6 +108,19 @@ final readonly class WorkoutRules
      */
     public function isWithinWindow(DateTimeImmutable $endedAt, DateTimeImmutable $now): bool
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->isWithinWindow($endedAt, $now);
+        }
+
         return $endedAt >= $now->modify(\sprintf('-%d days', $this->importWindowDays));
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var array{minimum_duration_seconds: int, maximum_duration_seconds: int, import_window_days: int} $training */
+        $training = $snapshot['training'];
+
+        return new self($training['minimum_duration_seconds'], $training['maximum_duration_seconds'], $training['import_window_days'], $rulesets);
     }
 }

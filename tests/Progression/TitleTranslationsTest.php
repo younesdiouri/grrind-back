@@ -6,6 +6,7 @@ namespace App\Tests\Progression;
 
 use App\Progression\Domain\TitleCatalog;
 use App\Progression\Infrastructure\Translation\TitleTranslator;
+use App\Shared\Application\GameRulesets;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -35,24 +36,19 @@ final class TitleTranslationsTest extends KernelTestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('locales')]
     public function testEveryDeliveredTitleHasANameAndAHintInEveryLocale(string $locale): void
     {
-        $translator = self::getContainer()->get(TranslatorInterface::class);
-        self::assertInstanceOf(TranslatorInterface::class, $translator);
-
         foreach (self::catalog()->all() as $title) {
             foreach (['name', 'hint'] as $part) {
                 $key = $title->id.'.'.$part;
-                $translated = $translator->trans($key, domain: TitleTranslator::DOMAIN, locale: $locale);
+                $translated = 'name' === $part ? self::translator($locale)->nameOf($title) : self::translator($locale)->hintOf($title);
 
-                self::assertNotSame($key, $translated, \sprintf('`%s` manque à translations/titles.%s.yaml.', $key, $locale));
+                self::assertNotSame($key, $translated, \sprintf('`%s` manque dans le snapshot publié (%s).', $key, $locale));
             }
         }
     }
 
     public function testAHintNeverSpellsOutAThresholdItCouldContradict(): void
     {
-        $translator = self::getContainer()->get(TranslatorInterface::class);
-        self::assertInstanceOf(TranslatorInterface::class, $translator);
-        $titles = new TitleTranslator($translator);
+        $titles = self::translator('en');
 
         foreach (self::catalog()->all() as $title) {
             $hint = $titles->hintOf($title);
@@ -64,13 +60,40 @@ final class TitleTranslationsTest extends KernelTestCase
         }
     }
 
-    /** Le catalogue livré, construit depuis son paramètre — même geste que pour la courbe. */
+    /** Le catalogue runtime, lu dans le snapshot réellement publié. */
     private static function catalog(): TitleCatalog
     {
-        $titles = self::getContainer()->getParameter('game.titles.titles');
-        self::assertIsArray($titles);
+        $catalog = self::getContainer()->get(TitleCatalog::class);
+        self::assertInstanceOf(TitleCatalog::class, $catalog);
 
-        /** @var list<array{id: string, condition: array{type: string, threshold: int, discipline: string|null}}> $titles */
-        return new TitleCatalog($titles);
+        return $catalog;
+    }
+
+    private static function translator(string $locale): TitleTranslator
+    {
+        $rulesets = self::getContainer()->get(GameRulesets::class);
+        self::assertInstanceOf(GameRulesets::class, $rulesets);
+
+        return new TitleTranslator(self::locale($locale), $rulesets);
+    }
+
+    private static function locale(string $locale): TranslatorInterface
+    {
+        return new class($locale) implements TranslatorInterface {
+            public function __construct(private readonly string $locale)
+            {
+            }
+
+            /** @param array<string, mixed> $parameters */
+            public function trans(string $id, array $parameters = [], ?string $domain = null, ?string $locale = null): string
+            {
+                return $id;
+            }
+
+            public function getLocale(): string
+            {
+                return $this->locale;
+            }
+        };
     }
 }

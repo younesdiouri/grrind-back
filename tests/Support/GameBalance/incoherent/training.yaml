@@ -1,4 +1,0 @@
-# Plafond sous le plancher : aucun workout ne pourrait être retenu.
-minimum_duration_seconds: 3600
-maximum_duration_seconds: 60
-import_window_days: 30

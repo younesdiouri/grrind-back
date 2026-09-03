@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Domain\Activity;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use InvalidArgumentException;
 
 /**
@@ -81,8 +83,9 @@ use InvalidArgumentException;
  * snapshot, qui est un cache d'un ledger append-only. `bonused()` et {@see explain()} se
  * rappellent donc à chaque lecture de `/api/progression` et du profil public.
  */
-final readonly class Vitality
+final class Vitality
 {
+    use RuntimeRuleset;
     private const int PERMILLE = 1000;
 
     public function __construct(
@@ -91,7 +94,9 @@ final readonly class Vitality
         private int $targetActiveKcal,
         /** Le bonus ne dépasse jamais ce plafond, même très au-delà de la cible. */
         private int $bonusCapPermille,
+        ?GameRulesets $rulesets = null,
     ) {
+        $this->useRuntimeRulesets($rulesets);
         if ($floorPermille < 0 || $floorPermille > self::PERMILLE) {
             throw new InvalidArgumentException(\sprintf('Le plancher de Vitality s\'exprime en millièmes, entre 0 et 1000 : %d reçu.', $floorPermille));
         }
@@ -110,12 +115,21 @@ final readonly class Vitality
         }
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
     /**
      * La Vitality du joueur, dérivée des quatre totaux qu'il a déjà accumulés — au ledger
      * comme au snapshot, jamais recalculée depuis autre chose.
      */
     public function of(AttributeGains $totals): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->of($totals);
+        }
+
         // Un total négatif n'a de sens pour aucun joueur réel — voir `LevelCurve::standingAt()`
         // pour le même garde-fou sur le total d'XP. `0` couvre aussi l'inscription : diviser
         // par une moyenne arithmétique nulle plus bas serait de toute façon indéfini.
@@ -137,6 +151,10 @@ final readonly class Vitality
      */
     public function bonused(int $base, int $windowAverageActiveKcal): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->bonused($base, $windowAverageActiveKcal);
+        }
+
         return self::scale($base, self::PERMILLE + $this->bonusPermilleFor($windowAverageActiveKcal));
     }
 
@@ -147,6 +165,10 @@ final readonly class Vitality
      */
     public function explain(int $windowAverageActiveKcal): VitalityBreakdown
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->explain($windowAverageActiveKcal);
+        }
+
         $average = max(0, $windowAverageActiveKcal);
 
         return new VitalityBreakdown($average, $this->targetActiveKcal, $this->bonusPermilleFor($average));
@@ -185,5 +207,15 @@ final readonly class Vitality
     private static function scale(int $total, int $permille): int
     {
         return intdiv($total * $permille, self::PERMILLE);
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var array{vitality: array{floor_permille: int, target_active_kcal: int, bonus_cap_permille: int}} $attributes */
+        $attributes = $snapshot['attributes'];
+        $vitality = $attributes['vitality'];
+
+        return new self($vitality['floor_permille'], $vitality['target_active_kcal'], $vitality['bonus_cap_permille'], $rulesets);
     }
 }

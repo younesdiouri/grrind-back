@@ -6,6 +6,7 @@ namespace App\Identity\UI\Http;
 
 use App\Identity\Application\SignInWithProvider;
 use App\Identity\Application\SignInWithProviderHandler;
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\SocialProvider;
 use App\Identity\UI\Http\Request\SocialSignInRequest;
 use App\Identity\UI\Http\Response\AuthResource;
@@ -13,6 +14,7 @@ use App\Shared\Application\PlayerTitles;
 use Nelmio\ApiDocBundle\Attribute\Security;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -61,7 +63,7 @@ final readonly class SocialSignInController
         ),
     )]
     #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
-    public function __invoke(SocialProvider $provider, #[MapRequestPayload] SocialSignInRequest $request): JsonResponse
+    public function __invoke(SocialProvider $provider, Request $httpRequest, #[MapRequestPayload] SocialSignInRequest $request): JsonResponse
     {
         $authenticated = ($this->signIn)(new SignInWithProvider(
             $provider,
@@ -69,8 +71,16 @@ final readonly class SocialSignInController
             $request->redirectUri,
             $request->codeVerifier,
             $request->timezone,
+            self::localeOf($request->locale, $httpRequest),
         ));
 
         return new JsonResponse(AuthResource::from($authenticated, $this->titles->of($authenticated->user->id()))->toArray());
+    }
+
+    private static function localeOf(?string $requested, Request $request): Locale
+    {
+        return Locale::tryFrom($requested ?? '')
+            ?? Locale::tryFrom($request->getPreferredLanguage(Locale::values()) ?? '')
+            ?? Locale::English;
     }
 }

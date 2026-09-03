@@ -18,7 +18,7 @@ use InvalidArgumentException;
  *
  * L'ordre de déclaration est **signifiant** : il départage les ex æquo quand il faut
  * désigner le prochain titre d'un joueur. Le chargeur d'équilibrage ne descend pas dans les
- * listes, donc `game.titles.titles` reste un paramètre unique et cet ordre survit au
+ * listes, donc le snapshot publié conserve cet ordre et le rend au runtime
  * conteneur compilé.
  */
 final class TitleCatalog

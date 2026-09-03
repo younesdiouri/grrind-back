@@ -136,7 +136,7 @@ abstract class ApiTestCase extends WebTestCase
         }
 
         self::assertCount(1, $rulesetQueries);
-        self::assertMatchesRegularExpression('/^SELECT revision FROM game_ruleset WHERE id = 1$/i', $rulesetQueries[0]);
+        self::assertMatchesRegularExpression('/^SELECT revision, version FROM game_ruleset WHERE id = 1$/i', $rulesetQueries[0]);
     }
 
     /** Une réponse qui ne consulte aucun catalogue ne touche pas même le pointeur. */
@@ -166,7 +166,7 @@ abstract class ApiTestCase extends WebTestCase
             $connection->createSchemaManager()->listTableNames(),
             // Les rulesets sont des données de référence migrées, pas des faits du scénario.
             // Les vider rendrait chaque API test incapable d'exercer le runtime DB qu'il vise.
-            static fn (string $table): bool => !\in_array($table, ['doctrine_migration_versions', 'game_enemy', 'game_item', 'game_loot_table', 'game_ruleset', 'game_settings', 'game_title'], true),
+            static fn (string $table): bool => !\in_array($table, ['doctrine_migration_versions', 'game_activity_type', 'game_discipline', 'game_enemy', 'game_item', 'game_level', 'game_loot_table', 'game_ruleset', 'game_settings', 'game_title'], true),
         );
 
         if ([] === $tables) {

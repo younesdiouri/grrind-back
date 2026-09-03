@@ -41,6 +41,7 @@ final readonly class RegisterUserHandler
             $command->displayName,
             Timezone::fromString($command->timezone),
             $this->clock->now(),
+            $command->locale,
         );
 
         // L'algorithme et son coût viennent de `security.password_hashers`, donc

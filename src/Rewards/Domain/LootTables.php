@@ -66,8 +66,8 @@ final class LootTables
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $adversary
      * @param list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}>                                                                                                   $chest     une table par clé de coffre (#230) — même forme que `$adversary`
      * @param list<array{key: string, kind?: string}>                                                                                                                                                                                $items     le catalogue brut du snapshot publié — la clé, et depuis le #230 `kind`, importent ici
-     * @param list<array{key: string}>                                                                                                                                                                                               $enemies   `game.combat.enemies`
-     * @param list<array{key: string}>                                                                                                                                                                                               $bosses    `game.combat.bosses`
+     * @param list<array{key: string}>                                                                                                                                                                                               $enemies   ennemis du snapshot publié
+     * @param list<array{key: string}>                                                                                                                                                                                               $bosses    boss du snapshot publié
      *
      * @throws InvalidArgumentException les tables ne tiennent pas debout ; la construction du service s'arrête là
      */

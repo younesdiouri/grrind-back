@@ -55,7 +55,7 @@ class PendingPushReceiptRepository extends ServiceEntityRepository
      * docblock de {@see \App\Shared\Infrastructure\Notifier\CheckExpoPushReceipts} pour le
      * délai retenu. `$limit` borne à ce que l'API accepte en un seul appel
      * ({@see \App\Shared\Infrastructure\Notifier\CheckExpoPushReceiptsHandler}) ; une guilde
-     * plafonnée à quelques dizaines de membres (`game.community.maximum_members`) n'en
+     * plafonnée à quelques dizaines de membres par le snapshot publié n'en
      * approchera jamais la borne, mais la requête reste bornée par construction plutôt que
      * par une hypothèse sur la taille d'une guilde.
      *

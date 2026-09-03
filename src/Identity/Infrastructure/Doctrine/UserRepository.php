@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Identity\Infrastructure\Doctrine;
 
 use App\Identity\Domain\Exception\EmailAlreadyUsed;
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\User;
+use App\Shared\Application\PlayerLocales;
 use App\Shared\Application\PlayerTimezones;
 use App\Shared\Domain\Timezone;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -29,7 +31,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * @extends ServiceEntityRepository<User>
  */
-class UserRepository extends ServiceEntityRepository implements UserLoaderInterface, PasswordUpgraderInterface, PlayerTimezones
+class UserRepository extends ServiceEntityRepository implements UserLoaderInterface, PasswordUpgraderInterface, PlayerTimezones, PlayerLocales
 {
     public function __construct(ManagerRegistry $registry)
     {
@@ -85,6 +87,20 @@ class UserRepository extends ServiceEntityRepository implements UserLoaderInterf
         $timezone = \is_array($row) ? $row['timezone'] : null;
 
         return $timezone instanceof Timezone ? $timezone : Timezone::utc();
+    }
+
+    public function localeOf(Uuid $userId): string
+    {
+        $row = $this->createQueryBuilder('u')
+            ->select('u.locale')
+            ->where('u.id = :id')
+            ->setParameter('id', $userId, UuidType::NAME)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        $locale = \is_array($row) ? $row['locale'] : null;
+
+        return ($locale instanceof Locale ? $locale : Locale::English)->value;
     }
 
     /**

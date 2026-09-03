@@ -143,8 +143,8 @@ class Guild
             throw new PlayerAlreadyInAGuild();
         }
 
-        if ($this->memberships->count() >= $rules->maximumMembers) {
-            throw new GuildIsFull($rules->maximumMembers);
+        if ($this->memberships->count() >= $rules->maximumMembers()) {
+            throw new GuildIsFull($rules->maximumMembers());
         }
 
         $membership = new GuildMembership($this, $playerId, GuildRole::Member, $now);

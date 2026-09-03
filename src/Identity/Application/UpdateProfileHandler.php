@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
+use App\Identity\Domain\Locale;
 use App\Identity\Domain\User;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
 use App\Shared\Domain\NotificationCategory;
@@ -26,6 +27,10 @@ final readonly class UpdateProfileHandler
             // restent en UTC, seule leur lecture change. Un déménagement ne doit
             // ni casser ni rallonger un streak.
             $user->moveTo(Timezone::fromString($command->timezone));
+        }
+
+        if (null !== $command->locale) {
+            $user->prefer(Locale::from($command->locale));
         }
 
         foreach ($command->notificationPreferences as $categoryValue => $enabled) {

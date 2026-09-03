@@ -612,7 +612,7 @@ when@dev:
 
                     UserProfile:
                         type: object
-                        required: [id, email, displayName, timezone, registeredAt, title, nextTitle, notificationPreferences]
+                        required: [id, email, displayName, timezone, locale, registeredAt, title, nextTitle, notificationPreferences]
                         properties:
                             id: { type: string, format: uuid }
                             email: { type: string, format: email }
@@ -621,6 +621,10 @@ when@dev:
                                 type: string
                                 description: "Identifiant IANA. **Le streak et le plafond quotidien se calculent dedans** : c'est un attribut de profil, jamais une déduction."
                                 example: Europe/Paris
+                            locale:
+                                type: string
+                                enum: [en, fr]
+                                description: "Langue persistée du joueur, utilisée aussi pour ses notifications asynchrones."
                             registeredAt: { type: string, format: date-time }
                             title:
                                 description: "Le titre porté, ou `null` si le joueur n'en a débloqué aucun ou n'en affiche aucun."

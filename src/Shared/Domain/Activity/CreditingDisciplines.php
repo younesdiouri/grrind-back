@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Shared\Domain\Activity;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use InvalidArgumentException;
 
 /**
  * Les disciplines qui rapportent de l'XP, lues une seule fois depuis la liste brute de
- * `xp.yaml` (`game.xp.disciplines`).
+ * snapshot publié des disciplines créditées.
  *
  * **La question « qui crédite ? » se posait déjà à deux endroits** — `XpRates`, qui la
  * tranche pour le calcul, et {@see AttributeSplit}, qui s'en sert pour refuser une ligne de
@@ -25,16 +27,18 @@ use InvalidArgumentException;
  * distance et de dénivelé, donc il la lit de toute façon. Ce n'est pas cette duplication-là
  * qu'on ferme.
  */
-final readonly class CreditingDisciplines
+final class CreditingDisciplines
 {
+    use RuntimeRuleset;
     /** @var array<string, true> valeur de discipline → présence, pour une réponse en O(1) */
     private array $crediting;
 
     /**
      * @param list<array{discipline: string, credits_xp?: bool}> $disciplines la liste brute de `xp.yaml` — seule `credits_xp` compte ici
      */
-    public function __construct(array $disciplines)
+    public function __construct(array $disciplines, ?GameRulesets $rulesets = null)
     {
+        $this->useRuntimeRulesets($rulesets);
         $crediting = [];
 
         foreach ($disciplines as $rate) {
@@ -51,8 +55,17 @@ final readonly class CreditingDisciplines
         $this->crediting = $crediting;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
     public function credits(Discipline $discipline): bool
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->credits($discipline);
+        }
+
         return isset($this->crediting[$discipline->value]);
     }
 
@@ -66,6 +79,28 @@ final readonly class CreditingDisciplines
      */
     public function all(): array
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->all();
+        }
+
         return array_values(array_filter(Discipline::cases(), $this->credits(...)));
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var list<array{discipline: string, active: bool, credits_xp: bool}> $disciplines */
+        $disciplines = $snapshot['disciplines'];
+        /** @var list<array{discipline: string, credits_xp?: bool}> $rates */
+        $rates = [];
+        foreach ($disciplines as $discipline) {
+            $rate = ['discipline' => $discipline['discipline']];
+            if (!$discipline['active'] || !$discipline['credits_xp']) {
+                $rate['credits_xp'] = false;
+            }
+            $rates[] = $rate;
+        }
+
+        return new self($rates, $rulesets);
     }
 }

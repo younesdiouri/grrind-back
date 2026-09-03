@@ -6,7 +6,9 @@ namespace App\Tests\Rewards;
 
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Infrastructure\Translation\ItemTranslator;
+use App\Shared\Application\GameRulesets;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -31,26 +33,52 @@ final class ItemTranslationsTest extends KernelTestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('locales')]
     public function testEveryDeliveredItemHasANameInEveryLocale(string $locale): void
     {
-        $translator = self::getContainer()->get(TranslatorInterface::class);
-        self::assertInstanceOf(TranslatorInterface::class, $translator);
-
         $catalog = self::catalog();
 
         foreach ($catalog->all() as $item) {
             $key = strtolower($item->key).'.name';
-            $translated = $translator->trans($key, domain: ItemTranslator::DOMAIN, locale: $locale);
+            $translated = self::translator($locale)->nameOf($item->key);
 
-            self::assertNotSame($key, $translated, \sprintf('`%s` manque à translations/items.%s.yaml.', $key, $locale));
+            self::assertNotSame($key, $translated, \sprintf('`%s` manque dans le snapshot publié (%s).', $key, $locale));
         }
     }
 
     private static function catalog(): ItemCatalog
     {
         self::bootKernel();
-        $items = self::getContainer()->getParameter('game.items.items');
-        self::assertIsArray($items);
+        $catalog = self::getContainer()->get(ItemCatalog::class);
+        self::assertInstanceOf(ItemCatalog::class, $catalog);
 
-        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */
-        return new ItemCatalog($items);
+        return $catalog;
+    }
+
+    private static function translator(string $locale): ItemTranslator
+    {
+        $rulesets = self::getContainer()->get(GameRulesets::class);
+        $urls = self::getContainer()->get(UrlGeneratorInterface::class);
+        self::assertInstanceOf(GameRulesets::class, $rulesets);
+        self::assertInstanceOf(UrlGeneratorInterface::class, $urls);
+
+        return new ItemTranslator(self::locale($locale), $rulesets, $urls);
+    }
+
+    private static function locale(string $locale): TranslatorInterface
+    {
+        return new class($locale) implements TranslatorInterface {
+            public function __construct(private readonly string $locale)
+            {
+            }
+
+            /** @param array<string, mixed> $parameters */
+            public function trans(string $id, array $parameters = [], ?string $domain = null, ?string $locale = null): string
+            {
+                return $id;
+            }
+
+            public function getLocale(): string
+            {
+                return $this->locale;
+            }
+        };
     }
 }

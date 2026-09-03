@@ -28,6 +28,7 @@ final readonly class UserResource
         public string $email,
         public string $displayName,
         public string $timezone,
+        public string $locale,
         public string $registeredAt,
         public PlayerTitleStanding $titles,
         public array $notificationPreferences,
@@ -41,6 +42,7 @@ final readonly class UserResource
             $user->email(),
             $user->displayName(),
             $user->timezone()->toString(),
+            $user->locale()->value,
             $user->registeredAt()->format(DateTimeInterface::ATOM),
             $titles,
             self::preferencesOf($user),
@@ -57,6 +59,7 @@ final readonly class UserResource
             'email' => $this->email,
             'displayName' => $this->displayName,
             'timezone' => $this->timezone,
+            'locale' => $this->locale,
             'registeredAt' => $this->registeredAt,
             // Deux clés distinctes et non une liste : le client en affiche une comme un
             // acquis et l'autre comme un objectif, à deux endroits différents de l'écran.

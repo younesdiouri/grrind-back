@@ -235,11 +235,10 @@ final class FightBattleHandlerTest extends KernelTestCase
      */
     private static function levelCurve(): LevelCurve
     {
-        $levels = self::getContainer()->getParameter('game.levels.levels');
-        self::assertIsArray($levels);
+        $curve = self::getContainer()->get(LevelCurve::class);
+        self::assertInstanceOf(LevelCurve::class, $curve);
 
-        /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
-        return new LevelCurve($levels);
+        return $curve;
     }
 
     /**
@@ -247,17 +246,9 @@ final class FightBattleHandlerTest extends KernelTestCase
      */
     private static function vitalityRules(): Vitality
     {
-        $container = self::getContainer();
+        $vitality = self::getContainer()->get(Vitality::class);
+        self::assertInstanceOf(Vitality::class, $vitality);
 
-        $floorPermille = $container->getParameter('game.attributes.vitality.floor_permille');
-        self::assertIsInt($floorPermille);
-
-        $targetActiveKcal = $container->getParameter('game.attributes.vitality.target_active_kcal');
-        self::assertIsInt($targetActiveKcal);
-
-        $bonusCapPermille = $container->getParameter('game.attributes.vitality.bonus_cap_permille');
-        self::assertIsInt($bonusCapPermille);
-
-        return new Vitality($floorPermille, $targetActiveKcal, $bonusCapPermille);
+        return $vitality;
     }
 }

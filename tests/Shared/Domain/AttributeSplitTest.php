@@ -166,6 +166,25 @@ final class AttributeSplitTest extends TestCase
         );
     }
 
+    public function testRefusesANegativeComponentEvenWhenTheLineSumsToOneHundred(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/entre 0 et 100/');
+
+        $withoutRunning = array_values(array_filter(
+            self::everyDiscipline(),
+            static fn (array $split): bool => 'RUNNING' !== $split['discipline'],
+        ));
+
+        new AttributeSplit(
+            [
+                ...$withoutRunning,
+                ['discipline' => 'RUNNING', 'strength' => -10, 'endurance' => 80, 'mobility' => 20, 'dexterity' => 10],
+            ],
+            self::everyDisciplineCredits(),
+        );
+    }
+
     /**
      * L'invariant du #167 : une discipline qui ne crédite pas n'a rien à exiger — sa
      * ligne peut manquer sans que la construction échoue.

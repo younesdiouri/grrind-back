@@ -238,6 +238,18 @@ final class XpRatesTest extends TestCase
             [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'daily_cap_xp' => 180, 'credits_xp' => true]],
             '/ne dit rien de plus que son absence/',
         ];
+
+        yield 'bonus de distance nul' => [
+            90,
+            [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'daily_cap_xp' => 180, 'xp_per_km' => 0]],
+            '/distance.*au moins 1 XP/',
+        ];
+
+        yield 'bonus de dénivelé négatif' => [
+            90,
+            [...self::everyDisciplineExceptRunning(), ['discipline' => 'RUNNING', 'daily_cap_xp' => 180, 'xp_per_100m_elevation' => -1]],
+            '/dénivelé.*au moins 1 XP/',
+        ];
     }
 
     /**

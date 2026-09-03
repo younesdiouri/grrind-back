@@ -104,10 +104,13 @@ final class ProgressionStateProviderTest extends ApiTestCase
         $account = $this->openAccount();
         ($this->grantXp)(new GrantXp($account->id, Uuid::v7(), Discipline::Running, 3600, new DateTimeImmutable()));
 
-        $target = self::getContainer()->getParameter('game.attributes.vitality.target_active_kcal');
+        $attributes = self::getContainer()->get(\App\Shared\Application\GameRulesets::class)->snapshot()['attributes'];
+        self::assertIsArray($attributes);
+        $vitality = $attributes['vitality'] ?? null;
+        self::assertIsArray($vitality);
+        $target = $vitality['target_active_kcal'] ?? null;
+        $windowDays = $vitality['window_days'] ?? null;
         self::assertIsInt($target);
-
-        $windowDays = self::getContainer()->getParameter('game.attributes.vitality.window_days');
         self::assertIsInt($windowDays);
 
         // Le même jour que celui que `ProgressionStateProvider` calculera à la lecture —
@@ -137,15 +140,9 @@ final class ProgressionStateProviderTest extends ApiTestCase
      */
     private static function vitality(): Vitality
     {
-        $floorPermille = self::getContainer()->getParameter('game.attributes.vitality.floor_permille');
-        self::assertIsInt($floorPermille);
+        $vitality = self::getContainer()->get(Vitality::class);
+        self::assertInstanceOf(Vitality::class, $vitality);
 
-        $targetActiveKcal = self::getContainer()->getParameter('game.attributes.vitality.target_active_kcal');
-        self::assertIsInt($targetActiveKcal);
-
-        $bonusCapPermille = self::getContainer()->getParameter('game.attributes.vitality.bonus_cap_permille');
-        self::assertIsInt($bonusCapPermille);
-
-        return new Vitality($floorPermille, $targetActiveKcal, $bonusCapPermille);
+        return $vitality;
     }
 }

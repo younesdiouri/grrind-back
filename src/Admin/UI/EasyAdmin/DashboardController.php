@@ -13,7 +13,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
-#[AdminDashboard(routePath: '/admin', routeName: 'admin', allowedControllers: [ItemCrudController::class, TitleCrudController::class, EnemyCrudController::class, LootTableCrudController::class, SettingsCrudController::class, UserCrudController::class, BattleCrudController::class, InventoryCrudController::class, XpTransactionCrudController::class, CoinTransactionCrudController::class])]
+#[AdminDashboard(routePath: '/admin', routeName: 'admin', allowedControllers: [ItemCrudController::class, TitleCrudController::class, EnemyCrudController::class, LootTableCrudController::class, DisciplineCrudController::class, LevelCrudController::class, ActivityTypeCrudController::class, SettingsCrudController::class, UserCrudController::class, BattleCrudController::class, InventoryCrudController::class, XpTransactionCrudController::class, CoinTransactionCrudController::class])]
 final class DashboardController extends AbstractDashboardController
 {
     /** @var array<class-string, array{label: string, icon: string}> */
@@ -22,6 +22,9 @@ final class DashboardController extends AbstractDashboardController
         TitleCrudController::class => ['label' => 'Titres', 'icon' => 'fa fa-trophy'],
         EnemyCrudController::class => ['label' => 'Ennemis et boss', 'icon' => 'fa fa-dragon'],
         LootTableCrudController::class => ['label' => 'Tables de loot', 'icon' => 'fa fa-dice'],
+        DisciplineCrudController::class => ['label' => 'Disciplines', 'icon' => 'fa fa-person-running'],
+        LevelCrudController::class => ['label' => 'Niveaux', 'icon' => 'fa fa-layer-group'],
+        ActivityTypeCrudController::class => ['label' => 'Types d’activité', 'icon' => 'fa fa-heart-pulse'],
         SettingsCrudController::class => ['label' => 'Réglages globaux', 'icon' => 'fa fa-sliders'],
     ];
 

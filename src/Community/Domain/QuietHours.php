@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Community\Domain;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use App\Shared\Domain\Timezone;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -16,15 +18,24 @@ use InvalidArgumentException;
  * intervalle simple : {@see contains()} encode l'union des deux bornes plutôt que de
  * laisser l'appelant s'en souvenir.
  */
-final readonly class QuietHours
+final class QuietHours
 {
+    use RuntimeRuleset;
+
     public function __construct(
         private int $startHour,
         private int $endHour,
+        ?GameRulesets $rulesets = null,
     ) {
+        $this->useRuntimeRulesets($rulesets);
         if ($startHour < 0 || $startHour > 23 || $endHour < 0 || $endHour > 23) {
             throw new InvalidArgumentException('Les heures calmes se bornent entre 0 et 23.');
         }
+    }
+
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
     }
 
     /**
@@ -43,6 +54,10 @@ final readonly class QuietHours
      */
     public function endsAfter(DateTimeImmutable $instant, Timezone $timezone): DateTimeImmutable
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->endsAfter($instant, $timezone);
+        }
+
         if (!$this->contains($instant, $timezone)) {
             return $instant;
         }
@@ -57,6 +72,10 @@ final readonly class QuietHours
 
     public function contains(DateTimeImmutable $instant, Timezone $timezone): bool
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->contains($instant, $timezone);
+        }
+
         // Identiques : aucune plage calme n'est configurée, plutôt qu'une plage de
         // vingt-quatre heures — un réglage à zéro ne doit jamais rendre la guilde muette.
         if ($this->startHour === $this->endHour) {
@@ -70,5 +89,14 @@ final readonly class QuietHours
         }
 
         return $hour >= $this->startHour || $hour < $this->endHour;
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var array{quiet_hours_start_hour: int, quiet_hours_end_hour: int} $notifications */
+        $notifications = $snapshot['notifications'];
+
+        return new self($notifications['quiet_hours_start_hour'], $notifications['quiet_hours_end_hour'], $rulesets);
     }
 }

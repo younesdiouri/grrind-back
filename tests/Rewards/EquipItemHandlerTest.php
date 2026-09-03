@@ -138,10 +138,9 @@ final class EquipItemHandlerTest extends ApiTestCase
 
     private static function catalog(): ItemCatalog
     {
-        $items = self::getContainer()->getParameter('game.items.items');
-        self::assertIsArray($items);
+        $catalog = self::getContainer()->get(ItemCatalog::class);
+        self::assertInstanceOf(ItemCatalog::class, $catalog);
 
-        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */
-        return new ItemCatalog($items);
+        return $catalog;
     }
 }

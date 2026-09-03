@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Progression\Domain;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use InvalidArgumentException;
 
 /**
@@ -17,8 +19,9 @@ use InvalidArgumentException;
  * indépendante de l'historique. Un joueur à 3 060 XP est niveau 10, qu'il y soit arrivé en
  * un mois ou en un jour, et qu'on ait rejoué ou non les transactions qui l'y ont mené.
  */
-final readonly class LevelCurve
+final class LevelCurve
 {
+    use RuntimeRuleset;
     /** @var list<array{level: int, total_xp: int, skill_points: int}> par niveau croissant */
     private array $levels;
 
@@ -28,8 +31,9 @@ final readonly class LevelCurve
     /**
      * @param list<array{level: int, total_xp: int, skill_points: int}> $levels
      */
-    public function __construct(array $levels)
+    public function __construct(array $levels, ?GameRulesets $rulesets = null)
     {
+        $this->useRuntimeRulesets($rulesets);
         if ([] === $levels) {
             throw new InvalidArgumentException('Une courbe de niveaux sans niveau ne projette rien.');
         }
@@ -64,6 +68,11 @@ final readonly class LevelCurve
         $this->cumulativeSkillPoints = $cumulative;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
     /**
      * Le niveau atteint par ce total, et tout ce qui s'en déduit.
      *
@@ -73,6 +82,10 @@ final readonly class LevelCurve
      */
     public function standingAt(int $totalXp): LevelStanding
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->standingAt($totalXp);
+        }
+
         $totalXp = max(0, $totalXp);
         $index = 0;
 
@@ -99,6 +112,19 @@ final readonly class LevelCurve
 
     public function maxLevel(): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->maxLevel();
+        }
+
         return $this->levels[\count($this->levels) - 1]['level'];
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
+        $levels = $snapshot['levels'];
+
+        return new self($levels, $rulesets);
     }
 }

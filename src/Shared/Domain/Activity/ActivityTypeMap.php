@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Domain\Activity;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use InvalidArgumentException;
 
 /**
@@ -23,8 +25,9 @@ use InvalidArgumentException;
  * doit compter et nommer au joueur (#92). Lever ici ferait échouer un lot entier pour une
  * séance de curling.
  */
-final readonly class ActivityTypeMap
+final class ActivityTypeMap
 {
+    use RuntimeRuleset;
     private const string APPLE_HEALTH = 'APPLE_HEALTH';
     private const string HEALTH_CONNECT = 'HEALTH_CONNECT';
 
@@ -39,9 +42,11 @@ final readonly class ActivityTypeMap
      *
      * @param list<array{activity_type: string, discipline: string}> $appleHealth
      * @param list<array{activity_type: string, discipline: string}> $healthConnect
+     * @param list<Discipline>|null                                  $requiredDisciplines
      */
-    public function __construct(array $appleHealth, array $healthConnect)
+    public function __construct(array $appleHealth, array $healthConnect, ?GameRulesets $rulesets = null, ?array $requiredDisciplines = null)
     {
+        $this->useRuntimeRulesets($rulesets);
         $this->bySource = [
             self::APPLE_HEALTH => self::index($appleHealth, self::APPLE_HEALTH),
             self::HEALTH_CONNECT => self::index($healthConnect, self::HEALTH_CONNECT),
@@ -51,12 +56,17 @@ final readonly class ActivityTypeMap
         // portera jamais : elle apparaîtrait dans le contrat, dans le barème d'XP et dans
         // les titres, sans qu'un joueur puisse l'atteindre. On préfère ne pas démarrer.
         foreach (self::sources() as $source) {
-            foreach (Discipline::cases() as $discipline) {
+            foreach ($requiredDisciplines ?? Discipline::cases() as $discipline) {
                 if (!\in_array($discipline, $this->bySource[$source], true)) {
                     throw new InvalidArgumentException(\sprintf('Aucun type "%s" ne mène à la discipline "%s".', $source, $discipline->value));
                 }
             }
         }
+    }
+
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
     }
 
     /**
@@ -77,7 +87,35 @@ final readonly class ActivityTypeMap
      */
     public function disciplineFor(string $source, string $activityType): ?Discipline
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->disciplineFor($source, $activityType);
+        }
+
         return $this->bySource[$source][$activityType] ?? null;
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        $bySource = [self::APPLE_HEALTH => [], self::HEALTH_CONNECT => []];
+        $activeDisciplines = [];
+        /** @var list<array{discipline: string, active: bool}> $disciplines */
+        $disciplines = $snapshot['disciplines'];
+        foreach ($disciplines as $discipline) {
+            if ($discipline['active']) {
+                $active = Discipline::from($discipline['discipline']);
+                $activeDisciplines[$active->value] = $active;
+            }
+        }
+        /** @var list<array{source: string, provider_type: string, discipline: string, active: bool}> $activityTypes */
+        $activityTypes = $snapshot['activity_types'];
+        foreach ($activityTypes as $activityType) {
+            if ($activityType['active'] && isset($activeDisciplines[$activityType['discipline']])) {
+                $bySource[$activityType['source']][] = ['activity_type' => $activityType['provider_type'], 'discipline' => $activityType['discipline']];
+            }
+        }
+
+        return new self($bySource[self::APPLE_HEALTH], $bySource[self::HEALTH_CONNECT], $rulesets, array_values($activeDisciplines));
     }
 
     /**

@@ -14,18 +14,26 @@ use App\Community\Domain\Guild;
 use App\Community\Domain\Risala;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
 use App\Community\Infrastructure\Doctrine\RisalaRepository;
+use App\Shared\Application\PlayerLocales;
+use App\Shared\Application\PlayerProfiles;
+use App\Shared\Application\PlayerTimezones;
 use App\Shared\Domain\Activity\CreditingDisciplines;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
+use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
+use App\Shared\Infrastructure\Translation\DisciplineTranslator;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\LocalHours;
 use App\Tests\Support\SpyingPushSender;
 use Doctrine\DBAL\Connection;
+use RuntimeException;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Les deux annonces des Risālāt (#194) : « c'est ton tour » à une personne, « la Risāla est
@@ -100,7 +108,25 @@ final class RisalatNotificationTest extends ApiTestCase
         );
 
         self::assertSame(NotificationCategory::RisalaRevealed, SpyingPushSender::$sent[0]['notification']->category);
-        self::assertStringContainsString('Escalade', SpyingPushSender::$sent[0]['notification']->body);
+        self::assertStringContainsString('Climbing', SpyingPushSender::$sent[0]['notification']->body);
+    }
+
+    /** Une même annonce est rendue dans la langue stockée de chacun des membres. */
+    public function testTheRevealUsesEachMembersPersistedLocale(): void
+    {
+        $members = $this->guildOfThree(self::AWAKE);
+        self::assertSame(Response::HTTP_OK, $this->send('PATCH', '/api/me', ['locale' => 'fr'], $members[1]->headers)->getStatusCode());
+        $risala = $this->revealedRisala(Discipline::Climbing);
+
+        ($this->announceRisala)(new AnnounceRisala($risala->id()));
+
+        $bodies = [];
+        foreach (SpyingPushSender::$sent as $sent) {
+            $bodies[$sent['recipientId']->toRfc4122()] = $sent['notification']->body;
+        }
+
+        self::assertStringContainsString('Escalade', $bodies[$members[1]->id->toRfc4122()]);
+        self::assertStringContainsString('Climbing', $bodies[$members[2]->id->toRfc4122()]);
     }
 
     public function testAMemberInQuietHoursMissesTheReveal(): void
@@ -150,6 +176,62 @@ final class RisalatNotificationTest extends ApiTestCase
         // L'outbox livre au moins une fois. C'est la réservation prise avant l'appel réseau
         // qui borne le nombre d'envois — pas l'espoir qu'un handler ne rejoue jamais.
         self::assertCount(3, SpyingPushSender::$sent);
+    }
+
+    public function testRevealLocalizationFailureDoesNotClaimTheNotificationBeforeRetry(): void
+    {
+        $this->guildOfThree(self::AWAKE);
+        $risala = $this->revealedRisala(Discipline::Climbing);
+        $locales = $this->flakyLocales();
+        $handler = new AnnounceRisalaHandler(
+            self::service(RisalaRepository::class),
+            self::service(PlayerProfiles::class),
+            $locales,
+            self::service(PlayerTimezones::class),
+            self::service(SpyingPushSender::class),
+            self::service(NotificationAttemptRepository::class),
+            self::service(\App\Community\Domain\QuietHours::class),
+            self::service(\App\Community\Domain\RisalaRules::class),
+            self::service(MockClock::class),
+            self::service(TranslatorInterface::class),
+            self::service(DisciplineTranslator::class),
+        );
+
+        try {
+            $handler(new AnnounceRisala($risala->id()));
+            self::fail('La première localisation devait échouer.');
+        } catch (RuntimeException) {
+        }
+        $handler(new AnnounceRisala($risala->id()));
+
+        self::assertCount(3, SpyingPushSender::$sent);
+    }
+
+    public function testTurnLocalizationFailureDoesNotClaimTheNotificationBeforeRetry(): void
+    {
+        $this->guildOfThree(self::AWAKE);
+        $turn = $this->firstTurn();
+        $locales = $this->flakyLocales();
+        $handler = new AnnounceRisalaTurnHandler(
+            self::service(RisalaRepository::class),
+            self::service(PlayerTimezones::class),
+            $locales,
+            self::service(SpyingPushSender::class),
+            self::service(NotificationAttemptRepository::class),
+            self::service(\App\Community\Domain\QuietHours::class),
+            self::service(MessageBusInterface::class),
+            self::service(MockClock::class),
+            self::service(TranslatorInterface::class),
+        );
+
+        try {
+            $handler(new AnnounceRisalaTurn($turn->id()));
+            self::fail('La première localisation devait échouer.');
+        } catch (RuntimeException) {
+        }
+        $handler(new AnnounceRisalaTurn($turn->id()));
+
+        self::assertCount(1, SpyingPushSender::$sent);
     }
 
     public function testTheBasculeQueuesBothAnnouncementsInItsOwnTransaction(): void
@@ -281,6 +363,23 @@ final class RisalatNotificationTest extends ApiTestCase
         self::assertInstanceOf(Connection::class, $connection);
 
         return $connection;
+    }
+
+    private function flakyLocales(): PlayerLocales
+    {
+        return new class implements PlayerLocales {
+            private bool $first = true;
+
+            public function localeOf(Uuid $userId): string
+            {
+                if ($this->first) {
+                    $this->first = false;
+                    throw new RuntimeException('Catalogue de langues momentanément indisponible.');
+                }
+
+                return 'en';
+            }
+        };
     }
 
     /**

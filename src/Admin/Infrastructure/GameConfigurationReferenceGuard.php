@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Admin\Infrastructure;
 
+use App\Admin\Domain\GameActivityType;
+use App\Admin\Domain\GameDiscipline;
 use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLootTable;
@@ -52,6 +54,12 @@ final readonly class GameConfigurationReferenceGuard
             $configuration instanceof GameLootTable => ['table de loot', $configuration->getKind().':'.$configuration->getKey(), [
                 ['SELECT 1 FROM rewards_loot_roll WHERE table_key = ? LIMIT 1', [$configuration->getKey()]],
             ]],
+            $configuration instanceof GameDiscipline => ['discipline', $configuration->getDiscipline()->value, [
+                ['SELECT 1 FROM game_title WHERE active = true AND discipline = ? LIMIT 1', [$configuration->getDiscipline()->value]],
+                ['SELECT 1 FROM game_loot_table WHERE active = true AND eligibility::jsonb @> ?::jsonb LIMIT 1', [json_encode(['disciplines' => [$configuration->getDiscipline()->value]], \JSON_THROW_ON_ERROR)]],
+                ['SELECT 1 FROM community_risala WHERE discipline = ? LIMIT 1', [$configuration->getDiscipline()->value]],
+            ]],
+            $configuration instanceof GameActivityType => ['type d’activité', $configuration->getProviderType(), []],
             default => ['', '', []],
         };
         foreach ($queries as [$sql, $parameters]) {
@@ -69,10 +77,19 @@ final readonly class GameConfigurationReferenceGuard
      */
     public function lockForMutation(object $configuration): void
     {
-        if (!$configuration instanceof GameItem && !$configuration instanceof GameTitle && !$configuration instanceof GameEnemy && !$configuration instanceof GameLootTable) {
+        if (!$configuration instanceof GameItem && !$configuration instanceof GameTitle && !$configuration instanceof GameEnemy && !$configuration instanceof GameLootTable && !$configuration instanceof GameDiscipline && !$configuration instanceof GameActivityType) {
             return;
         }
-        $this->lockCurrentState($configuration);
+        $state = $this->lockCurrentState($configuration);
+        if ($configuration instanceof GameDiscipline && $state['active'] && !$configuration->isActive()) {
+            $currentRisala = $this->connection->fetchOne(
+                "SELECT 1 FROM community_risala WHERE discipline = ? AND (status = 'DRAWN' OR (status = 'SENT' AND revealed_at <= CURRENT_TIMESTAMP AND expires_at > CURRENT_TIMESTAMP)) LIMIT 1",
+                [$configuration->getDiscipline()->value],
+            );
+            if (false !== $currentRisala) {
+                throw new LogicException('Désactivation refusée : cette discipline porte une Risāla en cours.');
+            }
+        }
     }
 
     /** @return array{active: bool, everPublishedActive: bool} */
@@ -83,9 +100,12 @@ final readonly class GameConfigurationReferenceGuard
             $configuration instanceof GameTitle => ['game_title', $configuration->getId()->toRfc4122()],
             $configuration instanceof GameEnemy => ['game_enemy', $configuration->getId()->toRfc4122()],
             $configuration instanceof GameLootTable => ['game_loot_table', $configuration->getId()->toRfc4122()],
+            $configuration instanceof GameDiscipline => ['game_discipline', $configuration->getId()->toRfc4122()],
+            $configuration instanceof GameActivityType => ['game_activity_type', $configuration->getId()->toRfc4122()],
             default => throw new LogicException('Cette configuration ne peut pas être supprimée.'),
         };
-        $state = $this->connection->fetchAssociative("SELECT active, ever_published_active FROM {$table} WHERE id = ? FOR UPDATE", [$id]);
+        $everPublished = $configuration instanceof GameActivityType ? 'false AS ever_published_active' : 'ever_published_active';
+        $state = $this->connection->fetchAssociative("SELECT active, {$everPublished} FROM {$table} WHERE id = ? FOR UPDATE", [$id]);
         if (false === $state) {
             // Si l'administrateur a attendu un DELETE concurrent, son UPDATE ne doit jamais
             // publier l'ancienne entité encore en mémoire comme si elle existait toujours.

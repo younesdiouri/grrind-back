@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Community\Domain;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use DateInterval;
 use InvalidArgumentException;
 
@@ -17,12 +19,16 @@ use InvalidArgumentException;
  * {@see \App\Community\Infrastructure\Config\CommunitySection} la fait rejouer à la
  * compilation du conteneur.
  */
-final readonly class GuildRules
+final class GuildRules
 {
+    use RuntimeRuleset;
+
     public function __construct(
         public int $maximumMembers,
         public int $inviteCodeLifetimeHours,
+        ?GameRulesets $rulesets = null,
     ) {
+        $this->useRuntimeRulesets($rulesets);
         // Une guilde d'un seul membre est un profil avec plus d'étapes : le fondateur
         // occupe déjà une place, donc en dessous de deux personne ne peut le rejoindre.
         if ($maximumMembers < 2) {
@@ -36,6 +42,21 @@ final readonly class GuildRules
         }
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
+    public function maximumMembers(): int
+    {
+        return $this->isRuntimeRuleset() ? $this->runtimeValue()->maximumMembers() : $this->maximumMembers;
+    }
+
+    public function inviteCodeLifetimeHours(): int
+    {
+        return $this->isRuntimeRuleset() ? $this->runtimeValue()->inviteCodeLifetimeHours() : $this->inviteCodeLifetimeHours;
+    }
+
     /**
      * La durée sous la forme que {@see GuildInviteCode::issueFor()} consomme. Un
      * `DateInterval` et non un nombre de secondes : l'addition passe par le calendrier,
@@ -43,6 +64,15 @@ final readonly class GuildRules
      */
     public function inviteCodeLifetime(): DateInterval
     {
-        return new DateInterval(\sprintf('PT%dH', $this->inviteCodeLifetimeHours));
+        return new DateInterval(\sprintf('PT%dH', $this->inviteCodeLifetimeHours()));
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var array{maximum_members: int, invite_code_lifetime_hours: int} $community */
+        $community = $snapshot['community'];
+
+        return new self($community['maximum_members'], $community['invite_code_lifetime_hours'], $rulesets);
     }
 }

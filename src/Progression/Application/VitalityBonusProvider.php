@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Progression\Application;
 
 use App\Shared\Application\ActiveEnergyWindows;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Vitality;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
@@ -26,12 +27,12 @@ use Symfony\Component\Uid\Uuid;
  * potentiellement dans des fuseaux différents. Voir le docblock de
  * `TranslatedPlayerProgressions` pour le compromis retenu sur ce second cas.
  */
-final readonly class VitalityBonusProvider
+final class VitalityBonusProvider
 {
     public function __construct(
         private ActiveEnergyWindows $activeEnergy,
         private Vitality $vitality,
-        private int $windowDays,
+        private GameRulesets $rulesets,
     ) {
     }
 
@@ -45,7 +46,7 @@ final readonly class VitalityBonusProvider
      */
     public function of(array $baseVitalityByUserId, array $userIds, DateTimeImmutable $endingOn): array
     {
-        $averages = $this->activeEnergy->averagesOf($userIds, $endingOn, $this->windowDays);
+        $averages = $this->activeEnergy->averagesOf($userIds, $endingOn, $this->windowDays());
 
         $bonused = [];
 
@@ -61,5 +62,14 @@ final readonly class VitalityBonusProvider
         }
 
         return $bonused;
+    }
+
+    private function windowDays(): int
+    {
+        $snapshot = $this->rulesets->snapshot();
+        /** @var array{vitality: array{window_days: int}} $attributes */
+        $attributes = $snapshot['attributes'];
+
+        return $attributes['vitality']['window_days'];
     }
 }

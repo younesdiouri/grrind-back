@@ -72,7 +72,7 @@ final readonly class RisalatBoardProvider
                     // définition même de « vivante », que le dépôt applique en SQL.
                     $risala->revealedAt() ?? throw new LogicException('Risāla vivante sans date de révélation.'),
                     $risala->expiresAt() ?? throw new LogicException('Risāla vivante sans date d\'expiration.'),
-                    $risala->senderId()->equals($playerId) ? $this->rules->senderBonusPercent : $this->rules->recipientBonusPercent,
+                    $risala->senderId()->equals($playerId) ? $this->rules->senderBonusPercent() : $this->rules->recipientBonusPercent(),
                 ),
                 $live,
             ),

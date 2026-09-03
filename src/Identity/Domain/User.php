@@ -68,6 +68,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'timezone', length: 64)]
     private Timezone $timezone;
 
+    #[ORM\Column(length: 2, enumType: Locale::class)]
+    private Locale $locale;
+
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $registeredAt;
 
@@ -97,12 +100,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         string $displayName,
         Timezone $timezone,
         DateTimeImmutable $registeredAt,
+        Locale $locale,
     ) {
         $this->id = $id;
         $this->email = self::normalizeEmail($email);
         $this->displayName = trim($displayName);
         $this->timezone = $timezone;
         $this->registeredAt = $registeredAt;
+        $this->locale = $locale;
     }
 
     /**
@@ -114,8 +119,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         string $displayName,
         Timezone $timezone,
         DateTimeImmutable $now,
+        Locale $locale = Locale::English,
     ): self {
-        return new self(Uuid::v7(), $email, $displayName, $timezone, $now);
+        return new self(Uuid::v7(), $email, $displayName, $timezone, $now, $locale);
     }
 
     /**
@@ -190,6 +196,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->registeredAt;
     }
 
+    public function locale(): Locale
+    {
+        return $this->locale;
+    }
+
     public function rename(string $displayName): void
     {
         $this->displayName = trim($displayName);
@@ -198,6 +209,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function moveTo(Timezone $timezone): void
     {
         $this->timezone = $timezone;
+    }
+
+    public function prefer(Locale $locale): void
+    {
+        $this->locale = $locale;
     }
 
     /**

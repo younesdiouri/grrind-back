@@ -10,8 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * La table livrée, celle de `config/game/v1/activity_types.yaml`, contre les vrais noms
- * de types des deux fournisseurs.
+ * La table publiée, contre les vrais noms de types des deux fournisseurs.
  *
  * `ActivityTypeMapTest` prouve que l'objet tient ses règles sur des données écrites pour
  * lui ; celui-ci prouve que **la table qu'on livre** traduit ce qu'une montre produit
@@ -149,23 +148,15 @@ final class ActivityTypesCoverageTest extends KernelTestCase
     }
 
     /**
-     * Construit depuis les paramètres du conteneur, exactement comme `services.yaml` le
-     * fait : le service lui-même est retiré tant qu'aucun code ne le consomme — l'import
-     * arrive au #88.
+     * Lit le service runtime : une publication incomplète se voit ici sur le snapshot qui
+     * servira réellement à l'import, pas dans une copie de test.
      */
     private static function shippedMap(): ActivityTypeMap
     {
         self::bootKernel();
-        $container = self::getContainer();
+        $map = self::getContainer()->get(ActivityTypeMap::class);
+        self::assertInstanceOf(ActivityTypeMap::class, $map);
 
-        $appleHealth = $container->getParameter('game.activity_types.apple_health');
-        $healthConnect = $container->getParameter('game.activity_types.health_connect');
-
-        self::assertIsArray($appleHealth);
-        self::assertIsArray($healthConnect);
-
-        /** @var list<array{activity_type: string, discipline: string}> $appleHealth */
-        /** @var list<array{activity_type: string, discipline: string}> $healthConnect */
-        return new ActivityTypeMap($appleHealth, $healthConnect);
+        return $map;
     }
 }
