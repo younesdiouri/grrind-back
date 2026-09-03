@@ -202,16 +202,17 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertSame(99, $secondItems[1]['price_coins']);
     }
 
-    public function testSameSnapshotAtANewerRevisionReusesItsContentCache(): void
+    public function testSameSnapshotAtANewerRevisionRefreshesItsPublicationCache(): void
     {
         $snapshot = $this->rulesets()->snapshot();
         $version = GameRulesetVersion::of($snapshot);
         $connection = $this->createMock(Connection::class);
         $connection->expects(self::never())->method('fetchOne');
-        $connection->expects(self::exactly(3))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+        $connection->expects(self::exactly(4))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
             ['revision' => 1, 'version' => $version],
             ['revision' => 1, 'version' => $version, 'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR)],
             ['revision' => 2, 'version' => $version],
+            ['revision' => 2, 'version' => $version, 'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR)],
         );
         $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()));
 
@@ -219,6 +220,33 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         $rulesets->reset();
         self::assertSame(2, $rulesets->revision());
         self::assertSame($snapshot, $rulesets->snapshot());
+    }
+
+    public function testPresentationOnlyPublicationRefreshesTheCachedSnapshot(): void
+    {
+        $first = $this->rulesets()->snapshot();
+        /** @var array{items: list<array{translations?: array<string, array{name: string}>}>} $first */
+        $second = $first;
+        $second['items'][1]['translations'] = ['fr' => ['name' => 'Bottes publiees']];
+        $version = GameRulesetVersion::of($first);
+        self::assertSame($version, GameRulesetVersion::of($second));
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(4))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            ['revision' => 1, 'version' => $version],
+            ['revision' => 1, 'version' => $version, 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
+            ['revision' => 2, 'version' => $version],
+            ['revision' => 2, 'version' => $version, 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+        );
+        $cache = new TagAwareAdapter(new ArrayAdapter());
+        $worker = new DatabaseGameRulesets($connection, $cache);
+
+        self::assertSame(1, $worker->revision());
+        $worker->reset();
+        self::assertSame(2, $worker->revision());
+        $items = $worker->snapshot()['items'];
+        self::assertIsArray($items);
+        self::assertSame('Bottes publiees', $items[1]['translations']['fr']['name']);
     }
 
     public function testInvalidatedCacheLoadsOneWholeNewRevision(): void
@@ -393,6 +421,47 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertFalse($rules->isTooShort(299));
     }
 
+    public function testRuntimeRulesRebuildWhenTheVersionChangesAtTheSameRevision(): void
+    {
+        $rulesets = $this->balanceRulesets();
+        $rules = WorkoutRules::runtime($rulesets);
+        self::assertTrue($rules->isTooShort(299));
+
+        /** @var array{training: array{minimum_duration_seconds: int}} $published */
+        $published = $rulesets->publishedSnapshot;
+        $published['training']['minimum_duration_seconds'] = 200;
+        $rulesets->publishedSnapshot = $published;
+        $rulesets->publishedVersion = 'v1-after-reset';
+
+        self::assertFalse($rules->isTooShort(299));
+    }
+
+    public function testFailedRuntimeRebuildNeverKeepsThePreviousValueForTheNewPointer(): void
+    {
+        $rulesets = $this->balanceRulesets();
+        $rules = WorkoutRules::runtime($rulesets);
+        self::assertTrue($rules->isTooShort(299));
+
+        /** @var array{training: array{minimum_duration_seconds: int}} $invalid */
+        $invalid = $rulesets->publishedSnapshot;
+        $invalid['training']['minimum_duration_seconds'] = -1;
+        $rulesets->publishedSnapshot = $invalid;
+        $rulesets->publishedRevision = 2;
+        $rulesets->publishedVersion = 'v1-invalid';
+
+        try {
+            $rules->isTooShort(299);
+            self::fail('La reconstruction invalide devait echouer.');
+        } catch (\Throwable) {
+        }
+
+        $valid = $invalid;
+        $valid['training']['minimum_duration_seconds'] = 200;
+        $rulesets->publishedSnapshot = $valid;
+
+        self::assertFalse($rules->isTooShort(299));
+    }
+
     private function rulesets(): GameRulesets
     {
         return new class implements GameRulesets {
@@ -442,6 +511,8 @@ final class MutableRulesets implements GameRulesets
 {
     public int $publishedRevision = 1;
 
+    public string $publishedVersion = 'v1-test';
+
     /** @param array<string, mixed> $publishedSnapshot */
     public function __construct(public array $publishedSnapshot)
     {
@@ -454,7 +525,7 @@ final class MutableRulesets implements GameRulesets
 
     public function version(): string
     {
-        return 'v1-test';
+        return $this->publishedVersion;
     }
 
     public function revision(): int

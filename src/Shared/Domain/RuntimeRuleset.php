@@ -20,6 +20,8 @@ trait RuntimeRuleset
 
     private ?int $runtimeRevision = null;
 
+    private ?string $runtimeVersion = null;
+
     private function useRuntimeRulesets(?GameRulesets $rulesets): void
     {
         $this->rulesets = $rulesets;
@@ -35,13 +37,17 @@ trait RuntimeRuleset
     {
         \assert(null !== $this->rulesets);
         $revision = $this->rulesets->revision();
-        if ($this->runtimeRevision === $revision && null !== $this->runtimeValue) {
+        $version = $this->rulesets->version();
+        if ($this->runtimeRevision === $revision && $this->runtimeVersion === $version && null !== $this->runtimeValue) {
             return $this->runtimeValue;
         }
 
         $snapshot = $this->rulesets->snapshot();
+        $value = self::fromSnapshot($snapshot);
+        $this->runtimeValue = $value;
         $this->runtimeRevision = $revision;
+        $this->runtimeVersion = $version;
 
-        return $this->runtimeValue = self::fromSnapshot($snapshot);
+        return $value;
     }
 }

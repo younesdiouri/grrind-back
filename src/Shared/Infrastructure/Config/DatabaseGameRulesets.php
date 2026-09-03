@@ -65,6 +65,18 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
 
                     return $this->load($pointer);
                 });
+                if ($current['revision'] !== $pointer['revision']) {
+                    $key = 'game.ruleset.'.$pointer['version'];
+                    if (!$this->cache->delete($key)) {
+                        $current = $this->load($pointer);
+                    } else {
+                        $current = $this->cache->get($key, function (ItemInterface $item) use ($pointer): array {
+                            $item->tag('game.ruleset');
+
+                            return $this->load($pointer);
+                        });
+                    }
+                }
                 /** @var array{revision: int, version: string, snapshot: array<string, mixed>} $current */
             } catch (Throwable $exception) {
                 if ($exception instanceof PublishedRulesetMoved) {
@@ -79,10 +91,7 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
                 }
             }
             if ($current['version'] === $pointer['version'] && $current['version'] === GameRulesetVersion::of($current['snapshot'])) {
-                // La clé porte le contenu, pas son compteur : publier puis revenir à un
-                // snapshot identique réutilise légitimement son cache. La révision du
-                // pointeur reste celle de l'opération qui vient de l'ouvrir.
-                return $this->current = ['revision' => $pointer['revision'], 'version' => $pointer['version'], 'snapshot' => $current['snapshot']];
+                return $this->current = $current;
             }
         }
 
