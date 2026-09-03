@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
+use App\Shared\Domain\Locale;
+
 /**
- * Commande d'inscription. Elle porte des types primitifs : la traduction en value
- * objects appartient au handler, qui est le seul à savoir ce qui est valide.
+ * Commande d'inscription. La locale est déjà résolue par l'interface HTTP : elle ne doit pas
+ * être redécidée dans un handler qui peut aussi être appelé par une autre entrée.
  */
 final readonly class RegisterUser
 {
@@ -15,6 +17,7 @@ final readonly class RegisterUser
         public string $plainPassword,
         public string $displayName,
         public string $timezone,
+        public Locale $locale,
     ) {
     }
 }

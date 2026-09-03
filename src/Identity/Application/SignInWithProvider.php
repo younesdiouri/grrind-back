@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Identity\Application;
 
 use App\Identity\Domain\SocialProvider;
+use App\Shared\Domain\Locale;
 
 final readonly class SignInWithProvider
 {
@@ -19,6 +20,7 @@ final readonly class SignInWithProvider
          * demande au client plutôt que de le deviner.
          */
         public string $timezone,
+        public Locale $locale,
     ) {
     }
 }

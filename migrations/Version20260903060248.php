@@ -33,6 +33,7 @@ final class Version20260903060248 extends AbstractMigration
         $this->addSql("ALTER TABLE game_settings ADD attributes JSON NOT NULL DEFAULT '{}'");
         $this->addSql("ALTER TABLE game_settings ADD community JSON NOT NULL DEFAULT '{}'");
         $this->addSql("ALTER TABLE game_settings ADD notifications JSON NOT NULL DEFAULT '{}'");
+        $this->addSql("ALTER TABLE identity_user ADD locale VARCHAR(2) NOT NULL DEFAULT 'en'");
 
         require_once __DIR__.'/GameBalanceSeed.php';
         $seed = GameBalanceSeed::data();
@@ -78,6 +79,7 @@ final class Version20260903060248 extends AbstractMigration
         $this->addSql('ALTER TABLE game_settings DROP attributes');
         $this->addSql('ALTER TABLE game_settings DROP community');
         $this->addSql('ALTER TABLE game_settings DROP notifications');
+        $this->addSql('ALTER TABLE identity_user DROP locale');
     }
 
     /** @param array<string, scalar|null> $values */

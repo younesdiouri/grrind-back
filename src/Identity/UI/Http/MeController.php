@@ -71,6 +71,7 @@ final readonly class MeController
         $updated = ($this->updateProfile)($user, new UpdateProfile(
             $request->displayName,
             $request->timezone,
+            $request->locale,
             self::preferencesOf($request->notificationPreferences),
         ));
 

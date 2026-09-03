@@ -57,6 +57,20 @@ final class SocialSignInTest extends ApiTestCase
         self::assertSame($first['user']['id'], $second['user']['id']);
     }
 
+    public function testNegotiatesTheLocaleWhenCreatingTheAccount(): void
+    {
+        $response = $this->post('/api/auth/social/google', [
+            'code' => Stub::codeFor('sub-fr', 'francois@grrind.app'),
+            'redirectUri' => 'app.grrind://auth/google',
+            'timezone' => 'Europe/Paris',
+        ], ['Accept-Language' => 'fr-FR,fr;q=0.9,en;q=0.8']);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $user = self::decode($response)['user'];
+        self::assertIsArray($user);
+        self::assertSame('fr', $user['locale']);
+    }
+
     public function testANewAddressOnAKnownSubjectStillFindsTheSameAccount(): void
     {
         // Le joueur a changé d'adresse chez le fournisseur. Le `sub` n'a pas bougé :

@@ -11,9 +11,11 @@ use App\Identity\Application\RegisterUserHandler;
 use App\Identity\UI\Http\Request\RegisterRequest;
 use App\Identity\UI\Http\Response\AuthResource;
 use App\Shared\Application\PlayerTitles;
+use App\Shared\Domain\Locale;
 use Nelmio\ApiDocBundle\Attribute\Security;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -44,13 +46,14 @@ final readonly class RegisterController
         ),
     )]
     #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
-    public function __invoke(#[MapRequestPayload] RegisterRequest $request): JsonResponse
+    public function __invoke(Request $httpRequest, #[MapRequestPayload] RegisterRequest $request): JsonResponse
     {
         $user = ($this->register)(new RegisterUser(
             $request->email,
             $request->password,
             $request->displayName,
             $request->timezone,
+            self::localeOf($request->locale, $httpRequest),
         ));
 
         // L'inscription ouvre directement la session : forcer un login juste après
@@ -58,5 +61,12 @@ final readonly class RegisterController
         $authenticated = new AuthenticatedUser($user, ($this->issueTokens)($user));
 
         return new JsonResponse(AuthResource::from($authenticated, $this->titles->of($user->id()))->toArray(), Response::HTTP_CREATED);
+    }
+
+    private static function localeOf(?string $requested, Request $request): Locale
+    {
+        return Locale::tryFrom($requested ?? '')
+            ?? Locale::tryFrom($request->getPreferredLanguage(Locale::values()) ?? '')
+            ?? Locale::English;
     }
 }

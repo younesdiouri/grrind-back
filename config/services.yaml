@@ -206,6 +206,7 @@ services:
     # Le fuseau du joueur traverse la frontière des modules par ce seul point : `Identity`
     # implémente le port, `Progression` et `Engagement` ne connaissent que l'interface.
     App\Shared\Application\PlayerTimezones: '@App\Identity\Infrastructure\Doctrine\UserRepository'
+    App\Shared\Application\PlayerLocales: '@App\Identity\Infrastructure\Doctrine\UserRepository'
 
     # Le pendant exact, dans l'autre sens : `Progression` possède les titres, `Identity` les
     # affiche dans le profil sans jamais connaître ni le catalogue ni la table.

@@ -23,6 +23,7 @@ final class MeTest extends ApiTestCase
         self::assertSame(self::EMAIL, $body['email']);
         self::assertSame('Bob', $body['displayName']);
         self::assertSame('Europe/Paris', $body['timezone']);
+        self::assertSame('en', $body['locale']);
         // Toutes les catégories vivantes sont rendues, même celles encore activées par défaut.
         self::assertSame(
             ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
@@ -70,6 +71,24 @@ final class MeTest extends ApiTestCase
 
         self::assertSame('Asia/Tokyo', $body['timezone']);
         self::assertSame('Bob', $body['displayName'], 'Un champ absent du PATCH ne doit pas être écrasé.');
+    }
+
+    public function testUpdatesTheLocaleWithoutTouchingOtherProfileFields(): void
+    {
+        $headers = $this->authenticated();
+
+        $response = $this->send('PATCH', '/api/me', ['locale' => 'fr'], $headers);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+        self::assertSame('fr', self::decode($response)['locale']);
+        self::assertSame('Bob', self::decode($this->get('/api/me', $headers))['displayName']);
+    }
+
+    public function testRejectsAnUnknownLocale(): void
+    {
+        $response = $this->send('PATCH', '/api/me', ['locale' => 'es'], $this->authenticated());
+
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
     }
 
     public function testTheChangeSurvivesTheRequest(): void

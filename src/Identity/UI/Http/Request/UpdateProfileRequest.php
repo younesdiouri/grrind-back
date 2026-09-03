@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Identity\UI\Http\Request;
 
 use App\Identity\Domain\User;
+use App\Shared\Domain\Locale;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -24,6 +25,8 @@ final readonly class UpdateProfileRequest
         public ?string $displayName = null,
         #[Assert\Timezone]
         public ?string $timezone = null,
+        #[Assert\Choice(callback: [Locale::class, 'values'])]
+        public ?string $locale = null,
         // `Valid` fait descendre la validation dans chaque élément — même pattern que
         // `ImportWorkoutsRequest::$workouts` ; pas de `Count` ici, une liste vide est le
         // cas nominal d'un PATCH qui ne touche pas aux préférences.

@@ -3001,6 +3001,13 @@ components:
           type: string
           nullable: true
           default: null
+        locale:
+          type: string
+          nullable: true
+          default: null
+          enum:
+            - en
+            - fr
         notificationPreferences:
           type: array
           items:
@@ -3025,6 +3032,13 @@ components:
         timezone:
           type: string
           default: UTC
+        locale:
+          type: string
+          nullable: true
+          default: null
+          enum:
+            - en
+            - fr
       type: object
     SocialSignInRequest:
       properties:
@@ -3045,6 +3059,13 @@ components:
         timezone:
           type: string
           default: UTC
+        locale:
+          type: string
+          nullable: true
+          default: null
+          enum:
+            - en
+            - fr
       type: object
     XpHistoryQuery:
       properties:
