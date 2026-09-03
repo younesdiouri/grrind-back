@@ -289,6 +289,15 @@ final class GameCrudHttpTest extends ApiTestCase
 
         $crawler = $this->client->request('GET', '/admin/settings/1/edit');
         self::assertResponseIsSuccessful();
+        foreach ([
+            'GameSettings[training][minimum_duration_seconds]',
+            'GameSettings[xp][base_xp_per_hour]',
+            'GameSettings[attributes][vitality][floor_permille]',
+            'GameSettings[community][risala][week_timezone]',
+            'GameSettings[notifications][quiet_hours_start_hour]',
+        ] as $name) {
+            self::assertCount(1, $crawler->filter(\sprintf('input[name="%s"]', $name)));
+        }
         $form = $crawler->filter('form[name="GameSettings"]')->form();
         $form->setValues(['GameSettings[lootLuck][floor_percent]' => (string) $newFloor]);
         $this->client->submit($form);

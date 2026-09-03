@@ -65,7 +65,7 @@ final readonly class GameRulesetPublisher
             throw new LogicException('Les réglages globaux initiaux sont absents. Rejouer les migrations avant d’ouvrir EasyAdmin.');
         }
 
-        foreach ([...$items, ...$titles, ...$enemies, ...$tables] as $configuration) {
+        foreach ([...$items, ...$titles, ...$enemies, ...$tables, ...$disciplines] as $configuration) {
             if ($configuration->isActive()) {
                 $configuration->markPublishedActive();
             }
@@ -179,6 +179,9 @@ final readonly class GameRulesetPublisher
         new LootTables($lootVersion, $workout, $adversary, $chest, $items, $enemies, $bosses);
         /** @var array{minimum_duration_seconds: int, maximum_duration_seconds: int, import_window_days: int} $training */
         $training = $snapshot['training'];
+        if ($training['minimum_duration_seconds'] >= $training['maximum_duration_seconds']) {
+            throw new LogicException('Le plancher de durée doit rester strictement sous le plafond.');
+        }
         /** @var array{base_xp_per_hour: int, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $xp */
         $xp = $snapshot['xp'];
         /** @var list<array{discipline: string, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int, split: ?array<string, int>}> $disciplines */

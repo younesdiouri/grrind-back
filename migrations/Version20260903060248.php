@@ -24,7 +24,7 @@ final class Version20260903060248 extends AbstractMigration
     {
         $this->addSql('CREATE TABLE game_activity_type (id UUID NOT NULL, source VARCHAR(30) NOT NULL, provider_type VARCHAR(120) NOT NULL, discipline VARCHAR(30) NOT NULL, active BOOLEAN NOT NULL, PRIMARY KEY (id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_game_activity_source_provider ON game_activity_type (source, provider_type)');
-        $this->addSql('CREATE TABLE game_discipline (id UUID NOT NULL, discipline VARCHAR(30) NOT NULL, active BOOLEAN NOT NULL, sort_order INT NOT NULL, credits_xp BOOLEAN NOT NULL, daily_cap_xp INT DEFAULT NULL, xp_per_km INT DEFAULT NULL, xp_per_100m_elevation INT DEFAULT NULL, split JSON DEFAULT NULL, translations JSON NOT NULL, PRIMARY KEY (id))');
+        $this->addSql('CREATE TABLE game_discipline (id UUID NOT NULL, discipline VARCHAR(30) NOT NULL, active BOOLEAN NOT NULL, ever_published_active BOOLEAN NOT NULL DEFAULT false, sort_order INT NOT NULL, credits_xp BOOLEAN NOT NULL, daily_cap_xp INT DEFAULT NULL, xp_per_km INT DEFAULT NULL, xp_per_100m_elevation INT DEFAULT NULL, split JSON DEFAULT NULL, translations JSON NOT NULL, PRIMARY KEY (id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_game_discipline ON game_discipline (discipline)');
         $this->addSql('CREATE TABLE game_level (id UUID NOT NULL, level INT NOT NULL, total_xp INT NOT NULL, skill_points INT NOT NULL, PRIMARY KEY (id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_game_level ON game_level (level)');
@@ -45,7 +45,7 @@ final class Version20260903060248 extends AbstractMigration
         $activityTypes = $seed['activity_types'];
         foreach ($disciplines as $discipline) {
             $this->insert('game_discipline', [
-                'id' => Uuid::v7()->toRfc4122(), 'discipline' => $discipline['discipline'], 'active' => $discipline['active'], 'sort_order' => $discipline['sort_order'],
+                'id' => Uuid::v7()->toRfc4122(), 'discipline' => $discipline['discipline'], 'active' => $discipline['active'], 'ever_published_active' => $discipline['active'], 'sort_order' => $discipline['sort_order'],
                 'credits_xp' => $discipline['credits_xp'], 'daily_cap_xp' => $discipline['daily_cap_xp'], 'xp_per_km' => $discipline['xp_per_km'],
                 'xp_per_100m_elevation' => $discipline['xp_per_100m_elevation'], 'split' => null === $discipline['split'] ? null : json_encode($discipline['split'], JSON_THROW_ON_ERROR),
                 'translations' => json_encode($discipline['translations'], JSON_THROW_ON_ERROR),

@@ -26,6 +26,10 @@ class GameDiscipline
     #[ORM\Column]
     private bool $active = true;
 
+    /** La clé reste nécessaire tant qu'une opération ouverte peut encore la relire. */
+    #[ORM\Column(name: 'ever_published_active')]
+    private bool $everPublishedActive = false;
+
     #[ORM\Column(name: 'sort_order')]
     private int $sortOrder = 0;
 
@@ -77,6 +81,16 @@ class GameDiscipline
     public function setActive(bool $active): void
     {
         $this->active = $active;
+    }
+
+    public function wasEverPublishedActive(): bool
+    {
+        return $this->everPublishedActive;
+    }
+
+    public function markPublishedActive(): void
+    {
+        $this->everPublishedActive = true;
     }
 
     public function getSortOrder(): int

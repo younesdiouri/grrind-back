@@ -60,7 +60,17 @@ final class ActiveGameConfigurationValidationTest extends KernelTestCase
         $this->validate($snapshot);
     }
 
-    /** @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array{enemies: list<array<string, mixed>>, bosses: list<array<string, mixed>>, fighter: array<string, mixed>}, loot: array{adversary: list<array{key: string}>, chest: list<array{key: string}>}&array<string, mixed>} */
+    public function testTrainingMinimumMustRemainStrictlyBelowTheMaximum(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot['training']['maximum_duration_seconds'] = $snapshot['training']['minimum_duration_seconds'];
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('strictement sous le plafond');
+        $this->validate($snapshot);
+    }
+
+    /** @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array{enemies: list<array<string, mixed>>, bosses: list<array<string, mixed>>, fighter: array<string, mixed>}, loot: array{adversary: list<array{key: string}>, chest: list<array{key: string}>}&array<string, mixed>, training: array{minimum_duration_seconds: int, maximum_duration_seconds: int}} */
     private function snapshot(): array
     {
         $manager = self::getContainer()->get(EntityManagerInterface::class);
@@ -68,7 +78,7 @@ final class ActiveGameConfigurationValidationTest extends KernelTestCase
         $ruleset = $manager->find(GameRuleset::class, 1);
         self::assertInstanceOf(GameRuleset::class, $ruleset);
 
-        /** @var array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array{enemies: list<array<string, mixed>>, bosses: list<array<string, mixed>>, fighter: array<string, mixed>}, loot: array{adversary: list<array{key: string}>, chest: list<array{key: string}>}&array<string, mixed>} $snapshot */
+        /** @var array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array{enemies: list<array<string, mixed>>, bosses: list<array<string, mixed>>, fighter: array<string, mixed>}, loot: array{adversary: list<array{key: string}>, chest: list<array{key: string}>}&array<string, mixed>, training: array{minimum_duration_seconds: int, maximum_duration_seconds: int}} $snapshot */
         $snapshot = $ruleset->snapshot();
 
         return $snapshot;

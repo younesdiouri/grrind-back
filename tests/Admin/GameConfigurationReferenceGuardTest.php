@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Admin;
 
+use App\Admin\Domain\GameDiscipline;
 use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLootTable;
@@ -74,6 +75,13 @@ final class GameConfigurationReferenceGuardTest extends TestCase
 
             return $table;
         }, 1];
+        yield 'discipline, titres/tables/risalat' => [static function (): GameDiscipline {
+            $discipline = new GameDiscipline();
+            $discipline->setDiscipline(\App\Shared\Domain\Activity\Discipline::Running);
+            $discipline->setActive(false);
+
+            return $discipline;
+        }, 3];
     }
 
     public function testActiveConfigurationMustBeDeactivatedBeforePhysicalDeletion(): void
