@@ -54,7 +54,7 @@ final readonly class GameConfigurationReferenceGuard
                 ['SELECT 1 FROM rewards_loot_roll WHERE table_key = ? LIMIT 1', [$configuration->getKey()]],
             ]],
             $configuration instanceof GameDiscipline => ['discipline', $configuration->getDiscipline()->value, [
-                ['SELECT 1 FROM game_title WHERE active = true AND condition::jsonb @> ?::jsonb LIMIT 1', [json_encode(['discipline' => $configuration->getDiscipline()->value], \JSON_THROW_ON_ERROR)]],
+                ['SELECT 1 FROM game_title WHERE active = true AND discipline = ? LIMIT 1', [$configuration->getDiscipline()->value]],
                 ['SELECT 1 FROM game_loot_table WHERE active = true AND eligibility::jsonb @> ?::jsonb LIMIT 1', [json_encode(['disciplines' => [$configuration->getDiscipline()->value]], \JSON_THROW_ON_ERROR)]],
                 ['SELECT 1 FROM community_risala WHERE discipline = ? LIMIT 1', [$configuration->getDiscipline()->value]],
             ]],
@@ -78,7 +78,16 @@ final readonly class GameConfigurationReferenceGuard
         if (!$configuration instanceof GameItem && !$configuration instanceof GameTitle && !$configuration instanceof GameEnemy && !$configuration instanceof GameLootTable && !$configuration instanceof GameDiscipline) {
             return;
         }
-        $this->lockCurrentState($configuration);
+        $state = $this->lockCurrentState($configuration);
+        if ($configuration instanceof GameDiscipline && $state['active'] && !$configuration->isActive()) {
+            $currentRisala = $this->connection->fetchOne(
+                "SELECT 1 FROM community_risala WHERE discipline = ? AND (status = 'DRAWN' OR (status = 'SENT' AND revealed_at <= CURRENT_TIMESTAMP AND expires_at > CURRENT_TIMESTAMP)) LIMIT 1",
+                [$configuration->getDiscipline()->value],
+            );
+            if (false !== $currentRisala) {
+                throw new LogicException('Désactivation refusée : cette discipline porte une Risāla en cours.');
+            }
+        }
     }
 
     /** @return array{active: bool, everPublishedActive: bool} */

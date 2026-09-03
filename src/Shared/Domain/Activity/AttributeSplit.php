@@ -97,6 +97,12 @@ final class AttributeSplit
                 Attribute::Dexterity->value => $split['dexterity'],
             ];
 
+            foreach ($byAttribute as $percentage) {
+                if ($percentage < 0 || $percentage > 100) {
+                    throw new InvalidArgumentException(\sprintf('Chaque composante de la répartition de "%s" doit rester entre 0 et 100.', $discipline->value));
+                }
+            }
+
             $sum = array_sum($byAttribute);
 
             // Une ligne qui ne somme pas à 100 casserait l'invariant `S+E+M+D == $amount`
@@ -159,7 +165,7 @@ final class AttributeSplit
     /** @param array<string, mixed> $snapshot */
     private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
     {
-        /** @var list<array{discipline: string, credits_xp: bool, split: ?array{strength: int, endurance: int, mobility: int, dexterity: int}}> $disciplines */
+        /** @var list<array{discipline: string, active: bool, credits_xp: bool, split: ?array{strength: int, endurance: int, mobility: int, dexterity: int}}> $disciplines */
         $disciplines = $snapshot['disciplines'];
         /** @var list<array{discipline: string, credits_xp?: bool}> $rates */
         $rates = [];
@@ -167,11 +173,11 @@ final class AttributeSplit
         $splits = [];
         foreach ($disciplines as $discipline) {
             $rate = ['discipline' => $discipline['discipline']];
-            if (!$discipline['credits_xp']) {
+            if (!$discipline['active'] || !$discipline['credits_xp']) {
                 $rate['credits_xp'] = false;
             }
             $rates[] = $rate;
-            if (null !== $discipline['split']) {
+            if ($discipline['active'] && null !== $discipline['split']) {
                 $splits[] = ['discipline' => $discipline['discipline'], ...$discipline['split']];
             }
         }

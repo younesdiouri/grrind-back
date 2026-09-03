@@ -42,8 +42,9 @@ final class ActivityTypeMap
      *
      * @param list<array{activity_type: string, discipline: string}> $appleHealth
      * @param list<array{activity_type: string, discipline: string}> $healthConnect
+     * @param list<Discipline>|null                                  $requiredDisciplines
      */
-    public function __construct(array $appleHealth, array $healthConnect, ?GameRulesets $rulesets = null)
+    public function __construct(array $appleHealth, array $healthConnect, ?GameRulesets $rulesets = null, ?array $requiredDisciplines = null)
     {
         $this->useRuntimeRulesets($rulesets);
         $this->bySource = [
@@ -55,7 +56,7 @@ final class ActivityTypeMap
         // portera jamais : elle apparaîtrait dans le contrat, dans le barème d'XP et dans
         // les titres, sans qu'un joueur puisse l'atteindre. On préfère ne pas démarrer.
         foreach (self::sources() as $source) {
-            foreach (Discipline::cases() as $discipline) {
+            foreach ($requiredDisciplines ?? Discipline::cases() as $discipline) {
                 if (!\in_array($discipline, $this->bySource[$source], true)) {
                     throw new InvalidArgumentException(\sprintf('Aucun type "%s" ne mène à la discipline "%s".', $source, $discipline->value));
                 }
@@ -97,15 +98,24 @@ final class ActivityTypeMap
     private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
     {
         $bySource = [self::APPLE_HEALTH => [], self::HEALTH_CONNECT => []];
+        $activeDisciplines = [];
+        /** @var list<array{discipline: string, active: bool}> $disciplines */
+        $disciplines = $snapshot['disciplines'];
+        foreach ($disciplines as $discipline) {
+            if ($discipline['active']) {
+                $active = Discipline::from($discipline['discipline']);
+                $activeDisciplines[$active->value] = $active;
+            }
+        }
         /** @var list<array{source: string, provider_type: string, discipline: string, active: bool}> $activityTypes */
         $activityTypes = $snapshot['activity_types'];
         foreach ($activityTypes as $activityType) {
-            if ($activityType['active']) {
+            if ($activityType['active'] && isset($activeDisciplines[$activityType['discipline']])) {
                 $bySource[$activityType['source']][] = ['activity_type' => $activityType['provider_type'], 'discipline' => $activityType['discipline']];
             }
         }
 
-        return new self($bySource[self::APPLE_HEALTH], $bySource[self::HEALTH_CONNECT], $rulesets);
+        return new self($bySource[self::APPLE_HEALTH], $bySource[self::HEALTH_CONNECT], $rulesets, array_values($activeDisciplines));
     }
 
     /**

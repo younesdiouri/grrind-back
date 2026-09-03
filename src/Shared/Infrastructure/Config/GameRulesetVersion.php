@@ -82,6 +82,16 @@ final class GameRulesetVersion
         }
         unset($discipline);
         $snapshot['disciplines'] = $disciplines;
+        $activityTypes = $snapshot['activity_types'] ?? [];
+        \assert(\is_array($activityTypes));
+        usort($activityTypes, static fn (mixed $left, mixed $right): int => [
+            \is_array($left) ? $left['source'] ?? '' : '',
+            \is_array($left) ? $left['provider_type'] ?? '' : '',
+        ] <=> [
+            \is_array($right) ? $right['source'] ?? '' : '',
+            \is_array($right) ? $right['provider_type'] ?? '' : '',
+        ]);
+        $snapshot['activity_types'] = $activityTypes;
 
         return $snapshot;
     }

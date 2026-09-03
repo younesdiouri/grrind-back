@@ -115,10 +115,16 @@ final class XpRates
             // fonte. Le schéma refuse le zéro pour que la seule façon de ne pas accorder de
             // bonus soit de ne pas en déclarer.
             if (isset($rate['xp_per_km'])) {
+                if ($rate['xp_per_km'] < 1) {
+                    throw new InvalidArgumentException(\sprintf('Le bonus de distance de "%s" doit valoir au moins 1 XP.', $discipline->value));
+                }
                 $perKilometre[$discipline->value] = $rate['xp_per_km'];
             }
 
             if (isset($rate['xp_per_100m_elevation'])) {
+                if ($rate['xp_per_100m_elevation'] < 1) {
+                    throw new InvalidArgumentException(\sprintf('Le bonus de dénivelé de "%s" doit valoir au moins 1 XP.', $discipline->value));
+                }
                 $perHundredMetresOfElevation[$discipline->value] = $rate['xp_per_100m_elevation'];
             }
         }
@@ -239,16 +245,17 @@ final class XpRates
     {
         /** @var array{base_xp_per_hour: int} $xp */
         $xp = $snapshot['xp'];
-        /** @var list<array{discipline: string, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int}> $disciplines */
+        /** @var list<array{discipline: string, active: bool, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int}> $disciplines */
         $disciplines = $snapshot['disciplines'];
         $rates = array_map(static function (array $discipline): array {
             $rate = ['discipline' => $discipline['discipline']];
-            if (!$discipline['credits_xp']) {
+            if (!$discipline['active'] || !$discipline['credits_xp']) {
                 $rate['credits_xp'] = false;
-            }
-            foreach (['daily_cap_xp', 'xp_per_km', 'xp_per_100m_elevation'] as $key) {
-                if (null !== $discipline[$key]) {
-                    $rate[$key] = $discipline[$key];
+            } else {
+                foreach (['daily_cap_xp', 'xp_per_km', 'xp_per_100m_elevation'] as $key) {
+                    if (null !== $discipline[$key]) {
+                        $rate[$key] = $discipline[$key];
+                    }
                 }
             }
 

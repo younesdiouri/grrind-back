@@ -111,4 +111,41 @@ final class GameConfigurationReferenceGuardTest extends TestCase
         $this->expectExceptionMessage('déjà été publiée active');
         new GameConfigurationReferenceGuard($connection)->assertDeletable($item);
     }
+
+    public function testDisciplineCannotBeDisabledWhileARisalaIsCurrent(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturn(['active' => true, 'ever_published_active' => true]);
+        $connection->expects(self::once())->method('fetchOne')->with(
+            self::callback(static fn (string $sql): bool => str_contains($sql, "status = 'DRAWN'") && str_contains($sql, "status = 'SENT'") && str_contains($sql, 'expires_at > CURRENT_TIMESTAMP')),
+            ['RUNNING'],
+        )->willReturn('used');
+        $discipline = new GameDiscipline();
+        $discipline->setDiscipline(\App\Shared\Domain\Activity\Discipline::Running);
+        $discipline->setActive(false);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Risāla en cours');
+        new GameConfigurationReferenceGuard($connection)->lockForMutation($discipline);
+    }
+
+    public function testDisciplineDeletionUsesTheRealTitleSchema(): void
+    {
+        $queries = [];
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturn(['active' => false, 'ever_published_active' => false]);
+        $connection->expects(self::exactly(3))->method('fetchOne')->willReturnCallback(static function (string $sql) use (&$queries): false {
+            $queries[] = $sql;
+
+            return false;
+        });
+        $discipline = new GameDiscipline();
+        $discipline->setDiscipline(\App\Shared\Domain\Activity\Discipline::Running);
+        $discipline->setActive(false);
+
+        new GameConfigurationReferenceGuard($connection)->assertDeletable($discipline);
+
+        self::assertStringContainsString('FROM game_title WHERE active = true AND discipline = ?', $queries[0]);
+        self::assertStringNotContainsString('condition::jsonb', $queries[0]);
+    }
 }

@@ -12,6 +12,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
+use Symfony\Component\Validator\Constraints\Positive;
 
 final class DisciplineCrudController extends GameCrudController
 {
@@ -37,8 +38,8 @@ final class DisciplineCrudController extends GameCrudController
         yield IntegerField::new('sortOrder');
         yield BooleanField::new('creditsXp');
         yield IntegerField::new('dailyCapXp');
-        yield IntegerField::new('xpPerKm');
-        yield IntegerField::new('xpPer100mElevation');
+        yield IntegerField::new('xpPerKm')->setFormTypeOption('constraints', [new Positive()]);
+        yield IntegerField::new('xpPer100mElevation')->setFormTypeOption('constraints', [new Positive()]);
         yield StructuredField::new('split')->setFormType(AttributeSplitType::class)->hideOnIndex();
         yield StructuredField::new('translations')->setFormType(TranslationsType::class)->hideOnIndex();
     }

@@ -89,13 +89,13 @@ final class CreditingDisciplines
     /** @param array<string, mixed> $snapshot */
     private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
     {
-        /** @var list<array{discipline: string, credits_xp: bool}> $disciplines */
+        /** @var list<array{discipline: string, active: bool, credits_xp: bool}> $disciplines */
         $disciplines = $snapshot['disciplines'];
         /** @var list<array{discipline: string, credits_xp?: bool}> $rates */
         $rates = [];
         foreach ($disciplines as $discipline) {
             $rate = ['discipline' => $discipline['discipline']];
-            if (!$discipline['credits_xp']) {
+            if (!$discipline['active'] || !$discipline['credits_xp']) {
                 $rate['credits_xp'] = false;
             }
             $rates[] = $rate;

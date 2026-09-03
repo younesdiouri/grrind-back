@@ -24,6 +24,7 @@ use App\Rewards\Domain\LootLuckRules;
 use App\Rewards\Domain\LootTables;
 use App\Shared\Domain\Activity\ActivityTypeMap;
 use App\Shared\Domain\Activity\AttributeSplit;
+use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\Vitality;
 use App\Shared\Domain\Timezone;
 use App\Shared\Infrastructure\Config\DatabaseGameRulesets;
@@ -148,6 +149,7 @@ final readonly class GameRulesetPublisher
         ], $disciplines);
         $levelRows = array_map(static fn (GameLevel $level): array => ['level' => $level->getLevel(), 'total_xp' => $level->getTotalXp(), 'skill_points' => $level->getSkillPoints()], $levels);
         $activityRows = array_map(static fn (GameActivityType $activityType): array => ['source' => $activityType->getSource()->value, 'provider_type' => $activityType->getProviderType(), 'discipline' => $activityType->getDiscipline()->value, 'active' => $activityType->isActive()], $activityTypes);
+        usort($activityRows, static fn (array $left, array $right): int => [$left['source'], $left['provider_type']] <=> [$right['source'], $right['provider_type']]);
 
         return [
             'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
@@ -184,17 +186,18 @@ final readonly class GameRulesetPublisher
         }
         /** @var array{base_xp_per_hour: int, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $xp */
         $xp = $snapshot['xp'];
-        /** @var list<array{discipline: string, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int, split: ?array<string, int>}> $disciplines */
+        /** @var list<array{discipline: string, active: bool, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int, split: ?array<string, int>}> $disciplines */
         $disciplines = $snapshot['disciplines'];
-        self::validateActiveDisciplineReferences($titles, $workout, $disciplines);
+        self::validateActiveDisciplineReferences($titles, $workout, $disciplines, $snapshot['activity_types']);
         $rates = array_map(static function (array $discipline): array {
             $rate = ['discipline' => $discipline['discipline']];
-            if (!$discipline['credits_xp']) {
+            if (!$discipline['active'] || !$discipline['credits_xp']) {
                 $rate['credits_xp'] = false;
-            }
-            foreach (['daily_cap_xp', 'xp_per_km', 'xp_per_100m_elevation'] as $key) {
-                if (null !== $discipline[$key]) {
-                    $rate[$key] = $discipline[$key];
+            } else {
+                foreach (['daily_cap_xp', 'xp_per_km', 'xp_per_100m_elevation'] as $key) {
+                    if (null !== $discipline[$key]) {
+                        $rate[$key] = $discipline[$key];
+                    }
                 }
             }
 
@@ -203,7 +206,7 @@ final readonly class GameRulesetPublisher
         /** @var list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}> $splits */
         $splits = [];
         foreach ($disciplines as $discipline) {
-            if (null !== $discipline['split']) {
+            if ($discipline['active'] && null !== $discipline['split']) {
                 $splits[] = [
                     'discipline' => $discipline['discipline'],
                     'strength' => $discipline['split']['strength'],
@@ -217,8 +220,11 @@ final readonly class GameRulesetPublisher
         new XpRates($xp['base_xp_per_hour'], $rates);
         new DiminishingReturns($xp['diminishing_returns'], $xp['diminishing_returns_beyond_percent']);
         new AttributeSplit($splits, $rates);
-        /** @var array{vitality: array{floor_permille: int, target_active_kcal: int, bonus_cap_permille: int}} $attributes */
+        /** @var array{vitality: array{floor_permille: int, window_days: int, target_active_kcal: int, bonus_cap_permille: int}} $attributes */
         $attributes = $snapshot['attributes'];
+        if ($attributes['vitality']['window_days'] < 1) {
+            throw new LogicException('La fenêtre de Vitality doit couvrir au moins une journée.');
+        }
         new Vitality($attributes['vitality']['floor_permille'], $attributes['vitality']['target_active_kcal'], $attributes['vitality']['bonus_cap_permille']);
         /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
         $levels = $snapshot['levels'];
@@ -231,12 +237,23 @@ final readonly class GameRulesetPublisher
                 $activityBySource[$activityType['source']][] = ['activity_type' => $activityType['provider_type'], 'discipline' => $activityType['discipline']];
             }
         }
-        new ActivityTypeMap($activityBySource['APPLE_HEALTH'], $activityBySource['HEALTH_CONNECT']);
+        $activeDisciplines = [];
+        foreach ($disciplines as $discipline) {
+            if ($discipline['active']) {
+                $activeDisciplines[] = Discipline::from($discipline['discipline']);
+            }
+        }
+        new ActivityTypeMap($activityBySource['APPLE_HEALTH'], $activityBySource['HEALTH_CONNECT'], null, $activeDisciplines);
         /** @var array{maximum_members: int, invite_code_lifetime_hours: int, risala: array{active_weeks: int, reveal_day: int, reveal_hour: int, week_timezone: string, recipient_bonus_percent: int, sender_bonus_percent: int}} $community */
         $community = $snapshot['community'];
         self::validateCommunity($community);
         /** @var array{quiet_hours_start_hour: int, quiet_hours_end_hour: int} $notifications */
         $notifications = $snapshot['notifications'];
+        foreach (['freshness_window_minutes', 'announcement_delay_seconds', 'stale_window_minutes'] as $key) {
+            if (($notifications[$key] ?? 0) < 1) {
+                throw new LogicException('Les fenêtres et délais de notification doivent être strictement positifs.');
+            }
+        }
         if ($notifications['quiet_hours_start_hour'] < 0 || $notifications['quiet_hours_start_hour'] > 23 || $notifications['quiet_hours_end_hour'] < 0 || $notifications['quiet_hours_end_hour'] > 23) {
             throw new LogicException('Les heures calmes se bornent entre 0 et 23.');
         }
@@ -340,8 +357,9 @@ final readonly class GameRulesetPublisher
      * @param list<array<string, mixed>> $titles
      * @param list<array<string, mixed>> $workout
      * @param list<array<string, mixed>> $disciplines
+     * @param list<array<string, mixed>> $activityTypes
      */
-    private static function validateActiveDisciplineReferences(array $titles, array $workout, array $disciplines): void
+    private static function validateActiveDisciplineReferences(array $titles, array $workout, array $disciplines, array $activityTypes): void
     {
         $active = [];
         foreach ($disciplines as $discipline) {
@@ -370,6 +388,13 @@ final readonly class GameRulesetPublisher
                     \assert(\is_string($tableKey));
                     throw new LogicException(\sprintf('La table active "%s" référence la discipline inactive "%s".', $tableKey, $discipline));
                 }
+            }
+        }
+        foreach ($activityTypes as $activityType) {
+            if (($activityType['active'] ?? true) === true && \is_string($activityType['discipline'] ?? null) && !isset($active[$activityType['discipline']])) {
+                $providerType = $activityType['provider_type'] ?? null;
+                \assert(\is_string($providerType));
+                throw new LogicException(\sprintf('Le type d’activité actif "%s" référence la discipline inactive "%s".', $providerType, $activityType['discipline']));
             }
         }
     }

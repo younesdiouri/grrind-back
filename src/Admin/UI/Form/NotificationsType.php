@@ -8,6 +8,7 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Positive;
 
 /** @extends AbstractType<array{freshness_window_minutes: int, announcement_delay_seconds: int, stale_window_minutes: int, quiet_hours_start_hour: int, quiet_hours_end_hour: int}> */
 final class NotificationsType extends AbstractType
@@ -15,7 +16,7 @@ final class NotificationsType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         foreach (['freshness_window_minutes', 'announcement_delay_seconds', 'stale_window_minutes', 'quiet_hours_start_hour', 'quiet_hours_end_hour'] as $field) {
-            $builder->add($field, IntegerType::class);
+            $builder->add($field, IntegerType::class, ['constraints' => \in_array($field, ['quiet_hours_start_hour', 'quiet_hours_end_hour'], true) ? [] : [new Positive()]]);
         }
     }
 

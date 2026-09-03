@@ -33,6 +33,7 @@ use RuntimeException;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 use Symfony\Contracts\Cache\CacheInterface;
+use Throwable;
 
 /** Les entrées retirées restent lisibles pour les faits, jamais sélectionnables à nouveau. */
 final class DatabaseRuntimeCatalogTest extends TestCase
@@ -246,6 +247,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertSame(2, $worker->revision());
         $items = $worker->snapshot()['items'];
         self::assertIsArray($items);
+        /** @var list<array{translations: array{fr: array{name: string}}}> $items */
         self::assertSame('Bottes publiees', $items[1]['translations']['fr']['name']);
     }
 
@@ -402,6 +404,36 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertFalse(QuietHours::runtime($rulesets)->contains(new DateTimeImmutable('2026-01-01 12:00:00+00:00'), Timezone::fromString('UTC')));
     }
 
+    public function testInactiveDisciplineCannotCreditXpOrBeImported(): void
+    {
+        $rulesets = $this->balanceRulesets();
+        /** @var list<array{discipline: string, active: bool}> $disciplines */
+        $disciplines = $rulesets->publishedSnapshot['disciplines'];
+        foreach ($disciplines as &$discipline) {
+            if ('RUNNING' === $discipline['discipline']) {
+                $discipline['active'] = false;
+                break;
+            }
+        }
+        unset($discipline);
+        $rulesets->publishedSnapshot['disciplines'] = $disciplines;
+
+        self::assertFalse(XpRates::runtime($rulesets)->credits(Discipline::Running));
+        self::assertFalse(CreditingDisciplines::runtime($rulesets)->credits(Discipline::Running));
+        self::assertNull(ActivityTypeMap::runtime($rulesets)->disciplineFor('APPLE_HEALTH', 'running'));
+    }
+
+    public function testActivityTypeOrderDoesNotChangeTheGameplayVersion(): void
+    {
+        $snapshot = $this->balanceRulesets()->snapshot();
+        $version = GameRulesetVersion::of($snapshot);
+        $activityTypes = $snapshot['activity_types'];
+        self::assertIsArray($activityTypes);
+        $snapshot['activity_types'] = array_reverse($activityTypes);
+
+        self::assertSame($version, GameRulesetVersion::of($snapshot));
+    }
+
     public function testRuntimeRulesRebuildAfterThePublishedRevisionChanges(): void
     {
         $rulesets = $this->balanceRulesets();
@@ -452,7 +484,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         try {
             $rules->isTooShort(299);
             self::fail('La reconstruction invalide devait echouer.');
-        } catch (\Throwable) {
+        } catch (Throwable) {
         }
 
         $valid = $invalid;
