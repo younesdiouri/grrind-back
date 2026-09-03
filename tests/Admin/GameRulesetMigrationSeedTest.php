@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Admin;
 
 use App\Admin\Domain\GameRuleset;
+use App\Admin\Infrastructure\GameRulesetPublisher;
 use App\Admin\Infrastructure\GameRulesetSeed as RuntimeSeed;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use Doctrine\ORM\EntityManagerInterface;
@@ -62,10 +63,42 @@ final class GameRulesetMigrationSeedTest extends KernelTestCase
         self::assertSame(GameRulesetVersion::of($snapshot), $ruleset->version());
     }
 
+    public function testFrozenMigrationSeedPassesThePublisherValidation(): void
+    {
+        $validate = new ReflectionMethod(GameRulesetPublisher::class, 'validate');
+        $validate->invoke(null, $this->publishedSnapshot());
+
+        self::addToAssertionCount(1);
+    }
+
+    public function testMigrationOwnsItsCanonicalVersionAlgorithm(): void
+    {
+        $path = \dirname(__DIR__, 2).'/migrations/Version20260903060248.php';
+        $source = file_get_contents($path);
+        self::assertIsString($source);
+        self::assertStringNotContainsString('App\\Shared\\Infrastructure\\Config\\GameRulesetVersion', $source);
+
+        require_once $path;
+        $version = new ReflectionMethod('DoctrineMigrations\\Version20260903060248', 'version');
+        $snapshot = $this->publishedSnapshot();
+        self::assertSame(GameRulesetVersion::of($snapshot), $version->invoke(null, $snapshot));
+    }
+
     public function testRetiredYamlCatalogCannotBecomeARuntimeSourceAgain(): void
     {
         $directory = \dirname(__DIR__, 2).'/config/game/v1';
 
         self::assertDirectoryDoesNotExist($directory);
+    }
+
+    /** @return array<string, mixed> */
+    private function publishedSnapshot(): array
+    {
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+        $ruleset = $manager->find(GameRuleset::class, 1);
+        self::assertInstanceOf(GameRuleset::class, $ruleset);
+
+        return $ruleset->snapshot();
     }
 }

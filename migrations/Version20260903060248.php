@@ -6,7 +6,6 @@ namespace DoctrineMigrations;
 
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
-use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -66,7 +65,7 @@ final class Version20260903060248 extends AbstractMigration
         $snapshot = json_decode($stored, true, 512, JSON_THROW_ON_ERROR);
         \assert(\is_array($snapshot));
         $snapshot = [...$snapshot, ...array_intersect_key($seed, array_flip(['training', 'xp', 'attributes', 'disciplines', 'levels', 'activity_types', 'community', 'notifications']))];
-        $this->addSql('UPDATE game_ruleset SET revision = revision + 1, version = ?, snapshot = ?, published_at = ? WHERE id = 1', [GameRulesetVersion::of($snapshot), json_encode($snapshot, JSON_THROW_ON_ERROR), (new \DateTimeImmutable())->format('c')]);
+        $this->addSql('UPDATE game_ruleset SET revision = revision + 1, version = ?, snapshot = ?, published_at = ? WHERE id = 1', [self::version($snapshot), json_encode($snapshot, JSON_THROW_ON_ERROR), (new \DateTimeImmutable())->format('c')]);
     }
 
     public function down(Schema $schema): void
@@ -93,20 +92,57 @@ final class Version20260903060248 extends AbstractMigration
     /** @param array<string, mixed> $snapshot */
     private static function version(array $snapshot): string
     {
-        foreach (['items', 'titles', 'disciplines'] as $section) {
-            foreach ($snapshot[$section] ?? [] as &$row) {
-                \assert(\is_array($row));
-                unset($row['image_path'], $row['translations']);
-            }
-            unset($row);
+        $items = $snapshot['items'] ?? [];
+        \assert(\is_array($items));
+        foreach ($items as &$item) {
+            \assert(\is_array($item));
+            unset($item['image_path'], $item['translations']);
         }
+        unset($item);
+        $snapshot['items'] = $items;
+
+        $titles = $snapshot['titles'] ?? [];
+        \assert(\is_array($titles));
+        foreach ($titles as &$title) {
+            \assert(\is_array($title));
+            unset($title['translations']);
+        }
+        unset($title);
+        $snapshot['titles'] = $titles;
+
+        $combat = $snapshot['combat'] ?? [];
+        \assert(\is_array($combat));
         foreach (['enemies', 'bosses'] as $kind) {
-            foreach ($snapshot['combat'][$kind] ?? [] as &$enemy) {
+            $enemies = $combat[$kind] ?? [];
+            \assert(\is_array($enemies));
+            foreach ($enemies as &$enemy) {
                 \assert(\is_array($enemy));
                 unset($enemy['translations']);
             }
             unset($enemy);
+            $combat[$kind] = $enemies;
         }
+        $snapshot['combat'] = $combat;
+
+        $disciplines = $snapshot['disciplines'] ?? [];
+        \assert(\is_array($disciplines));
+        foreach ($disciplines as &$discipline) {
+            \assert(\is_array($discipline));
+            unset($discipline['translations']);
+        }
+        unset($discipline);
+        $snapshot['disciplines'] = $disciplines;
+
+        $activityTypes = $snapshot['activity_types'] ?? [];
+        \assert(\is_array($activityTypes));
+        usort($activityTypes, static fn (mixed $left, mixed $right): int => [
+            \is_array($left) ? $left['source'] ?? '' : '',
+            \is_array($left) ? $left['provider_type'] ?? '' : '',
+        ] <=> [
+            \is_array($right) ? $right['source'] ?? '' : '',
+            \is_array($right) ? $right['provider_type'] ?? '' : '',
+        ]);
+        $snapshot['activity_types'] = $activityTypes;
 
         return 'v1-'.substr(hash('sha256', json_encode(self::canonicalize($snapshot), JSON_THROW_ON_ERROR)), 0, 12);
     }

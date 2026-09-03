@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared\Config;
 
+use App\Admin\Infrastructure\GameRulesetSeed;
 use App\Combat\Application\FighterFactory;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\EnemyCatalog;
@@ -115,6 +116,9 @@ final class RewardsCoverageTest extends KernelTestCase
         self::assertInstanceOf(\App\Shared\Application\GameRulesets::class, $ruleset);
         /** @var array{loot: array{version: int}} $snapshot */
         $snapshot = $ruleset->snapshot();
+        $seedLoot = GameRulesetSeed::data()['loot'];
+        self::assertIsArray($seedLoot);
+        self::assertSame(1, $seedLoot['version']);
         self::assertSame($snapshot['loot']['version'], self::shippedTables()->version());
         self::assertNotSame('', $ruleset->version());
     }
