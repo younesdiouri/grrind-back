@@ -315,7 +315,7 @@ final readonly class ImportWorkoutsHandler
      */
     private function occupiedIntervals(ImportWorkouts $command, array $eligible): array
     {
-        $margin = \sprintf('%d seconds', $this->rules->maximumDurationSeconds);
+        $margin = \sprintf('%d seconds', $this->rules->maximumDurationSeconds());
         $latest = $eligible[array_key_last($eligible)][0];
 
         return $this->workouts->busyIntervalsBetween(

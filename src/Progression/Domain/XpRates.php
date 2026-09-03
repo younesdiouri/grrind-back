@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Progression\Domain;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\RuntimeRuleset;
 use InvalidArgumentException;
 
 /**
@@ -33,8 +35,9 @@ use InvalidArgumentException;
  * bonus de terrain, et ne consomme donc ni les rendements décroissants ni le plafond
  * quotidien d'aucune autre discipline pratiquée le même jour.
  */
-final readonly class XpRates
+final class XpRates
 {
+    use RuntimeRuleset;
     /** @var array<string, int> valeur de discipline → plafond d'XP quotidien, uniquement les disciplines qui créditent */
     private array $dailyCap;
 
@@ -54,7 +57,9 @@ final readonly class XpRates
     public function __construct(
         private int $baseXpPerHour,
         array $disciplines,
+        ?GameRulesets $rulesets = null,
     ) {
+        $this->useRuntimeRulesets($rulesets);
         if ($baseXpPerHour < 1) {
             throw new InvalidArgumentException('Une heure de pratique doit valoir au moins 1 XP.');
         }
@@ -133,8 +138,17 @@ final readonly class XpRates
         $this->nonCrediting = $nonCrediting;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
     public function baseXpPerHour(): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->baseXpPerHour();
+        }
+
         return $this->baseXpPerHour;
     }
 
@@ -145,6 +159,10 @@ final readonly class XpRates
      */
     public function credits(Discipline $discipline): bool
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->credits($discipline);
+        }
+
         return !isset($this->nonCrediting[$discipline->value]);
     }
 
@@ -156,6 +174,10 @@ final readonly class XpRates
      */
     public function dailyCapOf(Discipline $discipline): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->dailyCapOf($discipline);
+        }
+
         return $this->dailyCap[$discipline->value]
             ?? throw new InvalidArgumentException(\sprintf('"%s" ne crédite pas d\'XP, elle n\'a pas de plafond quotidien — vérifier credits() avant d\'appeler dailyCapOf().', $discipline->value));
     }
@@ -168,6 +190,10 @@ final readonly class XpRates
      */
     public function baseFor(int $durationSeconds): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->baseFor($durationSeconds);
+        }
+
         if ($durationSeconds < 0) {
             throw new InvalidArgumentException(\sprintf('Une séance ne dure pas %d secondes.', $durationSeconds));
         }
@@ -183,6 +209,10 @@ final readonly class XpRates
      */
     public function distanceBonusOf(Discipline $discipline, ?int $distanceMeters): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->distanceBonusOf($discipline, $distanceMeters);
+        }
+
         if (null === $distanceMeters || !isset($this->perKilometre[$discipline->value])) {
             return 0;
         }
@@ -193,10 +223,38 @@ final readonly class XpRates
     /** Le pendant exact pour le dénivelé positif, par tranche de 100 mètres. */
     public function elevationBonusOf(Discipline $discipline, ?int $elevationGainMeters): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->elevationBonusOf($discipline, $elevationGainMeters);
+        }
+
         if (null === $elevationGainMeters || !isset($this->perHundredMetresOfElevation[$discipline->value])) {
             return 0;
         }
 
         return intdiv(max(0, $elevationGainMeters) * $this->perHundredMetresOfElevation[$discipline->value], 100);
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var array{base_xp_per_hour: int} $xp */
+        $xp = $snapshot['xp'];
+        /** @var list<array{discipline: string, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int}> $disciplines */
+        $disciplines = $snapshot['disciplines'];
+        $rates = array_map(static function (array $discipline): array {
+            $rate = ['discipline' => $discipline['discipline']];
+            if (!$discipline['credits_xp']) {
+                $rate['credits_xp'] = false;
+            }
+            foreach (['daily_cap_xp', 'xp_per_km', 'xp_per_100m_elevation'] as $key) {
+                if (null !== $discipline[$key]) {
+                    $rate[$key] = $discipline[$key];
+                }
+            }
+
+            return $rate;
+        }, $disciplines);
+
+        return new self($xp['base_xp_per_hour'], $rates, $rulesets);
     }
 }

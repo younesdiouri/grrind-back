@@ -135,6 +135,6 @@ final readonly class GuildInviteController
         // validation ne s'applique — voir {@see JoinGuildRequest}.
         $guild = ($this->joinGuild)(new JoinGuild($playerId, $request->code));
 
-        return new JsonResponse(GuildResource::from($guild, $playerId, $this->rules->maximumMembers)->toArray());
+        return new JsonResponse(GuildResource::from($guild, $playerId, $this->rules->maximumMembers())->toArray());
     }
 }

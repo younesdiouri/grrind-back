@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Community\Infrastructure\Doctrine;
 
 use App\Community\Domain\PendingGuildActivity;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -26,7 +27,7 @@ class PendingGuildActivityRepository extends ServiceEntityRepository
          * pourquoi ce garde-fou existe (#134), et celui de `notifications.yaml`
          * (`stale_window_minutes`) pour la valeur retenue.
          */
-        private readonly int $staleWindowMinutes,
+        private readonly GameRulesets $rulesets,
     ) {
         parent::__construct($registry, PendingGuildActivity::class);
     }
@@ -94,7 +95,7 @@ class PendingGuildActivityRepository extends ServiceEntityRepository
             $this->getEntityManager()->refresh($pending);
 
             $ageInMinutes = ($now->getTimestamp() - $pending->openedAt()->getTimestamp()) / 60;
-            $isAbandoned = $ageInMinutes >= $this->staleWindowMinutes;
+            $isAbandoned = $ageInMinutes >= $this->staleWindowMinutes();
 
             $pending->addSession($discipline, $durationSeconds, $xpGranted);
             $this->getEntityManager()->flush();
@@ -147,5 +148,14 @@ class PendingGuildActivityRepository extends ServiceEntityRepository
             'DELETE FROM community_pending_guild_activity WHERE author_id = :authorId AND window_id = :windowId',
             ['authorId' => $authorId->toRfc4122(), 'windowId' => $windowId->toRfc4122()],
         );
+    }
+
+    private function staleWindowMinutes(): int
+    {
+        $snapshot = $this->rulesets->snapshot();
+        /** @var array{stale_window_minutes: int} $notifications */
+        $notifications = $snapshot['notifications'];
+
+        return $notifications['stale_window_minutes'];
     }
 }

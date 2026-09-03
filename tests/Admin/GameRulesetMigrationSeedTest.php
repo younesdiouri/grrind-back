@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Admin;
 
-use App\Admin\Infrastructure\GameRulesetSeed as RuntimeSeed;
 use App\Admin\Domain\GameRuleset;
+use App\Admin\Infrastructure\GameRulesetSeed as RuntimeSeed;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use Doctrine\ORM\EntityManagerInterface;
 use ReflectionMethod;
@@ -19,15 +19,23 @@ final class GameRulesetMigrationSeedTest extends KernelTestCase
         require_once \dirname(__DIR__, 2).'/migrations/GameRulesetSeed.php';
         $migrationSeed = new ReflectionMethod('DoctrineMigrations\\GameRulesetSeed', 'data')->invoke(null);
         self::assertIsArray($migrationSeed);
-        /** @var array{items: list<mixed>, titles: list<mixed>, enemies: list<mixed>, loot: array{adversary: list<mixed>}} $migrationSeed */
+        /** @var array<string, mixed> $migrationSeed */
         self::assertSame(RuntimeSeed::data(), $migrationSeed);
-        self::assertCount(12, $migrationSeed['items']);
-        self::assertCount(17, $migrationSeed['titles']);
-        self::assertCount(6, $migrationSeed['enemies']);
+        foreach (['items' => 12, 'titles' => 17, 'enemies' => 6] as $section => $count) {
+            self::assertArrayHasKey($section, $migrationSeed);
+            self::assertIsArray($migrationSeed[$section]);
+            self::assertCount($count, $migrationSeed[$section]);
+        }
+        self::assertArrayHasKey('loot', $migrationSeed);
+        self::assertIsArray($migrationSeed['loot']);
+        self::assertArrayHasKey('adversary', $migrationSeed['loot']);
+        self::assertIsArray($migrationSeed['loot']['adversary']);
         self::assertCount(10, $migrationSeed['loot']['adversary']);
-        self::assertCount(12, $migrationSeed['disciplines']);
-        self::assertCount(50, $migrationSeed['levels']);
-        self::assertCount(63, $migrationSeed['activity_types']);
+        foreach (['disciplines' => 12, 'levels' => 50, 'activity_types' => 63] as $section => $count) {
+            self::assertArrayHasKey($section, $migrationSeed);
+            self::assertIsArray($migrationSeed[$section]);
+            self::assertCount($count, $migrationSeed[$section]);
+        }
         self::assertArrayHasKey('training', $migrationSeed);
         self::assertArrayHasKey('xp', $migrationSeed);
         self::assertArrayHasKey('attributes', $migrationSeed);
@@ -46,9 +54,11 @@ final class GameRulesetMigrationSeedTest extends KernelTestCase
         foreach (['training', 'xp', 'attributes', 'disciplines', 'levels', 'activity_types', 'community', 'notifications'] as $section) {
             self::assertArrayHasKey($section, $snapshot);
         }
-        self::assertCount(12, $snapshot['disciplines']);
-        self::assertCount(50, $snapshot['levels']);
-        self::assertCount(63, $snapshot['activity_types']);
+        foreach (['disciplines' => 12, 'levels' => 50, 'activity_types' => 63] as $section => $count) {
+            self::assertArrayHasKey($section, $snapshot);
+            self::assertIsArray($snapshot[$section]);
+            self::assertCount($count, $snapshot[$section]);
+        }
         self::assertSame(GameRulesetVersion::of($snapshot), $ruleset->version());
     }
 

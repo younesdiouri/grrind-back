@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Domain\Activity;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use InvalidArgumentException;
 
 /**
@@ -53,8 +55,9 @@ use InvalidArgumentException;
  * sans qu'un seul fichier bouge. Une ligne de répartition pour une discipline qui ne
  * crédite pas serait de la config morte — refusée au même titre qu'une ligne manquante.
  */
-final readonly class AttributeSplit
+final class AttributeSplit
 {
+    use RuntimeRuleset;
     /** @var array<string, array<string, int>> valeur de discipline → valeur d'attribut → pourcentage */
     private array $percentages;
 
@@ -62,8 +65,9 @@ final readonly class AttributeSplit
      * @param list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}> $splits
      * @param list<array{discipline: string, credits_xp?: bool}>                                            $disciplines la liste brute de `xp.yaml` — seule `credits_xp` compte ici
      */
-    public function __construct(array $splits, array $disciplines)
+    public function __construct(array $splits, array $disciplines, ?GameRulesets $rulesets = null)
     {
+        $this->useRuntimeRulesets($rulesets);
         $percentages = [];
 
         // La lecture de « qui crédite » vit dans son propre objet depuis le #191, où un
@@ -116,6 +120,11 @@ final readonly class AttributeSplit
         $this->percentages = $percentages;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
     /**
      * Répartit `$amount` entre les quatre caractéristiques selon la discipline pratiquée.
      * Fonction pure, plus fort reste, symétrique sur les négatifs — voir le docblock de la
@@ -126,6 +135,10 @@ final readonly class AttributeSplit
      */
     public function distribute(Discipline $discipline, int $amount): AttributeGains
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->distribute($discipline, $amount);
+        }
+
         $percentages = $this->percentages[$discipline->value]
             ?? throw new InvalidArgumentException(\sprintf('"%s" ne crédite pas d\'XP, elle n\'a pas de ligne à la table de répartition.', $discipline->value));
 
@@ -141,6 +154,29 @@ final readonly class AttributeSplit
             $magnitude[Attribute::Mobility->value],
             $magnitude[Attribute::Dexterity->value],
         );
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var list<array{discipline: string, credits_xp: bool, split: ?array{strength: int, endurance: int, mobility: int, dexterity: int}}> $disciplines */
+        $disciplines = $snapshot['disciplines'];
+        /** @var list<array{discipline: string, credits_xp?: bool}> $rates */
+        $rates = [];
+        /** @var list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}> $splits */
+        $splits = [];
+        foreach ($disciplines as $discipline) {
+            $rate = ['discipline' => $discipline['discipline']];
+            if (!$discipline['credits_xp']) {
+                $rate['credits_xp'] = false;
+            }
+            $rates[] = $rate;
+            if (null !== $discipline['split']) {
+                $splits[] = ['discipline' => $discipline['discipline'], ...$discipline['split']];
+            }
+        }
+
+        return new self($splits, $rates, $rulesets);
     }
 
     /**

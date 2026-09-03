@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Progression\Domain;
 
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\RuntimeRuleset;
 use InvalidArgumentException;
 
 /**
@@ -20,8 +22,9 @@ use InvalidArgumentException;
  * et bien plus simple à garder en arithmétique entière, puisqu'il n'y a qu'une troncature
  * au lieu d'une par tranche.
  */
-final readonly class DiminishingReturns
+final class DiminishingReturns
 {
+    use RuntimeRuleset;
     /** @var list<array{seconds: int, weight: int}> bornes hautes du cumul, en secondes */
     private array $brackets;
 
@@ -29,8 +32,9 @@ final readonly class DiminishingReturns
      * @param list<array{up_to_minutes: int, weight_percent: int}> $brackets
      * @param int                                                  $beyondWeightPercent ce que vaut une minute au-delà de la dernière tranche
      */
-    public function __construct(array $brackets, private int $beyondWeightPercent)
+    public function __construct(array $brackets, private int $beyondWeightPercent, ?GameRulesets $rulesets = null)
     {
+        $this->useRuntimeRulesets($rulesets);
         if ([] === $brackets) {
             throw new InvalidArgumentException('Il faut au moins une tranche de rendement.');
         }
@@ -66,6 +70,11 @@ final readonly class DiminishingReturns
         $this->brackets = $normalized;
     }
 
+    public static function runtime(GameRulesets $rulesets): self
+    {
+        return self::fromSnapshot($rulesets->snapshot(), $rulesets);
+    }
+
     /**
      * Les secondes retenues d'une séance, sachant ce que le joueur a déjà accumulé
      * aujourd'hui. C'est `$alreadyToday` qui place la séance sur la courbe : la même durée
@@ -75,6 +84,10 @@ final readonly class DiminishingReturns
      */
     public function retain(int $alreadyTodaySeconds, int $sessionSeconds): int
     {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->retain($alreadyTodaySeconds, $sessionSeconds);
+        }
+
         if ($alreadyTodaySeconds < 0 || $sessionSeconds < 0) {
             throw new InvalidArgumentException('Un cumul de la journée ne peut pas être négatif.');
         }
@@ -109,5 +122,14 @@ final readonly class DiminishingReturns
         if ($percent < 0 || $percent > 100) {
             throw new InvalidArgumentException(\sprintf('%s doit être entre 0 et 100 %%, pas %d.', $what, $percent));
         }
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
+    {
+        /** @var array{diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $xp */
+        $xp = $snapshot['xp'];
+
+        return new self($xp['diminishing_returns'], $xp['diminishing_returns_beyond_percent'], $rulesets);
     }
 }

@@ -84,7 +84,7 @@ final readonly class GuildMembersController
             $guild,
             $this->members->of($guild),
             $playerId,
-            $this->rules->maximumMembers,
+            $this->rules->maximumMembers(),
         )->toArray();
     }
 }

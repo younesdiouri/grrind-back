@@ -89,7 +89,7 @@ final readonly class AnnounceRisalaHandler
 
         $notification = new PushNotification(
             'Risāla de la semaine',
-            \sprintf('📜 %s envoie %s à la guilde — +%d %% pendant deux semaines', $sender->displayName, self::disciplineLabel($discipline), $this->rules->recipientBonusPercent),
+            \sprintf('📜 %s envoie %s à la guilde — +%d %% pendant deux semaines', $sender->displayName, self::disciplineLabel($discipline), $this->rules->recipientBonusPercent()),
             NotificationCategory::RisalaRevealed,
             // Une seule Risāla par semaine et par guilde : la clé de regroupement est celle
             // de la guilde, donc l'annonce de la semaine remplace celle de la précédente sur

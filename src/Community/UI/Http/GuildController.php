@@ -81,7 +81,7 @@ final readonly class GuildController
         $guild = ($this->foundGuild)(new FoundGuild($playerId, $request->name));
 
         return new JsonResponse(
-            GuildResource::from($guild, $playerId, $this->rules->maximumMembers)->toArray(),
+            GuildResource::from($guild, $playerId, $this->rules->maximumMembers())->toArray(),
             Response::HTTP_CREATED,
         );
     }
@@ -110,7 +110,7 @@ final readonly class GuildController
         $renamed = ($this->renameGuild)(new RenameGuild($guild, $request->name));
 
         return new JsonResponse(
-            GuildResource::from($renamed, Uuid::fromString($user->getUserIdentifier()), $this->rules->maximumMembers)->toArray(),
+            GuildResource::from($renamed, Uuid::fromString($user->getUserIdentifier()), $this->rules->maximumMembers())->toArray(),
         );
     }
 

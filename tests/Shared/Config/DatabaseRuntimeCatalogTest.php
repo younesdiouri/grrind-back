@@ -4,13 +4,29 @@ declare(strict_types=1);
 
 namespace App\Tests\Shared\Config;
 
+use App\Admin\Infrastructure\GameRulesetSeed;
 use App\Combat\Domain\EnemyCatalog;
+use App\Community\Domain\GuildRules;
+use App\Community\Domain\QuietHours;
+use App\Community\Domain\RisalaRules;
+use App\Progression\Domain\DiminishingReturns;
+use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\TitleCatalog;
+use App\Progression\Domain\XpRates;
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Domain\LootTables;
 use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\Activity\ActivityTypeMap;
+use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\AttributeSplit;
+use App\Shared\Domain\Activity\CreditingDisciplines;
+use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Activity\Vitality;
+use App\Shared\Domain\Timezone;
 use App\Shared\Infrastructure\Config\DatabaseGameRulesets;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
+use App\Training\Domain\WorkoutRules;
+use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -186,6 +202,25 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertSame(99, $secondItems[1]['price_coins']);
     }
 
+    public function testSameSnapshotAtANewerRevisionReusesItsContentCache(): void
+    {
+        $snapshot = $this->rulesets()->snapshot();
+        $version = GameRulesetVersion::of($snapshot);
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(3))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            ['revision' => 1, 'version' => $version],
+            ['revision' => 1, 'version' => $version, 'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR)],
+            ['revision' => 2, 'version' => $version],
+        );
+        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()));
+
+        self::assertSame(1, $rulesets->revision());
+        $rulesets->reset();
+        self::assertSame(2, $rulesets->revision());
+        self::assertSame($snapshot, $rulesets->snapshot());
+    }
+
     public function testInvalidatedCacheLoadsOneWholeNewRevision(): void
     {
         $first = $this->rulesets()->snapshot();
@@ -322,6 +357,42 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertSame(9, $publishedItem->priceCoins);
     }
 
+    public function testEveryRemainingBalanceObjectReadsThePublishedSnapshot(): void
+    {
+        $rulesets = $this->balanceRulesets();
+
+        self::assertTrue(WorkoutRules::runtime($rulesets)->isTooShort(299));
+        self::assertSame(Discipline::Running, ActivityTypeMap::runtime($rulesets)->disciplineFor('APPLE_HEALTH', 'running'));
+        self::assertTrue(XpRates::runtime($rulesets)->credits(Discipline::Running));
+        self::assertTrue(CreditingDisciplines::runtime($rulesets)->credits(Discipline::Running));
+        self::assertSame(100, AttributeSplit::runtime($rulesets)->distribute(Discipline::Running, 100)->total());
+        self::assertGreaterThan(0, Vitality::runtime($rulesets)->of(new AttributeGains(100, 100, 100, 100)));
+        self::assertGreaterThan(0, DiminishingReturns::runtime($rulesets)->retain(0, 60));
+        self::assertSame(1, LevelCurve::runtime($rulesets)->standingAt(0)->level);
+        self::assertGreaterThanOrEqual(2, GuildRules::runtime($rulesets)->maximumMembers());
+        self::assertGreaterThan(0, RisalaRules::runtime($rulesets)->recipientBonusPercent());
+        self::assertFalse(QuietHours::runtime($rulesets)->contains(new DateTimeImmutable('2026-01-01 12:00:00+00:00'), Timezone::fromString('UTC')));
+    }
+
+    public function testRuntimeRulesRebuildAfterThePublishedRevisionChanges(): void
+    {
+        $rulesets = $this->balanceRulesets();
+        $rules = WorkoutRules::runtime($rulesets);
+        self::assertTrue($rules->isTooShort(299));
+
+        /** @var array{training: array{minimum_duration_seconds: int}} $published */
+        $published = $rulesets->publishedSnapshot;
+        $published['training']['minimum_duration_seconds'] = 200;
+        $rulesets->publishedSnapshot = $published;
+
+        // La révision est le pointeur d'une publication : tant qu'elle ne bouge pas,
+        // l'import qui a ouvert le snapshot garde exactement le même barème.
+        self::assertTrue($rules->isTooShort(299));
+        ++$rulesets->publishedRevision;
+
+        self::assertFalse($rules->isTooShort(299));
+    }
+
     private function rulesets(): GameRulesets
     {
         return new class implements GameRulesets {
@@ -358,5 +429,36 @@ final class DatabaseRuntimeCatalogTest extends TestCase
                 return 1;
             }
         };
+    }
+
+    private function balanceRulesets(): MutableRulesets
+    {
+        return new MutableRulesets(GameRulesetSeed::data());
+    }
+}
+
+/** @internal Fixture mutable pour prouver la relecture d'une publication. */
+final class MutableRulesets implements GameRulesets
+{
+    public int $publishedRevision = 1;
+
+    /** @param array<string, mixed> $publishedSnapshot */
+    public function __construct(public array $publishedSnapshot)
+    {
+    }
+
+    public function snapshot(): array
+    {
+        return $this->publishedSnapshot;
+    }
+
+    public function version(): string
+    {
+        return 'v1-test';
+    }
+
+    public function revision(): int
+    {
+        return $this->publishedRevision;
     }
 }

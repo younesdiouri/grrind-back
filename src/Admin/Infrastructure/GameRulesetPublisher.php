@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Admin\Infrastructure;
 
-use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameActivityType;
 use App\Admin\Domain\GameDiscipline;
+use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLevel;
 use App\Admin\Domain\GameLootTable;
@@ -15,21 +15,20 @@ use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\EnemyCatalog;
-use App\Progression\Domain\TitleCatalog;
 use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\LevelCurve;
+use App\Progression\Domain\TitleCatalog;
 use App\Progression\Domain\XpRates;
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Domain\LootLuckRules;
 use App\Rewards\Domain\LootTables;
-use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use App\Shared\Domain\Activity\ActivityTypeMap;
 use App\Shared\Domain\Activity\AttributeSplit;
 use App\Shared\Domain\Activity\Vitality;
+use App\Shared\Domain\Timezone;
+use App\Shared\Infrastructure\Config\DatabaseGameRulesets;
+use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use App\Training\Domain\WorkoutRules;
-use App\Community\Domain\GuildRules;
-use App\Community\Domain\QuietHours;
-use App\Community\Domain\RisalaRules;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
@@ -43,7 +42,7 @@ use Throwable;
  */
 final readonly class GameRulesetPublisher
 {
-    public function __construct(private TagAwareCacheInterface $cache)
+    public function __construct(private TagAwareCacheInterface $cache, private ?DatabaseGameRulesets $rulesets = null)
     {
     }
 
@@ -73,6 +72,7 @@ final readonly class GameRulesetPublisher
         }
 
         $snapshot = self::snapshot($items, $titles, $enemies, $tables, $disciplines, $levels, $activityTypes, $settings);
+        /** @var array<string, mixed> $previous */
         $previous = $ruleset->snapshot();
         if (self::lootGameplay($previous) !== self::lootGameplay($snapshot)) {
             $settings->incrementLootVersion();
@@ -87,6 +87,11 @@ final readonly class GameRulesetPublisher
     /** Le cache est une accélération : la publication DB réussie ne dépend jamais de lui. */
     public function invalidateAfterCommit(): void
     {
+        // EasyAdmin relit ses services dans la même requête après le commit : conserver le
+        // snapshot ouvert avant la publication lui ferait comparer le nouveau pointeur à
+        // l'ancienne image. Le reset garde l'atomicité d'une opération métier tout en
+        // ouvrant explicitement une nouvelle lecture pour la réponse d'administration.
+        $this->rulesets?->reset();
         try {
             $this->cache->invalidateTags(['game.ruleset']);
         } catch (Throwable) {
@@ -95,12 +100,15 @@ final readonly class GameRulesetPublisher
     }
 
     /**
-     * @param list<GameItem>      $items
-     * @param list<GameTitle>     $titles
-     * @param list<GameEnemy>     $enemies
-     * @param list<GameLootTable> $tables
+     * @param list<GameItem>         $items
+     * @param list<GameTitle>        $titles
+     * @param list<GameEnemy>        $enemies
+     * @param list<GameLootTable>    $tables
+     * @param list<GameDiscipline>   $disciplines
+     * @param list<GameLevel>        $levels
+     * @param list<GameActivityType> $activityTypes
      *
-     * @return array<string, mixed>
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>}
      */
     private static function snapshot(array $items, array $titles, array $enemies, array $tables, array $disciplines, array $levels, array $activityTypes, GameSettings $settings): array
     {
@@ -148,7 +156,7 @@ final readonly class GameRulesetPublisher
         ];
     }
 
-    /** @param array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>} $snapshot */
+    /** @param array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>} $snapshot */
     private static function validate(array $snapshot): void
     {
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */ $items = $snapshot['items'];
@@ -188,7 +196,19 @@ final readonly class GameRulesetPublisher
 
             return $rate;
         }, $disciplines);
-        $splits = array_map(static fn (array $discipline): array => ['discipline' => $discipline['discipline'], ...$discipline['split']], array_filter($disciplines, static fn (array $discipline): bool => null !== $discipline['split']));
+        /** @var list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}> $splits */
+        $splits = [];
+        foreach ($disciplines as $discipline) {
+            if (null !== $discipline['split']) {
+                $splits[] = [
+                    'discipline' => $discipline['discipline'],
+                    'strength' => $discipline['split']['strength'],
+                    'endurance' => $discipline['split']['endurance'],
+                    'mobility' => $discipline['split']['mobility'],
+                    'dexterity' => $discipline['split']['dexterity'],
+                ];
+            }
+        }
         new WorkoutRules($training['minimum_duration_seconds'], $training['maximum_duration_seconds'], $training['import_window_days']);
         new XpRates($xp['base_xp_per_hour'], $rates);
         new DiminishingReturns($xp['diminishing_returns'], $xp['diminishing_returns_beyond_percent']);
@@ -200,8 +220,9 @@ final readonly class GameRulesetPublisher
         $levels = $snapshot['levels'];
         new LevelCurve($levels);
         $activityBySource = ['APPLE_HEALTH' => [], 'HEALTH_CONNECT' => []];
-        foreach ($snapshot['activity_types'] as $activityType) {
-            \assert(\is_array($activityType));
+        /** @var list<array{source: 'APPLE_HEALTH'|'HEALTH_CONNECT', provider_type: string, discipline: string, active: bool}> $activityTypes */
+        $activityTypes = $snapshot['activity_types'];
+        foreach ($activityTypes as $activityType) {
             if ($activityType['active']) {
                 $activityBySource[$activityType['source']][] = ['activity_type' => $activityType['provider_type'], 'discipline' => $activityType['discipline']];
             }
@@ -209,18 +230,25 @@ final readonly class GameRulesetPublisher
         new ActivityTypeMap($activityBySource['APPLE_HEALTH'], $activityBySource['HEALTH_CONNECT']);
         /** @var array{maximum_members: int, invite_code_lifetime_hours: int, risala: array{active_weeks: int, reveal_day: int, reveal_hour: int, week_timezone: string, recipient_bonus_percent: int, sender_bonus_percent: int}} $community */
         $community = $snapshot['community'];
-        new GuildRules($community['maximum_members'], $community['invite_code_lifetime_hours']);
-        new RisalaRules(
-            $community['risala']['active_weeks'],
-            $community['risala']['reveal_day'],
-            $community['risala']['reveal_hour'],
-            $community['risala']['week_timezone'],
-            $community['risala']['recipient_bonus_percent'],
-            $community['risala']['sender_bonus_percent'],
-        );
+        self::validateCommunity($community);
         /** @var array{quiet_hours_start_hour: int, quiet_hours_end_hour: int} $notifications */
         $notifications = $snapshot['notifications'];
-        new QuietHours($notifications['quiet_hours_start_hour'], $notifications['quiet_hours_end_hour']);
+        if ($notifications['quiet_hours_start_hour'] < 0 || $notifications['quiet_hours_start_hour'] > 23 || $notifications['quiet_hours_end_hour'] < 0 || $notifications['quiet_hours_end_hour'] > 23) {
+            throw new LogicException('Les heures calmes se bornent entre 0 et 23.');
+        }
+    }
+
+    /** @param array{maximum_members: int, invite_code_lifetime_hours: int, risala: array{active_weeks: int, reveal_day: int, reveal_hour: int, week_timezone: string, recipient_bonus_percent: int, sender_bonus_percent: int}} $community */
+    private static function validateCommunity(array $community): void
+    {
+        if ($community['maximum_members'] < 2 || $community['invite_code_lifetime_hours'] < 1) {
+            throw new LogicException('Les réglages de guilde doivent accueillir deux membres et garder le code au moins une heure.');
+        }
+        $risala = $community['risala'];
+        Timezone::fromString($risala['week_timezone']);
+        if ($risala['active_weeks'] < 2 || $risala['reveal_day'] < 1 || $risala['reveal_day'] > 7 || $risala['reveal_hour'] < 0 || $risala['reveal_hour'] > 23 || $risala['recipient_bonus_percent'] < 1 || $risala['sender_bonus_percent'] < 1 || $risala['sender_bonus_percent'] >= $risala['recipient_bonus_percent']) {
+            throw new LogicException('Les réglages de Risāla sont incohérents.');
+        }
     }
 
     /**

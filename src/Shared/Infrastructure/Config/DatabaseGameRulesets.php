@@ -78,8 +78,11 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
                     continue;
                 }
             }
-            if ($current['revision'] === $pointer['revision'] && $current['version'] === $pointer['version']) {
-                return $this->current = $current;
+            if ($current['version'] === $pointer['version'] && $current['version'] === GameRulesetVersion::of($current['snapshot'])) {
+                // La clé porte le contenu, pas son compteur : publier puis revenir à un
+                // snapshot identique réutilise légitimement son cache. La révision du
+                // pointeur reste celle de l'opération qui vient de l'ouvrir.
+                return $this->current = ['revision' => $pointer['revision'], 'version' => $pointer['version'], 'snapshot' => $current['snapshot']];
             }
         }
 

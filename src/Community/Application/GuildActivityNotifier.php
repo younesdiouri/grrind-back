@@ -6,6 +6,7 @@ namespace App\Community\Application;
 
 use App\Community\Infrastructure\Doctrine\GuildMembershipRepository;
 use App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Event\WorkoutCredited;
 use DateTimeImmutable;
 use Psr\Clock\ClockInterface;
@@ -27,7 +28,7 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
  * séance est exactement ce que le ticket met en garde contre — et pour ce que le
  * `DelayStamp` posé ci-dessous garantit réellement.
  */
-final readonly class GuildActivityNotifier
+final class GuildActivityNotifier
 {
     public function __construct(
         private GuildMembershipRepository $memberships,
@@ -39,8 +40,7 @@ final readonly class GuildActivityNotifier
         // `messenger.yaml`.
         private MessageBusInterface $bus,
         private ClockInterface $clock,
-        private int $freshnessWindowMinutes,
-        private int $announcementDelaySeconds,
+        private GameRulesets $rulesets,
     ) {
     }
 
@@ -82,13 +82,23 @@ final readonly class GuildActivityNotifier
         // le docblock d'`AnnounceGuildActivity` : sans lui, deux messages publiés dans la
         // même seconde n'ont aucun ordre garanti entre eux, et cette annonce pourrait être
         // traitée *avant* une séance déjà en file pour le même lot.
-        $this->bus->dispatch(new AnnounceGuildActivity($event->userId, $windowId), [new DelayStamp($this->announcementDelaySeconds * 1000)]);
+        $this->bus->dispatch(new AnnounceGuildActivity($event->userId, $windowId), [new DelayStamp($this->notificationSettings()['announcement_delay_seconds'] * 1000)]);
     }
 
     private function isFresh(DateTimeImmutable $endedAt): bool
     {
         $ageInMinutes = ($this->clock->now()->getTimestamp() - $endedAt->getTimestamp()) / 60;
 
-        return $ageInMinutes <= $this->freshnessWindowMinutes;
+        return $ageInMinutes <= $this->notificationSettings()['freshness_window_minutes'];
+    }
+
+    /** @return array{freshness_window_minutes: int, announcement_delay_seconds: int, stale_window_minutes: int} */
+    private function notificationSettings(): array
+    {
+        $snapshot = $this->rulesets->snapshot();
+        /** @var array{freshness_window_minutes: int, announcement_delay_seconds: int, stale_window_minutes: int} $notifications */
+        $notifications = $snapshot['notifications'];
+
+        return $notifications;
     }
 }
