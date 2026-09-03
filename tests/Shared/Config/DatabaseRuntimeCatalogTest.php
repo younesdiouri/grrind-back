@@ -83,33 +83,32 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertNull($tables->forAdversary('OLD_ENEMY'));
     }
 
-    public function testHybridVersionChangesForGameplayButNotPresentation(): void
+    public function testVersionChangesForGameplayButNotPresentation(): void
     {
         $snapshot = $this->rulesets()->snapshot();
         /** @var array{items: list<array<string, mixed>>} $snapshot */
-        $version = GameRulesetVersion::of('v1-yaml', $snapshot);
+        $version = GameRulesetVersion::of($snapshot);
         $presentation = $snapshot;
         $presentation['items'][0]['image_path'] = 'new.png';
         $presentation['items'][0]['translations'] = ['fr' => ['name' => 'Nouveau']];
-        self::assertSame($version, GameRulesetVersion::of('v1-yaml', $presentation));
+        self::assertSame($version, GameRulesetVersion::of($presentation));
 
         $gameplay = $snapshot;
         $gameplay['items'][0]['price_coins'] = 2;
-        self::assertNotSame($version, GameRulesetVersion::of('v1-yaml', $gameplay));
-        self::assertNotSame($version, GameRulesetVersion::of('v1-other-yaml', $snapshot));
+        self::assertNotSame($version, GameRulesetVersion::of($gameplay));
     }
 
     public function testHotReadDoesNotQueryConfigurationAgain(): void
     {
         $snapshot = $this->rulesets()->snapshot();
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::exactly(2))->method('fetchOne')->willReturn(1, 1);
-        $connection->expects(self::once())->method('fetchAssociative')->willReturn([
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(3))->method('fetchAssociative')->willReturn([
             'revision' => 1,
-            'version' => 'ignored-at-runtime',
+            'version' => GameRulesetVersion::of($snapshot),
             'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR),
         ]);
-        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()));
 
         $rulesets->snapshot();
         $rulesets->reset();
@@ -121,14 +120,14 @@ final class DatabaseRuntimeCatalogTest extends TestCase
     {
         $snapshot = $this->rulesets()->snapshot();
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::once())->method('fetchOne')->willReturn(3);
-        $connection->expects(self::once())->method('fetchAssociative')->willReturn([
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturn([
             'revision' => 3,
-            'version' => 'ignored-at-runtime',
+            'version' => GameRulesetVersion::of($snapshot),
             'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR),
         ]);
 
-        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()));
 
         self::assertSame(3, $rulesets->revision());
         self::assertSame($snapshot, $rulesets->snapshot());
@@ -138,20 +137,53 @@ final class DatabaseRuntimeCatalogTest extends TestCase
     {
         $snapshot = $this->rulesets()->snapshot();
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::exactly(2))->method('fetchOne')->willReturn(5, 5);
-        $connection->expects(self::once())->method('fetchAssociative')->willReturn([
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(3))->method('fetchAssociative')->willReturn([
             'revision' => 5,
-            'version' => 'ignored-at-runtime',
+            'version' => GameRulesetVersion::of($snapshot),
             'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR),
         ]);
         $cache = new TagAwareAdapter(new ArrayAdapter());
 
-        $first = new DatabaseGameRulesets($connection, $cache, 'v1-yaml');
-        $second = new DatabaseGameRulesets($connection, $cache, 'v1-yaml');
+        $first = new DatabaseGameRulesets($connection, $cache);
+        $second = new DatabaseGameRulesets($connection, $cache);
 
         self::assertSame(5, $first->revision());
         self::assertSame(5, $second->revision());
         self::assertSame($first->snapshot(), $second->snapshot());
+    }
+
+    public function testDifferentSnapshotsWithTheSameRevisionNeverShareACacheEntry(): void
+    {
+        $firstSnapshot = $this->rulesets()->snapshot();
+        /** @var array{items: list<array{price_coins: int}>} $firstSnapshot */
+        $secondSnapshot = $firstSnapshot;
+        $secondSnapshot['items'][1]['price_coins'] = 99;
+        $firstVersion = GameRulesetVersion::of($firstSnapshot);
+        $secondVersion = GameRulesetVersion::of($secondSnapshot);
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(4))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            ['revision' => 1, 'version' => $firstVersion, 'snapshot' => json_encode($firstSnapshot, \JSON_THROW_ON_ERROR)],
+            ['revision' => 1, 'version' => $firstVersion, 'snapshot' => json_encode($firstSnapshot, \JSON_THROW_ON_ERROR)],
+            ['revision' => 1, 'version' => $secondVersion, 'snapshot' => json_encode($secondSnapshot, \JSON_THROW_ON_ERROR)],
+            ['revision' => 1, 'version' => $secondVersion, 'snapshot' => json_encode($secondSnapshot, \JSON_THROW_ON_ERROR)],
+        );
+        $cache = new TagAwareAdapter(new ArrayAdapter());
+
+        $first = new DatabaseGameRulesets($connection, $cache);
+        $second = new DatabaseGameRulesets($connection, $cache);
+
+        self::assertSame(1, $first->revision());
+        self::assertSame(1, $second->revision());
+        $firstItems = $first->snapshot()['items'];
+        $secondItems = $second->snapshot()['items'];
+        self::assertIsArray($firstItems);
+        self::assertIsArray($secondItems);
+        /** @var list<array{price_coins: int}> $firstItems */
+        /** @var list<array{price_coins: int}> $secondItems */
+        self::assertSame(1, $firstItems[1]['price_coins']);
+        self::assertSame(99, $secondItems[1]['price_coins']);
     }
 
     public function testInvalidatedCacheLoadsOneWholeNewRevision(): void
@@ -162,13 +194,15 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         $second = $first;
         $second['items'][1]['price_coins'] = 99;
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::exactly(2))->method('fetchOne')->willReturnOnConsecutiveCalls(1, 2);
-        $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
-            ['revision' => 1, 'version' => 'ignored', 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
-            ['revision' => 2, 'version' => 'ignored', 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(4))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            ['revision' => 1, 'version' => GameRulesetVersion::of($first), 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
+            ['revision' => 1, 'version' => GameRulesetVersion::of($first), 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
+            ['revision' => 2, 'version' => GameRulesetVersion::of($second), 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+            ['revision' => 2, 'version' => GameRulesetVersion::of($second), 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
         );
         $cache = new TagAwareAdapter(new ArrayAdapter());
-        $rulesets = new DatabaseGameRulesets($connection, $cache, 'v1-yaml');
+        $rulesets = new DatabaseGameRulesets($connection, $cache);
         self::assertSame(1, $rulesets->revision());
 
         $cache->invalidateTags(['game.ruleset']);
@@ -186,16 +220,18 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         $second = $first;
         $second['items'][1]['price_coins'] = 99;
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::exactly(2))->method('fetchOne')->willReturnOnConsecutiveCalls(1, 2);
-        $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
-            ['revision' => 1, 'version' => 'ignored', 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
-            ['revision' => 2, 'version' => 'ignored', 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(4))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            ['revision' => 1, 'version' => GameRulesetVersion::of($first), 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
+            ['revision' => 1, 'version' => GameRulesetVersion::of($first), 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
+            ['revision' => 2, 'version' => GameRulesetVersion::of($second), 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+            ['revision' => 2, 'version' => GameRulesetVersion::of($second), 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
         );
 
         // Deux caches filesystem distincts représentent app et worker Fly : la seconde
         // machine ne peut pas compter sur le tag invalidé par la première.
-        $app = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
-        $worker = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+        $app = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()));
+        $worker = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()));
         self::assertSame(1, $app->revision());
         self::assertSame(2, $worker->revision());
         $published = $worker->snapshot();
@@ -207,16 +243,16 @@ final class DatabaseRuntimeCatalogTest extends TestCase
     {
         $snapshot = $this->rulesets()->snapshot();
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::once())->method('fetchOne')->willReturn(7);
-        $connection->expects(self::once())->method('fetchAssociative')->willReturn([
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturn([
             'revision' => 7,
-            'version' => 'ignored-at-runtime',
+            'version' => GameRulesetVersion::of($snapshot),
             'snapshot' => json_encode($snapshot, \JSON_THROW_ON_ERROR),
         ]);
         $cache = $this->createMock(CacheInterface::class);
         $cache->expects(self::once())->method('get')->willThrowException(new RuntimeException('Redis indisponible'));
 
-        $rulesets = new DatabaseGameRulesets($connection, $cache, 'v1-yaml');
+        $rulesets = new DatabaseGameRulesets($connection, $cache);
 
         self::assertSame(7, $rulesets->revision());
         self::assertSame($snapshot, $rulesets->snapshot());
@@ -229,12 +265,14 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         $second = $first;
         $second['items'][1]['price_coins'] = 42;
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::exactly(2))->method('fetchOne')->willReturn(4, 5);
-        $connection->expects(self::exactly(2))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+        $connection->expects(self::never())->method('fetchOne');
+        $connection->expects(self::exactly(4))->method('fetchAssociative')->willReturnOnConsecutiveCalls(
+            ['revision' => 4, 'version' => GameRulesetVersion::of($first), 'snapshot' => json_encode($first, \JSON_THROW_ON_ERROR)],
             false,
-            ['revision' => 5, 'version' => 'ignored-at-runtime', 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+            ['revision' => 5, 'version' => GameRulesetVersion::of($second), 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
+            ['revision' => 5, 'version' => GameRulesetVersion::of($second), 'snapshot' => json_encode($second, \JSON_THROW_ON_ERROR)],
         );
-        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()), 'v1-yaml');
+        $rulesets = new DatabaseGameRulesets($connection, new TagAwareAdapter(new ArrayAdapter()));
 
         self::assertSame(5, $rulesets->revision());
         /** @var array{items: list<array{price_coins: int}>} $snapshot */

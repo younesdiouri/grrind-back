@@ -130,7 +130,7 @@ final class GameImageStagingTest extends TestCase
 
     private function controller(string $directory): ImageStagingCrudController
     {
-        return new ImageStagingCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter()), 'v1'), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), $directory);
+        return new ImageStagingCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter())), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), $directory);
     }
 
     private function temporaryDirectory(): string

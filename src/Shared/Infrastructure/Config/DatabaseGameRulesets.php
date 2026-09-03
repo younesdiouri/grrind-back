@@ -13,17 +13,16 @@ use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
 
 /**
- * Chaque opération lit d'abord la révision scalaire, puis le snapshot immuable portant cette
- * révision. Une clé cache révisionnée garde donc deux machines Fly cohérentes même si leurs
- * pools filesystem ne se parlent pas ou si l'invalidation post-commit échoue. Le cache évite
- * seulement l'hydratation du graphe ; PostgreSQL reste la source de vérité du pointeur courant.
+ * Chaque opération lit le pointeur léger {révision, empreinte}, puis le snapshot immuable qui
+ * porte cette révision seulement sur cache miss. La clé de contenu évite qu'un reset de base,
+ * qui remet la révision à 1, ne serve le snapshot d'une base précédente.
  */
 final class DatabaseGameRulesets implements GameRulesets, ResetInterface
 {
     /** @var array{revision: int, version: string, snapshot: array<string, mixed>}|null */
     private ?array $current = null;
 
-    public function __construct(private readonly Connection $connection, private readonly CacheInterface $cache, private readonly string $yamlGameplayVersion)
+    public function __construct(private readonly Connection $connection, private readonly CacheInterface $cache)
     {
     }
 
@@ -55,18 +54,18 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
         }
 
         // Le SELECT scalaire est volontairement le seul coût de cohérence à chaud. La clé
-        // porte ensuite la révision, ce qui interdit qu'un cache local périmé serve N après
-        // une publication N+1 sur une autre machine.
+        // porte la version de contenu, ce qui interdit qu'un cache local d'une base reset
+        // serve un snapshot différent dont la révision est revenue à 1.
         for ($attempt = 0; $attempt < 2; ++$attempt) {
-            $revision = $this->revisionPointer();
-            $key = 'game.ruleset.'.$this->yamlGameplayVersion.'.'.$revision;
+            $pointer = $this->pointer();
             try {
                 /** @var array{revision: int, version: string, snapshot: array<string, mixed>} $current */
-                $current = $this->cache->get($key, function (ItemInterface $item) use ($revision): array {
+                $current = $this->cache->get('game.ruleset.'.$pointer['version'], function (ItemInterface $item) use ($pointer): array {
                     $item->tag('game.ruleset');
 
-                    return $this->load($revision);
+                    return $this->load($pointer);
                 });
+                /** @var array{revision: int, version: string, snapshot: array<string, mixed>} $current */
             } catch (Throwable $exception) {
                 if ($exception instanceof PublishedRulesetMoved) {
                     // Le cache peut appeler son callback avant de relayer l'exception : ne
@@ -74,12 +73,12 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
                     continue;
                 }
                 try {
-                    $current = $this->load($revision);
+                    $current = $this->load($pointer);
                 } catch (PublishedRulesetMoved) {
                     continue;
                 }
             }
-            if ($current['revision'] === $revision) {
+            if ($current['revision'] === $pointer['revision'] && $current['version'] === $pointer['version']) {
                 return $this->current = $current;
             }
         }
@@ -87,25 +86,31 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
         throw new LogicException('La révision de jeu a changé pendant son chargement. Réessayer l’opération.');
     }
 
-    private function revisionPointer(): int
+    /** @return array{revision: int, version: string} */
+    private function pointer(): array
     {
-        $revision = $this->connection->fetchOne('SELECT revision FROM game_ruleset WHERE id = 1');
-        if (false === $revision) {
+        /** @var array{revision: int|string, version: string}|false $pointer */
+        $pointer = $this->connection->fetchAssociative('SELECT revision, version FROM game_ruleset WHERE id = 1');
+        if (false === $pointer) {
             throw new LogicException('Le snapshot de jeu est absent. Appliquer les migrations.');
         }
 
-        if (!\is_int($revision) && !\is_string($revision) && !\is_float($revision)) {
+        if ((!\is_int($pointer['revision']) && !\is_string($pointer['revision'])) || '' === $pointer['version']) {
             throw new LogicException('La révision de jeu est invalide.');
         }
 
-        return (int) $revision;
+        return ['revision' => (int) $pointer['revision'], 'version' => $pointer['version']];
     }
 
-    /** @return array{revision: int, version: string, snapshot: array<string, mixed>} */
-    private function load(int $expectedRevision): array
+    /**
+     * @param array{revision: int, version: string} $expectedPointer
+     *
+     * @return array{revision: int, version: string, snapshot: array<string, mixed>}
+     */
+    private function load(array $expectedPointer): array
     {
         /** @var array{revision: int|string, version: string, snapshot: string|array<string, mixed>}|false $row */
-        $row = $this->connection->fetchAssociative('SELECT revision, version, snapshot FROM game_ruleset WHERE id = 1 AND revision = :revision', ['revision' => $expectedRevision]);
+        $row = $this->connection->fetchAssociative('SELECT revision, version, snapshot FROM game_ruleset WHERE id = 1 AND revision = :revision AND version = :version', ['revision' => $expectedPointer['revision'], 'version' => $expectedPointer['version']]);
         if (false === $row) {
             throw new PublishedRulesetMoved('La révision de jeu a changé pendant son chargement.');
         }
@@ -113,7 +118,11 @@ final class DatabaseGameRulesets implements GameRulesets, ResetInterface
         $snapshot = \is_array($row['snapshot']) ? $row['snapshot'] : json_decode($row['snapshot'], true, 512, \JSON_THROW_ON_ERROR);
         \assert(\is_array($snapshot));
         /** @var array<string, mixed> $snapshot */
+        $version = GameRulesetVersion::of($snapshot);
+        if ($version !== $row['version']) {
+            throw new LogicException('L’empreinte du snapshot de jeu publié est invalide. Rejouer la publication.');
+        }
 
-        return ['revision' => $revision, 'version' => GameRulesetVersion::of($this->yamlGameplayVersion, $snapshot), 'snapshot' => $snapshot];
+        return ['revision' => $revision, 'version' => $version, 'snapshot' => $snapshot];
     }
 }

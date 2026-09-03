@@ -1,10 +1,5 @@
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
-# L'équilibrage du jeu est du config-as-code, sous `config/game/v1/`. Il n'est pas importé
-# ici : ce n'est pas de la configuration Symfony mais de la donnée, lue et validée à la
-# compilation par App\Shared\Infrastructure\Config\GameBalancePass, qui en tire les
-# paramètres `game.*` utilisés plus bas et le `rulesetVersion` du dossier.
-
 parameters:
 
 services:
@@ -28,11 +23,6 @@ services:
     App\Shared\Infrastructure\Config\DatabaseGameRulesets:
         arguments:
             $cache: '@game.ruleset'
-            $yamlGameplayVersion: '%game.ruleset_version%'
-
-    App\Admin\Infrastructure\GameRulesetPublisher:
-        arguments:
-            $yamlGameplayVersion: '%game.ruleset_version%'
 
     App\Progression\Domain\XpCalculator:
         arguments:

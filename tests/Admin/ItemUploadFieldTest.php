@@ -22,7 +22,7 @@ final class ItemUploadFieldTest extends TestCase
 {
     public function testNewItemRequiresAnImageButEditingKeepsTheExistingOne(): void
     {
-        $controller = new ItemCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter()), 'v1'), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), sys_get_temp_dir());
+        $controller = new ItemCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter())), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), sys_get_temp_dir());
 
         self::assertTrue($this->imageField($controller, Crud::PAGE_NEW)->getAsDto()->getFormTypeOption('required'));
         self::assertFalse($this->imageField($controller, Crud::PAGE_EDIT)->getAsDto()->getFormTypeOption('required'));
@@ -31,7 +31,7 @@ final class ItemUploadFieldTest extends TestCase
 
     public function testForgedMimeSvgOversizeAndOversizedDimensionsAreRejectedByTheActualFieldConstraint(): void
     {
-        $controller = new ItemCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter()), 'v1'), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), sys_get_temp_dir());
+        $controller = new ItemCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter())), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), sys_get_temp_dir());
         $constraints = $this->imageField($controller, Crud::PAGE_NEW)->getAsDto()->getCustomOption(ImageField::OPTION_FILE_CONSTRAINTS);
         self::assertIsArray($constraints);
         self::assertCount(1, $constraints);

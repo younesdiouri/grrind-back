@@ -30,12 +30,7 @@ use Throwable;
  */
 final readonly class GameRulesetPublisher
 {
-    /**
-     * L'empreinte des YAML restant est déjà calculée au boot avec leur validation. La
-     * conserver comme composant du hash hybride rend son schéma identique à celui de la
-     * migration, sans faire dépendre la publication d'un fichier disparu.
-     */
-    public function __construct(private TagAwareCacheInterface $cache, private string $yamlGameplayVersion)
+    public function __construct(private TagAwareCacheInterface $cache)
     {
     }
 
@@ -69,7 +64,7 @@ final readonly class GameRulesetPublisher
         }
         self::validate($snapshot);
 
-        $ruleset->publish($snapshot, GameRulesetVersion::of($this->yamlGameplayVersion, $snapshot));
+        $ruleset->publish($snapshot, GameRulesetVersion::of($snapshot));
         $manager->flush();
     }
 
