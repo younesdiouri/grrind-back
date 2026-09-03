@@ -64,10 +64,8 @@ final class EquippedItemsChangeTheXpBreakdownTest extends ApiTestCase
         $repository = self::getContainer()->get(InventoryItemRepository::class);
         self::assertInstanceOf(InventoryItemRepository::class, $repository);
 
-        $items = self::getContainer()->getParameter('game.items.items');
-        self::assertIsArray($items);
-        /** @var list<array{key: string, rarity: string, slot: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $items */
-        $catalog = new ItemCatalog($items);
+        $catalog = self::getContainer()->get(ItemCatalog::class);
+        self::assertInstanceOf(ItemCatalog::class, $catalog);
 
         $repository->grant($userId, $itemKey, Uuid::v7(), new DateTimeImmutable());
 

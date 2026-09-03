@@ -36,7 +36,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * qu'un seul appel `getReceipts` une fois le délai écoulé pour le lot entier — les trente
  * messages différés qui suivent ne trouvent alors plus rien à faire. `MAX_IDS_PER_REQUEST` est
  * la limite qu'Expo documente pour cet appel, pas une estimation : à ce volume, une seule
- * guilde ne peut pas l'atteindre (`game.community.maximum_members`).
+ * guilde ne peut pas l'atteindre (plafond du snapshot publié).
  *
  * **Un reçu absent n'est ni positif ni négatif.** Expo peut ne pas encore l'avoir produit — le
  * délai de {@see CheckExpoPushReceipts::DELAY_MINUTES} n'est qu'une recommandation, pas une

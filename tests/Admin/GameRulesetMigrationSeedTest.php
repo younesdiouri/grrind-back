@@ -62,12 +62,10 @@ final class GameRulesetMigrationSeedTest extends KernelTestCase
         self::assertSame(GameRulesetVersion::of($snapshot), $ruleset->version());
     }
 
-    public function testRetiredCatalogYamlFilesCannotBecomeARuntimeSourceAgain(): void
+    public function testRetiredYamlCatalogCannotBecomeARuntimeSourceAgain(): void
     {
         $directory = \dirname(__DIR__, 2).'/config/game/v1';
 
-        foreach (['items.yaml', 'loot.yaml', 'titles.yaml', 'combat.yaml'] as $file) {
-            self::assertFileDoesNotExist($directory.'/'.$file);
-        }
+        self::assertDirectoryDoesNotExist($directory);
     }
 }

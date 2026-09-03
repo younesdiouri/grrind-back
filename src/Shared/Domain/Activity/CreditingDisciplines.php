@@ -10,7 +10,7 @@ use InvalidArgumentException;
 
 /**
  * Les disciplines qui rapportent de l'XP, lues une seule fois depuis la liste brute de
- * `xp.yaml` (`game.xp.disciplines`).
+ * snapshot publié des disciplines créditées.
  *
  * **La question « qui crédite ? » se posait déjà à deux endroits** — `XpRates`, qui la
  * tranche pour le calcul, et {@see AttributeSplit}, qui s'en sert pour refuser une ligne de

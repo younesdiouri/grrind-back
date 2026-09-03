@@ -1,4 +1,0 @@
-# Un seul seuil déplacé : le rulesetVersion doit bouger.
-minimum_duration_seconds: 600
-maximum_duration_seconds: 14400
-import_window_days: 30

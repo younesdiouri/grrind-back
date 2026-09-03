@@ -20,7 +20,6 @@ use DateTimeImmutable;
 use Random\Engine\Xoshiro256StarStar;
 use Random\Randomizer;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -39,13 +38,12 @@ use Symfony\Component\Uid\Uuid;
  */
 final class CombatCoverageTest extends KernelTestCase
 {
-    public function testExposesTheFighterCoefficientsAsTheirOwnParameters(): void
+    public function testPublishesTheFighterCoefficients(): void
     {
         self::bootKernel();
-        $container = self::getContainer();
-
-        self::assertSame(140, $container->getParameter('game.combat.fighter.base_hp'));
-        self::assertSame(200, $container->getParameter('game.combat.fighter.max_turns'));
+        $snapshot = self::ruleset();
+        self::assertSame(140, $snapshot['combat']['fighter']['base_hp']);
+        self::assertSame(200, $snapshot['combat']['fighter']['max_turns']);
     }
 
     public function testTheShippedFighterCoefficientsAreCoherent(): void
@@ -71,8 +69,7 @@ final class CombatCoverageTest extends KernelTestCase
 
     public function testTheShippedCatalogueHasNoDuplicateLevel(): void
     {
-        $enemies = self::getContainer()->getParameter('game.combat.enemies');
-        self::assertIsArray($enemies);
+        $enemies = self::ruleset()['combat']['enemies'];
         /** @var list<array{level: int}> $enemies */
         $levels = [];
         foreach ($enemies as $enemy) {
@@ -299,46 +296,43 @@ final class CombatCoverageTest extends KernelTestCase
 
     private static function shippedRules(): CombatRules
     {
-        self::bootKernel();
-        $container = self::getContainer();
+        $fighter = self::ruleset()['combat']['fighter'];
+        self::assertIsArray($fighter);
 
         return new CombatRules(
-            self::intParameter($container, 'game.combat.fighter.base_hp'),
-            self::intParameter($container, 'game.combat.fighter.hp_per_1000_vitality'),
-            self::intParameter($container, 'game.combat.fighter.base_damage'),
-            self::intParameter($container, 'game.combat.fighter.damage_per_1000_strength'),
-            self::intParameter($container, 'game.combat.fighter.mitigation_permille_per_1000_endurance'),
-            self::intParameter($container, 'game.combat.fighter.mitigation_cap_permille'),
-            self::intParameter($container, 'game.combat.fighter.extra_turn_permille_per_1000_dexterity'),
-            self::intParameter($container, 'game.combat.fighter.extra_turn_cap_permille'),
-            self::intParameter($container, 'game.combat.fighter.dodge_permille_per_1000_mobility'),
-            self::intParameter($container, 'game.combat.fighter.dodge_cap_permille'),
-            self::intParameter($container, 'game.combat.fighter.minimum_damage'),
-            self::intParameter($container, 'game.combat.fighter.max_turns'),
+            $fighter['base_hp'],
+            $fighter['hp_per_1000_vitality'],
+            $fighter['base_damage'],
+            $fighter['damage_per_1000_strength'],
+            $fighter['mitigation_permille_per_1000_endurance'],
+            $fighter['mitigation_cap_permille'],
+            $fighter['extra_turn_permille_per_1000_dexterity'],
+            $fighter['extra_turn_cap_permille'],
+            $fighter['dodge_permille_per_1000_mobility'],
+            $fighter['dodge_cap_permille'],
+            $fighter['minimum_damage'],
+            $fighter['max_turns'],
         );
     }
 
     private static function shippedCatalog(): EnemyCatalog
     {
         self::bootKernel();
-        $container = self::getContainer();
+        $catalog = self::getContainer()->get(EnemyCatalog::class);
+        self::assertInstanceOf(EnemyCatalog::class, $catalog);
 
-        $enemies = $container->getParameter('game.combat.enemies');
-        self::assertIsArray($enemies);
-
-        $bosses = $container->getParameter('game.combat.bosses');
-        self::assertIsArray($bosses);
-
-        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */
-        /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses */
-        return new EnemyCatalog($enemies, $bosses);
+        return $catalog;
     }
 
-    private static function intParameter(ContainerInterface $container, string $name): int
+    /** @return array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_turns: int}, enemies: list<array{level: int}>, bosses: list<array<string, mixed>>}} */
+    private static function ruleset(): array
     {
-        $value = $container->getParameter($name);
-        self::assertIsInt($value);
+        $ruleset = self::getContainer()->get(\App\Shared\Application\GameRulesets::class);
+        self::assertInstanceOf(\App\Shared\Application\GameRulesets::class, $ruleset);
 
-        return $value;
+        /** @var array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_turns: int}, enemies: list<array{level: int}>, bosses: list<array<string, mixed>>}} $snapshot */
+        $snapshot = $ruleset->snapshot();
+
+        return $snapshot;
     }
 }

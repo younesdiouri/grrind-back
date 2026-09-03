@@ -88,11 +88,13 @@ db-reset: ## Recrée la base et rejoue toutes les migrations
 	$(RUN_DB) bin/console doctrine:database:drop --if-exists --force
 	$(RUN_DB) bin/console doctrine:database:create
 	$(RUN_DB) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+	$(RUN_DB) bin/console cache:pool:clear game.ruleset
 
 test-db-reset: ## Recrée la base de test et rejoue toutes les migrations
 	$(RUN_TEST) bin/console doctrine:database:drop --if-exists --force
 	$(RUN_TEST) bin/console doctrine:database:create
 	$(RUN_TEST) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+	$(RUN_TEST) bin/console cache:pool:clear game.ruleset
 
 # La migration du déploiement. Elle ne tourne pas dans l'image de dev mais dans
 # l'image de prod — celle qui partira sur ECS — pour que ce qui migre la base soit

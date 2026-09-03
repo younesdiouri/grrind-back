@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * La table livrée, celle de `config/game/v1/attributes.yaml`, contre les neuf disciplines
+ * La table publiée, contre les neuf disciplines
  * réelles qui créditent de l'XP.
  *
  * `AttributeSplitTest` prouve que l'objet tient ses règles sur des données écrites pour
@@ -21,7 +21,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  *
  * **`WALKING` n'y figure plus (#167).** Elle ne crédite pas d'XP — voir `xp.yaml` — donc
  * `AttributeSplit` n'exige plus de ligne pour elle ; ce test le prouve en même temps que la
- * couverture, en construisant depuis `game.xp.disciplines` comme `services.yaml` le fait
+ * couverture, en construisant depuis le snapshot publié comme le runtime le fait
  * réellement, plutôt que de coder en dur la liste des disciplines créditantes.
  */
 final class AttributeSplitCoverageTest extends KernelTestCase
@@ -30,7 +30,9 @@ final class AttributeSplitCoverageTest extends KernelTestCase
     {
         self::bootKernel();
 
-        $floorPermille = self::getContainer()->getParameter('game.attributes.vitality.floor_permille');
+        /** @var array{attributes: array{vitality: array{floor_permille: int}}} $snapshot */
+        $snapshot = self::getContainer()->get(\App\Shared\Application\GameRulesets::class)->snapshot();
+        $floorPermille = $snapshot['attributes']['vitality']['floor_permille'];
 
         // Un quart du taux plein — tranché en revue, voir le docblock de `Vitality` : ni un
         // socle absolu, ni zéro.
@@ -95,34 +97,25 @@ final class AttributeSplitCoverageTest extends KernelTestCase
     {
         self::bootKernel();
 
-        $splits = self::getContainer()->getParameter('game.attributes.splits');
-        self::assertIsArray($splits);
-
-        foreach ($splits as $split) {
-            self::assertIsArray($split);
-            self::assertNotSame('WALKING', $split['discipline'] ?? null);
+        /** @var array{disciplines: list<array<string, mixed>>} $snapshot */
+        $snapshot = self::getContainer()->get(\App\Shared\Application\GameRulesets::class)->snapshot();
+        foreach ($snapshot['disciplines'] as $discipline) {
+            self::assertIsArray($discipline);
+            if ('WALKING' === ($discipline['discipline'] ?? null)) {
+                self::assertNull($discipline['split'] ?? null);
+            }
         }
     }
 
     /**
-     * Construit depuis les paramètres du conteneur, exactement comme `services.yaml` le
-     * fait — même geste qu'`ActivityTypesCoverageTest`. Que la compilation ait abouti
-     * prouve déjà que `AttributeSplitSection` a validé la table sans broncher ; ce test
-     * vérifie ce qu'elle vaut.
+     * Lit le service runtime, donc la publication qui devra réellement répartir les gains.
      */
     private static function shippedSplit(): AttributeSplit
     {
         self::bootKernel();
-        $container = self::getContainer();
+        $split = self::getContainer()->get(AttributeSplit::class);
+        self::assertInstanceOf(AttributeSplit::class, $split);
 
-        $splits = $container->getParameter('game.attributes.splits');
-        $disciplines = $container->getParameter('game.xp.disciplines');
-
-        self::assertIsArray($splits);
-        self::assertIsArray($disciplines);
-
-        /** @var list<array{discipline: string, strength: int, endurance: int, mobility: int, dexterity: int}> $splits */
-        /** @var list<array{discipline: string, credits_xp?: bool}> $disciplines */
-        return new AttributeSplit($splits, $disciplines);
+        return $split;
     }
 }

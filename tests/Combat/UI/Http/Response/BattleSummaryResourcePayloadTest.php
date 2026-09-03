@@ -13,6 +13,7 @@ use App\Combat\Domain\Enemy;
 use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Response\BattleSummaryResource;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
@@ -51,7 +52,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
 
         self::assertSame(
             $reward,
-            BattleSummaryResource::from($battle, new EnemyTranslator(self::stubTranslator()))->toArray()['rewards'],
+            BattleSummaryResource::from($battle, new EnemyTranslator(self::stubTranslator(), self::rulesets()))->toArray()['rewards'],
         );
     }
 
@@ -64,7 +65,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
     {
         $battle = self::battleConcludedByMaxTurns(BattleResult::Defeat);
 
-        $payload = BattleSummaryResource::from($battle, new EnemyTranslator(self::stubTranslator()))->toArray();
+        $payload = BattleSummaryResource::from($battle, new EnemyTranslator(self::stubTranslator(), self::rulesets()))->toArray();
 
         self::assertSame('DEFEAT', $payload['result']);
         self::assertContains($payload['result'], ['VICTORY', 'DEFEAT']);
@@ -87,7 +88,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
     {
         $battle = self::battleAgainst('GHOST_ENEMY');
 
-        $payload = BattleSummaryResource::from($battle, new EnemyTranslator(self::stubTranslator()))->toArray();
+        $payload = BattleSummaryResource::from($battle, new EnemyTranslator(self::stubTranslator(), self::rulesets()))->toArray();
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
@@ -97,7 +98,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
 
     private static function resource(): BattleSummaryResource
     {
-        return BattleSummaryResource::from(self::battleAgainst('SAND_JACKAL'), new EnemyTranslator(self::stubTranslator()));
+        return BattleSummaryResource::from(self::battleAgainst('SAND_JACKAL'), new EnemyTranslator(self::stubTranslator(), self::rulesets()));
     }
 
     /**
@@ -163,6 +164,26 @@ final class BattleSummaryResourcePayloadTest extends TestCase
             public function getLocale(): string
             {
                 return 'fr';
+            }
+        };
+    }
+
+    private static function rulesets(): GameRulesets
+    {
+        return new class implements GameRulesets {
+            public function snapshot(): array
+            {
+                return ['combat' => ['enemies' => [['key' => 'SAND_JACKAL', 'translations' => ['fr' => ['name' => 'Chacal des sables'], 'en' => ['name' => 'Sand jackal']]]], 'bosses' => []]];
+            }
+
+            public function version(): string
+            {
+                return 'v1-test';
+            }
+
+            public function revision(): int
+            {
+                return 1;
             }
         };
     }

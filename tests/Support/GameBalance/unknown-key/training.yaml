@@ -1,5 +1,0 @@
-# Faute de frappe sur un nom de réglage : sans refus, le défaut passerait en silence.
-minimum_duration_seconds: 300
-maximum_duration_seconds: 14400
-maximum_duration_second: 60
-import_window_days: 30

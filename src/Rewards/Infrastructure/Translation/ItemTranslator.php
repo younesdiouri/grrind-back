@@ -26,9 +26,6 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 final class ItemTranslator implements ItemImageUrlResolver, ResetInterface
 {
-    /** Le domaine de traduction, donc le nom des fichiers : `translations/items.<locale>.yaml`. */
-    public const string DOMAIN = 'items';
-
     /** @var array<string, array<string, mixed>>|null */
     private ?array $items = null;
 

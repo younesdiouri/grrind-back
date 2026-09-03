@@ -50,7 +50,7 @@ use InvalidArgumentException;
  * `WALKING` ne rapporte plus d'XP — voir le docblock de `App\Progression\Domain\XpRates` —
  * donc `distribute()` n'est jamais appelée pour elle : `XpCalculator` s'arrête avant. La
  * couverture exigée ici en tient compte, et le second paramètre du constructeur est **la
- * même liste brute que `XpRates` consomme** (`game.xp.disciplines`), passée telle quelle
+ * même liste brute que `XpRates` consomme**, lue dans le snapshot publié et passée telle quelle
  * plutôt que pré-filtrée : les deux tables ne peuvent alors pas diverger sur « qui crédite »
  * sans qu'un seul fichier bouge. Une ligne de répartition pour une discipline qui ne
  * crédite pas serait de la config morte — refusée au même titre qu'une ligne manquante.

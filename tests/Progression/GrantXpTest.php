@@ -349,11 +349,10 @@ final class GrantXpTest extends ApiTestCase
      */
     private static function curve(): LevelCurve
     {
-        $levels = self::getContainer()->getParameter('game.levels.levels');
-        self::assertIsArray($levels);
+        $curve = self::getContainer()->get(LevelCurve::class);
+        self::assertInstanceOf(LevelCurve::class, $curve);
 
-        /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
-        return new LevelCurve($levels);
+        return $curve;
     }
 
     /**
@@ -363,15 +362,9 @@ final class GrantXpTest extends ApiTestCase
      */
     private static function vitality(): Vitality
     {
-        $floorPermille = self::getContainer()->getParameter('game.attributes.vitality.floor_permille');
-        self::assertIsInt($floorPermille);
+        $vitality = self::getContainer()->get(Vitality::class);
+        self::assertInstanceOf(Vitality::class, $vitality);
 
-        $targetActiveKcal = self::getContainer()->getParameter('game.attributes.vitality.target_active_kcal');
-        self::assertIsInt($targetActiveKcal);
-
-        $bonusCapPermille = self::getContainer()->getParameter('game.attributes.vitality.bonus_cap_permille');
-        self::assertIsInt($bonusCapPermille);
-
-        return new Vitality($floorPermille, $targetActiveKcal, $bonusCapPermille);
+        return $vitality;
     }
 }

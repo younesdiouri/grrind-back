@@ -35,7 +35,7 @@ final class TitleTranslator implements ResetInterface
 
     private ?int $revision = null;
 
-    public function __construct(private readonly TranslatorInterface $translator, private readonly ?GameRulesets $rulesets = null)
+    public function __construct(private readonly TranslatorInterface $translator, private readonly GameRulesets $rulesets)
     {
     }
 
@@ -87,9 +87,6 @@ final class TitleTranslator implements ResetInterface
 
     private function text(string $key, string $field): string
     {
-        if (null === $this->rulesets) {
-            return $this->translator->trans($key.'.'.$field, domain: self::DOMAIN);
-        }
         $locale = substr($this->translator->getLocale(), 0, 2);
         $translations = $this->translations();
 
@@ -102,7 +99,6 @@ final class TitleTranslator implements ResetInterface
     /** @return array<string, array<string, array<string, string>>> */
     private function translations(): array
     {
-        \assert(null !== $this->rulesets);
         $revision = $this->rulesets->revision();
         if (null !== $this->translations && $revision === $this->revision) {
             return $this->translations;

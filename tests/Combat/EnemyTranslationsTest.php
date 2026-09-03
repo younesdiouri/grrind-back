@@ -6,6 +6,7 @@ namespace App\Tests\Combat;
 
 use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
+use App\Shared\Application\GameRulesets;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -32,32 +33,52 @@ final class EnemyTranslationsTest extends KernelTestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('locales')]
     public function testEveryDeliveredEnemyHasANameInEveryLocale(string $locale): void
     {
-        $translator = self::getContainer()->get(TranslatorInterface::class);
-        self::assertInstanceOf(TranslatorInterface::class, $translator);
-
         $catalog = self::catalog();
 
         // Les boss (#219) partagent le même traducteur que les ennemis ordinaires : aucun
         // adversaire n'est livré sans nom, dans aucune des deux listes.
         foreach ([...$catalog->all(), ...$catalog->bosses()] as $enemy) {
             $key = strtolower($enemy->key).'.name';
-            $translated = $translator->trans($key, domain: EnemyTranslator::DOMAIN, locale: $locale);
+            $translated = self::translator($locale)->nameOf($enemy->key);
 
-            self::assertNotSame($key, $translated, \sprintf('`%s` manque à translations/enemies.%s.yaml.', $key, $locale));
+            self::assertNotSame($key, $translated, \sprintf('`%s` manque dans le snapshot publié (%s).', $key, $locale));
         }
     }
 
     private static function catalog(): EnemyCatalog
     {
         self::bootKernel();
-        $enemies = self::getContainer()->getParameter('game.combat.enemies');
-        self::assertIsArray($enemies);
+        $catalog = self::getContainer()->get(EnemyCatalog::class);
+        self::assertInstanceOf(EnemyCatalog::class, $catalog);
 
-        $bosses = self::getContainer()->getParameter('game.combat.bosses');
-        self::assertIsArray($bosses);
+        return $catalog;
+    }
 
-        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */
-        /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses */
-        return new EnemyCatalog($enemies, $bosses);
+    private static function translator(string $locale): EnemyTranslator
+    {
+        $rulesets = self::getContainer()->get(GameRulesets::class);
+        self::assertInstanceOf(GameRulesets::class, $rulesets);
+
+        return new EnemyTranslator(self::locale($locale), $rulesets);
+    }
+
+    private static function locale(string $locale): TranslatorInterface
+    {
+        return new class($locale) implements TranslatorInterface {
+            public function __construct(private readonly string $locale)
+            {
+            }
+
+            /** @param array<string, mixed> $parameters */
+            public function trans(string $id, array $parameters = [], ?string $domain = null, ?string $locale = null): string
+            {
+                return $id;
+            }
+
+            public function getLocale(): string
+            {
+                return $this->locale;
+            }
+        };
     }
 }
