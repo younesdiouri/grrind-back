@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Admin\Infrastructure;
 
+use App\Admin\Domain\GameDiscipline;
 use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLootTable;
@@ -52,6 +53,11 @@ final readonly class GameConfigurationReferenceGuard
             $configuration instanceof GameLootTable => ['table de loot', $configuration->getKind().':'.$configuration->getKey(), [
                 ['SELECT 1 FROM rewards_loot_roll WHERE table_key = ? LIMIT 1', [$configuration->getKey()]],
             ]],
+            $configuration instanceof GameDiscipline => ['discipline', $configuration->getDiscipline()->value, [
+                ['SELECT 1 FROM game_title WHERE active = true AND condition::jsonb @> ?::jsonb LIMIT 1', [json_encode(['discipline' => $configuration->getDiscipline()->value], \JSON_THROW_ON_ERROR)]],
+                ['SELECT 1 FROM game_loot_table WHERE active = true AND eligibility::jsonb @> ?::jsonb LIMIT 1', [json_encode(['disciplines' => [$configuration->getDiscipline()->value]], \JSON_THROW_ON_ERROR)]],
+                ['SELECT 1 FROM community_risala WHERE discipline = ? LIMIT 1', [$configuration->getDiscipline()->value]],
+            ]],
             default => ['', '', []],
         };
         foreach ($queries as [$sql, $parameters]) {
@@ -69,7 +75,7 @@ final readonly class GameConfigurationReferenceGuard
      */
     public function lockForMutation(object $configuration): void
     {
-        if (!$configuration instanceof GameItem && !$configuration instanceof GameTitle && !$configuration instanceof GameEnemy && !$configuration instanceof GameLootTable) {
+        if (!$configuration instanceof GameItem && !$configuration instanceof GameTitle && !$configuration instanceof GameEnemy && !$configuration instanceof GameLootTable && !$configuration instanceof GameDiscipline) {
             return;
         }
         $this->lockCurrentState($configuration);
@@ -83,6 +89,7 @@ final readonly class GameConfigurationReferenceGuard
             $configuration instanceof GameTitle => ['game_title', $configuration->getId()->toRfc4122()],
             $configuration instanceof GameEnemy => ['game_enemy', $configuration->getId()->toRfc4122()],
             $configuration instanceof GameLootTable => ['game_loot_table', $configuration->getId()->toRfc4122()],
+            $configuration instanceof GameDiscipline => ['game_discipline', $configuration->getId()->toRfc4122()],
             default => throw new LogicException('Cette configuration ne peut pas être supprimée.'),
         };
         $state = $this->connection->fetchAssociative("SELECT active, ever_published_active FROM {$table} WHERE id = ? FOR UPDATE", [$id]);

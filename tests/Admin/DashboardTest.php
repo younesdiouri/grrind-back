@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Admin;
 
+use App\Admin\UI\EasyAdmin\ActivityTypeCrudController;
 use App\Admin\UI\EasyAdmin\BattleCrudController;
 use App\Admin\UI\EasyAdmin\CoinTransactionCrudController;
+use App\Admin\UI\EasyAdmin\DisciplineCrudController;
 use App\Admin\UI\EasyAdmin\EnemyCrudController;
 use App\Admin\UI\EasyAdmin\InventoryCrudController;
 use App\Admin\UI\EasyAdmin\ItemCrudController;
+use App\Admin\UI\EasyAdmin\LevelCrudController;
 use App\Admin\UI\EasyAdmin\LootTableCrudController;
 use App\Admin\UI\EasyAdmin\SettingsCrudController;
 use App\Admin\UI\EasyAdmin\TitleCrudController;
@@ -29,6 +32,9 @@ final class DashboardTest extends ApiTestCase
         'Titres' => TitleCrudController::class,
         'Ennemis et boss' => EnemyCrudController::class,
         'Tables de loot' => LootTableCrudController::class,
+        'Disciplines' => DisciplineCrudController::class,
+        'Niveaux' => LevelCrudController::class,
+        'Types d’activité' => ActivityTypeCrudController::class,
         'Réglages globaux' => SettingsCrudController::class,
         'Comptes' => UserCrudController::class,
         'Batailles' => BattleCrudController::class,
