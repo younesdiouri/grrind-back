@@ -17,6 +17,8 @@ final class DisciplineTranslator implements ResetInterface
 
     private ?int $revision = null;
 
+    private ?string $version = null;
+
     public function __construct(private readonly GameRulesets $rulesets)
     {
     }
@@ -39,13 +41,15 @@ final class DisciplineTranslator implements ResetInterface
     {
         $this->labels = null;
         $this->revision = null;
+        $this->version = null;
     }
 
     /** @return array<string, array<string, string>> */
     private function labels(): array
     {
         $revision = $this->rulesets->revision();
-        if (null !== $this->labels && $revision === $this->revision) {
+        $version = $this->rulesets->version();
+        if (null !== $this->labels && $revision === $this->revision && $version === $this->version) {
             return $this->labels;
         }
 
@@ -66,6 +70,7 @@ final class DisciplineTranslator implements ResetInterface
         }
 
         $this->revision = $revision;
+        $this->version = $version;
 
         return $this->labels = $labels;
     }

@@ -54,6 +54,36 @@ final class DisciplineTranslatorTest extends TestCase
         $translator->labelOf(Discipline::Running, 'en');
     }
 
+    public function testItReloadsLabelsWhenTheVersionChangesAtTheSameRevision(): void
+    {
+        $rulesets = new class implements GameRulesets {
+            public string $label = 'Running';
+            public string $publishedVersion = 'v1-before-reset';
+
+            public function snapshot(): array
+            {
+                return ['disciplines' => [['discipline' => 'RUNNING', 'translations' => ['en' => ['label' => $this->label]]]]];
+            }
+
+            public function version(): string
+            {
+                return $this->publishedVersion;
+            }
+
+            public function revision(): int
+            {
+                return 1;
+            }
+        };
+        $translator = new DisciplineTranslator($rulesets);
+        self::assertSame('Running', $translator->labelOf(Discipline::Running, 'en'));
+
+        $rulesets->label = 'New running';
+        $rulesets->publishedVersion = 'v1-after-reset';
+
+        self::assertSame('New running', $translator->labelOf(Discipline::Running, 'en'));
+    }
+
     /** @param array<string, array{label: string}> $translations */
     private function rulesets(array $translations): GameRulesets
     {
