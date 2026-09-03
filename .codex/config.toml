@@ -1,6 +1,6 @@
-# Equivalent projet de : codex --sandbox workspace-write --ask-for-approval on-request
-sandbox_mode = "workspace-write"
-approval_policy = "on-request"
+# Equivalent projet de : codex --dangerously-bypass-approvals-and-sandbox
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
 
 [agents]
 enabled = true
