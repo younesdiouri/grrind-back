@@ -74,6 +74,14 @@ final class GameRulesetVersion
             $combat[$type] = $enemies;
         }
         $snapshot['combat'] = $combat;
+        $disciplines = $snapshot['disciplines'] ?? [];
+        \assert(\is_array($disciplines));
+        foreach ($disciplines as &$discipline) {
+            \assert(\is_array($discipline));
+            unset($discipline['translations']);
+        }
+        unset($discipline);
+        $snapshot['disciplines'] = $disciplines;
 
         return $snapshot;
     }

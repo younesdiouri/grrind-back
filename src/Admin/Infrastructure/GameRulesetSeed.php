@@ -21,7 +21,10 @@ final class GameRulesetSeed
         $data = json_decode($json, true, 512, \JSON_THROW_ON_ERROR);
         \assert(\is_array($data));
         /** @var array<string, mixed> $data */
+        require_once \dirname(__DIR__, 3).'/migrations/GameBalanceSeed.php';
+        /** @var array<string, mixed> $balance */
+        $balance = \DoctrineMigrations\GameBalanceSeed::data();
 
-        return $data;
+        return [...$data, ...$balance];
     }
 }

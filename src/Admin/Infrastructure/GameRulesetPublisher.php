@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Admin\Infrastructure;
 
 use App\Admin\Domain\GameEnemy;
+use App\Admin\Domain\GameActivityType;
+use App\Admin\Domain\GameDiscipline;
 use App\Admin\Domain\GameItem;
+use App\Admin\Domain\GameLevel;
 use App\Admin\Domain\GameLootTable;
 use App\Admin\Domain\GameRuleset;
 use App\Admin\Domain\GameSettings;
@@ -13,10 +16,20 @@ use App\Admin\Domain\GameTitle;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\EnemyCatalog;
 use App\Progression\Domain\TitleCatalog;
+use App\Progression\Domain\DiminishingReturns;
+use App\Progression\Domain\LevelCurve;
+use App\Progression\Domain\XpRates;
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Domain\LootLuckRules;
 use App\Rewards\Domain\LootTables;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
+use App\Shared\Domain\Activity\ActivityTypeMap;
+use App\Shared\Domain\Activity\AttributeSplit;
+use App\Shared\Domain\Activity\Vitality;
+use App\Training\Domain\WorkoutRules;
+use App\Community\Domain\GuildRules;
+use App\Community\Domain\QuietHours;
+use App\Community\Domain\RisalaRules;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
@@ -45,6 +58,9 @@ final readonly class GameRulesetPublisher
         /** @var list<GameTitle> $titles */ $titles = $manager->getRepository(GameTitle::class)->findBy([], ['sortOrder' => 'ASC']);
         /** @var list<GameEnemy> $enemies */ $enemies = $manager->getRepository(GameEnemy::class)->findBy([], ['sortOrder' => 'ASC']);
         /** @var list<GameLootTable> $tables */ $tables = $manager->getRepository(GameLootTable::class)->findBy([], ['sortOrder' => 'ASC']);
+        /** @var list<GameDiscipline> $disciplines */ $disciplines = $manager->getRepository(GameDiscipline::class)->findBy([], ['sortOrder' => 'ASC']);
+        /** @var list<GameLevel> $levels */ $levels = $manager->getRepository(GameLevel::class)->findBy([], ['level' => 'ASC']);
+        /** @var list<GameActivityType> $activityTypes */ $activityTypes = $manager->getRepository(GameActivityType::class)->findBy([]);
         $settings = $manager->find(GameSettings::class, 1);
         if (!$settings instanceof GameSettings) {
             throw new LogicException('Les réglages globaux initiaux sont absents. Rejouer les migrations avant d’ouvrir EasyAdmin.');
@@ -56,7 +72,7 @@ final readonly class GameRulesetPublisher
             }
         }
 
-        $snapshot = self::snapshot($items, $titles, $enemies, $tables, $settings);
+        $snapshot = self::snapshot($items, $titles, $enemies, $tables, $disciplines, $levels, $activityTypes, $settings);
         $previous = $ruleset->snapshot();
         if (self::lootGameplay($previous) !== self::lootGameplay($snapshot)) {
             $settings->incrementLootVersion();
@@ -84,9 +100,9 @@ final readonly class GameRulesetPublisher
      * @param list<GameEnemy>     $enemies
      * @param list<GameLootTable> $tables
      *
-     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>}
+     * @return array<string, mixed>
      */
-    private static function snapshot(array $items, array $titles, array $enemies, array $tables, GameSettings $settings): array
+    private static function snapshot(array $items, array $titles, array $enemies, array $tables, array $disciplines, array $levels, array $activityTypes, GameSettings $settings): array
     {
         $itemRows = array_map(static fn (GameItem $item): array => [
             'key' => $item->getKey(), 'active' => $item->isActive(), 'rarity' => $item->getRarity(), 'kind' => $item->getKind(), 'slot' => $item->getSlot(),
@@ -117,7 +133,19 @@ final readonly class GameRulesetPublisher
             $lootRows[$table->getKind()][] = $row;
         }
 
-        return ['items' => $itemRows, 'titles' => $titleRows, 'combat' => ['fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows]];
+        $disciplineRows = array_map(static fn (GameDiscipline $discipline): array => [
+            'discipline' => $discipline->getDiscipline()->value, 'active' => $discipline->isActive(), 'sort_order' => $discipline->getSortOrder(), 'credits_xp' => $discipline->creditsXp(),
+            'daily_cap_xp' => $discipline->getDailyCapXp(), 'xp_per_km' => $discipline->getXpPerKm(), 'xp_per_100m_elevation' => $discipline->getXpPer100mElevation(),
+            'split' => $discipline->getSplit(), 'translations' => $discipline->getTranslations(),
+        ], $disciplines);
+        $levelRows = array_map(static fn (GameLevel $level): array => ['level' => $level->getLevel(), 'total_xp' => $level->getTotalXp(), 'skill_points' => $level->getSkillPoints()], $levels);
+        $activityRows = array_map(static fn (GameActivityType $activityType): array => ['source' => $activityType->getSource()->value, 'provider_type' => $activityType->getProviderType(), 'discipline' => $activityType->getDiscipline()->value, 'active' => $activityType->isActive()], $activityTypes);
+
+        return [
+            'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
+            'training' => $settings->getTraining(), 'xp' => $settings->getXp(), 'attributes' => $settings->getAttributes(), 'disciplines' => $disciplineRows, 'levels' => $levelRows,
+            'activity_types' => $activityRows, 'community' => $settings->getCommunity(), 'notifications' => $settings->getNotifications(),
+        ];
     }
 
     /** @param array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>} $snapshot */
@@ -141,6 +169,58 @@ final readonly class GameRulesetPublisher
         $lootVersion = $snapshot['loot']['version'];
         \assert(\is_int($lootVersion));
         new LootTables($lootVersion, $workout, $adversary, $chest, $items, $enemies, $bosses);
+        /** @var array{minimum_duration_seconds: int, maximum_duration_seconds: int, import_window_days: int} $training */
+        $training = $snapshot['training'];
+        /** @var array{base_xp_per_hour: int, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $xp */
+        $xp = $snapshot['xp'];
+        /** @var list<array{discipline: string, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int, split: ?array<string, int>}> $disciplines */
+        $disciplines = $snapshot['disciplines'];
+        $rates = array_map(static function (array $discipline): array {
+            $rate = ['discipline' => $discipline['discipline']];
+            if (!$discipline['credits_xp']) {
+                $rate['credits_xp'] = false;
+            }
+            foreach (['daily_cap_xp', 'xp_per_km', 'xp_per_100m_elevation'] as $key) {
+                if (null !== $discipline[$key]) {
+                    $rate[$key] = $discipline[$key];
+                }
+            }
+
+            return $rate;
+        }, $disciplines);
+        $splits = array_map(static fn (array $discipline): array => ['discipline' => $discipline['discipline'], ...$discipline['split']], array_filter($disciplines, static fn (array $discipline): bool => null !== $discipline['split']));
+        new WorkoutRules($training['minimum_duration_seconds'], $training['maximum_duration_seconds'], $training['import_window_days']);
+        new XpRates($xp['base_xp_per_hour'], $rates);
+        new DiminishingReturns($xp['diminishing_returns'], $xp['diminishing_returns_beyond_percent']);
+        new AttributeSplit($splits, $rates);
+        /** @var array{vitality: array{floor_permille: int, target_active_kcal: int, bonus_cap_permille: int}} $attributes */
+        $attributes = $snapshot['attributes'];
+        new Vitality($attributes['vitality']['floor_permille'], $attributes['vitality']['target_active_kcal'], $attributes['vitality']['bonus_cap_permille']);
+        /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
+        $levels = $snapshot['levels'];
+        new LevelCurve($levels);
+        $activityBySource = ['APPLE_HEALTH' => [], 'HEALTH_CONNECT' => []];
+        foreach ($snapshot['activity_types'] as $activityType) {
+            \assert(\is_array($activityType));
+            if ($activityType['active']) {
+                $activityBySource[$activityType['source']][] = ['activity_type' => $activityType['provider_type'], 'discipline' => $activityType['discipline']];
+            }
+        }
+        new ActivityTypeMap($activityBySource['APPLE_HEALTH'], $activityBySource['HEALTH_CONNECT']);
+        /** @var array{maximum_members: int, invite_code_lifetime_hours: int, risala: array{active_weeks: int, reveal_day: int, reveal_hour: int, week_timezone: string, recipient_bonus_percent: int, sender_bonus_percent: int}} $community */
+        $community = $snapshot['community'];
+        new GuildRules($community['maximum_members'], $community['invite_code_lifetime_hours']);
+        new RisalaRules(
+            $community['risala']['active_weeks'],
+            $community['risala']['reveal_day'],
+            $community['risala']['reveal_hour'],
+            $community['risala']['week_timezone'],
+            $community['risala']['recipient_bonus_percent'],
+            $community['risala']['sender_bonus_percent'],
+        );
+        /** @var array{quiet_hours_start_hour: int, quiet_hours_end_hour: int} $notifications */
+        $notifications = $snapshot['notifications'];
+        new QuietHours($notifications['quiet_hours_start_hour'], $notifications['quiet_hours_end_hour']);
     }
 
     /**
