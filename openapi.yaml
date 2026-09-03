@@ -1519,6 +1519,7 @@ components:
         - email
         - displayName
         - timezone
+        - locale
         - registeredAt
         - title
         - nextTitle
@@ -1536,6 +1537,12 @@ components:
           description: "Identifiant IANA. **Le streak et le plafond quotidien se calculent dedans** : c'est un attribut de profil, jamais une déduction."
           type: string
           example: Europe/Paris
+        locale:
+          description: 'Langue persistée du joueur, utilisée aussi pour ses notifications asynchrones.'
+          type: string
+          enum:
+            - en
+            - fr
         registeredAt:
           type: string
           format: date-time

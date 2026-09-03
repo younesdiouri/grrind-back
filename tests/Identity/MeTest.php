@@ -81,7 +81,9 @@ final class MeTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
         self::assertSame('fr', self::decode($response)['locale']);
-        self::assertSame('Bob', self::decode($this->get('/api/me', $headers))['displayName']);
+        $persisted = self::decode($this->get('/api/me', $headers));
+        self::assertSame('fr', $persisted['locale']);
+        self::assertSame('Bob', $persisted['displayName']);
     }
 
     public function testRejectsAnUnknownLocale(): void

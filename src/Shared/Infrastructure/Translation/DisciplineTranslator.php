@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Translation;
 
 use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
+use LogicException;
 use Symfony\Contracts\Service\ResetInterface;
 
 /** Les libellés de disciplines sont du contenu de jeu : le snapshot publié les porte, pas le catalogue Symfony. */
@@ -24,7 +25,14 @@ final class DisciplineTranslator implements ResetInterface
     {
         $labels = $this->labels();
 
-        return $labels[$discipline->value][$locale] ?? $labels[$discipline->value]['en'] ?? $labels[$discipline->value]['fr'] ?? $discipline->value;
+        foreach ([$locale, 'en', 'fr'] as $candidate) {
+            $label = $labels[$discipline->value][$candidate] ?? null;
+            if (\is_string($label) && '' !== trim($label)) {
+                return $label;
+            }
+        }
+
+        throw new LogicException(\sprintf('Aucun libellé publié pour la discipline "%s".', $discipline->value));
     }
 
     public function reset(): void
@@ -51,7 +59,7 @@ final class DisciplineTranslator implements ResetInterface
             \assert(\is_array($row['translations'] ?? null));
             $translations = $row['translations'];
             foreach ($translations as $locale => $translation) {
-                if (\is_string($locale) && \is_array($translation) && \is_string($translation['label'] ?? null)) {
+                if (\is_string($locale) && \is_array($translation) && \is_string($translation['label'] ?? null) && '' !== trim($translation['label'])) {
                     $labels[$row['discipline']][$locale] = $translation['label'];
                 }
             }

@@ -14,18 +14,27 @@ use App\Community\Domain\Guild;
 use App\Community\Domain\Risala;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
 use App\Community\Infrastructure\Doctrine\RisalaRepository;
+use App\Shared\Application\PlayerLocales;
+use App\Shared\Application\PlayerProfiles;
+use App\Shared\Application\PlayerTimezones;
 use App\Shared\Domain\Activity\CreditingDisciplines;
 use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Locale;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
+use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
+use App\Shared\Infrastructure\Translation\DisciplineTranslator;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use App\Tests\Support\LocalHours;
 use App\Tests\Support\SpyingPushSender;
 use Doctrine\DBAL\Connection;
+use RuntimeException;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Les deux annonces des Risālāt (#194) : « c'est ton tour » à une personne, « la Risāla est
@@ -170,6 +179,62 @@ final class RisalatNotificationTest extends ApiTestCase
         self::assertCount(3, SpyingPushSender::$sent);
     }
 
+    public function testRevealLocalizationFailureDoesNotClaimTheNotificationBeforeRetry(): void
+    {
+        $this->guildOfThree(self::AWAKE);
+        $risala = $this->revealedRisala(Discipline::Climbing);
+        $locales = $this->flakyLocales();
+        $handler = new AnnounceRisalaHandler(
+            self::service(RisalaRepository::class),
+            self::service(PlayerProfiles::class),
+            $locales,
+            self::service(PlayerTimezones::class),
+            self::service(SpyingPushSender::class),
+            self::service(NotificationAttemptRepository::class),
+            self::service(\App\Community\Domain\QuietHours::class),
+            self::service(\App\Community\Domain\RisalaRules::class),
+            self::service(MockClock::class),
+            self::service(TranslatorInterface::class),
+            self::service(DisciplineTranslator::class),
+        );
+
+        try {
+            $handler(new AnnounceRisala($risala->id()));
+            self::fail('La première localisation devait échouer.');
+        } catch (RuntimeException) {
+        }
+        $handler(new AnnounceRisala($risala->id()));
+
+        self::assertCount(3, SpyingPushSender::$sent);
+    }
+
+    public function testTurnLocalizationFailureDoesNotClaimTheNotificationBeforeRetry(): void
+    {
+        $this->guildOfThree(self::AWAKE);
+        $turn = $this->firstTurn();
+        $locales = $this->flakyLocales();
+        $handler = new AnnounceRisalaTurnHandler(
+            self::service(RisalaRepository::class),
+            self::service(PlayerTimezones::class),
+            $locales,
+            self::service(SpyingPushSender::class),
+            self::service(NotificationAttemptRepository::class),
+            self::service(\App\Community\Domain\QuietHours::class),
+            self::service(MessageBusInterface::class),
+            self::service(MockClock::class),
+            self::service(TranslatorInterface::class),
+        );
+
+        try {
+            $handler(new AnnounceRisalaTurn($turn->id()));
+            self::fail('La première localisation devait échouer.');
+        } catch (RuntimeException) {
+        }
+        $handler(new AnnounceRisalaTurn($turn->id()));
+
+        self::assertCount(1, SpyingPushSender::$sent);
+    }
+
     public function testTheBasculeQueuesBothAnnouncementsInItsOwnTransaction(): void
     {
         $this->guildOfThree(self::AWAKE);
@@ -299,6 +364,23 @@ final class RisalatNotificationTest extends ApiTestCase
         self::assertInstanceOf(Connection::class, $connection);
 
         return $connection;
+    }
+
+    private function flakyLocales(): PlayerLocales
+    {
+        return new class implements PlayerLocales {
+            private bool $first = true;
+
+            public function localeOf(Uuid $userId): Locale
+            {
+                if ($this->first) {
+                    $this->first = false;
+                    throw new RuntimeException('Catalogue de langues momentanément indisponible.');
+                }
+
+                return Locale::English;
+            }
+        };
     }
 
     /**

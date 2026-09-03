@@ -111,11 +111,13 @@ final readonly class AnnounceRisalaHandler
             return;
         }
 
+        $notification = $this->notificationFor($recipientId, $senderName, $discipline, $risala);
+
         if (!$this->attempts->claim($risala->id(), $recipientId, NotificationCategory::RisalaRevealed, $now)) {
             return;
         }
 
-        $this->pushSender->send($recipientId, $this->notificationFor($recipientId, $senderName, $discipline, $risala));
+        $this->pushSender->send($recipientId, $notification);
     }
 
     private function notificationFor(Uuid $recipientId, string $senderName, Discipline $discipline, Risala $risala): PushNotification

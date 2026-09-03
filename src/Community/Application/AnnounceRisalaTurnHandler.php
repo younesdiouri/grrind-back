@@ -94,19 +94,20 @@ final readonly class AnnounceRisalaTurnHandler
             return;
         }
 
-        if (!$this->attempts->claim($risala->id(), $risala->senderId(), NotificationCategory::RisalaTurn, $now)) {
-            return;
-        }
-
         $locale = $this->locales->localeOf($risala->senderId())->value;
         $deadline = $risala->deadline()->setTimezone($timezone->toDateTimeZone())->format('fr' === $locale ? 'd/m \à H\hi' : 'M j \a\t H:i');
-
-        $this->pushSender->send($risala->senderId(), new PushNotification(
+        $notification = new PushNotification(
             $this->translator->trans('risala_turn.title', domain: 'messages', locale: $locale),
             $this->translator->trans('risala_turn.body', ['%deadline%' => $deadline], 'messages', $locale),
             NotificationCategory::RisalaTurn,
             'risala-turn:'.$risala->guild()->id()->toRfc4122(),
             new PushRoute(PushRouteType::GuildRisalat, $risala->guild()->id()),
-        ));
+        );
+
+        if (!$this->attempts->claim($risala->id(), $risala->senderId(), NotificationCategory::RisalaTurn, $now)) {
+            return;
+        }
+
+        $this->pushSender->send($risala->senderId(), $notification);
     }
 }
