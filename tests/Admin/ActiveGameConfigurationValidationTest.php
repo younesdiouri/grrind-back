@@ -130,6 +130,49 @@ final class ActiveGameConfigurationValidationTest extends KernelTestCase
         $this->validate($snapshot);
     }
 
+    public function testPartialEnemyPackCannotBePublished(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot['combat']['enemies'][0]['image_paths'] = ['idle' => str_repeat('a', 40).'.png', 'attack' => null, 'hit' => null];
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('trois poses');
+        $this->validate($snapshot);
+    }
+
+    public function testLongEnemyIntroductionCannotBePublished(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot['combat']['enemies'][0]['translations'] = ['fr' => ['name' => 'Nom', 'introduction' => str_repeat('é', 281)]];
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('280');
+        $this->validate($snapshot);
+    }
+
+    public function testPlaceholderIsNotAnEnemyPack(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot['combat']['enemies'][0]['image_paths'] = ['idle' => 'placeholder.png', 'attack' => 'placeholder.png', 'hit' => 'placeholder.png'];
+        $this->expectException(LogicException::class);
+        $this->validate($snapshot);
+    }
+
+    public function testUnicodeIntroductionAtTheLimitIsValidWithoutImages(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot['combat']['enemies'][0]['translations'] = ['fr' => ['name' => 'Nom', 'introduction' => str_repeat('é', 280)]];
+        $this->validate($snapshot);
+        $this->addToAssertionCount(1);
+    }
+
+    public function testMarkupCannotBePublishedAsAnIntroduction(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot['combat']['enemies'][0]['translations'] = ['fr' => ['name' => 'Nom', 'introduction' => '<b>Bonjour</b>']];
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('texte brut');
+        $this->validate($snapshot);
+    }
+
     /** @return array{items: list<array<string, mixed>>, titles: list<array{active: bool, condition: array{discipline?: string|null}}&array<string, mixed>>, combat: array{enemies: list<array<string, mixed>>, bosses: list<array<string, mixed>>, fighter: array<string, mixed>}, loot: array{adversary: list<array{key: string}>, chest: list<array{key: string}>, workout: list<array{eligibility: array{disciplines: list<string>}}>} & array<string, mixed>, training: array{minimum_duration_seconds: int, maximum_duration_seconds: int}, attributes: array{vitality: array{window_days: int}}, notifications: array<string, int>, activity_types: list<array{discipline: string} & array<string, mixed>>, disciplines: list<array{discipline: string, active: bool}>} */
     private function snapshot(): array
     {

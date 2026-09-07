@@ -29,7 +29,10 @@ class GameEnemy
     #[ORM\Column(name: 'mitigation_permille')] private int $mitigationPermille = 0;
     #[ORM\Column(name: 'extra_turn_permille')] private int $extraTurnPermille = 0;
     #[ORM\Column(name: 'dodge_permille')] private int $dodgePermille = 0;
-    /** @var array{fr: array{name: string}, en: array{name: string}} */
+    #[ORM\Column(name: 'idle_image_path', length: 255, nullable: true)] private ?string $idleImagePath = null;
+    #[ORM\Column(name: 'attack_image_path', length: 255, nullable: true)] private ?string $attackImagePath = null;
+    #[ORM\Column(name: 'hit_image_path', length: 255, nullable: true)] private ?string $hitImagePath = null;
+    /** @var array{fr: array{name: string, introduction?: ?string}, en: array{name: string, introduction?: ?string}} */
     #[ORM\Column(type: Types::JSON)] private array $translations = ['fr' => ['name' => ''], 'en' => ['name' => '']];
     public function __construct()
     {
@@ -156,15 +159,50 @@ class GameEnemy
         $this->dodgePermille = $value;
     }
 
-    /** @return array{fr: array{name: string}, en: array{name: string}} */
+    public function getIdleImagePath(): ?string
+    {
+        return $this->idleImagePath;
+    }
+
+    public function setIdleImagePath(?string $path): void
+    {
+        $this->idleImagePath = '' === $path ? null : $path;
+    }
+
+    public function getAttackImagePath(): ?string
+    {
+        return $this->attackImagePath;
+    }
+
+    public function setAttackImagePath(?string $path): void
+    {
+        $this->attackImagePath = '' === $path ? null : $path;
+    }
+
+    public function getHitImagePath(): ?string
+    {
+        return $this->hitImagePath;
+    }
+
+    public function setHitImagePath(?string $path): void
+    {
+        $this->hitImagePath = '' === $path ? null : $path;
+    }
+
+    /** @return array{fr: array{name: string, introduction?: ?string}, en: array{name: string, introduction?: ?string}} */
     public function getTranslations(): array
     {
         return $this->translations;
     }
 
-    /** @param array{fr: array{name: string}, en: array{name: string}} $translations */
+    /** @param array{fr: array{name: string, introduction?: ?string}, en: array{name: string, introduction?: ?string}} $translations */
     public function setTranslations(array $translations): void
     {
+        foreach ($translations as &$translation) {
+            $introduction = $translation['introduction'] ?? null;
+            $translation['introduction'] = null === $introduction || 1 === preg_match('/^[\s\p{Z}]*$/u', $introduction) ? null : $introduction;
+        }
+        unset($translation);
         $this->translations = $translations;
     }
 

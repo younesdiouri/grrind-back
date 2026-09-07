@@ -15,12 +15,13 @@ final class TranslationsType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('fr', LocaleTranslationType::class, ['label' => 'Français'])
-            ->add('en', LocaleTranslationType::class, ['label' => 'English']);
+            ->add('fr', LocaleTranslationType::class, ['label' => 'Français', 'introduction' => $options['introduction']])
+            ->add('en', LocaleTranslationType::class, ['label' => 'English', 'introduction' => $options['introduction']]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => null]);
+        $resolver->setDefaults(['data_class' => null, 'introduction' => false]);
+        $resolver->setAllowedTypes('introduction', 'bool');
     }
 }

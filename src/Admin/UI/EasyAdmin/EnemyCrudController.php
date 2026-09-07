@@ -10,9 +10,13 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Option\ReplacedFileBehavior;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ImageField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\Validator\Constraints\Image;
 
 final class EnemyCrudController extends GameCrudController
 {
@@ -52,6 +56,29 @@ final class EnemyCrudController extends GameCrudController
         yield IntegerField::new('mitigationPermille');
         yield IntegerField::new('extraTurnPermille');
         yield IntegerField::new('dodgePermille');
-        yield StructuredField::new('translations')->setFormType(TranslationsType::class)->hideOnIndex();
+        foreach (['idleImagePath' => 'Repos', 'attackImagePath' => 'Attaque', 'hitImagePath' => 'Coup reçu'] as $property => $label) {
+            yield ImageField::new($property, $label)
+                ->setHelp('Pack complet : renseignez les trois poses, ou retirez les trois pour supprimer le pack.')
+                ->setBasePath('/game-images')
+                // Le transformeur EasyAdmin relit le fichier courant depuis le volume final pour
+                // afficher sa miniature ; seul son écriture est redirigée vers le staging ci-dessous.
+                ->setUploadDir($this->gameImageDirectory)
+                ->setFormTypeOption('download_path', '/game-images/')
+                ->setFormTypeOption('upload_new', function (UploadedFile $file, string $unusedDirectory, string $name): void {
+                    $file->move($this->stagingImageDirectory(), $name);
+                })
+                // EasyAdmin calcule le SHA-1, le suffixe UUID isole deux transactions qui ont le
+                // même binaire en staging : l'annulation de l'une ne peut plus effacer l'autre.
+                ->setUploadedFileNamePattern('[contenthash]-[uuid].[extension]')
+                ->setFileConstraints(new Image(maxSize: '2M', mimeTypes: ['image/jpeg', 'image/png', 'image/webp'], maxWidth: 4096, maxHeight: 4096))
+                ->mimeTypes('image/jpeg,image/png,image/webp')
+                ->setFormTypeOption('allow_delete', true)
+                // Retirer la référence ne doit jamais détruire une URL déjà publiée.
+                ->setFormTypeOption('upload_delete', static function (): void {})
+                ->setCustomOption(ImageField::OPTION_REPLACED_FILE_BEHAVIOR, ReplacedFileBehavior::KEEP)
+                ->setRequired(false)
+                ->hideOnIndex();
+        }
+        yield StructuredField::new('translations')->setFormType(TranslationsType::class)->setFormTypeOption('introduction', true)->hideOnIndex();
     }
 }

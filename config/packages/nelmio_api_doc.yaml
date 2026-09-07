@@ -1494,6 +1494,17 @@ when@dev:
                             extraTurnPercent: { type: integer, example: 12, description: "Chance de rejouer un tour immédiatement." }
                             dodgePercent: { type: integer, example: 8, description: "Chance d'esquiver entièrement un coup." }
 
+                    EnemyImageUrls:
+                        type: object
+                        nullable: true
+                        description: "Pack publié complet ou null. URLs absolues publiques, HTTPS en production. hit est la pose de coup reçu ; une esquive utilise idle. La présentation courante est aussi utilisée au rejeu."
+                        required: [idle, attack, hit]
+                        additionalProperties: false
+                        properties:
+                            idle: { type: string, format: uri }
+                            attack: { type: string, format: uri }
+                            hit: { type: string, format: uri }
+
                     BattleEnemy:
                         type: object
                         description: |
@@ -1514,6 +1525,12 @@ when@dev:
                             mitigationPercent: { type: integer, example: 10 }
                             extraTurnPercent: { type: integer, example: 5 }
                             dodgePercent: { type: integer, example: 3 }
+                            imageUrls: { $ref: '#/components/schemas/EnemyImageUrls' }
+                            introduction:
+                                type: string
+                                nullable: true
+                                maxLength: 280
+                                description: "Texte brut localisé selon Accept-Language (repli EN puis FR), indépendant des images. Toujours présent, null si absent ; facultatif pour les anciennes réponses."
 
                     BattleEvent:
                         type: object
@@ -1697,6 +1714,12 @@ when@dev:
                             mitigationPercent: { type: integer, example: 20 }
                             extraTurnPercent: { type: integer, example: 12 }
                             dodgePercent: { type: integer, example: 9 }
+                            imageUrls: { $ref: '#/components/schemas/EnemyImageUrls' }
+                            introduction:
+                                type: string
+                                nullable: true
+                                maxLength: 280
+                                description: "Texte brut localisé selon Accept-Language (repli EN puis FR), indépendant des images. Toujours présent, null si absent ; facultatif pour les anciennes réponses."
 
                     EnemyCatalog:
                         type: object

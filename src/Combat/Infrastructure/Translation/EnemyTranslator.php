@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Combat\Infrastructure\Translation;
 
 use App\Shared\Application\GameRulesets;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -31,12 +32,12 @@ final class EnemyTranslator implements ResetInterface
 {
     public const string DOMAIN = 'enemies';
 
-    /** @var array<string, array<string, array{name: string}>>|null */
-    private ?array $translations = null;
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $enemies = null;
 
     private ?int $revision = null;
 
-    public function __construct(private readonly TranslatorInterface $translator, private readonly GameRulesets $rulesets)
+    public function __construct(private readonly TranslatorInterface $translator, private readonly GameRulesets $rulesets, private readonly ?UrlGeneratorInterface $urls = null)
     {
     }
 
@@ -48,31 +49,65 @@ final class EnemyTranslator implements ResetInterface
     public function nameOf(string $key): string
     {
         $locale = substr($this->translator->getLocale(), 0, 2);
-        $translations = $this->translations();
+        /** @var array<string, array{name?: string}> $translations */
+        $translations = $this->enemies()[$key]['translations'] ?? [];
 
-        return $translations[$key][$locale]['name']
-            ?? $translations[$key]['en']['name']
-            ?? $translations[$key]['fr']['name']
+        return $translations[$locale]['name']
+            ?? $translations['en']['name']
+            ?? $translations['fr']['name']
             // Une bataille historique peut référencer un ennemi retiré ; conserver la
             // clé de traduction rend ce cas identifiable sans prétendre le traduire.
             ?? strtolower($key).'.name';
     }
 
+    /** @return array{idle: string, attack: string, hit: string}|null */
+    public function imageUrlsOf(string $key): ?array
+    {
+        $paths = $this->enemies()[$key]['image_paths'] ?? null;
+        if (!\is_array($paths) || null === $this->urls) {
+            return null;
+        }
+        $urls = [];
+        foreach (['idle', 'attack', 'hit'] as $pose) {
+            $path = $paths[$pose] ?? null;
+            if (!\is_string($path) || '' === $path || 'placeholder.png' === $path) {
+                return null;
+            }
+            $urls[$pose] = $this->urls->generate('game_image', ['name' => $path], UrlGeneratorInterface::ABSOLUTE_URL);
+        }
+
+        return $urls;
+    }
+
+    public function introductionOf(string $key): ?string
+    {
+        /** @var array<string, array{introduction?: ?string}> $translations */
+        $translations = $this->enemies()[$key]['translations'] ?? [];
+        foreach ([substr($this->translator->getLocale(), 0, 2), 'en', 'fr'] as $locale) {
+            $text = $translations[$locale]['introduction'] ?? null;
+            if (\is_string($text) && 1 !== preg_match('/^[\s\p{Z}]*$/u', $text)) {
+                return $text;
+            }
+        }
+
+        return null;
+    }
+
     public function reset(): void
     {
-        $this->translations = null;
+        $this->enemies = null;
         $this->revision = null;
     }
 
-    /** @return array<string, array<string, array{name: string}>> */
-    private function translations(): array
+    /** @return array<string, array<string, mixed>> */
+    private function enemies(): array
     {
         $revision = $this->rulesets->revision();
-        if (null !== $this->translations && $revision === $this->revision) {
-            return $this->translations;
+        if (null !== $this->enemies && $revision === $this->revision) {
+            return $this->enemies;
         }
         $snapshot = $this->rulesets->snapshot();
-        $translations = [];
+        $indexed = [];
         $combat = $snapshot['combat'] ?? [];
         \assert(\is_array($combat));
         foreach (['enemies', 'bosses'] as $kind) {
@@ -80,16 +115,14 @@ final class EnemyTranslator implements ResetInterface
             \assert(\is_array($enemies));
             foreach ($enemies as $enemy) {
                 \assert(\is_array($enemy));
+                /** @var array<string, mixed> $enemy */
                 \assert(\is_string($enemy['key']));
-                \assert(\is_array($enemy['translations'] ?? null));
-                /** @var array<string, array{name: string}> $entry */
-                $entry = $enemy['translations'];
-                $translations[$enemy['key']] = $entry;
+                $indexed[$enemy['key']] = $enemy;
             }
         }
 
         $this->revision = $revision;
 
-        return $this->translations = $translations;
+        return $this->enemies = $indexed;
     }
 }

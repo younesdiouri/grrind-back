@@ -68,7 +68,7 @@ final class GameRulesetVersion
             \assert(\is_array($enemies));
             foreach ($enemies as &$enemy) {
                 \assert(\is_array($enemy));
-                unset($enemy['translations']);
+                unset($enemy['translations'], $enemy['image_paths']);
             }
             unset($enemy);
             $combat[$type] = $enemies;

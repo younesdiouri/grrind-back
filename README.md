@@ -94,3 +94,26 @@ dont dépend l'outbox ([#56]).
 
 Le suivi vit sur le [tableau GitHub](https://github.com/users/younesdiouri/projects/1) : un ticket
 par feature, un jalon par lot, un label par module.
+
+### Présentation des ennemis et boss
+
+Dans EasyAdmin → Ennemis et boss, les champs **Repos**, **Attaque** et **Coup reçu**
+acceptent un pack de trois images (PNG transparent accepté, 2 Mo par fichier, 4096 × 4096
+maximum). Les fichiers sont conservés sans transformation. Une édition sans nouvel upload
+conserve le pack ; pour le retirer, supprimer les trois références dans le même formulaire.
+Un remplacement crée une nouvelle URL et conserve les anciens fichiers.
+
+Les introductions FR/EN sont facultatives, en texte brut, limitées à 280 caractères Unicode.
+Les champs vides sont normalisés à `null`. Le runtime utilise la langue demandée, puis EN,
+puis FR. Le dialogue peut être publié sans images. Objets et titres n'ont pas ce champ.
+
+La publication atomique alimente `imageUrls: {idle, attack, hit} | null` et
+`introduction: string | null` dans le catalogue et le détail des combats. Le rejeu utilise
+la présentation actuellement publiée par clé, même désactivée ; les statistiques, événements
+et récompenses restent persistés. La liste résumée des combats garde son contrat.
+Les anciennes réponses restent compatibles avec les champs OpenAPI facultatifs.
+
+Les uploads passent par le volume `var/game-images` et la route
+publique `/game-images/{name}`. Les URLs absolues utilisent le contexte HTTP existant ; en
+production, le proxy de confiance transmet HTTPS. Aucune migration ne copie les assets ni
+n'active Al-Kasal : son paramétrage de contenu et le raccordement mobile restent séparés.

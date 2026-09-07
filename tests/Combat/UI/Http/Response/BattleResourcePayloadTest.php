@@ -50,7 +50,10 @@ final class BattleResourcePayloadTest extends TestCase
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'name', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'], array_keys($enemy));
+        self::assertSame(['key', 'name', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent', 'imageUrls', 'introduction'], array_keys($enemy));
+
+        self::assertNull($enemy['imageUrls']);
+        self::assertNull($enemy['introduction']);
 
         $events = $payload['events'];
         self::assertIsArray($events);
