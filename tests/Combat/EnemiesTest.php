@@ -59,7 +59,7 @@ final class EnemiesTest extends ApiTestCase
         $first = $entries[0];
         self::assertIsArray($first);
         self::assertSame(
-            ['key', 'name', 'minimumLevel', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'],
+            ['key', 'name', 'minimumLevel', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent', 'imageUrls', 'introduction'],
             array_keys($first),
         );
     }

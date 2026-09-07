@@ -21,15 +21,18 @@ use App\Combat\Infrastructure\Translation\EnemyTranslator;
  */
 final readonly class EnemyResource
 {
+    /** @param array{idle: string, attack: string, hit: string}|null $imageUrls */
     private function __construct(
         private Enemy $enemy,
         private string $name,
+        private ?array $imageUrls,
+        private ?string $introduction,
     ) {
     }
 
     public static function from(Enemy $enemy, EnemyTranslator $translator): self
     {
-        return new self($enemy, $translator->nameOf($enemy->key));
+        return new self($enemy, $translator->nameOf($enemy->key), $translator->imageUrlsOf($enemy->key), $translator->introductionOf($enemy->key));
     }
 
     /**
@@ -46,6 +49,7 @@ final readonly class EnemyResource
                 'extraTurnPermille' => $this->enemy->extraTurnPermille,
                 'dodgePermille' => $this->enemy->dodgePermille,
             ])->toArray(),
+            ['imageUrls' => $this->imageUrls, 'introduction' => $this->introduction],
         );
     }
 }

@@ -533,6 +533,155 @@ final class GameCrudHttpTest extends ApiTestCase
         }
     }
 
+    public function testEnemyPresentationUploadRollbackReplacementAndRemovalThroughAdmin(): void
+    {
+        $this->loginAdmin('enemy-poses@grrind.app');
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $enemy = $manager->getRepository(GameEnemy::class)->findOneBy(['key' => 'SAND_JACKAL']);
+        self::assertInstanceOf(GameEnemy::class, $enemy);
+        $originalTranslations = $enemy->getTranslations();
+        $originalPaths = [$enemy->getIdleImagePath(), $enemy->getAttackImagePath(), $enemy->getHitImagePath()];
+        $url = '/admin/enemy/'.$enemy->getId()->toRfc4122().'/edit';
+        $directory = self::getContainer()->getParameter('kernel.project_dir').'/var/game-images';
+        $before = $this->imageFiles($directory);
+        $png = tempnam(sys_get_temp_dir(), 'enemy-pose-');
+        self::assertIsString($png);
+        $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8ywAAAABJRU5ErkJggg==', true);
+        self::assertIsString($bytes);
+        file_put_contents($png, $bytes);
+        $dialogue = "je suis la paresse, laissez tomber, ce jeu n'est pas fait pour vous.";
+        try {
+            $form = $this->client->request('GET', $url)->filter('form[name="GameEnemy"]')->form();
+            foreach (['idle', 'attack', 'hit'] as $pose) {
+                $file = $form['GameEnemy['.$pose.'ImagePath][file]'];
+                self::assertInstanceOf(FileFormField::class, $file);
+                $file->upload($png);
+            }
+            $form->setValues(['GameEnemy[translations][fr][introduction]' => $dialogue, 'GameEnemy[translations][en][introduction]' => 'Give up.']);
+            $this->client->submit($form);
+            self::assertResponseRedirects();
+            $manager = self::getContainer()->get(EntityManagerInterface::class);
+            $manager->clear();
+            $stored = $manager->getRepository(GameEnemy::class)->findOneBy(['key' => 'SAND_JACKAL']);
+            self::assertInstanceOf(GameEnemy::class, $stored);
+            $paths = [$stored->getIdleImagePath(), $stored->getAttackImagePath(), $stored->getHitImagePath()];
+            $ruleset = $manager->find(GameRuleset::class, 1);
+            self::assertInstanceOf(GameRuleset::class, $ruleset);
+            $revision = $ruleset->revision();
+            $snapshot = $ruleset->snapshot();
+            foreach ($paths as $path) {
+                self::assertNotNull($path);
+                self::assertSame($bytes, file_get_contents($directory.'/'.$path));
+                $this->client->request('GET', '/game-images/'.$path);
+                self::assertResponseIsSuccessful();
+                self::assertResponseHeaderSame('Content-Type', 'image/png');
+                self::assertStringContainsString('immutable', (string) $this->client->getResponse()->headers->get('Cache-Control'));
+            }
+
+            // Validation du formulaire avant publication : trois candidats et un dialogue trop long.
+            $files = $this->imageFiles($directory);
+            $form = $this->client->request('GET', $url)->filter('form[name="GameEnemy"]')->form();
+            foreach (['idle', 'attack', 'hit'] as $pose) {
+                $file = $form['GameEnemy['.$pose.'ImagePath][file]'];
+                self::assertInstanceOf(FileFormField::class, $file);
+                $file->upload($png);
+            }
+            $form->setValues(['GameEnemy[translations][fr][introduction]' => str_repeat('é', 281)]);
+            $this->client->submit($form);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame($files, $this->imageFiles($directory));
+
+            // Trois remplacements promus, puis publication refusée : rien de la tentative ne reste.
+            $files = $this->imageFiles($directory);
+            $form = $this->client->request('GET', $url)->filter('form[name="GameEnemy"]')->form();
+            foreach (['idle', 'attack', 'hit'] as $pose) {
+                $file = $form['GameEnemy['.$pose.'ImagePath][file]'];
+                self::assertInstanceOf(FileFormField::class, $file);
+                $file->upload($png);
+            }
+            $form->setValues(['GameEnemy[mitigationPermille]' => '1000']);
+            $this->client->submit($form);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame($files, $this->imageFiles($directory));
+            $manager = self::getContainer()->get(EntityManagerInterface::class);
+            $manager->clear();
+            $ruleset = $manager->find(GameRuleset::class, 1);
+            self::assertInstanceOf(GameRuleset::class, $ruleset);
+            self::assertSame($revision, $ruleset->revision());
+            self::assertSame($snapshot, $ruleset->snapshot());
+
+            // Sans nouvel upload, les trois références restent identiques.
+            $form = $this->client->request('GET', $url)->filter('form[name="GameEnemy"]')->form();
+            $this->client->submit($form);
+            self::assertResponseRedirects();
+            self::assertSame($files, $this->imageFiles($directory));
+
+            // Le remplacement d'une seule pose d'un pack complet produit une nouvelle URL.
+            $form = $this->client->request('GET', $url)->filter('form[name="GameEnemy"]')->form();
+            $file = $form['GameEnemy[idleImagePath][file]'];
+            self::assertInstanceOf(FileFormField::class, $file);
+            $file->upload($png);
+            $this->client->submit($form);
+            self::assertResponseRedirects();
+            $manager = self::getContainer()->get(EntityManagerInterface::class);
+            $manager->clear();
+            $stored = $manager->getRepository(GameEnemy::class)->findOneBy(['key' => 'SAND_JACKAL']);
+            self::assertInstanceOf(GameEnemy::class, $stored);
+            self::assertNotSame($paths[0], $stored->getIdleImagePath());
+            self::assertSame($paths[1], $stored->getAttackImagePath());
+            self::assertSame($paths[2], $stored->getHitImagePath());
+
+            // Retrait partiel refusé, sans supprimer le fichier de la pose retirée.
+            $files = $this->imageFiles($directory);
+            $form = $this->client->request('GET', $url)->filter('form[name="GameEnemy"]')->form();
+            $delete = $form['GameEnemy[idleImagePath][delete]'];
+            self::assertInstanceOf(ChoiceFormField::class, $delete);
+            $delete->tick();
+            $this->client->submit($form);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame($files, $this->imageFiles($directory));
+
+            // Retrait complet valide ; le dialogue reste indépendant et les anciennes URLs vivent.
+            $form = $this->client->request('GET', $url)->filter('form[name="GameEnemy"]')->form();
+            foreach (['idle', 'attack', 'hit'] as $pose) {
+                $delete = $form['GameEnemy['.$pose.'ImagePath][delete]'];
+                self::assertInstanceOf(ChoiceFormField::class, $delete);
+                $delete->tick();
+            }
+            $this->client->submit($form);
+            self::assertResponseRedirects();
+            self::assertSame($files, $this->imageFiles($directory));
+            $manager = self::getContainer()->get(EntityManagerInterface::class);
+            $manager->clear();
+            $stored = $manager->getRepository(GameEnemy::class)->findOneBy(['key' => 'SAND_JACKAL']);
+            self::assertInstanceOf(GameEnemy::class, $stored);
+            self::assertNull($stored->getIdleImagePath());
+            self::assertNull($stored->getAttackImagePath());
+            self::assertNull($stored->getHitImagePath());
+            self::assertSame($dialogue, $stored->getTranslations()['fr']['introduction'] ?? null);
+        } finally {
+            $registry = self::getContainer()->get('doctrine');
+            $manager = $registry->resetManager();
+            self::assertInstanceOf(EntityManagerInterface::class, $manager);
+            $original = $manager->getRepository(GameEnemy::class)->findOneBy(['key' => 'SAND_JACKAL']);
+            self::assertInstanceOf(GameEnemy::class, $original);
+            $original->setIdleImagePath($originalPaths[0]);
+            $original->setAttackImagePath($originalPaths[1]);
+            $original->setHitImagePath($originalPaths[2]);
+            $original->setTranslations($originalTranslations);
+            $publisher = self::getContainer()->get(GameRulesetPublisher::class);
+            $manager->wrapInTransaction(static function () use ($manager, $publisher): void {
+                $manager->flush();
+                $publisher->publish($manager);
+            });
+            $publisher->invalidateAfterCommit();
+            unlink($png);
+            foreach (array_diff($this->imageFiles($directory), $before) as $file) {
+                unlink($directory.'/'.$file);
+            }
+        }
+    }
+
     private function delete(string $editUrl, string $deleteUrl): void
     {
         $page = $this->client->request('GET', $editUrl);

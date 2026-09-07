@@ -43,7 +43,7 @@ use Throwable;
  */
 final readonly class GameRulesetPublisher
 {
-    public function __construct(private TagAwareCacheInterface $cache, private ?DatabaseGameRulesets $rulesets = null)
+    public function __construct(private TagAwareCacheInterface $cache, private ?DatabaseGameRulesets $rulesets = null, private string $gameImageDirectory = '')
     {
     }
 
@@ -80,6 +80,13 @@ final readonly class GameRulesetPublisher
             $snapshot['loot']['version'] = $settings->lootVersion();
         }
         self::validate($snapshot);
+        foreach ($enemies as $enemy) {
+            foreach ([$enemy->getIdleImagePath(), $enemy->getAttackImagePath(), $enemy->getHitImagePath()] as $path) {
+                if (null !== $path && !is_file($this->gameImageDirectory.\DIRECTORY_SEPARATOR.$path)) {
+                    throw new LogicException('Les trois poses doivent être stockées avant leur publication.');
+                }
+            }
+        }
 
         $ruleset->publish($snapshot, GameRulesetVersion::of($snapshot));
         $manager->flush();
@@ -124,7 +131,7 @@ final readonly class GameRulesetPublisher
         ], $titles);
         $enemyRows = ['enemies' => [], 'bosses' => []];
         foreach ($enemies as $enemy) {
-            $row = ['key' => $enemy->getKey(), 'active' => $enemy->isActive(), 'hp' => $enemy->getHp(), 'damage' => $enemy->getDamage(), 'mitigation_permille' => $enemy->getMitigationPermille(), 'extra_turn_permille' => $enemy->getExtraTurnPermille(), 'dodge_permille' => $enemy->getDodgePermille(), 'translations' => $enemy->getTranslations()];
+            $row = ['key' => $enemy->getKey(), 'active' => $enemy->isActive(), 'hp' => $enemy->getHp(), 'damage' => $enemy->getDamage(), 'mitigation_permille' => $enemy->getMitigationPermille(), 'extra_turn_permille' => $enemy->getExtraTurnPermille(), 'dodge_permille' => $enemy->getDodgePermille(), 'translations' => $enemy->getTranslations(), 'image_paths' => null === $enemy->getIdleImagePath() && null === $enemy->getAttackImagePath() && null === $enemy->getHitImagePath() ? null : ['idle' => $enemy->getIdleImagePath(), 'attack' => $enemy->getAttackImagePath(), 'hit' => $enemy->getHitImagePath()]];
             if ($enemy->isBoss()) {
                 $row['minimum_level'] = $enemy->getMinimumLevel();
                 $enemyRows['bosses'][] = $row;
@@ -170,6 +177,36 @@ final readonly class GameRulesetPublisher
         /** @var list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout */ $workout = $snapshot['loot']['workout'];
         /** @var list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $adversary */ $adversary = $snapshot['loot']['adversary'];
         /** @var list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $chest */ $chest = $snapshot['loot']['chest'];
+        foreach (['enemies', 'bosses'] as $kind) {
+            $entries = $snapshot['combat'][$kind];
+            \assert(\is_array($entries));
+            foreach ($entries as $entry) {
+                \assert(\is_array($entry));
+                $paths = $entry['image_paths'] ?? null;
+                if (null !== $paths) {
+                    if (!\is_array($paths) || 3 !== \count($paths)) {
+                        throw new LogicException('Le pack doit contenir les trois poses.');
+                    }
+                    foreach (['idle', 'attack', 'hit'] as $pose) {
+                        if (!\is_string($paths[$pose] ?? null) || !preg_match('/^[a-f0-9]{40}(?:-[0-9]+|-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?\.(?:jpg|jpeg|png|webp)$/', $paths[$pose])) {
+                            throw new LogicException('Le pack doit contenir les trois poses avec des chemins d’images valides.');
+                        }
+                    }
+                }
+                $translations = $entry['translations'] ?? [];
+                \assert(\is_array($translations));
+                foreach ($translations as $translation) {
+                    \assert(\is_array($translation));
+                    $text = $translation['introduction'] ?? null;
+                    if (null !== $text && (!\is_string($text) || !mb_check_encoding($text, 'UTF-8') || mb_strlen($text, 'UTF-8') > 280)) {
+                        throw new LogicException('Le dialogue est limité à 280 caractères Unicode par langue.');
+                    }
+                    if (\is_string($text) && (strip_tags($text) !== $text || preg_match('/(?:\*\*|__|~~|`|!?\[[^\]]*\]\(|^\s{0,3}(?:#{1,6}\s|>\s|[-*+]\s|[0-9]+\.\s)|(?<!\w)[*_][^\r\n]+[*_](?!\w))/m', $text))) {
+                        throw new LogicException('Le dialogue doit être du texte brut, sans HTML ni Markdown.');
+                    }
+                }
+            }
+        }
         new ItemCatalog($items);
         new TitleCatalog($titles);
         new CombatRules($fighter['base_hp'], $fighter['hp_per_1000_vitality'], $fighter['base_damage'], $fighter['damage_per_1000_strength'], $fighter['mitigation_permille_per_1000_endurance'], $fighter['mitigation_cap_permille'], $fighter['extra_turn_permille_per_1000_dexterity'], $fighter['extra_turn_cap_permille'], $fighter['dodge_permille_per_1000_mobility'], $fighter['dodge_cap_permille'], $fighter['minimum_damage'], $fighter['max_turns']);

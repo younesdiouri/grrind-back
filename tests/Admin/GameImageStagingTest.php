@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Admin;
 
+use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Infrastructure\GameConfigurationReferenceGuard;
 use App\Admin\Infrastructure\GameRulesetPublisher;
@@ -128,6 +129,36 @@ final class GameImageStagingTest extends TestCase
         }
     }
 
+    public function testAllEnemyPosesAreCompensatedWithoutRemovingPreviouslyPublishedFiles(): void
+    {
+        $directory = $this->temporaryDirectory();
+        try {
+            $controller = $this->controller($directory);
+            $enemy = new GameEnemy();
+            $old = str_repeat('a', 40).'.png';
+            file_put_contents($directory.'/'.$old, 'old');
+            $names = [];
+            foreach (['Idle', 'Attack', 'Hit'] as $index => $pose) {
+                $name = str_repeat((string) ($index + 1), 40).'.png';
+                $names[] = $name;
+                $enemy->{'set'.$pose.'ImagePath'}($name);
+                file_put_contents($controller->staging().'/'.$name, 'new');
+            }
+            $controller->publishImage($enemy);
+            foreach ($names as $name) {
+                self::assertFileExists($directory.'/'.$name);
+            }
+            $controller->compensate($enemy, [$old]);
+            foreach ($names as $name) {
+                self::assertFileDoesNotExist($directory.'/'.$name);
+                self::assertFileDoesNotExist($controller->staging().'/'.$name);
+            }
+            self::assertFileExists($directory.'/'.$old);
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
     private function controller(string $directory): ImageStagingCrudController
     {
         return new ImageStagingCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter())), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), $directory);
@@ -177,12 +208,13 @@ final class ImageStagingCrudController extends GameCrudController
         return $this->stagingImageDirectory();
     }
 
-    public function publishImage(GameItem $item): void
+    public function publishImage(GameItem|GameEnemy $item): void
     {
         $this->finalizeStagedImage($item);
     }
 
-    public function compensate(GameItem $item, string $previous): void
+    /** @param string|list<string> $previous */
+    public function compensate(GameItem|GameEnemy $item, string|array $previous): void
     {
         $this->compensateImage($item, $previous);
     }

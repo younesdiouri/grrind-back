@@ -38,16 +38,19 @@ use DateTimeInterface;
  */
 final readonly class BattleResource
 {
+    /** @param array{idle: string, attack: string, hit: string}|null $imageUrls */
     private function __construct(
         private Battle $battle,
         private string $enemyName,
         private ?ItemImageUrlResolver $items,
+        private ?array $imageUrls,
+        private ?string $introduction,
     ) {
     }
 
     public static function from(Battle $battle, EnemyTranslator $translator, ?ItemImageUrlResolver $items = null): self
     {
-        return new self($battle, $translator->nameOf($battle->enemySnapshot()['key']), $items);
+        return new self($battle, $translator->nameOf($battle->enemySnapshot()['key']), $items, $translator->imageUrlsOf($battle->enemySnapshot()['key']), $translator->introductionOf($battle->enemySnapshot()['key']));
     }
 
     /**
@@ -69,6 +72,7 @@ final readonly class BattleResource
             'enemy' => array_merge(
                 ['key' => $enemySnapshot['key'], 'name' => $this->enemyName],
                 FighterResource::from($enemySnapshot['fighter'])->toArray(),
+                ['imageUrls' => $this->imageUrls, 'introduction' => $this->introduction],
             ),
             'events' => BattleEventResource::listOf($this->battle->timeline()),
             'rewards' => $this->rewards(),

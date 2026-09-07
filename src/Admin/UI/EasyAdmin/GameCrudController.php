@@ -17,7 +17,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
-use EasyCorp\Bundle\EasyAdminBundle\Dto\CrudDto;
 use EasyCorp\Bundle\EasyAdminBundle\Exception\EntityRemoveException;
 use InvalidArgumentException;
 use LogicException;
@@ -32,8 +31,11 @@ use Throwable;
 /** @extends AbstractCrudController<object> */
 abstract class GameCrudController extends AbstractCrudController
 {
-    /** Le fichier final réellement promu, pour ne jamais effacer une collision déjà publiée. */
-    private ?string $promotedImage = null;
+    /** @var list<string> Fichiers promus par cette tentative uniquement. */
+    private array $promotedImages = [];
+
+    /** @var FormInterface<mixed>|null */
+    private ?FormInterface $submittedForm = null;
 
     public function __construct(private readonly GameRulesetPublisher $publisher, private readonly GameConfigurationReferenceGuard $references, protected readonly string $gameImageDirectory, private readonly ?ManagerRegistry $doctrine = null)
     {
@@ -47,16 +49,14 @@ abstract class GameCrudController extends AbstractCrudController
     /** @param AdminContext<object> $context */
     public function new(AdminContext $context): KeyValueStore|Response
     {
+        $this->submittedForm = null;
         try {
             $response = parent::new($context);
             $this->compensateInvalidFormImage($response, $context, null);
 
             return $response;
         } catch (BadRequestHttpException $exception) {
-            $crud = $context->getCrud();
-            \assert($crud instanceof CrudDto);
-            $form = $this->createNewForm($context->getEntity(), $crud->getNewFormOptions(), $context);
-            $form->handleRequest($context->getRequest());
+            $form = $this->failedForm();
             $form->addError(new FormError($exception->getMessage()));
             $this->addFlash('danger', $exception->getMessage());
 
@@ -72,18 +72,16 @@ abstract class GameCrudController extends AbstractCrudController
     /** @param AdminContext<object> $context */
     public function edit(AdminContext $context): KeyValueStore|Response
     {
+        $this->submittedForm = null;
         $original = $context->getEntity()->getInstance();
-        $oldImage = $original instanceof GameItem ? $original->getImagePath() : null;
+        $oldImage = $this->imagePaths($original);
         try {
             $response = parent::edit($context);
             $this->compensateInvalidFormImage($response, $context, $oldImage);
 
             return $response;
         } catch (BadRequestHttpException $exception) {
-            $crud = $context->getCrud();
-            \assert($crud instanceof CrudDto);
-            $form = $this->createEditForm($context->getEntity(), $crud->getEditFormOptions(), $context);
-            $form->handleRequest($context->getRequest());
+            $form = $this->failedForm();
             $form->addError(new FormError($exception->getMessage()));
             $this->addFlash('danger', $exception->getMessage());
 
@@ -110,7 +108,7 @@ abstract class GameCrudController extends AbstractCrudController
 
     public function persistEntity(EntityManagerInterface $entityManager, object $entityInstance): void
     {
-        $this->promotedImage = null;
+        $this->promotedImages = [];
         try {
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
                 $entityManager->persist($entityInstance);
@@ -119,7 +117,7 @@ abstract class GameCrudController extends AbstractCrudController
                 $this->publisher->publish($entityManager);
             });
             $this->publisher->invalidateAfterCommit();
-            $this->promotedImage = null;
+            $this->promotedImages = [];
         } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             $this->compensateImage($entityInstance, null);
             // Retourner ferait croire à EasyAdmin que l'écriture a réussi et déclencherait
@@ -133,10 +131,14 @@ abstract class GameCrudController extends AbstractCrudController
 
     public function updateEntity(EntityManagerInterface $entityManager, object $entityInstance): void
     {
-        $this->promotedImage = null;
+        $this->promotedImages = [];
         $original = $entityManager->getUnitOfWork()->getOriginalEntityData($entityInstance);
-        $oldImage = $original['imagePath'] ?? null;
-        \assert(null === $oldImage || \is_string($oldImage));
+        $oldImage = [];
+        foreach (['imagePath', 'idleImagePath', 'attackImagePath', 'hitImagePath'] as $field) {
+            if (\is_string($original[$field] ?? null)) {
+                $oldImage[] = $original[$field];
+            }
+        }
         try {
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
                 $this->references->lockForMutation($entityInstance);
@@ -145,7 +147,7 @@ abstract class GameCrudController extends AbstractCrudController
                 $this->publisher->publish($entityManager);
             });
             $this->publisher->invalidateAfterCommit();
-            $this->promotedImage = null;
+            $this->promotedImages = [];
         } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             $this->compensateImage($entityInstance, $oldImage);
             throw new BadRequestHttpException($this->formError($exception), $exception);
@@ -215,6 +217,21 @@ abstract class GameCrudController extends AbstractCrudController
         return $this->redirectToRoute($context->getDashboardRouteName());
     }
 
+    /** @param FormInterface<mixed> $form Le formulaire soumis reste réaffichable après compensation des uploads déplacés. */
+    protected function processUploadedFiles(FormInterface $form): void
+    {
+        $root = null === $this->submittedForm;
+        $this->submittedForm ??= $form;
+        try {
+            parent::processUploadedFiles($form);
+        } catch (Throwable $exception) {
+            if ($root && \is_object($entity = $form->getData())) {
+                $this->compensateImage($entity, null);
+            }
+            throw $exception;
+        }
+    }
+
     /** Le staging n'est jamais servi ; une annulation ne peut donc pas publier d'image orpheline. */
     protected function stagingImageDirectory(): string
     {
@@ -229,54 +246,70 @@ abstract class GameCrudController extends AbstractCrudController
     /** Déplace l'upload hors de la zone publique seulement quand l'écriture va être publiée. */
     protected function finalizeStagedImage(object $entity): void
     {
-        if (!$entity instanceof GameItem || 'placeholder.png' === $entity->getImagePath()) {
-            return;
+        foreach ($this->imagePaths($entity) as $name) {
+            if ('placeholder.png' === $name) {
+                continue;
+            }
+            if (!preg_match('/^[a-f0-9]{40}(?:-[0-9]+|-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?\.(?:jpg|jpeg|png|webp)$/', $name)) {
+                throw new LogicException('Le nom de l’image envoyée est invalide.');
+            }
+            $staged = $this->stagingImageDirectory().\DIRECTORY_SEPARATOR.$name;
+            if (!is_file($staged)) {
+                continue;
+            }
+            $final = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;
+            if (is_file($final)) {
+                unlink($staged);
+                continue;
+            }
+            if (!rename($staged, $final)) {
+                throw new LogicException('Impossible de publier l’image envoyée.');
+            }
+            $this->promotedImages[] = $name;
         }
-        $name = $entity->getImagePath();
-        if (!preg_match('/^[a-f0-9]{40}(?:-[0-9]+|-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?\.(?:jpg|jpeg|png|webp)$/', $name)) {
-            throw new LogicException('Le nom de l’image envoyée est invalide.');
-        }
-        $staged = $this->stagingImageDirectory().\DIRECTORY_SEPARATOR.$name;
-        if (!is_file($staged)) {
-            return;
-        }
-        $final = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;
-        // Le hash de contenu peut naturellement désigner un fichier déjà publié. La collision
-        // est alors le même binaire attendu ; conserver l'ancien chemin protège ses snapshots.
-        if (is_file($final)) {
-            unlink($staged);
-
-            return;
-        }
-        if (!rename($staged, $final)) {
-            throw new LogicException('Impossible de publier l’image envoyée.');
-        }
-        $this->promotedImage = $name;
     }
 
-    /** Retire seulement le nouveau fichier déplacé par EasyAdmin avant notre transaction. */
-    protected function compensateImage(object $entity, ?string $previousPath): void
+    /** @param string|list<string>|null $previousPath */
+    protected function compensateImage(object $entity, string|array|null $previousPath): void
     {
-        if (!$entity instanceof GameItem || $entity->getImagePath() === $previousPath) {
-            return;
-        }
-        $name = $entity->getImagePath();
-        if ('placeholder.png' === $name || basename($name) !== $name) {
-            return;
-        }
-        // Une erreur de validation peut arriver avant la promotion : le staging est alors
-        // la seule trace du formulaire refusé et doit disparaître aussi.
-        $staged = $this->stagingImageDirectory().\DIRECTORY_SEPARATOR.$name;
-        if (is_file($staged)) {
-            unlink($staged);
-        }
-        if ($name === $this->promotedImage) {
-            $path = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;
-            if (is_file($path)) {
-                unlink($path);
+        $previous = \is_array($previousPath) ? $previousPath : [$previousPath];
+        foreach ($this->imagePaths($entity) as $name) {
+            if (\in_array($name, $previous, true) || 'placeholder.png' === $name || basename($name) !== $name) {
+                continue;
+            }
+            $staged = $this->stagingImageDirectory().\DIRECTORY_SEPARATOR.$name;
+            if (is_file($staged)) {
+                unlink($staged);
+            }
+            if (\in_array($name, $this->promotedImages, true)) {
+                $path = $this->gameImageDirectory.\DIRECTORY_SEPARATOR.$name;
+                if (is_file($path)) {
+                    unlink($path);
+                }
             }
         }
-        $this->promotedImage = null;
+        $this->promotedImages = [];
+    }
+
+    /** @return FormInterface<mixed> */
+    private function failedForm(): FormInterface
+    {
+        \assert($this->submittedForm instanceof FormInterface);
+
+        return $this->submittedForm;
+    }
+
+    /** @return list<string> */
+    private function imagePaths(?object $entity): array
+    {
+        if ($entity instanceof GameItem) {
+            return [$entity->getImagePath()];
+        }
+        if ($entity instanceof GameEnemy) {
+            return array_values(array_filter([$entity->getIdleImagePath(), $entity->getAttackImagePath(), $entity->getHitImagePath()], static fn (?string $path): bool => null !== $path));
+        }
+
+        return [];
     }
 
     /**
@@ -285,9 +318,10 @@ abstract class GameCrudController extends AbstractCrudController
      * est exécuté avant persistEntity/updateEntity : une erreur d'un autre champ ne laisse
      * jamais ce candidat dans .staging, et l'ancien fichier final d'un edit reste intact.
      *
-     * @param AdminContext<object> $context
+     * @param AdminContext<object>     $context
+     * @param string|list<string>|null $previousPath
      */
-    private function compensateInvalidFormImage(KeyValueStore|Response $response, AdminContext $context, ?string $previousPath): void
+    private function compensateInvalidFormImage(KeyValueStore|Response $response, AdminContext $context, string|array|null $previousPath): void
     {
         if (!$response instanceof KeyValueStore) {
             return;
@@ -297,7 +331,7 @@ abstract class GameCrudController extends AbstractCrudController
             return;
         }
         $entity = $context->getEntity()->getInstance();
-        if ($entity instanceof GameItem) {
+        if ($entity instanceof GameItem || $entity instanceof GameEnemy) {
             $this->compensateImage($entity, $previousPath);
         }
     }
