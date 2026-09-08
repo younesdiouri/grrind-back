@@ -50,15 +50,15 @@ final class ListBattlesTest extends ApiTestCase
 
     /**
      * La décision du #209 : `result` n'a que deux valeurs, y compris pour un combat que
-     * `max_turns` a interrompu sans KO — le meilleur ratio de PV tranche, un match nul n'a pas
-     * de mise en scène. Fabriqué exprès, `turns` au plafond du catalogue DB publié.
+     * `max_attacks` a interrompu sans KO — le meilleur ratio de PV tranche, un match nul n'a pas
+     * de mise en scène. Fabriqué exprès, `attackCount` au plafond du catalogue DB publié.
      */
     public function testEveryEntryCarriesAResultEvenOneConcludedByMaxTurns(): void
     {
         $bob = $this->openAccount();
 
         $this->recordBattle($bob, new DateTimeImmutable('2026-07-15T08:00:00+00:00'), BattleResult::Victory);
-        $this->recordBattle($bob, new DateTimeImmutable('2026-07-14T08:00:00+00:00'), BattleResult::Defeat, turns: 200);
+        $this->recordBattle($bob, new DateTimeImmutable('2026-07-14T08:00:00+00:00'), BattleResult::Defeat, attackCount: 200);
 
         $battles = $this->history($bob)['battles'];
         self::assertCount(2, $battles);
@@ -70,7 +70,7 @@ final class ListBattlesTest extends ApiTestCase
 
         self::assertSame('VICTORY', $battles[0]['result']);
         self::assertSame('DEFEAT', $battles[1]['result']);
-        self::assertSame(200, $battles[1]['turns']);
+        self::assertSame(200, $battles[1]['attackCount']);
     }
 
     /**
@@ -193,7 +193,7 @@ final class ListBattlesTest extends ApiTestCase
         $battle = $this->history($bob)['battles'][0];
         self::assertIsArray($battle);
 
-        self::assertSame(['id', 'result', 'enemy', 'turns', 'foughtAt', 'rewards'], array_keys($battle));
+        self::assertSame(['id', 'result', 'enemy', 'attackCount', 'actionCount', 'elapsedTicks', 'endReason', 'algorithmVersion', 'foughtAt', 'rewards'], array_keys($battle));
 
         $enemy = $battle['enemy'];
         self::assertIsArray($enemy);

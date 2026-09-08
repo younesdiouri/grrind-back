@@ -49,13 +49,17 @@ final readonly class BattleSummaryResource
         return [
             'id' => $this->battle->id()->toRfc4122(),
             // Toujours VICTORY ou DEFEAT — voir le docblock de `BattleResult` : un combat se
-            // termine toujours avec un vainqueur, y compris quand `max_turns` l'interrompt.
+            // termine toujours avec un vainqueur, y compris quand `max_attacks` l'interrompt.
             'result' => $this->battle->result()->value,
             'enemy' => [
                 'key' => $this->battle->enemySnapshot()['key'],
                 'name' => $this->enemyName,
             ],
-            'turns' => $this->battle->turns(),
+            'attackCount' => $this->battle->attackCount(),
+            'actionCount' => $this->battle->actionCount(),
+            'elapsedTicks' => $this->battle->elapsedTicks(),
+            'endReason' => $this->battle->endReason()->value,
+            'algorithmVersion' => $this->battle->algorithmVersion(),
             'foughtAt' => $this->battle->foughtAt()->format(DateTimeInterface::ATOM),
             'rewards' => $this->rewards(),
         ];

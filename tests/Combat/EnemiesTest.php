@@ -44,7 +44,7 @@ final class EnemiesTest extends ApiTestCase
 
         $player = $payload['player'];
         self::assertIsArray($player);
-        self::assertSame(['hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'], array_keys($player));
+        self::assertSame(['hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent'], array_keys($player));
         self::assertGreaterThan(0, $player['hp'], 'Un compte neuf reçoit le socle nu, jamais un combattant mort — voir le docblock de `FighterFactory`.');
     }
 
@@ -59,7 +59,7 @@ final class EnemiesTest extends ApiTestCase
         $first = $entries[0];
         self::assertIsArray($first);
         self::assertSame(
-            ['key', 'name', 'minimumLevel', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent', 'imageUrls', 'introduction'],
+            ['key', 'name', 'minimumLevel', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction'],
             array_keys($first),
         );
     }

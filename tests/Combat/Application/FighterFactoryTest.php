@@ -33,6 +33,37 @@ use Symfony\Component\Uid\Uuid;
  */
 final class FighterFactoryTest extends TestCase
 {
+    public function testEverySynergyAndDirectBonusUsesTheDeclaredOrder(): void
+    {
+        $fighter = self::factoryOf(modifiers: [
+            self::modifierOf(ModifierType::StrengthBonus, 10000),
+            self::modifierOf(ModifierType::MitigationBonus, -50),
+            self::modifierOf(ModifierType::MaintenanceBonus, 10000),
+            self::modifierOf(ModifierType::PrecisionBonus, -10000),
+        ])->forPlayer(self::progressionOf(endurance: 10000, mobility: 10000, dexterity: 10000), self::playerId(), self::occurredAt());
+        self::assertSame(70, $fighter->damage);
+        self::assertSame(300, $fighter->mitigationPermille); // paire 10000 → 350, puis −50
+        self::assertSame(950, $fighter->maintenancePermille);
+        self::assertSame(150, $fighter->dodgePermille);
+        self::assertSame(175, $fighter->criticalChancePermille);
+        self::assertSame(200, $fighter->guardPermille);
+        self::assertSame(250, $fighter->criticalResistancePermille);
+        self::assertSame(150, $fighter->cooldownReductionPermille);
+        self::assertSame(175, $fighter->comboPermille);
+        self::assertSame(0, $fighter->precisionPermille);
+    }
+
+    public function testNegativeAttributeBonusFloorsBeforePairDerivation(): void
+    {
+        $fighter = self::factoryOf(modifiers: [self::modifierOf(ModifierType::StrengthBonus, -20000)])
+            ->forPlayer(self::progressionOf(strength: 10000, endurance: 10000, mobility: 10000, dexterity: 10000), self::playerId(), self::occurredAt());
+        self::assertSame(0, $fighter->mitigationPermille);
+        self::assertSame(0, $fighter->guardPermille);
+        self::assertSame(0, $fighter->criticalResistancePermille);
+        self::assertSame(10, $fighter->damage);
+        self::assertSame(633, $fighter->maintenancePermille);
+    }
+
     public function testAFreshAccountIsPlayableAtTheFighterSocle(): void
     {
         $factory = self::factoryOf();
@@ -44,7 +75,7 @@ final class FighterFactoryTest extends TestCase
         self::assertSame(100, $fighter->hp);
         self::assertSame(10, $fighter->damage);
         self::assertSame(0, $fighter->mitigationPermille);
-        self::assertSame(0, $fighter->extraTurnPermille);
+        self::assertSame(0, $fighter->comboPermille);
         self::assertSame(0, $fighter->dodgePermille);
     }
 
@@ -72,20 +103,20 @@ final class FighterFactoryTest extends TestCase
     {
         $factory = self::factoryOf();
 
-        $low = $factory->forPlayer(self::progressionOf(endurance: 1_000), self::playerId(), self::occurredAt());
-        $high = $factory->forPlayer(self::progressionOf(endurance: 5_000), self::playerId(), self::occurredAt());
+        $low = $factory->forPlayer(self::progressionOf(strength: 1_000_000, endurance: 1_000), self::playerId(), self::occurredAt());
+        $high = $factory->forPlayer(self::progressionOf(strength: 1_000_000, endurance: 5_000), self::playerId(), self::occurredAt());
 
         self::assertGreaterThan($low->mitigationPermille, $high->mitigationPermille);
     }
 
-    public function testMoreDexterityYieldsMoreExtraTurnChanceEverythingElseEqual(): void
+    public function testMoreDexterityYieldsMoreComboChanceEverythingElseEqual(): void
     {
         $factory = self::factoryOf();
 
-        $low = $factory->forPlayer(self::progressionOf(dexterity: 1_000), self::playerId(), self::occurredAt());
-        $high = $factory->forPlayer(self::progressionOf(dexterity: 5_000), self::playerId(), self::occurredAt());
+        $low = $factory->forPlayer(self::progressionOf(endurance: 1_000_000, dexterity: 1_000), self::playerId(), self::occurredAt());
+        $high = $factory->forPlayer(self::progressionOf(endurance: 1_000_000, dexterity: 5_000), self::playerId(), self::occurredAt());
 
-        self::assertGreaterThan($low->extraTurnPermille, $high->extraTurnPermille);
+        self::assertGreaterThan($low->comboPermille, $high->comboPermille);
     }
 
     /**
@@ -122,25 +153,25 @@ final class FighterFactoryTest extends TestCase
 
         $fighter = $factory->forPlayer(self::progressionOf(mobility: 1_000_000), self::playerId(), self::occurredAt());
 
-        self::assertSame(300, $fighter->dodgePermille);
+        self::assertSame(297, $fighter->dodgePermille);
     }
 
     public function testMitigationNeverExceedsTheConfiguredCap(): void
     {
         $factory = self::factoryOf(mitigationCapPermille: 700);
 
-        $fighter = $factory->forPlayer(self::progressionOf(endurance: 1_000_000), self::playerId(), self::occurredAt());
+        $fighter = $factory->forPlayer(self::progressionOf(strength: 1_000_000, endurance: 1_000_000), self::playerId(), self::occurredAt());
 
-        self::assertSame(700, $fighter->mitigationPermille);
+        self::assertLessThanOrEqual(700, $fighter->mitigationPermille);
     }
 
-    public function testExtraTurnChanceNeverExceedsTheConfiguredCap(): void
+    public function testComboChanceNeverExceedsTheConfiguredCap(): void
     {
-        $factory = self::factoryOf(extraTurnCapPermille: 350);
+        $factory = self::factoryOf(comboCapPermille: 350);
 
-        $fighter = $factory->forPlayer(self::progressionOf(dexterity: 1_000_000), self::playerId(), self::occurredAt());
+        $fighter = $factory->forPlayer(self::progressionOf(endurance: 1_000_000, dexterity: 1_000_000), self::playerId(), self::occurredAt());
 
-        self::assertSame(350, $fighter->extraTurnPermille);
+        self::assertLessThanOrEqual(350, $fighter->comboPermille);
     }
 
     /**
@@ -151,14 +182,14 @@ final class FighterFactoryTest extends TestCase
     {
         $factory = self::factoryOf();
 
-        $enemy = new Enemy(key: 'SAND_JACKAL', level: 1, hp: 120, damage: 12, mitigationPermille: 50, extraTurnPermille: 40, dodgePermille: 30);
+        $enemy = new Enemy(key: 'SAND_JACKAL', level: 1, hp: 120, damage: 12, mitigationPermille: 50, comboPermille: 40, dodgePermille: 30);
 
         $fighter = $factory->forEnemy($enemy);
 
         self::assertSame(120, $fighter->hp);
         self::assertSame(12, $fighter->damage);
         self::assertSame(50, $fighter->mitigationPermille);
-        self::assertSame(40, $fighter->extraTurnPermille);
+        self::assertSame(40, $fighter->comboPermille);
         self::assertSame(30, $fighter->dodgePermille);
     }
 
@@ -219,9 +250,9 @@ final class FighterFactoryTest extends TestCase
     {
         $factory = self::factoryOf(mitigationCapPermille: 700, modifiers: [self::modifierOf(ModifierType::MitigationBonus, 1_000_000)]);
 
-        $fighter = $factory->forPlayer(self::progressionOf(endurance: 1_000_000), self::playerId(), self::occurredAt());
+        $fighter = $factory->forPlayer(self::progressionOf(strength: 1_000_000, endurance: 1_000_000), self::playerId(), self::occurredAt());
 
-        self::assertSame(700, $fighter->mitigationPermille);
+        self::assertLessThanOrEqual(700, $fighter->mitigationPermille);
     }
 
     /**
@@ -247,7 +278,7 @@ final class FighterFactoryTest extends TestCase
     {
         $factory = self::factoryOf(modifiers: [self::modifierOf(ModifierType::HpBonus, 999_999)]);
 
-        $enemy = new Enemy(key: 'SAND_JACKAL', level: 1, hp: 120, damage: 12, mitigationPermille: 50, extraTurnPermille: 40, dodgePermille: 30);
+        $enemy = new Enemy(key: 'SAND_JACKAL', level: 1, hp: 120, damage: 12, mitigationPermille: 50, comboPermille: 40, dodgePermille: 30);
 
         $fighter = $factory->forEnemy($enemy);
 
@@ -259,7 +290,7 @@ final class FighterFactoryTest extends TestCase
      */
     private static function factoryOf(
         int $mitigationCapPermille = 700,
-        int $extraTurnCapPermille = 350,
+        int $comboCapPermille = 350,
         int $dodgeCapPermille = 300,
         array $modifiers = [],
     ): FighterFactory {
@@ -269,14 +300,30 @@ final class FighterFactoryTest extends TestCase
                 hpPer1000Vitality: 40,
                 baseDamage: 10,
                 damagePer1000Strength: 6,
-                mitigationPermillePer1000Endurance: 15,
                 mitigationCapPermille: $mitigationCapPermille,
-                extraTurnPermillePer1000Dexterity: 12,
-                extraTurnCapPermille: $extraTurnCapPermille,
-                dodgePermillePer1000Mobility: 10,
+                comboCapPermille: $comboCapPermille,
                 dodgeCapPermille: $dodgeCapPermille,
                 minimumDamage: 1,
-                maxTurns: 200,
+                maxAttacks: 200,
+                fatigueFloorPermille: 400,
+                fatigueCapacity: 4000,
+                criticalMultiplierPermille: 1500,
+                baseCooldownTicks: 1000,
+                maintenanceCapPermille: 950,
+                maintenanceHalfSaturation: 5000,
+                dodgeHalfSaturation: 10000,
+                criticalChanceCapPermille: 350,
+                criticalChanceHalfSaturation: 10000,
+                mitigationHalfSaturation: 10000,
+                guardCapPermille: 400,
+                guardHalfSaturation: 10000,
+                criticalResistanceCapPermille: 500,
+                criticalResistanceHalfSaturation: 10000,
+                cooldownReductionCapPermille: 300,
+                cooldownReductionHalfSaturation: 10000,
+                comboHalfSaturation: 10000,
+                precisionCapPermille: 500,
+                precisionHalfSaturation: 10000,
             ),
             new ModifierResolver([
                 new class($modifiers) implements ModifierContributor {

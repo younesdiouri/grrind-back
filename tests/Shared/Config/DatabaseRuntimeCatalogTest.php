@@ -72,7 +72,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
                 return [
                     'items' => [],
                     'titles' => [],
-                    'combat' => ['fighter' => [], 'enemies' => [['key' => 'OLD_ENEMY']], 'bosses' => []],
+                    'combat' => ['fighter' => GameRulesetSeed::data()['fighter'], 'enemies' => [['key' => 'OLD_ENEMY']], 'bosses' => []],
                     'loot' => [
                         'version' => 7,
                         'loot_luck' => ['floor_percent' => 0, 'cap_percent' => 100],
@@ -509,10 +509,10 @@ final class DatabaseRuntimeCatalogTest extends TestCase
                         ['id' => 'active_title', 'active' => true, 'condition' => ['type' => 'session_count', 'threshold' => 1]],
                     ],
                     'combat' => [
-                        'fighter' => [],
+                        'fighter' => GameRulesetSeed::data()['fighter'],
                         'enemies' => [
-                            ['key' => 'OLD_ENEMY', 'active' => false, 'level' => 2, 'hp' => 1, 'damage' => 0, 'mitigation_permille' => 0, 'extra_turn_permille' => 0, 'dodge_permille' => 0],
-                            ['key' => 'ACTIVE_ENEMY', 'active' => true, 'level' => 1, 'hp' => 1, 'damage' => 0, 'mitigation_permille' => 0, 'extra_turn_permille' => 0, 'dodge_permille' => 0],
+                            ['key' => 'OLD_ENEMY', 'active' => false, 'level' => 2, 'hp' => 1, 'damage' => 0, 'mitigation_permille' => 0, 'combo_permille' => 0, 'dodge_permille' => 0],
+                            ['key' => 'ACTIVE_ENEMY', 'active' => true, 'level' => 1, 'hp' => 1, 'damage' => 0, 'mitigation_permille' => 0, 'combo_permille' => 0, 'dodge_permille' => 0],
                         ],
                         'bosses' => [],
                     ],

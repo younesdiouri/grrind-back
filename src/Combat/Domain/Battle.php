@@ -78,7 +78,7 @@ use Symfony\Component\Uid\Uuid;
  * la construction, sous la forme `{loot: [...], coins: {gained, before, after}}` — les
  * mêmes clés, dans le même ordre, que `RewardSummary` rend déjà pour un drop de séance, pour
  * que le client réutilise le composant qu'il a écrit. Une défaite ou une victoire tranchée
- * par `max_turns` sans KO portent `{loot: [], coins: {gained: 0, before: X, after: X}}` —
+ * par `max_attacks` sans KO portent `{loot: [], coins: {gained: 0, before: X, after: X}}` —
  * jamais une clé absente, voir le docblock de `App\Shared\Application\BattleDrop` pour
  * pourquoi le solde voyage même à gain nul.
  *
@@ -123,7 +123,7 @@ class Battle
      * Les quatre caractéristiques, la Vitality, et le `Fighter` qui en a été dérivé — voir
      * {@see playerSnapshotOf()}.
      *
-     * @var array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
+     * @var array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     #[ORM\Column(type: Types::JSONB)]
     private array $playerSnapshot;
@@ -132,7 +132,7 @@ class Battle
      * La clé de l'ennemi du catalogue, et son `Fighter` au moment du combat — voir
      * {@see enemySnapshotOf()}.
      *
-     * @var array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
+     * @var array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     #[ORM\Column(type: Types::JSONB)]
     private array $enemySnapshot;
@@ -175,15 +175,19 @@ class Battle
      * dérivable du dernier événement mais porté ici pour ne pas payer ce coût à l'affichage.
      */
     #[ORM\Column]
-    private int $turns;
+    private int $attackCount;
 
+    #[ORM\Column] private int $actionCount;
+    #[ORM\Column] private int $elapsedTicks;
+    #[ORM\Column(length: 16, enumType: BattleEndReason::class)] private BattleEndReason $endReason;
+    #[ORM\Column(length: 8)] private string $algorithmVersion = 'v2';
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $foughtAt;
 
     /**
-     * @param array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}} $playerSnapshot
-     * @param array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}                                                                                    $enemySnapshot
-     * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}                                                                                                                      $reward
+     * @param array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}} $playerSnapshot
+     * @param array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}                                                                                    $enemySnapshot
+     * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}                                                                                                                                                                                                                                                                                      $reward
      */
     private function __construct(
         Uuid $id,
@@ -209,7 +213,10 @@ class Battle
         $this->reward = $reward;
         $this->seed = bin2hex($seed);
         $this->rulesetVersion = $rulesetVersion;
-        $this->turns = $outcome->turns;
+        $this->attackCount = $outcome->attackCount;
+        $this->actionCount = $outcome->actionCount;
+        $this->elapsedTicks = $outcome->elapsedTicks;
+        $this->endReason = $outcome->endReason;
         $this->foughtAt = $foughtAt;
     }
 
@@ -266,7 +273,7 @@ class Battle
     }
 
     /**
-     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
+     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     public function playerSnapshot(): array
     {
@@ -274,7 +281,7 @@ class Battle
     }
 
     /**
-     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
+     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     public function enemySnapshot(): array
     {
@@ -316,9 +323,29 @@ class Battle
         return $this->rulesetVersion;
     }
 
-    public function turns(): int
+    public function attackCount(): int
     {
-        return $this->turns;
+        return $this->attackCount;
+    }
+
+    public function actionCount(): int
+    {
+        return $this->actionCount;
+    }
+
+    public function elapsedTicks(): int
+    {
+        return $this->elapsedTicks;
+    }
+
+    public function endReason(): BattleEndReason
+    {
+        return $this->endReason;
+    }
+
+    public function algorithmVersion(): string
+    {
+        return $this->algorithmVersion;
     }
 
     public function foughtAt(): DateTimeImmutable
@@ -327,7 +354,7 @@ class Battle
     }
 
     /**
-     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
+     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     private static function playerSnapshotOf(AttributeGains $attributes, int $vitality, Fighter $fighter): array
     {
@@ -339,7 +366,7 @@ class Battle
     }
 
     /**
-     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}}
+     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     private static function enemySnapshotOf(Enemy $enemy, Fighter $fighter): array
     {
@@ -350,7 +377,7 @@ class Battle
     }
 
     /**
-     * @return array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int}
+     * @return array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}
      */
     private static function fighterToArray(Fighter $fighter): array
     {
@@ -358,8 +385,14 @@ class Battle
             'hp' => $fighter->hp,
             'damage' => $fighter->damage,
             'mitigationPermille' => $fighter->mitigationPermille,
-            'extraTurnPermille' => $fighter->extraTurnPermille,
+            'comboPermille' => $fighter->comboPermille,
             'dodgePermille' => $fighter->dodgePermille,
+            'maintenancePermille' => $fighter->maintenancePermille,
+            'criticalChancePermille' => $fighter->criticalChancePermille,
+            'guardPermille' => $fighter->guardPermille,
+            'criticalResistancePermille' => $fighter->criticalResistancePermille,
+            'cooldownReductionPermille' => $fighter->cooldownReductionPermille,
+            'precisionPermille' => $fighter->precisionPermille,
         ];
     }
 
@@ -383,18 +416,40 @@ class Battle
                 'damage' => $event->damage,
                 'mitigated' => $event->mitigated,
                 'targetHpRemaining' => $event->targetHpRemaining,
+                'critical' => $event->critical,
+                'guarded' => $event->guarded,
+                'powerPermille' => $event->powerPermille,
+                'baseDamage' => $event->baseDamage,
+                'fatiguedDamage' => $event->fatiguedDamage,
+                'criticalDamage' => $event->criticalDamage,
+                'guardReduction' => $event->guardReduction,
+                'minimumDamageAdded' => $event->minimumDamageAdded,
+                'atTick' => $event->atTick,
+                'actionIndex' => $event->actionIndex,
+                'attackIndex' => $event->attackIndex,
             ],
             $event instanceof Dodge => [
                 'type' => 'DODGE',
                 'attacker' => $event->attacker->value,
+                'powerPermille' => $event->powerPermille,
+                'atTick' => $event->atTick,
+                'actionIndex' => $event->actionIndex,
+                'attackIndex' => $event->attackIndex,
             ],
-            $event instanceof ExtraTurn => [
-                'type' => 'EXTRA_TURN',
+            $event instanceof Combo => [
+                'type' => 'COMBO',
                 'actor' => $event->actor->value,
+                'atTick' => $event->atTick,
+                'actionIndex' => $event->actionIndex,
+                'attackIndex' => $event->attackIndex,
             ],
             $event instanceof BattleFinished => [
                 'type' => 'BATTLE_FINISHED',
                 'result' => $event->result->value,
+                'endReason' => $event->endReason->value,
+                'atTick' => $event->atTick,
+                'actionCount' => $event->actionCount,
+                'attackCount' => $event->attackCount,
             ],
             // Fermé aux cinq formes de BattleEvent (#218 en ajoute une) : une sixième qui
             // arriverait sans mapping ici doit casser tout de suite, pas s'écrire

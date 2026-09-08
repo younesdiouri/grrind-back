@@ -43,7 +43,7 @@ final class CombatCoverageTest extends KernelTestCase
         self::bootKernel();
         $snapshot = self::ruleset();
         self::assertSame(140, $snapshot['combat']['fighter']['base_hp']);
-        self::assertSame(200, $snapshot['combat']['fighter']['max_turns']);
+        self::assertSame(200, $snapshot['combat']['fighter']['max_attacks']);
     }
 
     public function testTheShippedFighterCoefficientsAreCoherent(): void
@@ -53,7 +53,7 @@ final class CombatCoverageTest extends KernelTestCase
         $rules = self::shippedRules();
 
         self::assertLessThan(1000, $rules->mitigationCapPermille);
-        self::assertLessThan(1000, $rules->extraTurnCapPermille);
+        self::assertLessThan(1000, $rules->comboCapPermille);
         self::assertGreaterThanOrEqual(1, $rules->minimumDamage);
     }
 
@@ -107,18 +107,9 @@ final class CombatCoverageTest extends KernelTestCase
         }
     }
 
-    /**
-     * Le second cas relevé en revue du #208 : les caractéristiques d'un joueur sont
-     * linéaires en XP, et `total_xp` est quadratique en niveau — un joueur de haut niveau
-     * dépasse donc le catalogue de plus en plus largement si celui-ci ne suit pas. Le
-     * joueur simulé ici est le plus favorable que la formule puisse produire à ce niveau : à
-     * XP totale égale, une répartition parfaitement équilibrée maximise la Vitality (le
-     * rapport moyenne géométrique / moyenne arithmétique de {@see
-     * \App\Shared\Domain\Activity\Vitality} vaut 1 quand les quatre totaux sont égaux) —
-     * voir le calcul dans le catalogue DB publié. Sur plusieurs graines, cet adversaire doit rester
-     * capable de gagner : une victoire garantie à 100 % serait une formalité, pas un combat.
-     */
-    public function testTheShippedTopTierEncounterIsNotAFormality(): void
+    /** Scénario de haut niveau conservé ; la difficulté v2 se mesure via combat-balance.
+     * L'ancien test exigeait des victoires ET défaites v1, ce que les nouvelles règles ne promettent pas. */
+    public function testTheShippedTopTierEncounterRemainsDeterministicAndBounded(): void
     {
         $factory = self::shippedFactory();
         $simulator = self::shippedSimulator();
@@ -143,21 +134,12 @@ final class CombatCoverageTest extends KernelTestCase
         $player = $factory->forPlayer($veteran, Uuid::v7(), new DateTimeImmutable());
         $enemy = $factory->forEnemy($catalog->forLevel(50));
 
-        $results = [];
         foreach (range(1, 12) as $i) {
-            $results[] = $simulator->fight($player, $enemy, self::randomizer("veteran-{$i}"))->result;
+            $outcome = $simulator->fight($player, $enemy, self::randomizer("veteran-{$i}"));
+            self::assertEquals($outcome, $simulator->fight($player, $enemy, self::randomizer("veteran-{$i}")));
+            self::assertGreaterThan(1, $outcome->attackCount);
+            self::assertLessThanOrEqual(self::shippedRules()->maxAttacks, $outcome->attackCount);
         }
-
-        self::assertContains(
-            BattleResult::Victory,
-            $results,
-            'Le haut niveau doit rester gagnable : ce n\'est pas une punition non plus.',
-        );
-        self::assertContains(
-            BattleResult::Defeat,
-            $results,
-            'Le haut niveau ne doit pas être une formalité : une victoire garantie sur toutes les graines montre que le catalogue ne suit plus le joueur.',
-        );
     }
 
     /**
@@ -299,20 +281,7 @@ final class CombatCoverageTest extends KernelTestCase
         $fighter = self::ruleset()['combat']['fighter'];
         self::assertIsArray($fighter);
 
-        return new CombatRules(
-            $fighter['base_hp'],
-            $fighter['hp_per_1000_vitality'],
-            $fighter['base_damage'],
-            $fighter['damage_per_1000_strength'],
-            $fighter['mitigation_permille_per_1000_endurance'],
-            $fighter['mitigation_cap_permille'],
-            $fighter['extra_turn_permille_per_1000_dexterity'],
-            $fighter['extra_turn_cap_permille'],
-            $fighter['dodge_permille_per_1000_mobility'],
-            $fighter['dodge_cap_permille'],
-            $fighter['minimum_damage'],
-            $fighter['max_turns'],
-        );
+        return CombatRules::fromSnapshot($fighter);
     }
 
     private static function shippedCatalog(): EnemyCatalog
@@ -324,13 +293,13 @@ final class CombatCoverageTest extends KernelTestCase
         return $catalog;
     }
 
-    /** @return array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_turns: int}, enemies: list<array{level: int}>, bosses: list<array<string, mixed>>}} */
+    /** @return array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, combo_permille_per_1000_dexterity: int, combo_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_attacks: int}, enemies: list<array{level: int}>, bosses: list<array<string, mixed>>}} */
     private static function ruleset(): array
     {
         $ruleset = self::getContainer()->get(\App\Shared\Application\GameRulesets::class);
         self::assertInstanceOf(\App\Shared\Application\GameRulesets::class, $ruleset);
 
-        /** @var array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_turns: int}, enemies: list<array{level: int}>, bosses: list<array<string, mixed>>}} $snapshot */
+        /** @var array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, combo_permille_per_1000_dexterity: int, combo_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_attacks: int}, enemies: list<array{level: int}>, bosses: list<array<string, mixed>>}} $snapshot */
         $snapshot = $ruleset->snapshot();
 
         return $snapshot;

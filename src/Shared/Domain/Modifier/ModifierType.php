@@ -68,13 +68,13 @@ enum ModifierType: string
      */
     case StrengthBonus = 'STRENGTH_BONUS';
 
-    /** Même geste que `StrengthBonus`, avant dérivation en mitigation. */
+    /** Même geste que `StrengthBonus`, avant dérivation en résistance à la fatigue et synergies. */
     case EnduranceBonus = 'ENDURANCE_BONUS';
 
     /** Même geste que `StrengthBonus`, avant dérivation en esquive. */
     case MobilityBonus = 'MOBILITY_BONUS';
 
-    /** Même geste que `StrengthBonus`, avant dérivation en tour supplémentaire. */
+    /** Même geste que `StrengthBonus`, avant dérivation en critique et synergies. */
     case DexterityBonus = 'DEXTERITY_BONUS';
 
     /**
@@ -94,9 +94,21 @@ enum ModifierType: string
      */
     case MitigationBonus = 'MITIGATION_BONUS';
 
-    /** Même geste que `MitigationBonus`, plafonné par `extra_turn_cap_permille`. */
-    case ExtraTurnBonus = 'EXTRA_TURN_BONUS';
+    /** Même geste que `MitigationBonus`, plafonné par `combo_cap_permille`. */
+    case ComboBonus = 'COMBO_BONUS';
 
     /** Même geste que `MitigationBonus`, plafonné par `dodge_cap_permille`. */
     case DodgeBonus = 'DODGE_BONUS';
+
+    case MaintenanceBonus = 'MAINTENANCE_BONUS';
+
+    case CriticalChanceBonus = 'CRITICAL_CHANCE_BONUS';
+
+    case GuardBonus = 'GUARD_BONUS';
+
+    case CriticalResistanceBonus = 'CRITICAL_RESISTANCE_BONUS';
+
+    case CooldownReductionBonus = 'COOLDOWN_REDUCTION_BONUS';
+
+    case PrecisionBonus = 'PRECISION_BONUS';
 }

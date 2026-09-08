@@ -17,7 +17,7 @@ use Symfony\Component\Uid\Uuid;
  * **Seule une victoire rapporte, et cette classe ne repose pas la question à côté.**
  * `$victory` porte le verdict — calculé une fois par {@see \App\Combat\Application\FightBattleHandler}
  * depuis `BattleResult::Victory === $outcome->result` — et l'implémentation le lit plutôt
- * que d'en déduire un second de son côté : une défaite, ou une victoire par `max_turns`
+ * que d'en déduire un second de son côté : une défaite, ou une victoire par `max_attacks`
  * sans KO, ne tirent rien, exactement comme {@see WorkoutSessionDrops} lit `$reward->reason`
  * sans reposer la question de savoir si une séance crédite. Une récompense de consolation
  * ferait du combat perdu la stratégie optimale, puisqu'il est plus rapide à jouer.

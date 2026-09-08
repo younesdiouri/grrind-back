@@ -233,7 +233,7 @@ final class GameCrudHttpTest extends ApiTestCase
             'GameEnemy[hp]' => '100',
             'GameEnemy[damage]' => '1',
             'GameEnemy[mitigationPermille]' => '0',
-            'GameEnemy[extraTurnPermille]' => '0',
+            'GameEnemy[comboPermille]' => '0',
             'GameEnemy[dodgePermille]' => '0',
             'GameEnemy[translations][fr][name]' => 'Ennemi HTTP',
             'GameEnemy[translations][en][name]' => 'HTTP enemy',

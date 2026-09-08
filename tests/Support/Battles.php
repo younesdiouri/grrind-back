@@ -38,7 +38,7 @@ trait Battles
         Account $account,
         DateTimeImmutable $foughtAt,
         BattleResult $result = BattleResult::Victory,
-        int $turns = 3,
+        int $attackCount = 3,
         string $enemyKey = 'SAND_JACKAL',
         array $reward = ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
     ): string {
@@ -56,7 +56,7 @@ trait Battles
             new BattleOutcome(
                 $result,
                 [new BattleStarted(140, 120), new BattleFinished($result)],
-                $turns,
+                $attackCount,
             ),
             $reward,
             random_bytes(32),

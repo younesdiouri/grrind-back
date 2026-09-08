@@ -579,48 +579,44 @@ Ce qui compte, et qui n'est pas visible dans le code parce que c'est le framewor
 
 ---
 
-## 6. La balance du jeu est du code, pas de la donnée
+## 6. La balance du jeu est versionnée et publiée
 
-Courbe de niveaux, barème d'XP et garde-fous restent en YAML versionné sous
-`config/game/v1/`, **lus une seule fois à la compilation du conteneur**. Le catalogue
-d'items, loot, titres et combat est le snapshot publié en base, administré dans EasyAdmin.
+Les catalogues et réglages vivent dans les tables administrables `game_*`. Le runtime
+lit uniquement le snapshot publié, validé par les objets de domaine et identifié par
+une empreinte canonique commune à l'écriture et à la lecture. Une requête garde sa
+révision ; les traductions et images sont exclues de l'empreinte de gameplay.
 
-```mermaid
-flowchart TB
-    subgraph yaml["config/game/v1/ — versionné, relu en PR"]
-        y1["training.yaml"]
-        y2["xp.yaml"]
-        y3["levels.yaml"]
-        y4["autres YAML gameplay"]
-    end
+### Combat v2 (#269)
 
-    yaml --> pass["<b>GameBalancePass</b><br/><i>compilation du conteneur</i>"]
-    schema["un schéma par fichier,<br/>dans le module qui le lit"] --> pass
+`FighterFactory` applique les bonus d'attribut, dérive les effets puis ajoute les bonus
+directs et les plafonne. Les six paires valent `floor(sqrt(a*b))` ; les chances suivent
+`floor(cap*score/(score+half_saturation))`. `CombatMath` garde les calculs entiers même
+quand le produit intermédiaire dépasserait PHP_INT_MAX ; une sortie non représentable
+est refusée. Les seuils, caps, fatigue, multiplicateur critique et cadence sont publiés
+avec les réglages, jamais chargés d'un YAML.
 
-    pass -->|"valide, ou casse le build"| params["paramètres scalaires<br/>game.xp.disciplines …"]
-    pass -->|"SHA-256 de la config normalisée"| version["rulesetVersion<br/>v1-fe4edd019948"]
+`BattleSimulator` est pur et reçoit son `Randomizer`. Chaque action régulière résout sa
+chaîne de Combo au même tick virtuel, puis reprogramme seulement son acteur. Les égalités
+de date alternent la priorité, joueur d'abord. `HitResolver` suit esquive, puis fatigue,
+critique, mitigation, Guard et minimum de dégâts, en tronquant chaque étape. Précision et
+résistance critique réduisent relativement les probabilités adverses. Toute tentative,
+même esquivée, avance la fatigue personnelle. Guard divise les dégâts restants par deux.
 
-    params --> ruleset["<b>GameRulesets</b><br/>YAML restant + snapshot DB publié"]
-    ruleset --> objs["objets typés du domaine<br/>XpRates · LevelCurve · TitleCatalog<br/>DiminishingReturns · TrainingRules"]
-    version --> ruleset
-    ruleset --> tx["version hybride stockée sur les faits"]
+`attackCount` inclut toutes les tentatives ; `actionCount` compte les actions régulières ;
+`elapsedTicks` est la date de la dernière tentative. `maxAttacks` borne le combat, y compris
+face à un RNG qui déclenche toujours le Combo. À limite, le ratio de PV tranche, joueur
+gagnant en cas d'égalité. Le loot exige une victoire par KO. La timeline, les combattants
+résolus, la graine, la version publiée et `algorithmVersion=v2` sont persistés ensemble.
+L'historique affiche la timeline enregistrée sans simulation.
 
-    trad["traductions DB FR/EN"] -.->|"hors du hash — les mots<br/>ne sont pas de l'équilibrage"| objs
-```
+La migration de développement supprime uniquement les combats v1 et leurs réponses
+idempotentes identifiées par UUID/propriétaire, sans cascade sur les causes de loot,
+inventaires ou monnaies. Brouillons et snapshot publié sont convertis séparément ; le
+hash est recomposé et la révision incrémentée. `make combat-balance SAMPLES=100` mesure
+les 11 profils sur trois budgets, duels inversés et symétriques compris, et les douze
+graines du scénario historique de haut niveau. Ces chiffres sont une calibration de
+développement, pas une garantie d'équilibre.
 
-**Trois conséquences voulues :**
-
-- **Un YAML incohérent casse le build**, pas la première requête d'un joueur. En mode worker
-  FrankenPHP, aucune requête ne rouvre jamais un fichier.
-- **Un fichier posé là sans schéma casse aussi le build.** Sinon ce serait du réglage que
-  personne ne lit et que rien ne valide : le silence complet.
-- **Le `rulesetVersion` est stocké avec chaque montant d'XP.** On peut donc rééquilibrer sans
-  corrompre l'historique : une transaction dit sous quelles règles elle a été accordée. Une
-  annulation reprend la version du crédit qu'elle annule — recalculer aux règles courantes ferait
-  de chaque rééquilibrage une redistribution silencieuse.
-
-Le hash porte sur la configuration **normalisée**, défauts appliqués : reformater un YAML ne
-date pas un rééquilibrage, mais un défaut de schéma qui bouge, si.
 
 ---
 

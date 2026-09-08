@@ -26,7 +26,7 @@ use Symfony\Component\Uid\Uuid;
  * partagée) ont déjà posé.
  *
  * **La liste ne porte jamais les timelines.** Un `Battle` complet peut compter deux cents
- * événements — `max_turns` vaut 200, et chaque tour en produit un ou deux. Vingt combats par
+ * événements — `max_attacks` vaut 200, et chaque tour en produit un ou deux. Vingt combats par
  * page, et la réponse deviendrait un mégaoctet de choses que personne ne regarde : on ne
  * rejoue pas vingt combats à la fois, on en choisit un. Chaque ligne est donc un
  * {@see Response\BattleSummaryResource}, et le client va chercher la

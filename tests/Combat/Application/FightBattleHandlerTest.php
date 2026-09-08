@@ -8,16 +8,21 @@ use App\Combat\Application\FightBattle;
 use App\Combat\Application\FightBattleHandler;
 use App\Combat\Application\FighterFactory;
 use App\Combat\Domain\Battle;
+use App\Combat\Domain\BattleEndReason;
 use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\EnemyCatalog;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
+use App\Shared\Application\BattleDrop;
+use App\Shared\Application\BattleDrops;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerProgression;
+use App\Shared\Application\PlayerProgressions;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Vitality;
+use App\Tests\Combat\CombatRulesFixture;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -70,6 +75,27 @@ final class FightBattleHandlerTest extends KernelTestCase
         $connection->executeStatement('TRUNCATE combat_battle');
     }
 
+    public function testVictoryAtAttackLimitCannotAwardLoot(): void
+    {
+        $container = self::getContainer();
+        $progressions = $container->get(PlayerProgressions::class);
+        $fighters = $container->get(FighterFactory::class);
+        $enemies = $container->get(EnemyCatalog::class);
+        $clock = $container->get(ClockInterface::class);
+        self::assertInstanceOf(PlayerProgressions::class, $progressions);
+        self::assertInstanceOf(FighterFactory::class, $fighters);
+        self::assertInstanceOf(EnemyCatalog::class, $enemies);
+        self::assertInstanceOf(ClockInterface::class, $clock);
+        $drops = $this->createMock(BattleDrops::class);
+        $drops->expects(self::once())->method('rollFor')->with(self::anything(), self::anything(), false, self::anything(), self::anything())->willReturn(BattleDrop::none(77));
+        $handler = new FightBattleHandler($progressions, $fighters, $enemies, new BattleSimulator(CombatRulesFixture::rules(['max_attacks' => 1])), $this->battles, $drops, $this->rulesetVersion, $clock);
+        $battle = $handler(new FightBattle(Uuid::v7()));
+        self::assertSame(BattleResult::Victory, $battle->result());
+        self::assertSame(BattleEndReason::AttackLimit, $battle->endReason());
+        self::assertSame(['loot' => [], 'coins' => ['gained' => 0, 'before' => 77, 'after' => 77]], $battle->reward());
+        self::assertSame('v2', $battle->algorithmVersion());
+    }
+
     public function testAFreshPlayerFightsAndTheBattleIsWritten(): void
     {
         $playerId = Uuid::v7();
@@ -78,7 +104,7 @@ final class FightBattleHandlerTest extends KernelTestCase
 
         self::assertSame($playerId->toRfc4122(), $battle->playerId()->toRfc4122());
         self::assertContains($battle->result(), [BattleResult::Victory, BattleResult::Defeat]);
-        self::assertGreaterThan(0, $battle->turns());
+        self::assertGreaterThan(0, $battle->attackCount());
 
         $this->entityManager->clear();
         $reloaded = $this->battles->find($battle->id());
@@ -174,7 +200,7 @@ final class FightBattleHandlerTest extends KernelTestCase
         self::assertInstanceOf(Battle::class, $secondReloaded);
 
         self::assertSame($firstReloaded->result(), $secondReloaded->result());
-        self::assertSame($firstReloaded->turns(), $secondReloaded->turns());
+        self::assertSame($firstReloaded->attackCount(), $secondReloaded->attackCount());
         self::assertSame($firstReloaded->timeline(), $secondReloaded->timeline());
         self::assertSame($firstReloaded->playerSnapshot(), $secondReloaded->playerSnapshot());
         self::assertSame($firstReloaded->enemySnapshot(), $secondReloaded->enemySnapshot());

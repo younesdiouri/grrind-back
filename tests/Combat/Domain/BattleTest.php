@@ -11,9 +11,9 @@ use App\Combat\Domain\BattleFinished;
 use App\Combat\Domain\BattleOutcome;
 use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleStarted;
+use App\Combat\Domain\Combo;
 use App\Combat\Domain\Dodge;
 use App\Combat\Domain\Enemy;
-use App\Combat\Domain\ExtraTurn;
 use App\Combat\Domain\Fighter;
 use App\Shared\Domain\Activity\AttributeGains;
 use DateTimeImmutable;
@@ -37,7 +37,7 @@ final class BattleTest extends TestCase
             [
                 'attributes' => ['strength' => 10, 'endurance' => 20, 'mobility' => 30, 'dexterity' => 40],
                 'vitality' => 500,
-                'fighter' => ['hp' => 150, 'damage' => 12, 'mitigationPermille' => 100, 'extraTurnPermille' => 50, 'dodgePermille' => 25],
+                'fighter' => ['hp' => 150, 'damage' => 12, 'mitigationPermille' => 100, 'comboPermille' => 50, 'dodgePermille' => 25, 'maintenancePermille' => 0, 'criticalChancePermille' => 0, 'guardPermille' => 0, 'criticalResistancePermille' => 0, 'cooldownReductionPermille' => 0, 'precisionPermille' => 0],
             ],
             $battle->playerSnapshot(),
         );
@@ -50,7 +50,7 @@ final class BattleTest extends TestCase
         self::assertSame(
             [
                 'key' => 'SAND_JACKAL',
-                'fighter' => ['hp' => 120, 'damage' => 10, 'mitigationPermille' => 50, 'extraTurnPermille' => 40, 'dodgePermille' => 20],
+                'fighter' => ['hp' => 120, 'damage' => 10, 'mitigationPermille' => 50, 'comboPermille' => 40, 'dodgePermille' => 20, 'maintenancePermille' => 0, 'criticalChancePermille' => 0, 'guardPermille' => 0, 'criticalResistancePermille' => 0, 'cooldownReductionPermille' => 0, 'precisionPermille' => 0],
             ],
             $battle->enemySnapshot(),
         );
@@ -67,7 +67,7 @@ final class BattleTest extends TestCase
             [
                 new BattleStarted(150, 120),
                 new Attack(Actor::Player, 12, 3, 108),
-                new ExtraTurn(Actor::Player),
+                new Combo(Actor::Player),
                 new Dodge(Actor::Player),
                 new Attack(Actor::Player, 12, 3, 96),
                 new BattleFinished(BattleResult::Victory),
@@ -78,11 +78,11 @@ final class BattleTest extends TestCase
         self::assertSame(
             [
                 ['type' => 'BATTLE_STARTED', 'playerHp' => 150, 'enemyHp' => 120],
-                ['type' => 'ATTACK', 'attacker' => 'PLAYER', 'damage' => 12, 'mitigated' => 3, 'targetHpRemaining' => 108],
-                ['type' => 'EXTRA_TURN', 'actor' => 'PLAYER'],
-                ['type' => 'DODGE', 'attacker' => 'PLAYER'],
-                ['type' => 'ATTACK', 'attacker' => 'PLAYER', 'damage' => 12, 'mitigated' => 3, 'targetHpRemaining' => 96],
-                ['type' => 'BATTLE_FINISHED', 'result' => 'VICTORY'],
+                ['type' => 'ATTACK', 'attacker' => 'PLAYER', 'damage' => 12, 'mitigated' => 3, 'targetHpRemaining' => 108, 'critical' => false, 'guarded' => false, 'powerPermille' => 1000, 'baseDamage' => 0, 'fatiguedDamage' => 0, 'criticalDamage' => 0, 'guardReduction' => 0, 'minimumDamageAdded' => 0, 'atTick' => 0, 'actionIndex' => 1, 'attackIndex' => 1],
+                ['type' => 'COMBO', 'actor' => 'PLAYER', 'atTick' => 0, 'actionIndex' => 1, 'attackIndex' => 1],
+                ['type' => 'DODGE', 'attacker' => 'PLAYER', 'powerPermille' => 1000, 'atTick' => 0, 'actionIndex' => 1, 'attackIndex' => 1],
+                ['type' => 'ATTACK', 'attacker' => 'PLAYER', 'damage' => 12, 'mitigated' => 3, 'targetHpRemaining' => 96, 'critical' => false, 'guarded' => false, 'powerPermille' => 1000, 'baseDamage' => 0, 'fatiguedDamage' => 0, 'criticalDamage' => 0, 'guardReduction' => 0, 'minimumDamageAdded' => 0, 'atTick' => 0, 'actionIndex' => 1, 'attackIndex' => 1],
+                ['type' => 'BATTLE_FINISHED', 'result' => 'VICTORY', 'endReason' => 'KO', 'atTick' => 0, 'actionCount' => 0, 'attackCount' => 0],
             ],
             $battle->timeline(),
         );
@@ -97,7 +97,7 @@ final class BattleTest extends TestCase
         $battle = self::battleOf(outcome: new BattleOutcome(BattleResult::Defeat, [new BattleStarted(1, 1)], 7));
 
         self::assertSame(BattleResult::Defeat, $battle->result());
-        self::assertSame(7, $battle->turns());
+        self::assertSame(7, $battle->attackCount());
     }
 
     /**

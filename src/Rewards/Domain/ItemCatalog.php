@@ -37,7 +37,7 @@ use InvalidArgumentException;
  *
  * `FighterFactory` traite les neuf types de combat ouverts au #224 (`STRENGTH_BONUS`,
  * `ENDURANCE_BONUS`, `MOBILITY_BONUS`, `DEXTERITY_BONUS`, `HP_BONUS`, `DAMAGE_BONUS`,
- * `MITIGATION_BONUS`, `EXTRA_TURN_BONUS`, `DODGE_BONUS`) comme globaux, sans jamais regarder
+ * `MITIGATION_BONUS`, `COMBO_BONUS`, `DODGE_BONUS`) comme globaux, sans jamais regarder
  * {@see \App\Shared\Domain\Modifier\Modifier::$discipline} — voir son docblock : « un combat
  * n'a lieu dans aucune discipline ». Écrire `{ type: STRENGTH_BONUS, value: 350, discipline:
  * RUNNING }` dans le snapshot publié produirait donc un objet qui s'applique **partout**, alors que
@@ -95,8 +95,14 @@ final class ItemCatalog
         ModifierType::HpBonus,
         ModifierType::DamageBonus,
         ModifierType::MitigationBonus,
-        ModifierType::ExtraTurnBonus,
+        ModifierType::ComboBonus,
         ModifierType::DodgeBonus,
+        ModifierType::MaintenanceBonus,
+        ModifierType::CriticalChanceBonus,
+        ModifierType::GuardBonus,
+        ModifierType::CriticalResistanceBonus,
+        ModifierType::CooldownReductionBonus,
+        ModifierType::PrecisionBonus,
     ];
 
     /** @var array<string, Item> */
