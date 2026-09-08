@@ -1,7 +1,7 @@
-name = "developer_terra"
+name = "developer"
 description = "Implémente un ticket GRRIND back de bout en bout en arrière-plan : code, tests, PHPStan, CS, Deptrac, commits, push et PR directe après QA réussie. À utiliser lorsque le ticket et son périmètre sont prêts. Ne fusionne jamais."
-model = "gpt-5.6-sol"
-model_reasoning_effort = "high"
+model = "gpt-6-astra"
+model_reasoning_effort = "low"
 sandbox_mode = "danger-full-access"
 
 developer_instructions = """
