@@ -17,7 +17,7 @@ namespace App\Shared\Application;
  * rejeu ou une écriture concurrente pourrait faire diverger `before + gained` du vrai solde
  * sans que personne ne le remarque.
  *
- * **Vide n'est pas absent.** {@see none()} produit la forme qu'une défaite, un `max_turns`
+ * **Vide n'est pas absent.** {@see none()} produit la forme qu'une défaite, un `max_attacks`
  * sans KO, ou un adversaire sans table dédiée doit quand même porter : aucun objet, aucun
  * gain, mais un solde réel et identique avant et après.
  */

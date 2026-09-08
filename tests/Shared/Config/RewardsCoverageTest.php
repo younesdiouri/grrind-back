@@ -212,24 +212,11 @@ final class RewardsCoverageTest extends KernelTestCase
     private static function shippedFighterFactory(array $modifiers = []): FighterFactory
     {
         self::bootKernel();
-        /** @var array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_turns: int}}} $snapshot */
+        /** @var array{combat: array{fighter: array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, combo_permille_per_1000_dexterity: int, combo_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_attacks: int}}} $snapshot */
         $snapshot = self::getContainer()->get(\App\Shared\Application\GameRulesets::class)->snapshot();
         $fighter = $snapshot['combat']['fighter'];
         self::assertIsArray($fighter);
-        $rules = new CombatRules(
-            $fighter['base_hp'],
-            $fighter['hp_per_1000_vitality'],
-            $fighter['base_damage'],
-            $fighter['damage_per_1000_strength'],
-            $fighter['mitigation_permille_per_1000_endurance'],
-            $fighter['mitigation_cap_permille'],
-            $fighter['extra_turn_permille_per_1000_dexterity'],
-            $fighter['extra_turn_cap_permille'],
-            $fighter['dodge_permille_per_1000_mobility'],
-            $fighter['dodge_cap_permille'],
-            $fighter['minimum_damage'],
-            $fighter['max_turns'],
-        );
+        $rules = CombatRules::fromSnapshot($fighter);
 
         return new FighterFactory($rules, new ModifierResolver([
             new class($modifiers) implements ModifierContributor {
@@ -256,9 +243,9 @@ final class RewardsCoverageTest extends KernelTestCase
     {
         return match ($type) {
             ModifierType::StrengthBonus => $fighter->damage,
-            ModifierType::EnduranceBonus => $fighter->mitigationPermille,
+            ModifierType::EnduranceBonus => $fighter->maintenancePermille,
             ModifierType::MobilityBonus => $fighter->dodgePermille,
-            ModifierType::DexterityBonus => $fighter->extraTurnPermille,
+            ModifierType::DexterityBonus => $fighter->criticalChancePermille,
             default => throw new LogicException(\sprintf('"%s" n\'est pas un bonus de caractéristique pure.', $type->value)),
         };
     }

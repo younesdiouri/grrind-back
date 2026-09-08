@@ -34,7 +34,7 @@ use Symfony\Component\Uid\Uuid;
  * ## Le pipeline, dans l'ordre
  *
  * 1. **le verdict** — `$victory` — voir le docblock du port pour pourquoi la question ne se
- *    repose pas ici : une défaite, ou une victoire par `max_turns` sans KO, arrête tout
+ *    repose pas ici : une défaite, ou une victoire par `max_attacks` sans KO, arrête tout
  *    avant le premier tirage, et {@see BattleDrop::none()} rend la forme vide sur le solde
  *    réel ;
  * 2. `random_bytes(32)` tire la graine **de ce combat**, jamais partagée avec la graine qui
@@ -81,7 +81,7 @@ final readonly class AdversaryBattleDrops implements BattleDrops
 
     public function rollFor(Uuid $playerId, string $enemyKey, bool $victory, Uuid $battleId, DateTimeImmutable $foughtAt): BattleDrop
     {
-        // Défaite, ou victoire tranchée par `max_turns` sans KO : aucun tirage — voir le
+        // Défaite, ou victoire tranchée par `max_attacks` sans KO : aucun tirage — voir le
         // docblock du port pour pourquoi cette classe se contente de lire le verdict que
         // `FightBattleHandler` lui a déjà rendu.
         if (!$victory) {

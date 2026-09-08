@@ -72,7 +72,7 @@ final class BattlePresentationHttpTest extends ApiTestCase
             self::assertIsArray($detail['enemy']);
             self::assertSame('Give up.', $detail['enemy']['introduction']);
             self::assertSame($expected, $detail['enemy']['imageUrls']);
-            foreach (['events', 'rewards', 'player', 'turns', 'result'] as $field) {
+            foreach (['events', 'rewards', 'player', 'attackCount', 'result'] as $field) {
                 self::assertEquals($created[$field], $detail[$field]);
             }
 

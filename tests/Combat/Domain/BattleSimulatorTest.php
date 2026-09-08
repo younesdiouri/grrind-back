@@ -12,8 +12,8 @@ use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\BattleStarted;
 use App\Combat\Domain\CombatRules;
+use App\Combat\Domain\Combo;
 use App\Combat\Domain\Dodge;
-use App\Combat\Domain\ExtraTurn;
 use App\Combat\Domain\Fighter;
 use PHPUnit\Framework\TestCase;
 use Random\Engine\Xoshiro256StarStar;
@@ -23,7 +23,7 @@ use Random\Randomizer;
  * Le moteur seul, sans base ni horloge : des `Fighter` et un `Randomizer` entrent, une
  * timeline sort. Ce qui se démontre ici n'est pas « ça marche sur un exemple », c'est que
  * la boucle **termine toujours** — voir le docblock de {@see BattleSimulator} pour ce que
- * l'esquive (#218) a changé à cette démonstration, `max_turns` en étant désormais le seul
+ * l'esquive (#218) a changé à cette démonstration, `max_attacks` en étant désormais le seul
  * garant dur — et que la timeline qu'elle produit est le contrat d'animation qu'elle
  * prétend être.
  */
@@ -32,10 +32,10 @@ final class BattleSimulatorTest extends TestCase
     public function testHigherDamageKillsInFewerAttacks(): void
     {
         $simulator = self::simulatorOf();
-        $enemy = self::fighterOf(hp: 100, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
+        $enemy = self::fighterOf(hp: 100, damage: 0, mitigationPermille: 0, comboPermille: 0);
 
-        $strong = self::fighterOf(hp: 500, damage: 50, mitigationPermille: 0, extraTurnPermille: 0);
-        $weak = self::fighterOf(hp: 500, damage: 10, mitigationPermille: 0, extraTurnPermille: 0);
+        $strong = self::fighterOf(hp: 500, damage: 50, mitigationPermille: 0, comboPermille: 0);
+        $weak = self::fighterOf(hp: 500, damage: 10, mitigationPermille: 0, comboPermille: 0);
 
         $attacksToKill = static fn (Fighter $player): int => \count(array_filter(
             $simulator->fight($player, $enemy, self::randomizer())->timeline,
@@ -48,13 +48,13 @@ final class BattleSimulatorTest extends TestCase
     public function testHigherMitigationReducesDamageTakenAndRespectsTheCap(): void
     {
         $simulator = self::simulatorOf();
-        $attacker = self::fighterOf(hp: 1000, damage: 100, mitigationPermille: 0, extraTurnPermille: 0);
+        $attacker = self::fighterOf(hp: 1000, damage: 100, mitigationPermille: 0, comboPermille: 0);
 
-        $undefended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
+        $undefended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, comboPermille: 0);
         // 699 : juste sous le plafond de 700 que `CombatRules` impose à la dérivation
         // (#210) — ce ticket-ci ne dérive rien, mais la valeur qu'il force ici est celle
         // que la config autorise réellement.
-        $heavilyDefended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 699, extraTurnPermille: 0);
+        $heavilyDefended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 699, comboPermille: 0);
 
         $firstHitOn = static fn (Fighter $defender): int => self::firstAttack(
             $simulator->fight($attacker, $defender, self::randomizer())->timeline,
@@ -62,44 +62,44 @@ final class BattleSimulatorTest extends TestCase
 
         self::assertSame(100, $firstHitOn($undefended));
         self::assertLessThan($firstHitOn($undefended), $firstHitOn($heavilyDefended));
-        // 100 - floor(100 * 699 / 1000) = 100 - 69 = 31 : la mitigation s'applique, mais
+        // floor(100 * (1000 - 699) / 1000) = 30 : la mitigation s'applique, mais
         // reste sous le dégât brut, jamais jusqu'à l'invulnérabilité.
-        self::assertSame(31, $firstHitOn($heavilyDefended));
+        self::assertSame(30, $firstHitOn($heavilyDefended));
     }
 
-    public function testAnExtraTurnPermilleOfOneThousandAlwaysProcs(): void
+    public function testAnComboPermilleOfOneThousandAlwaysProcs(): void
     {
-        $simulator = self::simulatorOf(maxTurns: 50);
+        $simulator = self::simulatorOf(maxAttacks: 50);
 
         // L'ennemi encaisse sans jamais mourir avant que le test ait pu observer plusieurs
         // tours supplémentaires d'affilée ; il ne riposte jamais, donc si le joueur ne
         // procait pas systématiquement, la main lui reviendrait et un `Attack` de l'ennemi
         // apparaîtrait dans la timeline.
-        $player = self::fighterOf(hp: 100, damage: 1, mitigationPermille: 0, extraTurnPermille: 1000);
-        $enemy = self::fighterOf(hp: 100_000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
+        $player = self::fighterOf(hp: 100, damage: 1, mitigationPermille: 0, comboPermille: 1000);
+        $enemy = self::fighterOf(hp: 100_000, damage: 0, mitigationPermille: 0, comboPermille: 0);
 
         $timeline = $simulator->fight($player, $enemy, self::randomizer())->timeline;
 
         $enemyAttacks = array_filter($timeline, static fn (BattleEvent $event): bool => $event instanceof Attack && Actor::Enemy === $event->attacker);
-        $extraTurns = array_filter($timeline, static fn (BattleEvent $event): bool => $event instanceof ExtraTurn);
+        $combos = array_filter($timeline, static fn (BattleEvent $event): bool => $event instanceof Combo);
 
         self::assertSame([], array_values($enemyAttacks));
-        self::assertNotSame([], array_values($extraTurns));
+        self::assertNotSame([], array_values($combos));
 
-        foreach ($extraTurns as $extraTurn) {
-            self::assertSame(Actor::Player, $extraTurn->actor);
+        foreach ($combos as $combo) {
+            self::assertSame(Actor::Player, $combo->actor);
         }
     }
 
-    public function testAnExtraTurnPermilleOfZeroNeverProcs(): void
+    public function testAnComboPermilleOfZeroNeverProcs(): void
     {
         $simulator = self::simulatorOf();
-        $player = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0);
-        $enemy = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0);
+        $player = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, comboPermille: 0);
+        $enemy = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, comboPermille: 0);
 
         $timeline = $simulator->fight($player, $enemy, self::randomizer())->timeline;
 
-        self::assertSame([], array_values(array_filter($timeline, static fn (BattleEvent $event): bool => $event instanceof ExtraTurn)));
+        self::assertSame([], array_values(array_filter($timeline, static fn (BattleEvent $event): bool => $event instanceof Combo)));
 
         // Sans jamais rejouer, la main alterne strictement : joueur, ennemi, joueur, ...
         $attackers = array_map(
@@ -108,27 +108,27 @@ final class BattleSimulatorTest extends TestCase
         );
         self::assertSame(Actor::Player, $attackers[0]);
         self::assertSame(Actor::Enemy, $attackers[1]);
-        self::assertSame(Actor::Player, $attackers[2]);
+        self::assertSame(Actor::Enemy, $attackers[2]);
     }
 
     /**
      * `dodgePermille` à 1000 (100 %) est refusé par `CombatRules`, mais {@see Fighter} ne
      * le réapplique pas — voir son docblock — précisément pour que ce test puisse forcer la
      * valeur : une cible qui esquive toujours n'encaisse jamais rien, et le combat ne se
-     * termine plus que par `max_turns`, devenu le seul garant dur (#218).
+     * termine plus que par `max_attacks`, devenu le seul garant dur (#218).
      */
     public function testADodgePermilleOfOneThousandAlwaysDodgesAndTheBattleEndsByMaxTurns(): void
     {
-        $simulator = self::simulatorOf(maxTurns: 10);
+        $simulator = self::simulatorOf(maxAttacks: 10);
         // Dégât nul des deux côtés : le seul dégât qui peut jamais s'appliquer vient du
         // plancher (`minimum_damage`), jamais assez pour achever qui que ce soit avant
-        // `max_turns` sur un point de vie aussi haut.
-        $player = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
-        $enemy = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 1000);
+        // `max_attacks` sur un point de vie aussi haut.
+        $player = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, comboPermille: 0);
+        $enemy = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, comboPermille: 0, dodgePermille: 1000);
 
         $outcome = $simulator->fight($player, $enemy, self::randomizer());
 
-        self::assertSame(10, $outcome->turns);
+        self::assertSame(10, $outcome->attackCount);
         self::assertSame(
             [],
             array_values(array_filter($outcome->timeline, static fn (BattleEvent $event): bool => $event instanceof Attack && Actor::Player === $event->attacker)),
@@ -139,8 +139,8 @@ final class BattleSimulatorTest extends TestCase
     public function testADodgePermilleOfZeroNeverAppearsInTheTimeline(): void
     {
         $simulator = self::simulatorOf();
-        $player = self::fighterOf(hp: 200, damage: 15, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 0);
-        $enemy = self::fighterOf(hp: 200, damage: 14, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 0);
+        $player = self::fighterOf(hp: 200, damage: 15, mitigationPermille: 0, comboPermille: 0, dodgePermille: 0);
+        $enemy = self::fighterOf(hp: 200, damage: 14, mitigationPermille: 0, comboPermille: 0, dodgePermille: 0);
 
         $timeline = $simulator->fight($player, $enemy, self::randomizer())->timeline;
 
@@ -155,9 +155,9 @@ final class BattleSimulatorTest extends TestCase
      */
     public function testDodgeIsRolledOnTheTargetsMobilityNotTheAttackers(): void
     {
-        $simulator = self::simulatorOf(maxTurns: 6);
-        $player = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 1000);
-        $enemy = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 0);
+        $simulator = self::simulatorOf(maxAttacks: 6);
+        $player = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, comboPermille: 0, dodgePermille: 1000);
+        $enemy = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, comboPermille: 0, dodgePermille: 0);
 
         $timeline = $simulator->fight($player, $enemy, self::randomizer())->timeline;
 
@@ -187,9 +187,9 @@ final class BattleSimulatorTest extends TestCase
      */
     public function testADodgedTurnRemovesNoHitPointAndHpNeverIncreases(): void
     {
-        $simulator = self::simulatorOf(maxTurns: 30);
-        $player = self::fighterOf(hp: 500, damage: 20, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 500);
-        $enemy = self::fighterOf(hp: 500, damage: 20, mitigationPermille: 0, extraTurnPermille: 0, dodgePermille: 500);
+        $simulator = self::simulatorOf(maxAttacks: 30);
+        $player = self::fighterOf(hp: 500, damage: 20, mitigationPermille: 0, comboPermille: 0, dodgePermille: 500);
+        $enemy = self::fighterOf(hp: 500, damage: 20, mitigationPermille: 0, comboPermille: 0, dodgePermille: 500);
 
         $outcome = $simulator->fight($player, $enemy, self::randomizer());
 
@@ -218,11 +218,11 @@ final class BattleSimulatorTest extends TestCase
     public function testAttackReportsTheAmountAbsorbedByMitigation(): void
     {
         $simulator = self::simulatorOf();
-        $attacker = self::fighterOf(hp: 1000, damage: 100, mitigationPermille: 0, extraTurnPermille: 0);
+        $attacker = self::fighterOf(hp: 1000, damage: 100, mitigationPermille: 0, comboPermille: 0);
 
-        $undefended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
+        $undefended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 0, comboPermille: 0);
         // 699 : juste sous le plafond de 700 que `CombatRules` impose à la dérivation (#210).
-        $defended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 699, extraTurnPermille: 0);
+        $defended = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 699, comboPermille: 0);
 
         $attackOn = static fn (Fighter $defender): Attack => self::firstAttack(
             $simulator->fight($attacker, $defender, self::randomizer())->timeline,
@@ -233,10 +233,10 @@ final class BattleSimulatorTest extends TestCase
         self::assertSame($attacker->damage, $undefendedHit->damage + $undefendedHit->mitigated);
 
         $defendedHit = $attackOn($defended);
-        // 100 - floor(100 * 699 / 1000) = 100 - 69 = 31 : l'absorbé est la différence
+        // floor(100 * (1000 - 699) / 1000) = 30 : l'absorbé est la différence
         // exacte entre le dégât brut et le dégât porté, tant que le plancher ne mord pas.
-        self::assertSame(69, $defendedHit->mitigated);
-        self::assertSame(31, $defendedHit->damage);
+        self::assertSame(70, $defendedHit->mitigated);
+        self::assertSame(30, $defendedHit->damage);
         self::assertSame($attacker->damage, $defendedHit->damage + $defendedHit->mitigated);
     }
 
@@ -249,14 +249,14 @@ final class BattleSimulatorTest extends TestCase
     public function testMitigatedDoesNotReconstituteRawDamageWhenTheFloorBites(): void
     {
         $simulator = self::simulatorOf(minimumDamage: 3);
-        $attacker = self::fighterOf(hp: 1000, damage: 4, mitigationPermille: 0, extraTurnPermille: 0);
-        $defender = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 999, extraTurnPermille: 0);
+        $attacker = self::fighterOf(hp: 1000, damage: 4, mitigationPermille: 0, comboPermille: 0);
+        $defender = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 999, comboPermille: 0);
 
         $hit = self::firstAttack($simulator->fight($attacker, $defender, self::randomizer())->timeline);
 
-        // reduction = floor(4 * 999 / 1000) = 3, donc un dégât porté de 4 - 3 = 1 sans
-        // plancher ; le plancher le remonte à 3, mais `mitigated` reste 3.
-        self::assertSame(3, $hit->mitigated);
+        // reduction = 4 - floor(4 * (1000 - 999) / 1000) = 4, donc un dégât porté de 4 - 3 = 1 sans
+        // plancher ; le plancher le remonte à 3, mais `mitigated` reste 4.
+        self::assertSame(4, $hit->mitigated);
         self::assertSame(3, $hit->damage);
         self::assertGreaterThan($attacker->damage, $hit->damage + $hit->mitigated);
     }
@@ -266,8 +266,8 @@ final class BattleSimulatorTest extends TestCase
         $simulator = self::simulatorOf(minimumDamage: 3);
         // Un dégât brut faible face à une mitigation lourde : sans plancher, la formule
         // rendrait un dégât nul et la cible ne mourrait jamais.
-        $attacker = self::fighterOf(hp: 1000, damage: 4, mitigationPermille: 0, extraTurnPermille: 0);
-        $defender = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 999, extraTurnPermille: 0);
+        $attacker = self::fighterOf(hp: 1000, damage: 4, mitigationPermille: 0, comboPermille: 0);
+        $defender = self::fighterOf(hp: 1000, damage: 0, mitigationPermille: 999, comboPermille: 0);
 
         $outcome = $simulator->fight($attacker, $defender, self::randomizer());
 
@@ -281,8 +281,8 @@ final class BattleSimulatorTest extends TestCase
     public function testTheBattleAlwaysEndsWithAResult(): void
     {
         $simulator = self::simulatorOf();
-        $player = self::fighterOf(hp: 100, damage: 15, mitigationPermille: 50, extraTurnPermille: 200);
-        $enemy = self::fighterOf(hp: 120, damage: 12, mitigationPermille: 60, extraTurnPermille: 150);
+        $player = self::fighterOf(hp: 100, damage: 15, mitigationPermille: 50, comboPermille: 200);
+        $enemy = self::fighterOf(hp: 120, damage: 12, mitigationPermille: 60, comboPermille: 150);
 
         $outcome = $simulator->fight($player, $enemy, self::randomizer());
 
@@ -295,8 +295,8 @@ final class BattleSimulatorTest extends TestCase
     public function testTheSameSeedProducesIdenticalTimelines(): void
     {
         $simulator = self::simulatorOf();
-        $player = self::fighterOf(hp: 200, damage: 15, mitigationPermille: 50, extraTurnPermille: 300);
-        $enemy = self::fighterOf(hp: 200, damage: 14, mitigationPermille: 40, extraTurnPermille: 250);
+        $player = self::fighterOf(hp: 200, damage: 15, mitigationPermille: 50, comboPermille: 300);
+        $enemy = self::fighterOf(hp: 200, damage: 14, mitigationPermille: 40, comboPermille: 250);
 
         $first = $simulator->fight($player, $enemy, self::randomizer('même graine'));
         $second = $simulator->fight($player, $enemy, self::randomizer('même graine'));
@@ -307,8 +307,8 @@ final class BattleSimulatorTest extends TestCase
     public function testTheTimelineIsInternallyConsistent(): void
     {
         $simulator = self::simulatorOf();
-        $player = self::fighterOf(hp: 150, damage: 20, mitigationPermille: 30, extraTurnPermille: 200);
-        $enemy = self::fighterOf(hp: 140, damage: 18, mitigationPermille: 20, extraTurnPermille: 150);
+        $player = self::fighterOf(hp: 150, damage: 20, mitigationPermille: 30, comboPermille: 200);
+        $enemy = self::fighterOf(hp: 140, damage: 18, mitigationPermille: 20, comboPermille: 150);
 
         $outcome = $simulator->fight($player, $enemy, self::randomizer());
 
@@ -336,7 +336,7 @@ final class BattleSimulatorTest extends TestCase
         self::assertSame($enemyHpTrail, self::sortedDescending($enemyHpTrail));
         self::assertSame($playerHpTrail, self::sortedDescending($playerHpTrail));
 
-        // KO normal (pas de `max_turns` ici) : l'un des deux trails finit à zéro, et
+        // KO normal (pas de `max_attacks` ici) : l'un des deux trails finit à zéro, et
         // `battle_finished` désigne l'autre comme vainqueur.
         $last = $outcome->timeline[\count($outcome->timeline) - 1];
         self::assertInstanceOf(BattleFinished::class, $last);
@@ -351,17 +351,17 @@ final class BattleSimulatorTest extends TestCase
     public function testMaxTurnsReachedStillProducesAWinner(): void
     {
         // Deux tanks qui ne peuvent pas s'achever en trois tours : la boucle sort par
-        // `max_turns`, pas par un KO, et doit tout de même rendre un vainqueur.
-        $simulator = self::simulatorOf(maxTurns: 3);
-        $player = self::fighterOf(hp: 10_000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0);
-        $enemy = self::fighterOf(hp: 10_000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0);
+        // `max_attacks`, pas par un KO, et doit tout de même rendre un vainqueur.
+        $simulator = self::simulatorOf(maxAttacks: 3);
+        $player = self::fighterOf(hp: 10_000, damage: 5, mitigationPermille: 0, comboPermille: 0);
+        $enemy = self::fighterOf(hp: 10_000, damage: 5, mitigationPermille: 0, comboPermille: 0);
 
         $outcome = $simulator->fight($player, $enemy, self::randomizer());
 
-        self::assertSame(3, $outcome->turns);
+        self::assertSame(3, $outcome->attackCount);
         self::assertInstanceOf(BattleResult::class, $outcome->result);
 
-        // Aucun KO ici : personne n'atteint zéro, la sortie vient bien de `max_turns`.
+        // Aucun KO ici : personne n'atteint zéro, la sortie vient bien de `max_attacks`.
         foreach ($outcome->timeline as $event) {
             if ($event instanceof Attack) {
                 self::assertGreaterThan(0, $event->targetHpRemaining);
@@ -370,7 +370,7 @@ final class BattleSimulatorTest extends TestCase
     }
 
     /**
-     * À `max_turns`, le joueur joue en premier (voir le docblock de la classe) : sur un
+     * À `max_attacks`, le joueur joue en premier (voir le docblock de la classe) : sur un
      * nombre pair de tours et des combattants strictement symétriques, les deux camps
      * infligent exactement les mêmes dégâts. Une égalité stricte de ratio doit se
      * départager, et c'est le joueur qui l'emporte — un choix de ce ticket, écrit en toutes
@@ -378,31 +378,31 @@ final class BattleSimulatorTest extends TestCase
      */
     public function testATieAtMaxTurnsGoesToThePlayer(): void
     {
-        $simulator = self::simulatorOf(maxTurns: 4);
-        $player = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0);
-        $enemy = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, extraTurnPermille: 0);
+        $simulator = self::simulatorOf(maxAttacks: 4);
+        $player = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, comboPermille: 0);
+        $enemy = self::fighterOf(hp: 1000, damage: 5, mitigationPermille: 0, comboPermille: 0);
 
         $outcome = $simulator->fight($player, $enemy, self::randomizer());
 
-        self::assertSame(4, $outcome->turns);
+        self::assertSame(4, $outcome->attackCount);
         self::assertSame(BattleResult::Victory, $outcome->result);
     }
 
     /**
-     * Si `max_turns` tombe juste après l'émission d'un `ExtraTurn`, la timeline ne doit
+     * Si `max_attacks` tombe juste après l'émission d'un `Combo`, la timeline ne doit
      * jamais se terminer par un tour bonus annoncé sans l'attaque qu'il promet — le client
-     * jouerait « tour bonus ! » suivi de rien. `max_turns` est volontairement bas et
-     * `extraTurnPermille` à 1000 pour forcer la boucle à sortir juste après un proc garanti.
+     * jouerait « tour bonus ! » suivi de rien. `max_attacks` est volontairement bas et
+     * `comboPermille` à 1000 pour forcer la boucle à sortir juste après un proc garanti.
      */
-    public function testAnExtraTurnNeverDanglesWhenMaxTurnsIsReached(): void
+    public function testAnComboNeverDanglesWhenMaxTurnsIsReached(): void
     {
-        $simulator = self::simulatorOf(maxTurns: 5);
-        $player = self::fighterOf(hp: 100_000, damage: 1, mitigationPermille: 0, extraTurnPermille: 1000);
-        $enemy = self::fighterOf(hp: 100_000, damage: 0, mitigationPermille: 0, extraTurnPermille: 0);
+        $simulator = self::simulatorOf(maxAttacks: 5);
+        $player = self::fighterOf(hp: 100_000, damage: 1, mitigationPermille: 0, comboPermille: 1000);
+        $enemy = self::fighterOf(hp: 100_000, damage: 0, mitigationPermille: 0, comboPermille: 0);
 
         $outcome = $simulator->fight($player, $enemy, self::randomizer());
 
-        self::assertSame(5, $outcome->turns);
+        self::assertSame(5, $outcome->attackCount);
 
         $count = \count($outcome->timeline);
         self::assertInstanceOf(BattleFinished::class, $outcome->timeline[$count - 1]);
@@ -445,26 +445,42 @@ final class BattleSimulatorTest extends TestCase
         return new Randomizer(new Xoshiro256StarStar(hash('sha256', $seed, true)));
     }
 
-    private static function fighterOf(int $hp, int $damage, int $mitigationPermille, int $extraTurnPermille, int $dodgePermille = 0): Fighter
+    private static function fighterOf(int $hp, int $damage, int $mitigationPermille, int $comboPermille, int $dodgePermille = 0): Fighter
     {
-        return new Fighter($hp, $damage, $mitigationPermille, $extraTurnPermille, $dodgePermille);
+        return new Fighter($hp, $damage, $mitigationPermille, $comboPermille, $dodgePermille);
     }
 
-    private static function simulatorOf(int $minimumDamage = 1, int $maxTurns = 200): BattleSimulator
+    private static function simulatorOf(int $minimumDamage = 1, int $maxAttacks = 200): BattleSimulator
     {
         return new BattleSimulator(new CombatRules(
             baseHp: 100,
             hpPer1000Vitality: 40,
             baseDamage: 10,
             damagePer1000Strength: 6,
-            mitigationPermillePer1000Endurance: 15,
             mitigationCapPermille: 700,
-            extraTurnPermillePer1000Dexterity: 12,
-            extraTurnCapPermille: 350,
-            dodgePermillePer1000Mobility: 10,
+            comboCapPermille: 350,
             dodgeCapPermille: 300,
             minimumDamage: $minimumDamage,
-            maxTurns: $maxTurns,
+            maxAttacks: $maxAttacks,
+            fatigueFloorPermille: 400,
+            fatigueCapacity: 4000,
+            criticalMultiplierPermille: 1500,
+            baseCooldownTicks: 1000,
+            maintenanceCapPermille: 950,
+            maintenanceHalfSaturation: 5000,
+            dodgeHalfSaturation: 10000,
+            criticalChanceCapPermille: 350,
+            criticalChanceHalfSaturation: 10000,
+            mitigationHalfSaturation: 10000,
+            guardCapPermille: 400,
+            guardHalfSaturation: 10000,
+            criticalResistanceCapPermille: 500,
+            criticalResistanceHalfSaturation: 10000,
+            cooldownReductionCapPermille: 300,
+            cooldownReductionHalfSaturation: 10000,
+            comboHalfSaturation: 10000,
+            precisionCapPermille: 500,
+            precisionHalfSaturation: 10000,
         ));
     }
 }

@@ -26,6 +26,11 @@ final class GameRulesetSeed
         /** @var array<string, mixed> $balance */
         $balance = $seed::data();
 
-        return [...$data, ...$balance];
+        require_once \dirname(__DIR__, 3).'/migrations/CombatV2Upgrade.php';
+        $upgrade = 'DoctrineMigrations\\CombatV2Upgrade';
+        $converted = $upgrade::snapshot(['combat' => ['fighter' => $data['fighter'], 'enemies' => $data['enemies'], 'bosses' => $data['bosses']], 'items' => $data['items']]);
+        /** @var array{combat: array{fighter: array<string, int>, enemies: list<array<string, mixed>>, bosses: list<array<string, mixed>>}, items: list<array<string, mixed>>} $converted */
+
+        return [...$data, ...$balance, ...$converted['combat'], 'items' => $converted['items']];
     }
 }

@@ -1957,8 +1957,14 @@ components:
             - HP_BONUS
             - DAMAGE_BONUS
             - MITIGATION_BONUS
-            - EXTRA_TURN_BONUS
+            - COMBO_BONUS
             - DODGE_BONUS
+            - MAINTENANCE_BONUS
+            - CRITICAL_CHANCE_BONUS
+            - GUARD_BONUS
+            - CRITICAL_RESISTANCE_BONUS
+            - COOLDOWN_REDUCTION_BONUS
+            - PRECISION_BONUS
         value:
           description: "Un entier dont l'unité dépend de `type` — un pourcentage pour `XP_MULTIPLIER`, des points d'XP répartis pour un bonus de caractéristique. Jamais un flottant sur une valeur de jeu."
           type: integer
@@ -2587,13 +2593,19 @@ components:
           nullable: true
       type: object
     BattleFighter:
-      description: "Un combattant tel qu'affiché. **`mitigationPercent`, `extraTurnPercent` et\n`dodgePercent` sont résolus côté serveur**, jamais des taux que le client\nrecomposerait — même règle que `bonusPercent` sur une Risāla. Le domaine porte des\nmillièmes ; ce sont des pourcentages entiers, tronqués.\n"
+      description: "Un combattant tel qu'affiché. **`mitigationPercent`, `comboPercent` et\n`dodgePercent` sont résolus côté serveur**, jamais des taux que le client\nrecomposerait — même règle que `bonusPercent` sur une Risāla. Le domaine porte des\nmillièmes ; ce sont des pourcentages entiers, tronqués.\nPrécision 20 % contre esquive 30 % donne esquive effective 24 %, pas 10 %.\nLa résistance critique applique la même réduction relative à la chance de critique.\n"
       required:
         - hp
         - damage
         - mitigationPercent
-        - extraTurnPercent
+        - comboPercent
         - dodgePercent
+        - maintenancePercent
+        - criticalChancePercent
+        - guardPercent
+        - criticalResistancePercent
+        - cooldownReductionPercent
+        - precisionPercent
       properties:
         hp:
           type: integer
@@ -2605,7 +2617,7 @@ components:
           description: 'Réduction du dégât reçu.'
           type: integer
           example: 18
-        extraTurnPercent:
+        comboPercent:
           description: 'Chance de rejouer un tour immédiatement.'
           type: integer
           example: 12
@@ -2613,6 +2625,24 @@ components:
           description: "Chance d'esquiver entièrement un coup."
           type: integer
           example: 8
+        maintenancePercent:
+          description: 'Résistance à la fatigue, jamais un bonus de puissance. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        criticalChancePercent:
+          description: 'Chance de critique avant résistance critique adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        guardPercent:
+          description: 'Chance indépendante de diviser par deux les dégâts après mitigation. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        criticalResistancePercent:
+          description: 'Réduction relative de la chance de critique adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        cooldownReductionPercent:
+          description: 'Réduction du délai entre actions régulières. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        precisionPercent:
+          description: 'Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
       type: object
     EnemyImageUrls:
       description: 'Pack publié complet ou null. URLs absolues publiques, HTTPS en production. hit est la pose de coup reçu ; une esquive utilise idle. La présentation courante est aussi utilisée au rejeu.'
@@ -2641,8 +2671,14 @@ components:
         - hp
         - damage
         - mitigationPercent
-        - extraTurnPercent
+        - comboPercent
         - dodgePercent
+        - maintenancePercent
+        - criticalChancePercent
+        - guardPercent
+        - criticalResistancePercent
+        - cooldownReductionPercent
+        - precisionPercent
       properties:
         key:
           type: string
@@ -2660,12 +2696,30 @@ components:
         mitigationPercent:
           type: integer
           example: 10
-        extraTurnPercent:
+        comboPercent:
           type: integer
           example: 5
         dodgePercent:
           type: integer
           example: 3
+        maintenancePercent:
+          description: 'Résistance à la fatigue, jamais un bonus de puissance. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        criticalChancePercent:
+          description: 'Chance de critique avant résistance critique adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        guardPercent:
+          description: 'Chance indépendante de diviser par deux les dégâts après mitigation. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        criticalResistancePercent:
+          description: 'Réduction relative de la chance de critique adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        cooldownReductionPercent:
+          description: 'Réduction du délai entre actions régulières. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        precisionPercent:
+          description: 'Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
         imageUrls:
           $ref: '#/components/schemas/EnemyImageUrls'
         introduction:
@@ -2675,7 +2729,7 @@ components:
           maxLength: 280
       type: object
     BattleEvent:
-      description: "Un instant de la timeline. **Seul l'ordre des éléments de la liste compte** — voir\nla description de `Battle.events` — un événement isolé n'a pas de position propre.\n\nCinq formes, distinguées par `type` ; seuls les champs de la forme concernée\nsont présents, les autres sont **absents**, jamais `null` :\n  - `BATTLE_STARTED` : `playerHp`, `enemyHp` — l'état de départ, avant le premier coup.\n  - `ATTACK` : `attacker`, `damage`, `mitigated`, `targetHpRemaining` — un coup porté,\n    la part absorbée par la mitigation, et ce qu'il reste à la cible.\n  - `DODGE` : `attacker` — la cible de l'attaquant a esquivé, aucun dégât n'est\n    appliqué. Remplace l'`ATTACK` que ce tour aurait produit, ne s'ajoute jamais à\n    côté.\n  - `EXTRA_TURN` : `actor` — qui rejoue un tour immédiatement, que le tour qui l'a\n    déclenché ait porté ou été esquivé.\n  - `BATTLE_FINISHED` : `result` — toujours le dernier événement de la timeline.\n"
+      description: "Timeline autoritaire v2. Chaque tentative produit ATTACK ou DODGE.\natTick est le temps virtuel ; actionIndex et attackIndex sont globaux, à partir de 1.\nCOMBO annonce le prochain coup effectivement joué, avec ses indices et sa date.\nUne chaîne entière est jouée au même tick. BATTLE_STARTED porte les PV initiaux.\nBATTLE_FINISHED porte résultat, raison, compteurs et date finale.\nATTACK expose fatigue → critique → mitigation → guard → minimum.\nChaque étape est tronquée avant la suivante. criticalDamage est la puissance après\ncritique, mitigated et guardReduction les retraits aux étapes correspondantes.\nminimumDamageAdded explique le plancher final ; targetHpRemaining inclut le KO à zéro.\nDODGE consomme une tentative et de la fatigue, sans dégâts ni jets critique/guard.\n"
       required:
         - type
       properties:
@@ -2685,7 +2739,7 @@ components:
             - BATTLE_STARTED
             - ATTACK
             - DODGE
-            - EXTRA_TURN
+            - COMBO
             - BATTLE_FINISHED
         playerHp:
           description: '`BATTLE_STARTED` seulement.'
@@ -2709,11 +2763,48 @@ components:
           description: '`ATTACK` seulement.'
           type: integer
         actor:
-          description: '`EXTRA_TURN` seulement.'
+          description: '`COMBO` seulement.'
           type: string
           enum:
             - PLAYER
             - ENEMY
+        atTick:
+          type: integer
+          minimum: 0
+        actionIndex:
+          type: integer
+          minimum: 1
+        attackIndex:
+          type: integer
+          minimum: 1
+        critical:
+          type: boolean
+        guarded:
+          type: boolean
+        powerPermille:
+          description: 'Puissance appliquée après fatigue, en millièmes, pour ATTACK ou DODGE.'
+          type: integer
+          maximum: 1000
+          minimum: 0
+        baseDamage:
+          type: integer
+        fatiguedDamage:
+          type: integer
+        criticalDamage:
+          type: integer
+        guardReduction:
+          type: integer
+        minimumDamageAdded:
+          type: integer
+        endReason:
+          type: string
+          enum:
+            - KO
+            - ATTACK_LIMIT
+        actionCount:
+          type: integer
+        attackCount:
+          type: integer
         result:
           description: '`BATTLE_FINISHED` seulement.'
           type: string
@@ -2722,7 +2813,7 @@ components:
             - DEFEAT
       type: object
     BattleReward:
-      description: "Ce qu'une victoire a rapporté (#227) — persisté sur la ligne du combat, jamais\nrejoué depuis la graine : le jour où le catalogue DB de loot est rééquilibré, rejouer un\nvieux tirage sous les tables courantes rendrait un butin différent de celui que\nle joueur a vu tomber.\n\n**Vide pour une défaite, ou une victoire tranchée par `max_turns` sans KO** —\n`loot: []` et `coins` à gain nul, jamais des clés absentes : une récompense de\nconsolation ferait du combat perdu la stratégie optimale, puisqu'il est plus\nrapide à jouer qu'à gagner.\n\nMême forme, mêmes clés, dans le même ordre que `loot`/`coins` sur\n`RewardSummary` — les objets d'abord, les pièces ensuite — pour que le client\nréutilise le composant qu'il a déjà écrit.\n"
+      description: "Ce qu'une victoire a rapporté (#227) — persisté sur la ligne du combat, jamais\nrejoué depuis la graine : le jour où le catalogue DB de loot est rééquilibré, rejouer un\nvieux tirage sous les tables courantes rendrait un butin différent de celui que\nle joueur a vu tomber.\n\n**Vide pour une défaite, ou une victoire tranchée par `max_attacks` sans KO** —\n`loot: []` et `coins` à gain nul, jamais des clés absentes : une récompense de\nconsolation ferait du combat perdu la stratégie optimale, puisqu'il est plus\nrapide à jouer qu'à gagner.\n\nMême forme, mêmes clés, dans le même ordre que `loot`/`coins` sur\n`RewardSummary` — les objets d'abord, les pièces ensuite — pour que le client\nréutilise le composant qu'il a déjà écrit.\n"
       required:
         - loot
         - coins
@@ -2755,7 +2846,11 @@ components:
       required:
         - id
         - result
-        - turns
+        - attackCount
+        - actionCount
+        - elapsedTicks
+        - endReason
+        - algorithmVersion
         - foughtAt
         - player
         - enemy
@@ -2771,9 +2866,27 @@ components:
           enum:
             - VICTORY
             - DEFEAT
-        turns:
+        attackCount:
+          description: 'Toutes les tentatives, esquives et combos compris.'
           type: integer
           example: 7
+        actionCount:
+          description: 'Actions régulières ; une chaîne Combo appartient à une seule action.'
+          type: integer
+          example: 5
+        elapsedTicks:
+          description: 'Date virtuelle de la dernière tentative. Aucune durée réelle.'
+          type: integer
+          example: 2000
+        endReason:
+          type: string
+          enum:
+            - KO
+            - ATTACK_LIMIT
+        algorithmVersion:
+          type: string
+          enum:
+            - v2
         foughtAt:
           description: "L'instant de la requête : contrairement à un workout, un combat n'a aucune antériorité au serveur."
           type: string
@@ -2791,12 +2904,16 @@ components:
           $ref: '#/components/schemas/BattleReward'
       type: object
     BattleSummary:
-      description: "Une ligne de `GET /api/battles` (#220) — **jamais la timeline**. `Battle` peut\ncompter deux cents événements (`max_turns`) ; vingt résumés par page restent\nlégers, et le client va chercher `GET /api/battles/{id}` au moment où il choisit\nun combat précis à rejouer.\n\n`result` est **toujours** `VICTORY` ou `DEFEAT`, y compris pour un combat conclu\npar `max_turns` sans KO — voir la description de `Battle.result`. C'est ce qui\npermet à la liste d'être colorée ligne par ligne sans aucun troisième état à\ndessiner.\n\n`rewards` rend `Battle.rewards` à l'identique (#227) : c'est une ligne déjà\nécrite, rien à recalculer pour l'afficher dans la liste.\n"
+      description: "Une ligne de `GET /api/battles` (#220) — **jamais la timeline**. `Battle` peut\ncompter deux cents événements (`max_attacks`) ; vingt résumés par page restent\nlégers, et le client va chercher `GET /api/battles/{id}` au moment où il choisit\nun combat précis à rejouer.\n\n`result` est **toujours** `VICTORY` ou `DEFEAT`, y compris pour un combat conclu\npar `max_attacks` sans KO — voir la description de `Battle.result`. C'est ce qui\npermet à la liste d'être colorée ligne par ligne sans aucun troisième état à\ndessiner.\n\n`rewards` rend `Battle.rewards` à l'identique (#227) : c'est une ligne déjà\nécrite, rien à recalculer pour l'afficher dans la liste.\n"
       required:
         - id
         - result
         - enemy
-        - turns
+        - attackCount
+        - actionCount
+        - elapsedTicks
+        - endReason
+        - algorithmVersion
         - foughtAt
         - rewards
       properties:
@@ -2821,9 +2938,27 @@ components:
               type: string
               example: 'Chacal des sables'
           type: object
-        turns:
+        attackCount:
+          description: 'Toutes les tentatives, esquives et combos compris.'
           type: integer
           example: 7
+        actionCount:
+          description: 'Actions régulières ; une chaîne Combo appartient à une seule action.'
+          type: integer
+          example: 5
+        elapsedTicks:
+          description: 'Date virtuelle de la dernière tentative. Aucune durée réelle.'
+          type: integer
+          example: 2000
+        endReason:
+          type: string
+          enum:
+            - KO
+            - ATTACK_LIMIT
+        algorithmVersion:
+          type: string
+          enum:
+            - v2
         foughtAt:
           type: string
           format: date-time
@@ -2861,8 +2996,14 @@ components:
         - hp
         - damage
         - mitigationPercent
-        - extraTurnPercent
+        - comboPercent
         - dodgePercent
+        - maintenancePercent
+        - criticalChancePercent
+        - guardPercent
+        - criticalResistancePercent
+        - cooldownReductionPercent
+        - precisionPercent
       properties:
         key:
           type: string
@@ -2883,12 +3024,30 @@ components:
         mitigationPercent:
           type: integer
           example: 20
-        extraTurnPercent:
+        comboPercent:
           type: integer
           example: 12
         dodgePercent:
           type: integer
           example: 9
+        maintenancePercent:
+          description: 'Résistance à la fatigue, jamais un bonus de puissance. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        criticalChancePercent:
+          description: 'Chance de critique avant résistance critique adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        guardPercent:
+          description: 'Chance indépendante de diviser par deux les dégâts après mitigation. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        criticalResistancePercent:
+          description: 'Réduction relative de la chance de critique adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        cooldownReductionPercent:
+          description: 'Réduction du délai entre actions régulières. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
+        precisionPercent:
+          description: 'Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
+          type: integer
         imageUrls:
           $ref: '#/components/schemas/EnemyImageUrls'
         introduction:

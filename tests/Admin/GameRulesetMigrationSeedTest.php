@@ -21,7 +21,12 @@ final class GameRulesetMigrationSeedTest extends KernelTestCase
         $migrationSeed = new ReflectionMethod('DoctrineMigrations\\GameRulesetSeed', 'data')->invoke(null);
         self::assertIsArray($migrationSeed);
         /** @var array<string, mixed> $migrationSeed */
-        self::assertSame(RuntimeSeed::data(), $migrationSeed);
+        require_once \dirname(__DIR__, 2).'/migrations/CombatV2Upgrade.php';
+        $upgrade = new ReflectionMethod('DoctrineMigrations\\CombatV2Upgrade', 'snapshot');
+        $converted = $upgrade->invoke(null, ['combat' => ['fighter' => $migrationSeed['fighter'], 'enemies' => $migrationSeed['enemies'], 'bosses' => $migrationSeed['bosses']], 'items' => $migrationSeed['items']]);
+        self::assertIsArray($converted);
+        self::assertIsArray($converted['combat']);
+        self::assertSame(RuntimeSeed::data(), [...$migrationSeed, ...$converted['combat'], 'items' => $converted['items']]);
         foreach (['items' => 12, 'titles' => 17, 'enemies' => 6] as $section => $count) {
             self::assertArrayHasKey($section, $migrationSeed);
             self::assertIsArray($migrationSeed[$section]);

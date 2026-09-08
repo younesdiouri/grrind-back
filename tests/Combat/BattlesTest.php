@@ -43,8 +43,8 @@ final class BattlesTest extends ApiTestCase
         $body = self::decode($response);
         self::assertIsString($body['id']);
         self::assertContains($body['result'], ['VICTORY', 'DEFEAT']);
-        self::assertIsInt($body['turns']);
-        self::assertGreaterThan(0, $body['turns']);
+        self::assertIsInt($body['attackCount']);
+        self::assertGreaterThan(0, $body['attackCount']);
         self::assertIsString($body['foughtAt']);
 
         $player = $body['player'];
@@ -52,7 +52,7 @@ final class BattlesTest extends ApiTestCase
         self::assertArrayHasKey('hp', $player);
         self::assertArrayHasKey('damage', $player);
         self::assertArrayHasKey('mitigationPercent', $player);
-        self::assertArrayHasKey('extraTurnPercent', $player);
+        self::assertArrayHasKey('comboPercent', $player);
         self::assertArrayHasKey('dodgePercent', $player);
 
         // Un compte neuf est niveau 1 : `EnemyCatalog::forLevel(1)` rend toujours SAND_JACKAL

@@ -33,7 +33,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
     {
         $payload = self::resource()->toArray();
 
-        self::assertSame(['id', 'result', 'enemy', 'turns', 'foughtAt', 'rewards'], array_keys($payload));
+        self::assertSame(['id', 'result', 'enemy', 'attackCount', 'actionCount', 'elapsedTicks', 'endReason', 'algorithmVersion', 'foughtAt', 'rewards'], array_keys($payload));
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
@@ -57,9 +57,9 @@ final class BattleSummaryResourcePayloadTest extends TestCase
     }
 
     /**
-     * La décision du #209 : même quand `max_turns` interrompt le combat sans KO, le meilleur
+     * La décision du #209 : même quand `max_attacks` interrompt le combat sans KO, le meilleur
      * ratio de PV l'emporte — un match nul n'a pas de mise en scène. `result` reste l'un des
-     * deux seuls cas de `BattleResult`, ici fabriqué exprès avec `turns` au plafond.
+     * deux seuls cas de `BattleResult`, ici fabriqué exprès avec `attackCount` au plafond.
      */
     public function testAMaxTurnsConclusionStillRendersOneOfTheTwoResults(): void
     {

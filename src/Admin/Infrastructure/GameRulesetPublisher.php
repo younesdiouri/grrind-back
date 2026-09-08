@@ -131,7 +131,7 @@ final readonly class GameRulesetPublisher
         ], $titles);
         $enemyRows = ['enemies' => [], 'bosses' => []];
         foreach ($enemies as $enemy) {
-            $row = ['key' => $enemy->getKey(), 'active' => $enemy->isActive(), 'hp' => $enemy->getHp(), 'damage' => $enemy->getDamage(), 'mitigation_permille' => $enemy->getMitigationPermille(), 'extra_turn_permille' => $enemy->getExtraTurnPermille(), 'dodge_permille' => $enemy->getDodgePermille(), 'translations' => $enemy->getTranslations(), 'image_paths' => null === $enemy->getIdleImagePath() && null === $enemy->getAttackImagePath() && null === $enemy->getHitImagePath() ? null : ['idle' => $enemy->getIdleImagePath(), 'attack' => $enemy->getAttackImagePath(), 'hit' => $enemy->getHitImagePath()]];
+            $row = ['key' => $enemy->getKey(), 'active' => $enemy->isActive(), 'hp' => $enemy->getHp(), 'damage' => $enemy->getDamage(), 'mitigation_permille' => $enemy->getMitigationPermille(), 'combo_permille' => $enemy->getComboPermille(), 'dodge_permille' => $enemy->getDodgePermille(), 'maintenance_permille' => $enemy->getMaintenancePermille(), 'critical_chance_permille' => $enemy->getCriticalChancePermille(), 'guard_permille' => $enemy->getGuardPermille(), 'critical_resistance_permille' => $enemy->getCriticalResistancePermille(), 'cooldown_reduction_permille' => $enemy->getCooldownReductionPermille(), 'precision_permille' => $enemy->getPrecisionPermille(), 'translations' => $enemy->getTranslations(), 'image_paths' => null === $enemy->getIdleImagePath() && null === $enemy->getAttackImagePath() && null === $enemy->getHitImagePath() ? null : ['idle' => $enemy->getIdleImagePath(), 'attack' => $enemy->getAttackImagePath(), 'hit' => $enemy->getHitImagePath()]];
             if ($enemy->isBoss()) {
                 $row['minimum_level'] = $enemy->getMinimumLevel();
                 $enemyRows['bosses'][] = $row;
@@ -170,9 +170,9 @@ final readonly class GameRulesetPublisher
     {
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */ $items = $snapshot['items'];
         /** @var list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */ $titles = $snapshot['titles'];
-        /** @var array{base_hp: int, hp_per_1000_vitality: int, base_damage: int, damage_per_1000_strength: int, mitigation_permille_per_1000_endurance: int, mitigation_cap_permille: int, extra_turn_permille_per_1000_dexterity: int, extra_turn_cap_permille: int, dodge_permille_per_1000_mobility: int, dodge_cap_permille: int, minimum_damage: int, max_turns: int} $fighter */ $fighter = $snapshot['combat']['fighter'];
-        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $enemies */ $enemies = $snapshot['combat']['enemies'];
-        /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses */ $bosses = $snapshot['combat']['bosses'];
+        /** @var array<string, int> $fighter */ $fighter = $snapshot['combat']['fighter'];
+        /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, combo_permille: int, dodge_permille: int}> $enemies */ $enemies = $snapshot['combat']['enemies'];
+        /** @var list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, combo_permille: int, dodge_permille: int}> $bosses */ $bosses = $snapshot['combat']['bosses'];
         /** @var array{floor_percent: int, cap_percent: int} $lootLuck */ $lootLuck = $snapshot['loot']['loot_luck'];
         /** @var list<array{key: string, eligibility: array{disciplines: list<string>, minimum_duration_minutes: int, minimum_level: int}, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $workout */ $workout = $snapshot['loot']['workout'];
         /** @var list<array{key: string, coins: array{minimum: int, maximum: int}, entries: list<array{item?: string, weight: int}>}> $adversary */ $adversary = $snapshot['loot']['adversary'];
@@ -209,8 +209,8 @@ final readonly class GameRulesetPublisher
         }
         new ItemCatalog($items);
         new TitleCatalog($titles);
-        new CombatRules($fighter['base_hp'], $fighter['hp_per_1000_vitality'], $fighter['base_damage'], $fighter['damage_per_1000_strength'], $fighter['mitigation_permille_per_1000_endurance'], $fighter['mitigation_cap_permille'], $fighter['extra_turn_permille_per_1000_dexterity'], $fighter['extra_turn_cap_permille'], $fighter['dodge_permille_per_1000_mobility'], $fighter['dodge_cap_permille'], $fighter['minimum_damage'], $fighter['max_turns']);
-        new EnemyCatalog($enemies, $bosses);
+        $combatRules = CombatRules::fromSnapshot($fighter);
+        new EnemyCatalog($enemies, $bosses, combatRules: $combatRules);
         new LootLuckRules($lootLuck['floor_percent'], $lootLuck['cap_percent']);
         self::validateActiveReferences($items, $enemies, $bosses, $workout, $adversary, $chest);
         $lootVersion = $snapshot['loot']['version'];

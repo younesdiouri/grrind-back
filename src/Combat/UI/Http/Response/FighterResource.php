@@ -10,11 +10,14 @@ namespace App\Combat\UI\Http\Response;
  * porte.
  *
  * **Le domaine porte des millièmes, le contrat des pourcentages.** `mitigationPercent`,
- * `extraTurnPercent` et `dodgePercent` sont résolus ici, jamais recomposés côté client à
+ * `comboPercent` et `dodgePercent` sont résolus ici, jamais recomposés côté client à
  * partir de deux taux — même règle que `bonusPercent` sur une Risāla. La conversion est une
  * division entière tronquée par 10, le même geste arithmétique que partout ailleurs sur une
- * valeur de jeu (voir {@see \App\Combat\Application\FighterFactory::scale()}) : jamais de
+ * valeur de jeu (voir {@see \App\Combat\Domain\CombatMath::scale()}) : jamais de
  * flottant, même pour un simple affichage.
+ * Précision et résistance critique réduisent relativement le taux opposé :
+ * esquive 30 % contre précision 20 % donne 24 %, pas 10 %. Maintenance ralentit
+ * la fatigue, elle n'ajoute jamais de dégâts au premier coup.
  */
 final readonly class FighterResource
 {
@@ -22,13 +25,19 @@ final readonly class FighterResource
         public int $hp,
         public int $damage,
         public int $mitigationPercent,
-        public int $extraTurnPercent,
+        public int $comboPercent,
         public int $dodgePercent,
+        public int $maintenancePercent,
+        public int $criticalChancePercent,
+        public int $guardPercent,
+        public int $criticalResistancePercent,
+        public int $cooldownReductionPercent,
+        public int $precisionPercent,
     ) {
     }
 
     /**
-     * @param array{hp: int, damage: int, mitigationPermille: int, extraTurnPermille: int, dodgePermille: int} $fighter
+     * @param array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int} $fighter
      */
     public static function from(array $fighter): self
     {
@@ -36,13 +45,19 @@ final readonly class FighterResource
             $fighter['hp'],
             $fighter['damage'],
             self::percentOf($fighter['mitigationPermille']),
-            self::percentOf($fighter['extraTurnPermille']),
+            self::percentOf($fighter['comboPermille']),
             self::percentOf($fighter['dodgePermille']),
+            self::percentOf($fighter['maintenancePermille']),
+            self::percentOf($fighter['criticalChancePermille']),
+            self::percentOf($fighter['guardPermille']),
+            self::percentOf($fighter['criticalResistancePermille']),
+            self::percentOf($fighter['cooldownReductionPermille']),
+            self::percentOf($fighter['precisionPermille']),
         );
     }
 
     /**
-     * @return array{hp: int, damage: int, mitigationPercent: int, extraTurnPercent: int, dodgePercent: int}
+     * @return array{hp: int, damage: int, mitigationPercent: int, comboPercent: int, dodgePercent: int, maintenancePercent: int, criticalChancePercent: int, guardPercent: int, criticalResistancePercent: int, cooldownReductionPercent: int, precisionPercent: int}
      */
     public function toArray(): array
     {
@@ -50,8 +65,14 @@ final readonly class FighterResource
             'hp' => $this->hp,
             'damage' => $this->damage,
             'mitigationPercent' => $this->mitigationPercent,
-            'extraTurnPercent' => $this->extraTurnPercent,
+            'comboPercent' => $this->comboPercent,
             'dodgePercent' => $this->dodgePercent,
+            'maintenancePercent' => $this->maintenancePercent,
+            'criticalChancePercent' => $this->criticalChancePercent,
+            'guardPercent' => $this->guardPercent,
+            'criticalResistancePercent' => $this->criticalResistancePercent,
+            'cooldownReductionPercent' => $this->cooldownReductionPercent,
+            'precisionPercent' => $this->precisionPercent,
         ];
     }
 

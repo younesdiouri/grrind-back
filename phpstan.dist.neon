@@ -10,6 +10,10 @@ parameters:
         - src/
         - tests/
 
+    # Doctrine découvre les migrations hors de Composer ; les tests les instancient.
+    scanDirectories:
+        - migrations/
+
     symfony:
         containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
 

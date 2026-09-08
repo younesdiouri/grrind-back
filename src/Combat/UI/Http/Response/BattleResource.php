@@ -19,7 +19,7 @@ use DateTimeInterface;
  * **`rewards` vient directement de `Battle::$reward` (#227), jamais recalculé ici.** La
  * ligne porte déjà `{loot: [...], coins: {gained, before, after}}` — voir le docblock de
  * `Battle` pour pourquoi c'est persisté plutôt que rejoué depuis la graine. Une défaite ou
- * une victoire tranchée par `max_turns` sans KO portent la forme vide de
+ * une victoire tranchée par `max_attacks` sans KO portent la forme vide de
  * `App\Shared\Application\BattleDrop::none()`, jamais une clé absente — même argument que
  * `loot` sur le `RewardSummary`.
  *
@@ -63,7 +63,11 @@ final readonly class BattleResource
         return [
             'id' => $this->battle->id()->toRfc4122(),
             'result' => $this->battle->result()->value,
-            'turns' => $this->battle->turns(),
+            'attackCount' => $this->battle->attackCount(),
+            'actionCount' => $this->battle->actionCount(),
+            'elapsedTicks' => $this->battle->elapsedTicks(),
+            'endReason' => $this->battle->endReason()->value,
+            'algorithmVersion' => $this->battle->algorithmVersion(),
             'foughtAt' => $this->battle->foughtAt()->format(DateTimeInterface::ATOM),
             'player' => FighterResource::from($this->battle->playerSnapshot()['fighter'])->toArray(),
             // `key` et `name` d'abord, puis les mêmes quatre champs que `player` — voir le

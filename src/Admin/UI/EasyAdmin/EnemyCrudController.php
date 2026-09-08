@@ -54,8 +54,14 @@ final class EnemyCrudController extends GameCrudController
         yield IntegerField::new('hp');
         yield IntegerField::new('damage');
         yield IntegerField::new('mitigationPermille');
-        yield IntegerField::new('extraTurnPermille');
+        yield IntegerField::new('comboPermille');
         yield IntegerField::new('dodgePermille');
+        yield IntegerField::new('maintenancePermille')->setHelp('Millièmes ; taux relatif pour précision et résistance critique.');
+        yield IntegerField::new('criticalChancePermille')->setHelp('Millièmes ; taux relatif pour précision et résistance critique.');
+        yield IntegerField::new('guardPermille')->setHelp('Millièmes ; taux relatif pour précision et résistance critique.');
+        yield IntegerField::new('criticalResistancePermille')->setHelp('Millièmes ; taux relatif pour précision et résistance critique.');
+        yield IntegerField::new('cooldownReductionPermille')->setHelp('Millièmes ; taux relatif pour précision et résistance critique.');
+        yield IntegerField::new('precisionPermille')->setHelp('Millièmes ; taux relatif pour précision et résistance critique.');
         foreach (['idleImagePath' => 'Repos', 'attackImagePath' => 'Attaque', 'hitImagePath' => 'Coup reçu'] as $property => $label) {
             yield ImageField::new($property, $label)
                 ->setHelp('Pack complet : renseignez les trois poses, ou retirez les trois pour supprimer le pack.')

@@ -11,8 +11,8 @@ use App\Combat\Domain\BattleFinished;
 use App\Combat\Domain\BattleOutcome;
 use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleStarted;
+use App\Combat\Domain\Combo;
 use App\Combat\Domain\Enemy;
-use App\Combat\Domain\ExtraTurn;
 use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Response\BattleResource;
@@ -39,18 +39,18 @@ final class BattleResourcePayloadTest extends TestCase
         $payload = self::resource()->toArray();
 
         self::assertSame(
-            ['id', 'result', 'turns', 'foughtAt', 'player', 'enemy', 'events', 'rewards'],
+            ['id', 'result', 'attackCount', 'actionCount', 'elapsedTicks', 'endReason', 'algorithmVersion', 'foughtAt', 'player', 'enemy', 'events', 'rewards'],
             array_keys($payload),
             'Un champ déplacé change la mise en scène du combat. Si c\'est voulu, le client doit être prévenu avant.',
         );
 
         $player = $payload['player'];
         self::assertIsArray($player);
-        self::assertSame(['hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent'], array_keys($player));
+        self::assertSame(['hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent'], array_keys($player));
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'name', 'hp', 'damage', 'mitigationPercent', 'extraTurnPercent', 'dodgePercent', 'imageUrls', 'introduction'], array_keys($enemy));
+        self::assertSame(['key', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction'], array_keys($enemy));
 
         self::assertNull($enemy['imageUrls']);
         self::assertNull($enemy['introduction']);
@@ -75,7 +75,7 @@ final class BattleResourcePayloadTest extends TestCase
         self::assertIsArray($player);
         // 105 ‰ tronqué, pas arrondi : 10, jamais 11.
         self::assertSame(10, $player['mitigationPercent']);
-        self::assertSame(5, $player['extraTurnPercent']);
+        self::assertSame(5, $player['comboPercent']);
         // 20 ‰ tronqué : 2, jamais 3.
         self::assertSame(2, $player['dodgePercent']);
     }
@@ -158,7 +158,7 @@ final class BattleResourcePayloadTest extends TestCase
                 [
                     new BattleStarted(150, 120),
                     new Attack(Actor::Player, 12, 3, 108),
-                    new ExtraTurn(Actor::Player),
+                    new Combo(Actor::Player),
                     new BattleFinished(BattleResult::Victory),
                 ],
                 2,

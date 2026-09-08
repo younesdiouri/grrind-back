@@ -30,6 +30,7 @@ use App\Tests\Support\SpyingPushSender;
 use Doctrine\DBAL\Connection;
 use RuntimeException;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Uid\Uuid;
@@ -183,6 +184,7 @@ final class RisalatNotificationTest extends ApiTestCase
         $this->guildOfThree(self::AWAKE);
         $risala = $this->revealedRisala(Discipline::Climbing);
         $locales = $this->flakyLocales();
+        // LocalHours choisit le fuseau depuis l’heure réelle ; utiliser la même horloge.
         $handler = new AnnounceRisalaHandler(
             self::service(RisalaRepository::class),
             self::service(PlayerProfiles::class),
@@ -192,7 +194,7 @@ final class RisalatNotificationTest extends ApiTestCase
             self::service(NotificationAttemptRepository::class),
             self::service(\App\Community\Domain\QuietHours::class),
             self::service(\App\Community\Domain\RisalaRules::class),
-            self::service(MockClock::class),
+            new NativeClock(),
             self::service(TranslatorInterface::class),
             self::service(DisciplineTranslator::class),
         );
@@ -220,7 +222,7 @@ final class RisalatNotificationTest extends ApiTestCase
             self::service(NotificationAttemptRepository::class),
             self::service(\App\Community\Domain\QuietHours::class),
             self::service(MessageBusInterface::class),
-            self::service(MockClock::class),
+            new NativeClock(),
             self::service(TranslatorInterface::class),
         );
 

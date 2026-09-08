@@ -27,8 +27,14 @@ class GameEnemy
     #[ORM\Column] private int $hp = 1;
     #[ORM\Column] private int $damage = 0;
     #[ORM\Column(name: 'mitigation_permille')] private int $mitigationPermille = 0;
-    #[ORM\Column(name: 'extra_turn_permille')] private int $extraTurnPermille = 0;
+    #[ORM\Column(name: 'combo_permille')] private int $comboPermille = 0;
     #[ORM\Column(name: 'dodge_permille')] private int $dodgePermille = 0;
+    #[ORM\Column(name: 'maintenance_permille')] private int $maintenancePermille = 0;
+    #[ORM\Column(name: 'critical_chance_permille')] private int $criticalChancePermille = 0;
+    #[ORM\Column(name: 'guard_permille')] private int $guardPermille = 0;
+    #[ORM\Column(name: 'critical_resistance_permille')] private int $criticalResistancePermille = 0;
+    #[ORM\Column(name: 'cooldown_reduction_permille')] private int $cooldownReductionPermille = 0;
+    #[ORM\Column(name: 'precision_permille')] private int $precisionPermille = 0;
     #[ORM\Column(name: 'idle_image_path', length: 255, nullable: true)] private ?string $idleImagePath = null;
     #[ORM\Column(name: 'attack_image_path', length: 255, nullable: true)] private ?string $attackImagePath = null;
     #[ORM\Column(name: 'hit_image_path', length: 255, nullable: true)] private ?string $hitImagePath = null;
@@ -139,14 +145,14 @@ class GameEnemy
         $this->mitigationPermille = $value;
     }
 
-    public function getExtraTurnPermille(): int
+    public function getComboPermille(): int
     {
-        return $this->extraTurnPermille;
+        return $this->comboPermille;
     }
 
-    public function setExtraTurnPermille(int $value): void
+    public function setComboPermille(int $value): void
     {
-        $this->extraTurnPermille = $value;
+        $this->comboPermille = $value;
     }
 
     public function getDodgePermille(): int
@@ -157,6 +163,66 @@ class GameEnemy
     public function setDodgePermille(int $value): void
     {
         $this->dodgePermille = $value;
+    }
+
+    public function getMaintenancePermille(): int
+    {
+        return $this->maintenancePermille;
+    }
+
+    public function setMaintenancePermille(int $value): void
+    {
+        $this->maintenancePermille = $value;
+    }
+
+    public function getCriticalChancePermille(): int
+    {
+        return $this->criticalChancePermille;
+    }
+
+    public function setCriticalChancePermille(int $value): void
+    {
+        $this->criticalChancePermille = $value;
+    }
+
+    public function getGuardPermille(): int
+    {
+        return $this->guardPermille;
+    }
+
+    public function setGuardPermille(int $value): void
+    {
+        $this->guardPermille = $value;
+    }
+
+    public function getCriticalResistancePermille(): int
+    {
+        return $this->criticalResistancePermille;
+    }
+
+    public function setCriticalResistancePermille(int $value): void
+    {
+        $this->criticalResistancePermille = $value;
+    }
+
+    public function getCooldownReductionPermille(): int
+    {
+        return $this->cooldownReductionPermille;
+    }
+
+    public function setCooldownReductionPermille(int $value): void
+    {
+        $this->cooldownReductionPermille = $value;
+    }
+
+    public function getPrecisionPermille(): int
+    {
+        return $this->precisionPermille;
+    }
+
+    public function setPrecisionPermille(int $value): void
+    {
+        $this->precisionPermille = $value;
     }
 
     public function getIdleImagePath(): ?string

@@ -19,7 +19,7 @@ final class EnemyCatalogTest extends TestCase
     public function testFindsAnEnemyByItsKey(): void
     {
         $catalog = self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
         );
 
         $enemy = $catalog->find('SAND_JACKAL');
@@ -32,8 +32,8 @@ final class EnemyCatalogTest extends TestCase
     public function testFindsTheExactLevelWhenItExists(): void
     {
         $catalog = self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
-            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60, 'dodge_permille' => 30],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'combo_permille' => 60, 'dodge_permille' => 30],
         );
 
         self::assertSame('DUNE_RAIDER', $catalog->forLevel(5)->key);
@@ -46,8 +46,8 @@ final class EnemyCatalogTest extends TestCase
     public function testFallsBackToTheHighestEnemyAtOrBelowThePlayerLevel(): void
     {
         $catalog = self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
-            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60, 'dodge_permille' => 30],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'combo_permille' => 60, 'dodge_permille' => 30],
         );
 
         // Niveau 3 : rien d'écrit pour ce palier, le chacal du niveau 1 reste opposé.
@@ -73,8 +73,8 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
-            ['key' => 'DUNE_RAIDER', 'level' => 1, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60, 'dodge_permille' => 30],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
+            ['key' => 'DUNE_RAIDER', 'level' => 1, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'combo_permille' => 60, 'dodge_permille' => 30],
         );
     }
 
@@ -87,7 +87,7 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'extra_turn_permille' => 60, 'dodge_permille' => 30],
+            ['key' => 'DUNE_RAIDER', 'level' => 5, 'hp' => 220, 'damage' => 18, 'mitigation_permille' => 80, 'combo_permille' => 60, 'dodge_permille' => 30],
         );
     }
 
@@ -102,7 +102,7 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 1000, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 1000, 'combo_permille' => 40, 'dodge_permille' => 30],
         );
     }
 
@@ -115,7 +115,7 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 1000, 'dodge_permille' => 30],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 1000, 'dodge_permille' => 30],
         );
     }
 
@@ -128,7 +128,7 @@ final class EnemyCatalogTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         self::catalogOf(
-            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 1000],
+            ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 1000],
         );
     }
 
@@ -140,10 +140,10 @@ final class EnemyCatalogTest extends TestCase
     {
         $catalog = self::catalogWithBosses(
             [
-                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
             ],
             [
-                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'combo_permille' => 120, 'dodge_permille' => 90],
             ],
         );
 
@@ -162,10 +162,10 @@ final class EnemyCatalogTest extends TestCase
     {
         $catalog = self::catalogWithBosses(
             [
-                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
             ],
             [
-                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'combo_permille' => 120, 'dodge_permille' => 90],
             ],
         );
 
@@ -182,11 +182,11 @@ final class EnemyCatalogTest extends TestCase
     {
         $catalog = self::catalogWithBosses(
             [
-                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
             ],
             [
-                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
-                ['key' => 'STORM_MATRIARCH', 'minimum_level' => 10, 'hp' => 1150, 'damage' => 62, 'mitigation_permille' => 260, 'extra_turn_permille' => 170, 'dodge_permille' => 130],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'combo_permille' => 120, 'dodge_permille' => 90],
+                ['key' => 'STORM_MATRIARCH', 'minimum_level' => 10, 'hp' => 1150, 'damage' => 62, 'mitigation_permille' => 260, 'combo_permille' => 170, 'dodge_permille' => 130],
             ],
         );
 
@@ -199,11 +199,11 @@ final class EnemyCatalogTest extends TestCase
 
         self::catalogWithBosses(
             [
-                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
             ],
             [
-                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
-                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 20, 'hp' => 1150, 'damage' => 62, 'mitigation_permille' => 260, 'extra_turn_permille' => 170, 'dodge_permille' => 130],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'combo_permille' => 120, 'dodge_permille' => 90],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 20, 'hp' => 1150, 'damage' => 62, 'mitigation_permille' => 260, 'combo_permille' => 170, 'dodge_permille' => 130],
             ],
         );
     }
@@ -219,10 +219,10 @@ final class EnemyCatalogTest extends TestCase
 
         self::catalogWithBosses(
             [
-                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
             ],
             [
-                ['key' => 'SAND_JACKAL', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+                ['key' => 'SAND_JACKAL', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'combo_permille' => 120, 'dodge_permille' => 90],
             ],
         );
     }
@@ -238,10 +238,10 @@ final class EnemyCatalogTest extends TestCase
 
         self::catalogWithBosses(
             [
-                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
             ],
             [
-                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 1000, 'extra_turn_permille' => 120, 'dodge_permille' => 90],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 1000, 'combo_permille' => 120, 'dodge_permille' => 90],
             ],
         );
     }
@@ -255,10 +255,10 @@ final class EnemyCatalogTest extends TestCase
 
         self::catalogWithBosses(
             [
-                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
             ],
             [
-                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 1000, 'dodge_permille' => 90],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'combo_permille' => 1000, 'dodge_permille' => 90],
             ],
         );
     }
@@ -272,16 +272,16 @@ final class EnemyCatalogTest extends TestCase
 
         self::catalogWithBosses(
             [
-                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'extra_turn_permille' => 40, 'dodge_permille' => 30],
+                ['key' => 'SAND_JACKAL', 'level' => 1, 'hp' => 120, 'damage' => 12, 'mitigation_permille' => 50, 'combo_permille' => 40, 'dodge_permille' => 30],
             ],
             [
-                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'extra_turn_permille' => 120, 'dodge_permille' => 1000],
+                ['key' => 'DUNE_SOVEREIGN', 'minimum_level' => 10, 'hp' => 700, 'damage' => 40, 'mitigation_permille' => 200, 'combo_permille' => 120, 'dodge_permille' => 1000],
             ],
         );
     }
 
     /**
-     * @param array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int} ...$enemies
+     * @param array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, combo_permille: int, dodge_permille: int} ...$enemies
      */
     private static function catalogOf(array ...$enemies): EnemyCatalog
     {
@@ -289,8 +289,8 @@ final class EnemyCatalogTest extends TestCase
     }
 
     /**
-     * @param list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}>         $enemies
-     * @param list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, extra_turn_permille: int, dodge_permille: int}> $bosses
+     * @param list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, combo_permille: int, dodge_permille: int}>         $enemies
+     * @param list<array{key: string, minimum_level: int, hp: int, damage: int, mitigation_permille: int, combo_permille: int, dodge_permille: int}> $bosses
      */
     private static function catalogWithBosses(array $enemies, array $bosses): EnemyCatalog
     {

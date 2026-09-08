@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Combat\Application;
 
 use App\Combat\Domain\Battle;
+use App\Combat\Domain\BattleEndReason;
 use App\Combat\Domain\BattleResult;
 use App\Combat\Domain\BattleSimulator;
 use App\Combat\Domain\Enemy;
@@ -80,7 +81,7 @@ use Symfony\Component\Uid\Uuid;
  * **Seule une victoire rapporte.** `BattleResult::Victory === $outcome->result` est calculé
  * une fois ici et traverse en booléen jusqu'à {@see BattleDrops::rollFor()} — voir son
  * docblock pour pourquoi jamais `BattleResult` lui-même. Une défaite, ou une victoire
- * tranchée par `max_turns` sans KO, ne rapportent ni objet ni pièce : une récompense de
+ * tranchée par `max_attacks` sans KO, ne rapportent ni objet ni pièce : une récompense de
  * consolation ferait du combat perdu la stratégie optimale, puisqu'il est plus rapide à
  * jouer qu'à gagner.
  *
@@ -138,7 +139,7 @@ final readonly class FightBattleHandler
         // l'écriture » dans le docblock de la classe pour pourquoi `BattleDrops` en a
         // besoin avant que la ligne existe.
         $id = Uuid::v7();
-        $victory = BattleResult::Victory === $outcome->result;
+        $victory = BattleResult::Victory === $outcome->result && BattleEndReason::Knockout === $outcome->endReason;
 
         return $this->battles->transactional(function () use (
             $id,
