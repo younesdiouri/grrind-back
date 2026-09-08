@@ -117,7 +117,7 @@ final class ItemCatalog
     private ?int $runtimeRevision = null;
 
     /**
-     * @param list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
+     * @param list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
@@ -148,6 +148,13 @@ final class ItemCatalog
 
             $shop = self::shopListing($entry['key'], $rarity, $entry['shop'] ?? null);
 
+            // Les snapshots antérieurs au #271 restent immuables. Leur prix initial se
+            // déduit de leur propre prix historique, jamais du catalogue éditable courant.
+            $sellPrice = $entry['sell_price_coins'] ?? intdiv($entry['price_coins'], 2);
+            if ($sellPrice < 0) {
+                throw new InvalidArgumentException('sell_price_coins ne peut pas être négatif.');
+            }
+
             $item = new Item(
                 $entry['key'],
                 $rarity,
@@ -157,6 +164,7 @@ final class ItemCatalog
                 $kind,
                 $shop['available'],
                 $shop['minimumLevel'],
+                $sellPrice,
             );
 
             if (isset($byKey[$item->key])) {
@@ -240,7 +248,7 @@ final class ItemCatalog
         }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
-        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
 
         $this->runtimeRevision = $revision;
@@ -257,7 +265,7 @@ final class ItemCatalog
         }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
-        /** @var list<array{key: string, active?: bool, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        /** @var list<array{key: string, active?: bool, rarity: string, slot?: string, kind?: string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
 
         return $this->available = new self(array_values(array_filter($items, static fn (array $item): bool => $item['active'] ?? true)));

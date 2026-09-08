@@ -58,6 +58,12 @@ final readonly class CoinLedger
         $this->transactions->record($userId, CoinReason::Purchase, $sourceId, -$amount, $occurredAt);
     }
 
+    /** À appeler dans la transaction métier, après le verrou inventaire. */
+    public function lockedBalanceOf(Uuid $userId): int
+    {
+        return $this->transactions->lockedBalanceOf($userId);
+    }
+
     /** Le solde d'un joueur — voir le docblock de {@see CoinTransactionRepository::balanceOf()}. */
     public function balanceOf(Uuid $userId): int
     {

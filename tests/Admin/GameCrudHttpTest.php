@@ -398,6 +398,7 @@ final class GameCrudHttpTest extends ApiTestCase
                 'GameItem[kind]' => 'EQUIPMENT',
                 'GameItem[slot]' => 'FEET',
                 'GameItem[priceCoins]' => '1',
+                'GameItem[sellPriceCoins]' => '7',
                 'GameItem[shopMinimumLevel]' => '',
                 'GameItem[translations][fr][name]' => 'Objet HTTP',
                 'GameItem[translations][en][name]' => 'HTTP item',
@@ -407,6 +408,7 @@ final class GameCrudHttpTest extends ApiTestCase
             $item = self::getContainer()->get('doctrine')->getRepository(GameItem::class)->findOneBy(['key' => $key]);
             self::assertInstanceOf(GameItem::class, $item);
             self::assertFalse($item->isActive());
+            self::assertSame(7, $item->getSellPriceCoins());
             self::assertNotSame('placeholder.png', $item->getImagePath());
             $this->client->request('GET', '/game-images/'.$item->getImagePath());
             self::assertResponseIsSuccessful();
@@ -417,6 +419,30 @@ final class GameCrudHttpTest extends ApiTestCase
             $edit->setValues(['GameItem[priceCoins]' => '2']);
             $this->client->submit($edit);
             self::assertResponseRedirects();
+
+            self::getContainer()->get('doctrine')->getManager()->clear();
+            $updatedItem = self::getContainer()->get('doctrine')->getRepository(GameItem::class)->findOneBy(['key' => $key]);
+            self::assertInstanceOf(GameItem::class, $updatedItem);
+            self::assertSame(7, $updatedItem->getSellPriceCoins());
+            self::assertSame(2, $updatedItem->getPriceCoins());
+            $published = self::getContainer()->get('doctrine')->getRepository(GameRuleset::class)->find(1);
+            self::assertInstanceOf(GameRuleset::class, $published);
+            /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $publishedItems */
+            $publishedItems = $published->snapshot()['items'];
+            $catalog = new \App\Rewards\Domain\ItemCatalog($publishedItems);
+            self::assertSame(7, $catalog->find($key)?->sellPriceCoins);
+            $version = $published->version();
+            $crawler = $this->client->request('GET', '/admin/item/'.$item->getId()->toRfc4122().'/edit');
+            $edit = $crawler->filter('form[name="GameItem"]')->form();
+            $edit->setValues(['GameItem[sellPriceCoins]' => '9']);
+            $this->client->submit($edit);
+            self::assertResponseRedirects();
+            $changed = self::getContainer()->get('doctrine')->getRepository(GameRuleset::class)->find(1);
+            self::assertInstanceOf(GameRuleset::class, $changed);
+            self::assertNotSame($version, $changed->version());
+            /** @var list<array{key: string, sell_price_coins: int}> $changedItems */
+            $changedItems = $changed->snapshot()['items'];
+            self::assertSame(9, array_column($changedItems, 'sell_price_coins', 'key')[$key]);
 
             $this->delete('/admin/item/'.$item->getId()->toRfc4122().'/edit', '/admin/item/'.$item->getId()->toRfc4122().'/delete');
             self::getContainer()->get('doctrine')->getManager()->clear();
@@ -452,6 +478,35 @@ final class GameCrudHttpTest extends ApiTestCase
         self::assertInstanceOf(GameItem::class, $stored);
         self::assertInstanceOf(GameRuleset::class, $published);
         self::assertSame($price, $stored->getPriceCoins());
+        self::assertSame($revision, $published->revision());
+    }
+
+    public function testNegativeSalePriceIsRenderedBackWithoutPublishing(): void
+    {
+        $this->loginAdmin('form-error-admin@grrind.app');
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+        $item = $manager->getRepository(GameItem::class)->findOneBy([]);
+        $ruleset = $manager->find(GameRuleset::class, 1);
+        self::assertInstanceOf(GameItem::class, $item);
+        self::assertInstanceOf(GameRuleset::class, $ruleset);
+        $price = $item->getSellPriceCoins();
+        $revision = $ruleset->revision();
+
+        $crawler = $this->client->request('GET', '/admin/item/'.$item->getId()->toRfc4122().'/edit');
+        $form = $crawler->filter('form[name="GameItem"]')->form();
+        $form->setValues(['GameItem[sellPriceCoins]' => '-1']);
+        $crawler = $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertStringContainsString('le prix en pièces ne peut pas être négatif', $crawler->text());
+        self::assertSame('-1', $crawler->filter('input[name="GameItem[sellPriceCoins]"]')->attr('value'));
+        $manager->clear();
+        $stored = $manager->find(GameItem::class, $item->getId());
+        $published = $manager->find(GameRuleset::class, 1);
+        self::assertInstanceOf(GameItem::class, $stored);
+        self::assertInstanceOf(GameRuleset::class, $published);
+        self::assertSame($price, $stored->getSellPriceCoins());
         self::assertSame($revision, $published->revision());
     }
 

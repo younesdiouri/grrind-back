@@ -71,7 +71,7 @@ final class ChestRoutesTest extends ApiTestCase
 
         $inventoryEntry = self::itemNamed($this->inventory($bob)['items'], 'WOODEN_CHEST');
         self::assertSame(
-            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'quantity'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'quantity', 'sellPriceCoins'],
             array_keys($inventoryEntry),
         );
         self::assertSame('CHEST', $inventoryEntry['kind']);

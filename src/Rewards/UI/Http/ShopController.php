@@ -27,9 +27,7 @@ use Symfony\Component\Uid\Uuid;
  * n'est pas une donnée de co-équipier, la question du voter et du « 404 jamais 403 » ne se
  * pose pas ici.
  *
- * **Ni revente ni rachat.** Voir « Ce qu'on ne fait pas » du ticket : ce sont des décisions de
- * game design à part entière, pas un corollaire de l'achat — cette classe n'expose donc que
- * `GET` et un seul `POST`.
+ * La vente se fait depuis l’inventaire (#271), dans SellItemController.
  */
 final readonly class ShopController
 {

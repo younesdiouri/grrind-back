@@ -70,7 +70,7 @@ final class InventoryRoutesTest extends ApiTestCase
         $item = $items[0];
 
         self::assertSame(
-            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'quantity'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'quantity', 'sellPriceCoins'],
             array_keys($item),
         );
         self::assertSame('WORN_RUNNING_SHOES', $item['key']);

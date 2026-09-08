@@ -18,8 +18,8 @@ use LogicException;
  * rendent après avoir muté un emplacement — voir le docblock d'`InventoryController` pour
  * pourquoi les trois routes rendent la même forme.
  *
- * **Chaque objet reprend la forme d'{@see DroppedItem}, augmentée d'une seule clé,
- * `quantity`.** Le ticket #30 n'énumère que ce que `DroppedItem` porte déjà — libellé
+ * **Chaque objet reprend la forme d'{@see DroppedItem}, avec `quantity` et
+ * `sellPriceCoins`.** Le ticket #30 n'énumère que ce que `DroppedItem` porte déjà — libellé
  * traduit, rareté, emplacement, modificateurs, prix — mais taire combien d'exemplaires un
  * joueur possède ferait de ce sac une liste qui ment par omission sur une donnée déjà en
  * base, pour zéro raison de la cacher. Ce n'est pas une troisième forme d'objet : c'est la
@@ -86,7 +86,7 @@ final readonly class InventoryResource
 
     /**
      * Une ligne d'inventaire, traduite — voir le docblock de la classe pour pourquoi c'est
-     * `DroppedItem` augmentée d'une clé plutôt qu'une forme distincte. Même geste que
+     * `DroppedItem` complétée par les données propres au sac. Même geste que
      * {@see \App\Rewards\Infrastructure\Drop\WorkoutSessionDrops::describe()} pour la
      * traduction elle-même.
      *
@@ -115,6 +115,6 @@ final readonly class InventoryResource
             $translator->imageUrlOf($item->key),
         );
 
-        return [...$dropped->toArray(), 'quantity' => $owned->quantity()];
+        return [...$dropped->toArray(), 'quantity' => $owned->quantity(), 'sellPriceCoins' => $item->sellPriceCoins];
     }
 }

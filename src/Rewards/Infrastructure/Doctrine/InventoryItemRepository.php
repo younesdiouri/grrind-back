@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rewards\Infrastructure\Doctrine;
 
 use App\Rewards\Domain\EquipmentSlot;
+use App\Rewards\Domain\Exception\ItemEquipped;
 use App\Rewards\Domain\Exception\ItemNotOwned;
 use App\Rewards\Domain\InventoryItem;
 use App\Rewards\Domain\Item;
@@ -180,6 +181,32 @@ class InventoryItemRepository extends ServiceEntityRepository
                 throw new ItemNotOwned($itemKey);
             }
 
+            $owned->consumeOne();
+            $this->getEntityManager()->flush();
+
+            return $owned;
+        });
+    }
+
+    /**
+     * La garde équipé partage le verrou de consumeOne. Refresh écarte une éventuelle
+     * lecture d'affichage conservée dans l'identity map avant l'acquisition du verrou.
+     */
+    public function sellOne(Uuid $userId, string $itemKey): InventoryItem
+    {
+        return $this->getEntityManager()->wrapInTransaction(function () use ($userId, $itemKey): InventoryItem {
+            $this->lock($userId);
+            $owned = $this->ofPlayerAndItem($userId, $itemKey);
+            if (null === $owned) {
+                throw new ItemNotOwned($itemKey);
+            }
+            $this->getEntityManager()->refresh($owned);
+            if ($owned->quantity() < 1) {
+                throw new ItemNotOwned($itemKey);
+            }
+            if (1 === $owned->quantity() && null !== $owned->slot()) {
+                throw new ItemEquipped($itemKey);
+            }
             $owned->consumeOne();
             $this->getEntityManager()->flush();
 

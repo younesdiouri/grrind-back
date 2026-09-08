@@ -57,6 +57,8 @@ final class ItemCrudController extends GameCrudController
         yield ChoiceField::new('kind')->setChoices(['Équipement' => 'EQUIPMENT', 'Coffre' => 'CHEST']);
         yield TextField::new('slot')->hideOnIndex();
         yield IntegerField::new('priceCoins');
+        yield IntegerField::new('sellPriceCoins', 'Prix de revente (pièces)')
+            ->setHelp('Indépendant du prix d’achat. Zéro est autorisé. Les coffres ne se vendent pas.');
         yield CollectionField::new('modifiers')->setEntryType(ModifierEntryType::class)->allowAdd()->allowDelete()->hideOnIndex();
         yield BooleanField::new('shopAvailable');
         yield IntegerField::new('shopMinimumLevel')->hideOnIndex();
