@@ -1,0 +1,13 @@
+framework:
+    lock:
+        chat_storage: 'flock://%env(resolve:CHAT_IMAGES_DIR)%'
+    rate_limiter:
+        # Par joueur : les changements d'IP mobile ne contournent pas le plafond.
+        guild_chat_send:
+            policy: sliding_window
+            limit: 30
+            interval: '1 minute'
+        guild_chat_subscription:
+            policy: sliding_window
+            limit: 10
+            interval: '1 minute'

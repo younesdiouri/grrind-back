@@ -1,0 +1,25 @@
+{
+    {$CADDY_GLOBAL_OPTIONS}
+    frankenphp {
+        {$FRANKENPHP_CONFIG}
+    }
+}
+
+{$SERVER_NAME:localhost} {
+    root * /app/public
+    encode zstd br gzip
+
+    # Le hub partage la machine web, mais l'outbox le joint par HTTP depuis le worker.
+    # Aucun abonné anonyme ; un JWT ne permet que les topics qui lui ont été accordés.
+    mercure {
+        publisher_jwt {$MERCURE_JWT_SECRET}
+        subscriber_jwt {$MERCURE_JWT_SECRET}
+    }
+
+    # Le plafond applicatif d'image est inférieur ; borne aussi le corps avant PHP.
+    @chat path /api/guilds/*/chat/messages
+    request_body @chat {
+        max_size 7MB
+    }
+    php_server
+}

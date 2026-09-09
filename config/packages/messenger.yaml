@@ -81,6 +81,7 @@ framework:
             failed: 'doctrine://default?queue_name=failed&auto_setup=0'
 
         routing:
+            App\Community\Application\ChatChanged: outbox
             # Le routage porte sur l'interface : un événement ajouté dans
             # Shared\Domain\Event est routé du seul fait qu'il l'implémente, plutôt
             # qu'on découvre trois lots plus tard qu'il est resté synchrone.

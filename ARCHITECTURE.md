@@ -665,6 +665,14 @@ séances peuvent commencer à la même seconde.
 
 ## 8. Ce qui tourne en asynchrone
 
+Le chat de guilde (#275) utilise la même outbox : transaction du message →
+`ChatChanged` → hub Mercure intégré à FrankenPHP sur la machine web. Le worker
+le joint par HTTP, et le hub ne publie qu'un signal sans contenu privé. Les
+clients relisent PostgreSQL par l'API, qui revérifie l'adhésion ; les anciennes
+connexions ne conservent donc aucun accès au contenu après un départ. Les images
+restent privées sur le volume local, derrière `ChatImageStorage`, et leur nettoyage
+est exécuté sur la machine web. [Contrat et exploitation](docs/guild-chat.md).
+
 ```mermaid
 flowchart LR
     tx["transaction métier"] -->|"INSERT dans le même COMMIT"| mq[("messenger_messages")]

@@ -3,6 +3,9 @@ services:
     build:
       context: .
       target: dev
+    env_file:
+      - path: .env.mercure.local
+        required: false
     environment:
       APP_ENV: dev
       XDEBUG_MODE: ${XDEBUG_MODE:-off}
@@ -99,6 +102,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
 
 volumes:
   db_data:

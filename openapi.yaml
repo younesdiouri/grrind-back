@@ -111,6 +111,170 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  '/api/guilds/{id}/chat/subscription':
+    post:
+      tags:
+        - 'Chat de guilde'
+      operationId: post_community_chat_subscription
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Jeton de lecture du signal, valable 5 minutes. Aucun contenu privé dans Mercure.'
+          content:
+            application/json:
+              schema:
+                required:
+                  - url
+                  - topic
+                  - token
+                  - expiresAt
+                properties:
+                  url: { type: string, format: uri }
+                  topic: { type: string, format: uri }
+                  token: { type: string }
+                  expiresAt: { type: string, format: date-time }
+                type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: 'Trop de renouvellements de jeton.'
+  '/api/guilds/{id}/chat/messages':
+    get:
+      tags:
+        - 'Chat de guilde'
+      operationId: get_community_chat_history
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+            minimum: 1
+        -
+          name: before
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+        -
+          name: after
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+      responses:
+        '200':
+          description: 'Historique décroissant ; avec after, rattrapage croissant.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  messages: { type: array, items: { $ref: '#/components/schemas/GuildMessage' } }
+                  nextCursor: { type: string, nullable: true }
+                type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - 'Chat de guilde'
+      operationId: post_community_chat_send
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - clientId
+                - text
+              properties:
+                clientId:
+                  type: string
+                  format: uuid
+                text:
+                  description: 'Texte brut, 4 000 caractères par défaut.'
+                  type: string
+              type: object
+          multipart/form-data:
+            schema:
+              required:
+                - clientId
+              allOf:
+                -
+                  $ref: '#/components/schemas/SendChatMessageRequest'
+                -
+                  properties: { clientId: { type: string, format: uuid }, text: { type: string }, image: { description: 'Un JPEG, PNG ou WebP réel ; 5 Mio / 20 mégapixels par défaut. Texte ou image requis.', type: string, format: binary } }
+                  type: object
+      responses:
+        '201':
+          description: 'Message enregistré ou rejoué.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 'Identifiant client réutilisé pour un autre contenu.'
+        '422':
+          description: 'Contenu invalide.'
+        '429':
+          description: '30 tentatives par minute et par joueur, rejeux compris. Retry-After indique le délai.'
+  '/api/guilds/{id}/chat/messages/{messageId}/image':
+    get:
+      tags:
+        - 'Chat de guilde'
+      operationId: get_community_chat_image
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Image privée réencodée, sans cache.'
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
   /api/guilds:
     post:
       tags:
@@ -1121,6 +1285,36 @@ components:
         routeId:
           type: string
           format: uuid
+      type: object
+    GuildMessage:
+      required:
+        - id
+        - clientId
+        - cursor
+        - authorId
+        - text
+        - createdAt
+        - imageUrl
+      properties:
+        id:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        cursor:
+          type: string
+        authorId:
+          type: string
+          format: uuid
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        imageUrl:
+          type: string
+          nullable: true
       type: object
     ProblemDetails:
       description: "Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et\n`detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une\nviolation de validation donne `violations` — pour que le client se recale au lieu\nd'afficher un refus sec.\n"
@@ -3332,6 +3526,36 @@ components:
           maximum: 50
           minimum: 1
       type: object
+    SendChatMessageRequest:
+      properties:
+        clientId:
+          type: string
+          default: ''
+        text:
+          type: string
+          default: ''
+        image:
+          type: string
+          format: binary
+          nullable: true
+          default: null
+      type: object
+    ChatHistoryRequest:
+      properties:
+        limit:
+          type: integer
+          default: 50
+          maximum: 100
+          minimum: 1
+        before:
+          type: string
+          nullable: true
+          default: null
+        after:
+          type: string
+          nullable: true
+          default: null
+      type: object
     FoundGuildRequest:
       properties:
         name:
@@ -3750,6 +3974,8 @@ security:
 tags:
   -
     name: Combat
+  -
+    name: 'Chat de guilde'
   -
     name: Guildes
   -
