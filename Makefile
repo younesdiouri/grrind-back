@@ -11,6 +11,7 @@ RUN_DB  := $(DC) run --rm php
 RUN_TEST := $(DC) run --rm -e APP_ENV=test php
 
 .DEFAULT_GOAL := help
+.PHONY: mercure-smoke mercure-secrets chat-cleanup build-prod
 .PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset test-db-reset openapi test test-existing perf-ruleset audit qa phpstan cs cs-fix deptrac install
 
 help: ## Liste les commandes disponibles
@@ -45,6 +46,7 @@ failures: ## Liste les messages en échec (c="show 42" pour le détail, c="retry
 install: build ## Installation initiale : images, dépendances, secrets, clés, base
 	$(RUN) composer install
 	$(MAKE) secrets
+	$(MAKE) mercure-secrets
 	$(MAKE) jwt-keys
 	$(MAKE) up
 	$(MAKE) db-reset
@@ -123,6 +125,28 @@ migrate-prod: ## Applique les migrations depuis l'image de prod (étape de dépl
 # n'expose aucune documentation.
 openapi: ## Régénère openapi.yaml depuis les routes et les attributs
 	$(RUN) sh -c "bin/console nelmio:apidoc:dump --format=yaml" > openapi.yaml
+
+mercure-smoke: ## Vérifie publication et abonnements privés contre le hub local démarré
+	$(RUN) php bin/check-chat-mercure.php
+
+mercure-secrets: ## Initialise la clé locale du hub, sans écraser une clé existante
+	@if [ ! -f .env.mercure.local ]; then \
+		if grep -q '^MERCURE_JWT_SECRET=.' .env.local; then \
+			grep '^MERCURE_JWT_SECRET=.' .env.local > .env.mercure.local; \
+		else \
+			key=$$(openssl rand -hex 32); \
+			printf 'MERCURE_JWT_SECRET=%s\n' "$$key" > .env.mercure.local; \
+		fi; \
+		for f in .env.local .env.test.local; do \
+			if ! grep -q '^MERCURE_JWT_SECRET=' "$$f"; then printf '\n' >> "$$f"; cat .env.mercure.local >> "$$f"; fi; \
+		done; \
+	fi
+
+build-prod: ## Construit l'image de production sans déployer
+	$(DC) build php-prod
+
+chat-cleanup: ## Nettoie les pièces jointes sans référence sur le volume local
+	$(RUN_DB) bin/console app:chat:cleanup
 
 ## —— Qualité ——————————————————————————————————————————————————————————————
 test: ## Suite de tests (base de test créée/migrée au passage)

@@ -11,11 +11,16 @@ services:
             # Même source que lexik_jwt_authentication.token_ttl : la durée annoncée
             # au client ne peut pas diverger de celle réellement signée.
             int $accessTokenTtl: '%env(int:JWT_TTL)%'
+            string $chatImageDirectory: '%env(resolve:CHAT_IMAGES_DIR)%'
+            int $chatImageMaxBytes: '%env(int:CHAT_IMAGE_MAX_BYTES)%'
+            int $chatImageMaxPixels: '%env(int:CHAT_IMAGE_MAX_PIXELS)%'
             int $chatTextMaxLength: '%env(int:CHAT_TEXT_MAX_LENGTH)%'
             string $gameImageDirectory: '%env(resolve:GAME_IMAGES_DIR)%'
 
     App\:
         resource: '../src/'
+
+    App\Community\Application\ChatImageStorage: '@App\Community\Infrastructure\Storage\LocalChatImageStorage'
 
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
     App\Shared\Application\GameRulesets: '@App\Shared\Infrastructure\Config\DatabaseGameRulesets'

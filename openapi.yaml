@@ -111,6 +111,39 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  '/api/guilds/{id}/chat/subscription':
+    post:
+      tags:
+        - 'Chat de guilde'
+      operationId: post_community_chat_subscription
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Jeton de lecture du signal, valable 5 minutes. Aucun contenu privé dans Mercure.'
+          content:
+            application/json:
+              schema:
+                required:
+                  - url
+                  - topic
+                  - token
+                  - expiresAt
+                properties:
+                  url: { type: string, format: uri }
+                  topic: { type: string, format: uri }
+                  token: { type: string }
+                  expiresAt: { type: string, format: date-time }
+                type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: 'Trop de renouvellements de jeton.'
   '/api/guilds/{id}/chat/messages':
     get:
       tags:
@@ -176,7 +209,27 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SendChatMessageRequest'
+              required:
+                - clientId
+                - text
+              properties:
+                clientId:
+                  type: string
+                  format: uuid
+                text:
+                  description: 'Texte brut, 4 000 caractères par défaut.'
+                  type: string
+              type: object
+          multipart/form-data:
+            schema:
+              required:
+                - clientId
+              allOf:
+                -
+                  $ref: '#/components/schemas/SendChatMessageRequest'
+                -
+                  properties: { clientId: { type: string, format: uuid }, text: { type: string }, image: { description: 'Un JPEG, PNG ou WebP réel ; 5 Mio / 20 mégapixels par défaut. Texte ou image requis.', type: string, format: binary } }
+                  type: object
       responses:
         '201':
           description: 'Message enregistré ou rejoué.'
@@ -184,12 +237,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GuildMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
           description: 'Identifiant client réutilisé pour un autre contenu.'
         '422':
           description: 'Contenu invalide.'
+        '429':
+          description: '30 tentatives par minute et par joueur, rejeux compris. Retry-After indique le délai.'
+  '/api/guilds/{id}/chat/messages/{messageId}/image':
+    get:
+      tags:
+        - 'Chat de guilde'
+      operationId: get_community_chat_image
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Image privée réencodée, sans cache.'
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
   /api/guilds:
     post:
       tags:
@@ -3449,6 +3534,11 @@ components:
         text:
           type: string
           default: ''
+        image:
+          type: string
+          format: binary
+          nullable: true
+          default: null
       type: object
     ChatHistoryRequest:
       properties:

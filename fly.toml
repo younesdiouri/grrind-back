@@ -17,6 +17,11 @@ primary_region = 'cdg'
   # Les images sont provisoirement locales : le volume est mono-machine et non répliqué.
   # Ne pas scaler `app` horizontalement avant la migration vers un stockage objet.
   GAME_IMAGES_DIR = '/data/game-images'
+  # Même volume, répertoire privé inaccessible à la route publique /game-images.
+  CHAT_IMAGES_DIR = '/data/game-images/.chat-private'
+  # Le worker est une autre machine : localhost désignerait le mauvais processus.
+  MERCURE_URL = 'https://grrind-back.fly.dev/.well-known/mercure'
+  MERCURE_PUBLIC_URL = 'https://grrind-back.fly.dev/.well-known/mercure'
   # Fly Proxy termine TLS puis joint l'application depuis son pair immédiat. REMOTE_ADDR
   # suit ce pair, comme le recommande Fly pour que Symfony lise X-Forwarded-Proto en sûreté.
   TRUSTED_PROXIES = '127.0.0.1,REMOTE_ADDR'

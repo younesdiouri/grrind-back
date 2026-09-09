@@ -16,9 +16,12 @@ RUN install-php-extensions \
         intl \
         opcache \
         zip \
+        gd \
+        exif \
         apcu
 
 COPY --from=composer/composer:2-bin /composer /usr/bin/composer
+COPY docker/frankenphp/Caddyfile /etc/frankenphp/Caddyfile
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_HOME=/tmp/composer
