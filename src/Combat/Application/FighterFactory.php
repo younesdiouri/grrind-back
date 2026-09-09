@@ -12,6 +12,7 @@ use App\Shared\Application\GameRulesets;
 use App\Shared\Application\ModifierResolver;
 use App\Shared\Application\PlayerProgression;
 use App\Shared\Domain\Modifier\Modifier;
+use App\Shared\Domain\Modifier\ModifierSource;
 use App\Shared\Domain\Modifier\ModifierType;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
@@ -33,20 +34,44 @@ final readonly class FighterFactory
      */
     public function forPlayer(PlayerProgression $progression, Uuid $playerId, DateTimeImmutable $occurredAt): Fighter
     {
+        return $this->resolvePlayer($progression, $playerId, $occurredAt)['fighter'];
+    }
+
+    /**
+     * Une seule résolution alimente le combat et son explication : les bonus affichés ne
+     * doivent jamais être réappliqués côté client, notamment après saturation ou plancher.
+     *
+     * @return array{attributes: array<string, array{base: int, equipmentBonus: int, effective: int}>, fighter: Fighter}
+     */
+    public function resolvePlayer(PlayerProgression $progression, Uuid $playerId, DateTimeImmutable $occurredAt): array
+    {
         $rules = $this->rules();
         $modifiers = $this->modifiers->of($playerId, $occurredAt);
-        $attributes = $progression->attributes;
-
-        // Étape 1 du contrat d'ordre : le bonus de caractéristique s'ajoute au total lu du
-        // snapshot avant toute dérivation — voir le docblock de la classe.
-        $strength = max(0, CombatMath::add($attributes->strength, self::sumOf($modifiers, ModifierType::StrengthBonus)));
-        $endurance = max(0, CombatMath::add($attributes->endurance, self::sumOf($modifiers, ModifierType::EnduranceBonus)));
-        $mobility = max(0, CombatMath::add($attributes->mobility, self::sumOf($modifiers, ModifierType::MobilityBonus)));
-        $dexterity = max(0, CombatMath::add($attributes->dexterity, self::sumOf($modifiers, ModifierType::DexterityBonus)));
-        // Jamais bonifiée par un modificateur — voir le docblock de `ModifierType`.
+        $attributes = [];
+        $baseAttributes = $progression->attributes->toArray();
+        $equipmentModifiers = array_values(array_filter($modifiers, static fn (Modifier $modifier): bool => ModifierSource::Item === $modifier->source));
+        foreach ([
+            'strength' => ModifierType::StrengthBonus,
+            'endurance' => ModifierType::EnduranceBonus,
+            'mobility' => ModifierType::MobilityBonus,
+            'dexterity' => ModifierType::DexterityBonus,
+        ] as $name => $type) {
+            $base = $baseAttributes[$name];
+            $attributes[$name] = [
+                'base' => $base,
+                'equipmentBonus' => self::sumOf($equipmentModifiers, $type),
+                'effective' => max(0, CombatMath::add($base, self::sumOf($modifiers, $type))),
+            ];
+        }
+        // La vitalité inclut déjà le bonus d'énergie active ; aucun objet ne la bonifie.
         $vitality = max(0, $progression->vitality);
+        $attributes['vitality'] = ['base' => $progression->vitality, 'equipmentBonus' => 0, 'effective' => $vitality];
+        $strength = $attributes['strength']['effective'];
+        $endurance = $attributes['endurance']['effective'];
+        $mobility = $attributes['mobility']['effective'];
+        $dexterity = $attributes['dexterity']['effective'];
 
-        return new Fighter(
+        $fighter = new Fighter(
             hp: max(1, CombatMath::add(CombatMath::add($rules->baseHp, CombatMath::scale($vitality, $rules->hpPer1000Vitality)), self::sumOf($modifiers, ModifierType::HpBonus))),
             damage: max(0, CombatMath::add(CombatMath::add($rules->baseDamage, CombatMath::scale($strength, $rules->damagePer1000Strength)), self::sumOf($modifiers, ModifierType::DamageBonus))),
             maintenancePermille: min($rules->maintenanceCapPermille, max(0, CombatMath::add(CombatMath::rate($endurance, $rules->maintenanceCapPermille, $rules->maintenanceHalfSaturation), self::sumOf($modifiers, ModifierType::MaintenanceBonus)))),
@@ -59,6 +84,8 @@ final readonly class FighterFactory
             comboPermille: min($rules->comboCapPermille, max(0, CombatMath::add(CombatMath::rate(CombatMath::pair($endurance, $dexterity), $rules->comboCapPermille, $rules->comboHalfSaturation), self::sumOf($modifiers, ModifierType::ComboBonus)))),
             precisionPermille: min($rules->precisionCapPermille, max(0, CombatMath::add(CombatMath::rate(CombatMath::pair($mobility, $dexterity), $rules->precisionCapPermille, $rules->precisionHalfSaturation), self::sumOf($modifiers, ModifierType::PrecisionBonus)))),
         );
+
+        return ['attributes' => $attributes, 'fighter' => $fighter];
     }
 
     public function forEnemy(Enemy $enemy): Fighter

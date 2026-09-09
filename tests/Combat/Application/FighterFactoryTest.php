@@ -33,6 +33,26 @@ use Symfony\Component\Uid\Uuid;
  */
 final class FighterFactoryTest extends TestCase
 {
+    public function testStatisticsExplainTheSameAttributesUsedByCombat(): void
+    {
+        $factory = self::factoryOf(modifiers: [
+            self::modifierOf(ModifierType::StrengthBonus, 100),
+            self::modifierOf(ModifierType::StrengthBonus, 50),
+            self::modifierOf(ModifierType::DexterityBonus, -200),
+            new Modifier(ModifierType::MobilityBonus, 30, ModifierSource::Skill),
+        ]);
+        $progression = self::progressionOf(strength: 1000, dexterity: 100, vitality: 200);
+        $id = self::playerId();
+        $at = self::occurredAt();
+        $resolved = $factory->resolvePlayer($progression, $id, $at);
+
+        self::assertSame(['base' => 1000, 'equipmentBonus' => 150, 'effective' => 1150], $resolved['attributes']['strength']);
+        self::assertSame(['base' => 100, 'equipmentBonus' => -200, 'effective' => 0], $resolved['attributes']['dexterity']);
+        self::assertSame(['base' => 0, 'equipmentBonus' => 0, 'effective' => 30], $resolved['attributes']['mobility']);
+        self::assertSame(['base' => 200, 'equipmentBonus' => 0, 'effective' => 200], $resolved['attributes']['vitality']);
+        self::assertEquals($factory->forPlayer($progression, $id, $at), $resolved['fighter']);
+    }
+
     public function testEverySynergyAndDirectBonusUsesTheDeclaredOrder(): void
     {
         $fighter = self::factoryOf(modifiers: [

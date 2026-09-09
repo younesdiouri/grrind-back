@@ -8,6 +8,8 @@ use App\Community\Domain\Exception\PlayerNotFound;
 use App\Community\UI\Http\Response\PlayerResource;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
+use App\Shared\Application\PlayerStatistics;
+use App\Shared\Application\PublicInventories;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -39,6 +41,8 @@ final readonly class PlayerController
     public function __construct(
         private PlayerProfiles $profiles,
         private PlayerProgressions $progressions,
+        private PlayerStatistics $statistics,
+        private PublicInventories $inventories,
     ) {
     }
 
@@ -46,8 +50,8 @@ final readonly class PlayerController
     #[OA\Tag(name: 'Guildes')]
     #[OA\Response(
         response: 200,
-        description: 'Le profil public. **Exactement le bloc servi dans la liste des membres** : mêmes ports, même ressource, donc un seul type à décoder côté client.',
-        content: new OA\JsonContent(ref: '#/components/schemas/Player'),
+        description: 'Le profil public détaillé : identité et cercles de la liste des membres, inventaire public et statistiques résolues.',
+        content: new OA\JsonContent(ref: '#/components/schemas/PlayerDetail'),
     )]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     #[OA\Response(
@@ -77,6 +81,10 @@ final readonly class PlayerController
 
         $progression = $this->progressions->of([$id])[$id->toRfc4122()];
 
-        return new JsonResponse(PlayerResource::from($id, $profile, $progression)->toArray());
+        return new JsonResponse([
+            ...PlayerResource::from($id, $profile, $progression)->toArray(),
+            'inventory' => $this->inventories->of($id),
+            'statistics' => $this->statistics->of($id, $progression),
+        ]);
     }
 }

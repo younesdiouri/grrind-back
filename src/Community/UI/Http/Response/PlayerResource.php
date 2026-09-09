@@ -12,8 +12,8 @@ use DateTimeInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Un joueur **tel que les autres joueurs le voient**. La seule forme sous laquelle l'API
- * expose quelqu'un d'autre que soi-même.
+ * Un joueur **tel que les autres joueurs le voient**. Le bloc commun aux listes et au
+ * profil détaillé, qui ajoute l'inventaire public et le combattant au #273.
  *
  * **Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni rôle
  * applicatif. Ce sont des données de compte et non de profil public. La garantie ne repose

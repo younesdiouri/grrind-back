@@ -16,6 +16,8 @@ use App\Rewards\Infrastructure\Translation\ItemTranslator;
 use App\Rewards\UI\Http\Request\EquipItemRequest;
 use App\Rewards\UI\Http\Response\ChestOpenResource;
 use App\Rewards\UI\Http\Response\InventoryResource;
+use App\Shared\Application\PlayerProgressions;
+use App\Shared\Application\PlayerStatistics;
 use App\Shared\UI\Http\Idempotent;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -29,8 +31,8 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Le sac, la doublure équipée, la bourse — et les deux gestes qui font vivre l'équipement
  * (#30). Aucun identifiant de compte sur aucune route : le joueur vient de `#[CurrentUser]`,
- * comme `/api/me`, `/api/progression` et `/api/workouts` — un inventaire n'est pas une
- * donnée de co-équipier, la question du voter et du « 404 jamais 403 » ne se pose pas ici.
+ * comme `/api/me`, `/api/progression` et `/api/workouts`. Le profil public expose une
+ * projection distincte sans bourse ni prix, après contrôle du voter.
  *
  * **`{slot}` est une chaîne brute, jamais l'enum {@see \App\Rewards\Domain\EquipmentSlot}
  * résolue par Symfony.** Un typage direct aurait fait résoudre — ou refuser en 404 — la
@@ -68,6 +70,8 @@ final readonly class InventoryController
         private OpenChestHandler $openChest,
         private ItemCatalog $catalog,
         private ItemTranslator $translator,
+        private PlayerProgressions $progressions,
+        private PlayerStatistics $statistics,
     ) {
     }
 
@@ -75,7 +79,7 @@ final readonly class InventoryController
     #[OA\Tag(name: 'Récompenses')]
     #[OA\Response(
         response: 200,
-        description: 'Le sac, la doublure équipée par emplacement, et le solde de pièces.',
+        description: 'Le sac, la doublure équipée par emplacement, le solde de pièces et les statistiques résolues.',
         content: new OA\JsonContent(ref: '#/components/schemas/Inventory'),
     )]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
@@ -170,8 +174,13 @@ final readonly class InventoryController
 
     private function overviewResponse(UserInterface $user): JsonResponse
     {
-        $overview = $this->overview->of(Uuid::fromString($user->getUserIdentifier()));
+        $id = Uuid::fromString($user->getUserIdentifier());
+        $overview = $this->overview->of($id);
+        $progression = $this->progressions->of([$id])[$id->toRfc4122()];
 
-        return new JsonResponse(InventoryResource::from($overview, $this->catalog, $this->translator)->toArray());
+        return new JsonResponse([
+            ...InventoryResource::from($overview, $this->catalog, $this->translator)->toArray(),
+            'statistics' => $this->statistics->of($id, $progression),
+        ]);
     }
 }

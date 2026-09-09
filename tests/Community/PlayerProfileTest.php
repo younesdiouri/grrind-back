@@ -6,6 +6,7 @@ namespace App\Tests\Community;
 
 use App\Progression\Application\GrantXp;
 use App\Progression\Application\GrantXpHandler;
+use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
 use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
@@ -92,6 +93,38 @@ final class PlayerProfileTest extends ApiTestCase
         );
     }
 
+    public function testATeammatesEquipmentAndStatisticsMatchHisInventoryWithoutPrivateValues(): void
+    {
+        [$founder, $member] = $this->guildOfTwo();
+        $repository = self::getContainer()->get(InventoryItemRepository::class);
+        self::assertInstanceOf(InventoryItemRepository::class, $repository);
+        $repository->grant($member->id, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
+        $repository->grant($member->id, 'WORN_RUNNING_SHOES', Uuid::v7(), new DateTimeImmutable());
+        $own = self::decode($this->send('PUT', '/api/inventory/equipment/HANDS', ['itemKey' => 'IRON_GAUNTLETS'], $member->headers));
+        $public = self::decode($this->get('/api/players/'.$member->id->toRfc4122(), $founder->headers));
+
+        self::assertSame($own['statistics'], $public['statistics']);
+        self::assertIsArray($public['inventory']);
+        self::assertSame(['equipment', 'items'], array_keys($public['inventory']));
+        self::assertIsArray($public['inventory']['equipment']);
+        self::assertIsArray($own['equipment']);
+        self::assertIsArray($own['equipment']['HANDS']);
+        self::assertIsArray($public['inventory']['equipment']['HANDS']);
+        self::assertSame($own['equipment']['HANDS']['key'], $public['inventory']['equipment']['HANDS']['key']);
+        self::assertIsArray($public['inventory']['items']);
+        self::assertCount(2, $public['inventory']['items']);
+        foreach ([...$public['inventory']['items'], ...array_filter($public['inventory']['equipment'])] as $item) {
+            self::assertIsArray($item);
+            self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'imageUrl', 'quantity'], array_keys($item));
+            self::assertNotEmpty($item['modifiers']);
+        }
+        self::assertIsArray($public['attributes']);
+        self::assertIsArray($public['statistics']);
+        self::assertIsArray($public['statistics']['attributes']);
+        self::assertSame(0, $public['attributes']['strength'], 'Les cercles conservent la progression sans équipement.');
+        self::assertSame(['base' => 0, 'equipmentBonus' => 350, 'effective' => 350], $public['statistics']['attributes']['strength']);
+    }
+
     public function testAStrangerIsNotVisible(): void
     {
         $stranger = $this->openAccount('dan@grrind.app', 'Dan');
@@ -165,8 +198,8 @@ final class PlayerProfileTest extends ApiTestCase
         self::assertArrayNotHasKey('nextTitle', $body, 'Le prochain titre visé n\'a de sens que sur son propre profil.');
     }
 
-    /** Même bloc que dans la liste des membres : mêmes ports, même ressource. */
-    public function testTheProfileMatchesTheMemberBlockExactly(): void
+    /** Le détail enrichit le bloc commun sans charger les sacs dans la liste. */
+    public function testTheProfileKeepsTheSameMemberBlock(): void
     {
         [$founder, $member] = $this->guildOfTwo();
 
@@ -190,6 +223,9 @@ final class PlayerProfileTest extends ApiTestCase
         // La liste ajoute le rôle et la date d'entrée ; tout le reste doit coïncider, sans
         // quoi le client aurait deux types à décoder pour le même objet.
         unset($inList['role'], $inList['joinedAt']);
+        self::assertArrayNotHasKey('inventory', $inList);
+        self::assertArrayNotHasKey('statistics', $inList);
+        unset($alone['inventory'], $alone['statistics']);
         self::assertSame($alone, $inList);
     }
 
