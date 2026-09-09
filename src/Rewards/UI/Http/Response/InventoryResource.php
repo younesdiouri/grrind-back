@@ -85,6 +85,19 @@ final readonly class InventoryResource
     }
 
     /**
+     * Liste blanche : une nouvelle donnée privée de la ligne ne devient jamais publique
+     * par défaut. Les noms et images restent traduits par le même chemin que le sac.
+     *
+     * @return array<string, mixed>
+     */
+    public static function describePublic(InventoryItem $owned, ItemCatalog $catalog, ItemTranslator $translator): array
+    {
+        return array_intersect_key(self::describe($owned, $catalog, $translator), array_flip([
+            'key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'imageUrl', 'quantity',
+        ]));
+    }
+
+    /**
      * Une ligne d'inventaire, traduite — voir le docblock de la classe pour pourquoi c'est
      * `DroppedItem` complétée par les données propres au sac. Même geste que
      * {@see \App\Rewards\Infrastructure\Drop\WorkoutSessionDrops::describe()} pour la

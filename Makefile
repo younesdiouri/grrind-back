@@ -11,7 +11,7 @@ RUN_DB  := $(DC) run --rm php
 RUN_TEST := $(DC) run --rm -e APP_ENV=test php
 
 .DEFAULT_GOAL := help
-.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset test-db-reset openapi test perf-ruleset audit qa phpstan cs cs-fix deptrac install
+.PHONY: help build up down restart logs sh worker failures composer console cc secrets jwt-keys migration migrate migrate-prod db-reset test-db-reset openapi test test-existing perf-ruleset audit qa phpstan cs cs-fix deptrac install
 
 help: ## Liste les commandes disponibles
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -129,6 +129,9 @@ test: ## Suite de tests (base de test créée/migrée au passage)
 	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \
 		&& bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration \
 		&& vendor/bin/phpunit $(c)"
+
+test-existing: ## Suite de tests sur le schéma de test existant, sans migration
+	$(RUN_TEST) vendor/bin/phpunit $(c)
 
 perf-ruleset: ## Mesure froide/chaude des quatre endpoints de règles (#260)
 	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \

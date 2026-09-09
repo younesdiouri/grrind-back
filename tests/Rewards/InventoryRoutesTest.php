@@ -41,12 +41,31 @@ final class InventoryRoutesTest extends ApiTestCase
         );
     }
 
+    public function testStatisticsFollowEquipmentMutationsAndMatchTheCombat(): void
+    {
+        $bob = $this->openAccount();
+        $this->grant($bob->id, 'IRON_GAUNTLETS');
+        $before = self::decode($this->get('/api/inventory', $bob->headers));
+        $equipped = self::decode($this->send('PUT', '/api/inventory/equipment/HANDS', ['itemKey' => 'IRON_GAUNTLETS'], $bob->headers));
+        $enemies = self::decode($this->get('/api/enemies', $bob->headers));
+        self::assertIsArray($equipped['statistics']);
+        self::assertIsArray($equipped['statistics']['attributes']);
+        self::assertIsArray($equipped['statistics']['fighter']);
+        self::assertIsArray($before['statistics']);
+        self::assertIsArray($before['statistics']['fighter']);
+        self::assertSame($enemies['player'], $equipped['statistics']['fighter']);
+        self::assertSame(['base' => 0, 'equipmentBonus' => 350, 'effective' => 350], $equipped['statistics']['attributes']['strength']);
+        self::assertGreaterThan($before['statistics']['fighter']['damage'], $equipped['statistics']['fighter']['damage']);
+        $unequipped = self::decode($this->send('DELETE', '/api/inventory/equipment/HANDS', null, $bob->headers));
+        self::assertSame($before['statistics'], $unequipped['statistics']);
+    }
+
     /** L'ordre des clés de l'enveloppe est du contrat versionné. */
     public function testTheKeyOrderOfTheEnvelopeIsFixed(): void
     {
         $bob = $this->openAccount();
 
-        self::assertSame(['coins', 'equipment', 'items'], array_keys($this->inventory($bob)));
+        self::assertSame(['coins', 'equipment', 'items', 'statistics'], array_keys($this->inventory($bob)));
     }
 
     public function testAHotInventoryReadDoesNotQueryThePublishedRulesetAgain(): void
@@ -57,7 +76,7 @@ final class InventoryRoutesTest extends ApiTestCase
 
         $this->client->enableProfiler();
         $this->inventory($bob);
-        $this->assertNoRulesetSql();
+        $this->assertOnlyRulesetRevisionPointerSql();
     }
 
     public function testAnOwnedItemCarriesEverythingNeededToDisplayItWithoutAFurtherRequest(): void

@@ -378,11 +378,11 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Le profil public. **Exactement le bloc servi dans la liste des membres** : mêmes ports, même ressource, donc un seul type à décoder côté client.'
+          description: 'Le profil public détaillé : identité et cercles de la liste des membres, inventaire public et statistiques résolues.'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Player'
+                $ref: '#/components/schemas/PlayerDetail'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -762,7 +762,7 @@ paths:
       operationId: get_rewards_inventory_show
       responses:
         '200':
-          description: 'Le sac, la doublure équipée par emplacement, et le solde de pièces.'
+          description: 'Le sac, la doublure équipée par emplacement, le solde de pièces et les statistiques résolues.'
           content:
             application/json:
               schema:
@@ -1331,7 +1331,7 @@ components:
           minLength: 8
       type: object
     Player:
-      description: "Un joueur **tel que les autres joueurs le voient** — la seule forme sous\nlaquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par\n`GET /api/players/{id}`, et étalée dans chaque membre d'une guilde.\n\n**Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni\nrôle applicatif. Ce sont des données de compte, pas de profil public — et les\nports qui alimentent cette ressource ne les rendent tout simplement pas.\n\n**Les cinq caractéristiques (#176) y figurent par décision de produit** : la\nrépartition d'une pratique a été tranchée sociale, c'est une des raisons\nd'avoir des guildes. Ce que la phrase ci-dessus exclut ne bouge pas pour\nautant — un champ de compte n'entre pas ici parce qu'un champ de jeu vient d'y\nentrer.\n"
+      description: "Un joueur **tel que les autres joueurs le voient** — la seule forme sous\nlaquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par\n`GET /api/players/{id}` dans PlayerDetail, et étalée dans chaque membre d'une guilde.\n\n**Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni\nrôle applicatif. Ce sont des données de compte, pas de profil public — et les\nports qui alimentent cette ressource ne les rendent tout simplement pas.\n\n**Les cinq caractéristiques (#176) y figurent par décision de produit** : la\nrépartition d'une pratique a été tranchée sociale, c'est une des raisons\nd'avoir des guildes. Ce que la phrase ci-dessus exclut ne bouge pas pour\nautant — un champ de compte n'entre pas ici parce qu'un champ de jeu vient d'y\nentrer.\n"
       required:
         - id
         - displayName
@@ -2093,16 +2093,194 @@ components:
               type: integer
               minimum: 0
           type: object
+    PublicInventoryLine:
+      description: 'Objet possédé visible sur un profil autorisé, sans données monétaires.'
+      required:
+        - key
+        - kind
+        - name
+        - rarity
+        - slot
+        - modifiers
+        - imageUrl
+        - quantity
+      properties:
+        key:
+          description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire."
+          type: string
+          example: WORN_RUNNING_SHOES
+        kind:
+          description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
+          type: string
+          enum:
+            - EQUIPMENT
+            - CHEST
+        name:
+          description: 'Déjà traduit dans la langue du joueur — rien à recharger côté client.'
+          type: string
+          example: 'Chaussures de course usées'
+        rarity:
+          type: string
+          enum:
+            - COMMON
+            - UNCOMMON
+            - RARE
+            - EPIC
+            - LEGENDARY
+        slot:
+          description: "`null` pour un coffre (#230) — il ne se porte pas, il s'ouvre."
+          type: string
+          nullable: true
+          enum:
+            - HEAD
+            - CHEST
+            - HANDS
+            - LEGS
+            - FEET
+            - ACCESSORY
+            - WEAPON
+        modifiers:
+          description: "Dans l'ordre du catalogue."
+          type: array
+          items:
+            $ref: '#/components/schemas/DroppedItemModifier'
+        imageUrl:
+          description: "URL absolue de l'image livrée par le serveur."
+          type: string
+          format: uri
+          example: 'https://api.grrind.app/game-images/placeholder.png'
+        quantity:
+          type: integer
+          minimum: 1
+      type: object
+    PublicInventory:
+      required:
+        - equipment
+        - items
+      properties:
+        equipment:
+          required:
+            - HEAD
+            - CHEST
+            - HANDS
+            - LEGS
+            - FEET
+            - ACCESSORY
+            - WEAPON
+          properties:
+            HEAD:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/PublicInventoryLine'
+            CHEST:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/PublicInventoryLine'
+            HANDS:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/PublicInventoryLine'
+            LEGS:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/PublicInventoryLine'
+            FEET:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/PublicInventoryLine'
+            ACCESSORY:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/PublicInventoryLine'
+            WEAPON:
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/PublicInventoryLine'
+          type: object
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicInventoryLine'
+      type: object
+    AttributeStatistic:
+      required:
+        - base
+        - equipmentBonus
+        - effective
+      properties:
+        base:
+          description: "Valeur de progression avant les modificateurs de combat; vitalité déjà bonifiée par l'énergie active."
+          type: integer
+        equipmentBonus:
+          description: 'Somme saturée des bonus des objets équipés; zéro pour la vitalité. Peut être négative.'
+          type: integer
+        effective:
+          description: "Valeur résolue pour le combat après tous les modificateurs, saturation entière et plancher zéro. Ne pas recalculer depuis base et equipmentBonus : d'autres sources peuvent contribuer."
+          type: integer
+          minimum: 0
+      type: object
+    PlayerStatistics:
+      required:
+        - attributes
+        - fighter
+      properties:
+        attributes:
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+            - vitality
+          properties:
+            strength:
+              $ref: '#/components/schemas/AttributeStatistic'
+            endurance:
+              $ref: '#/components/schemas/AttributeStatistic'
+            mobility:
+              $ref: '#/components/schemas/AttributeStatistic'
+            dexterity:
+              $ref: '#/components/schemas/AttributeStatistic'
+            vitality:
+              $ref: '#/components/schemas/AttributeStatistic'
+          type: object
+        fighter:
+          $ref: '#/components/schemas/BattleFighter'
+      type: object
+    PlayerDetail:
+      description: 'Profil autorisé complet. Les listes de guilde conservent Player pour éviter de charger tous les sacs.'
+      allOf:
+        -
+          $ref: '#/components/schemas/Player'
+        -
+          required:
+            - inventory
+            - statistics
+          properties:
+            inventory:
+              $ref: '#/components/schemas/PublicInventory'
+            statistics:
+              $ref: '#/components/schemas/PlayerStatistics'
+          type: object
     Inventory:
       description: "`GET /api/inventory`, et ce que `PUT`/`DELETE /api/inventory/equipment/{slot}`\nrendent après une mutation, pour un seul aller-retour — le sac, la doublure\néquipée par emplacement, la bourse.\n\n`equipment` porte toujours les sept emplacements d'`EquipmentSlot`, `null` pour\nceux qui sont vides — jamais une clé absente, qui forcerait le client à distinguer\n« pas encore chargé » de « rien ici ». `items` porte tout ce que le joueur possède,\néquipé compris : ce n'est pas une donnée à recouper contre `equipment`, c'est la\nmême ligne, vue sous un autre angle.\n"
       required:
         - coins
         - equipment
         - items
+        - statistics
       properties:
         coins:
           description: "Le solde de la bourse — cet écran lui appartient autant qu'au sac."
           type: integer
+        statistics:
+          $ref: '#/components/schemas/PlayerStatistics'
         equipment:
           required:
             - HEAD

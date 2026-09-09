@@ -405,7 +405,7 @@ when@dev:
                         description: |
                             Un joueur **tel que les autres joueurs le voient** — la seule forme sous
                             laquelle l'API expose quelqu'un d'autre que soi-même. Servie telle quelle par
-                            `GET /api/players/{id}`, et étalée dans chaque membre d'une guilde.
+                            `GET /api/players/{id}` dans PlayerDetail, et étalée dans chaque membre d'une guilde.
 
                             **Ce qui n'y figure pas est la moitié du contrat** : ni adresse, ni fuseau, ni
                             rôle applicatif. Ce sont des données de compte, pas de profil public — et les
@@ -1084,6 +1084,84 @@ when@dev:
 
                                   sellPriceCoins: { type: integer, minimum: 0, description: "Prix de revente publié, indépendant du prix d’achat. Les coffres ne se vendent pas." }
 
+                    PublicInventoryLine:
+                        type: object
+                        description: "Objet possédé visible sur un profil autorisé, sans données monétaires."
+                        required: [key, kind, name, rarity, slot, modifiers, imageUrl, quantity]
+                        properties:
+                            key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
+                            kind:
+                                type: string
+                                enum: [EQUIPMENT, CHEST]
+                                description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
+                            name: { type: string, example: "Chaussures de course usées", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
+                            rarity:
+                                type: string
+                                enum: [COMMON, UNCOMMON, RARE, EPIC, LEGENDARY]
+                            slot:
+                                type: string
+                                nullable: true
+                                enum: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                                description: "`null` pour un coffre (#230) — il ne se porte pas, il s'ouvre."
+                            modifiers:
+                                type: array
+                                description: "Dans l'ordre du catalogue."
+                                items: { $ref: '#/components/schemas/DroppedItemModifier' }
+                            imageUrl: { type: string, format: uri, example: "https://api.grrind.app/game-images/placeholder.png", description: "URL absolue de l'image livrée par le serveur." }
+                            quantity: { type: integer, minimum: 1 }
+
+                    PublicInventory:
+                        type: object
+                        required: [equipment, items]
+                        properties:
+                            equipment:
+                                type: object
+                                required: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                                properties:
+                                    HEAD: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
+                                    CHEST: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
+                                    HANDS: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
+                                    LEGS: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
+                                    FEET: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
+                                    ACCESSORY: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
+                                    WEAPON: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
+                            items:
+                                type: array
+                                items: { $ref: '#/components/schemas/PublicInventoryLine' }
+
+                    AttributeStatistic:
+                        type: object
+                        required: [base, equipmentBonus, effective]
+                        properties:
+                            base: { type: integer, description: "Valeur de progression avant les modificateurs de combat; vitalité déjà bonifiée par l'énergie active." }
+                            equipmentBonus: { type: integer, description: "Somme saturée des bonus des objets équipés; zéro pour la vitalité. Peut être négative." }
+                            effective: { type: integer, minimum: 0, description: "Valeur résolue pour le combat après tous les modificateurs, saturation entière et plancher zéro. Ne pas recalculer depuis base et equipmentBonus : d'autres sources peuvent contribuer." }
+
+                    PlayerStatistics:
+                        type: object
+                        required: [attributes, fighter]
+                        properties:
+                            attributes:
+                                type: object
+                                required: [strength, endurance, mobility, dexterity, vitality]
+                                properties:
+                                    strength: { $ref: '#/components/schemas/AttributeStatistic' }
+                                    endurance: { $ref: '#/components/schemas/AttributeStatistic' }
+                                    mobility: { $ref: '#/components/schemas/AttributeStatistic' }
+                                    dexterity: { $ref: '#/components/schemas/AttributeStatistic' }
+                                    vitality: { $ref: '#/components/schemas/AttributeStatistic' }
+                            fighter: { $ref: '#/components/schemas/BattleFighter' }
+
+                    PlayerDetail:
+                        description: "Profil autorisé complet. Les listes de guilde conservent Player pour éviter de charger tous les sacs."
+                        allOf:
+                            - $ref: '#/components/schemas/Player'
+                            - type: object
+                              required: [inventory, statistics]
+                              properties:
+                                  inventory: { $ref: '#/components/schemas/PublicInventory' }
+                                  statistics: { $ref: '#/components/schemas/PlayerStatistics' }
+
                     Inventory:
                         type: object
                         description: |
@@ -1096,9 +1174,10 @@ when@dev:
                             « pas encore chargé » de « rien ici ». `items` porte tout ce que le joueur possède,
                             équipé compris : ce n'est pas une donnée à recouper contre `equipment`, c'est la
                             même ligne, vue sous un autre angle.
-                        required: [coins, equipment, items]
+                        required: [coins, equipment, items, statistics]
                         properties:
                             coins: { type: integer, description: "Le solde de la bourse — cet écran lui appartient autant qu'au sac." }
+                            statistics: { $ref: '#/components/schemas/PlayerStatistics' }
                             equipment:
                                 type: object
                                 required: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
