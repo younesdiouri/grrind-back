@@ -111,6 +111,85 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  '/api/guilds/{id}/chat/messages':
+    get:
+      tags:
+        - 'Chat de guilde'
+      operationId: get_community_chat_history
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+            minimum: 1
+        -
+          name: before
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+        -
+          name: after
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+      responses:
+        '200':
+          description: 'Historique décroissant ; avec after, rattrapage croissant.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  messages: { type: array, items: { $ref: '#/components/schemas/GuildMessage' } }
+                  nextCursor: { type: string, nullable: true }
+                type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - 'Chat de guilde'
+      operationId: post_community_chat_send
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendChatMessageRequest'
+      responses:
+        '201':
+          description: 'Message enregistré ou rejoué.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 'Identifiant client réutilisé pour un autre contenu.'
+        '422':
+          description: 'Contenu invalide.'
   /api/guilds:
     post:
       tags:
@@ -1121,6 +1200,36 @@ components:
         routeId:
           type: string
           format: uuid
+      type: object
+    GuildMessage:
+      required:
+        - id
+        - clientId
+        - cursor
+        - authorId
+        - text
+        - createdAt
+        - imageUrl
+      properties:
+        id:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        cursor:
+          type: string
+        authorId:
+          type: string
+          format: uuid
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        imageUrl:
+          type: string
+          nullable: true
       type: object
     ProblemDetails:
       description: "Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et\n`detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une\nviolation de validation donne `violations` — pour que le client se recale au lieu\nd'afficher un refus sec.\n"
@@ -3332,6 +3441,31 @@ components:
           maximum: 50
           minimum: 1
       type: object
+    SendChatMessageRequest:
+      properties:
+        clientId:
+          type: string
+          default: ''
+        text:
+          type: string
+          default: ''
+      type: object
+    ChatHistoryRequest:
+      properties:
+        limit:
+          type: integer
+          default: 50
+          maximum: 100
+          minimum: 1
+        before:
+          type: string
+          nullable: true
+          default: null
+        after:
+          type: string
+          nullable: true
+          default: null
+      type: object
     FoundGuildRequest:
       properties:
         name:
@@ -3750,6 +3884,8 @@ security:
 tags:
   -
     name: Combat
+  -
+    name: 'Chat de guilde'
   -
     name: Guildes
   -

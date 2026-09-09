@@ -138,6 +138,17 @@ when@dev:
                             Passé ce délai, on le renouvelle avec le refresh token.
 
                 schemas:
+                    GuildMessage:
+                        type: object
+                        required: [id, clientId, cursor, authorId, text, createdAt, imageUrl]
+                        properties:
+                            id: { type: string, format: uuid }
+                            clientId: { type: string, format: uuid }
+                            cursor: { type: string }
+                            authorId: { type: string, format: uuid }
+                            text: { type: string }
+                            createdAt: { type: string, format: date-time }
+                            imageUrl: { type: string, nullable: true }
                     # ————— Le vocabulaire des erreurs ——————————————————————————————————
                     ProblemDetails:
                         type: object

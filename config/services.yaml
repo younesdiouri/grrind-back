@@ -11,6 +11,7 @@ services:
             # Même source que lexik_jwt_authentication.token_ttl : la durée annoncée
             # au client ne peut pas diverger de celle réellement signée.
             int $accessTokenTtl: '%env(int:JWT_TTL)%'
+            int $chatTextMaxLength: '%env(int:CHAT_TEXT_MAX_LENGTH)%'
             string $gameImageDirectory: '%env(resolve:GAME_IMAGES_DIR)%'
 
     App\:
