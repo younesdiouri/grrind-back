@@ -10,7 +10,8 @@ namespace App\Rewards\Domain;
  * crédite pour une raison qui n'est pas listée ici, et une valeur qu'aucun code n'écrit est
  * une porte qu'on finit par pousser.
  *
- * Quatre valeurs : {@see LootRoller} tire pour un workout crédité, un combat gagné ou un
+ * Les drops et coffres créditent, les achats débitent, et les ventes créditent (`SALE`, #271).
+ * Historiquement : {@see LootRoller} tire pour un workout crédité, un combat gagné ou un
  * coffre ouvert (`WORKOUT_DROP`, `BATTLE_DROP`, `CHEST`, #225 et #230), et la boutique
  * dépense (`PURCHASE`, #229) — la seule raison qui écrit une ligne négative, voir
  * {@see \App\Rewards\Application\CoinLedger::spend()}. `CHEST` est arrivé sans migration au
@@ -23,4 +24,5 @@ enum CoinReason: string
     case BattleDrop = 'BATTLE_DROP';
     case Purchase = 'PURCHASE';
     case Chest = 'CHEST';
+    case Sale = 'SALE';
 }

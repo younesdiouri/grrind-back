@@ -122,7 +122,7 @@ final readonly class GameRulesetPublisher
     {
         $itemRows = array_map(static fn (GameItem $item): array => [
             'key' => $item->getKey(), 'active' => $item->isActive(), 'rarity' => $item->getRarity(), 'kind' => $item->getKind(), 'slot' => $item->getSlot(),
-            'price_coins' => $item->getPriceCoins(), 'modifiers' => $item->getModifiers(),
+            'price_coins' => $item->getPriceCoins(), 'sell_price_coins' => $item->getSellPriceCoins(), 'modifiers' => $item->getModifiers(),
             'shop' => ['available' => $item->isShopAvailable(), 'minimum_level' => $item->getShopMinimumLevel()],
             'image_path' => $item->getImagePath(), 'translations' => $item->getTranslations(),
         ], $items);

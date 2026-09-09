@@ -261,6 +261,9 @@ when@dev:
                                     # occupé par un autre objet n'en fait pas partie : `PUT` échange plutôt
                                     # que de refuser, voir le docblock d'`InventoryItemRepository::equip()`.
                                     - https://grrind.app/problems/item-not-owned
+                                    - https://grrind.app/problems/item-not-sellable
+                                    - https://grrind.app/problems/item-equipped
+                                    - https://grrind.app/problems/sale-price-changed
                                     - https://grrind.app/problems/equipment-slot-unknown
                                     - https://grrind.app/problems/equipment-slot-incompatible
                                     # La boutique (#229). Clé inconnue et objet hors étal partagent
@@ -1068,16 +1071,18 @@ when@dev:
                     InventoryLine:
                         type: object
                         description: |
-                            Un objet possédé (#30) — la même forme que `DroppedItem`, une seule clé de plus :
-                            `quantity`. Ce n'est pas une troisième forme d'objet, c'est la même, augmentée d'un
+                            Un objet possédé (#30, #271) — `DroppedItem` complété par `quantity` et
+                            `sellPriceCoins`. Ce n'est pas une troisième forme d'objet, c'est la même, augmentée d'un
                             fait qu'un tirage n'a jamais eu à porter — un objet qui tombe en crée ou en
                             incrémente une, il n'en a jamais une à afficher lui-même.
                         allOf:
                             - $ref: '#/components/schemas/DroppedItem'
                             - type: object
-                              required: [quantity]
+                              required: [quantity, sellPriceCoins]
                               properties:
-                                  quantity: { type: integer, example: 1, description: "Le nombre d'exemplaires possédés — pas de vente ni de rebut en v1, il ne redescend jamais." }
+                                  quantity: { type: integer, example: 1, description: "Le nombre d’exemplaires encore possédés." }
+
+                                  sellPriceCoins: { type: integer, minimum: 0, description: "Prix de revente publié, indépendant du prix d’achat. Les coffres ne se vendent pas." }
 
                     Inventory:
                         type: object
@@ -1114,7 +1119,7 @@ when@dev:
                         description: |
                             Un objet de l'étal (#229) — la même forme que `DroppedItem`, avec ce qu'un joueur
                             précis en sait en plus. `owned` s'appuie sur la même règle que l'achat lui-même :
-                            sans revente ni consommable, un objet déjà possédé ne redevient jamais achetable.
+                            un équipement redevient achetable après la vente de son dernier exemplaire.
                         allOf:
                             - $ref: '#/components/schemas/DroppedItem'
                             - type: object
@@ -1139,6 +1144,16 @@ when@dev:
                             items:
                                 type: array
                                 items: { $ref: '#/components/schemas/ShopListing' }
+
+                    Sale:
+                        type: object
+                        required: [itemKey, quantity, coins, coinsBefore, coinsAfter]
+                        properties:
+                            itemKey: { type: string }
+                            quantity: { type: integer, minimum: 0, description: "Quantité restante après la vente." }
+                            coins: { type: integer, minimum: 0, description: "Prix effectivement crédité depuis le snapshot publié." }
+                            coinsBefore: { type: integer }
+                            coinsAfter: { type: integer }
 
                     Purchase:
                         type: object
@@ -1180,9 +1195,9 @@ when@dev:
                         required: [id, sourceId, reason, amount, occurredAt]
                         properties:
                             id: { type: string, format: uuid }
-                            sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant du workout, du combat, ou de la ligne d'inventaire achetée pour un `PURCHASE`." }
-                            reason: { type: string, enum: [WORKOUT_DROP, BATTLE_DROP, PURCHASE] }
-                            amount: { type: integer, description: "Signé — négatif pour `PURCHASE` (#229), positif pour les deux autres raisons. Un solde ne passe jamais sous zéro, quel que soit le signe de l'écriture qui le tenterait." }
+                            sourceId: { type: string, format: uuid, description: "Ce qui a produit l'écriture — l'identifiant du workout, du combat, de la ligne d’inventaire achetée pour un `PURCHASE`, ou un UUID propre à chaque `SALE`." }
+                            reason: { type: string, enum: [WORKOUT_DROP, BATTLE_DROP, PURCHASE, CHEST, SALE] }
+                            amount: { type: integer, description: "Signé — négatif pour `PURCHASE` (#229), positif pour les autres raisons. Un solde ne passe jamais sous zéro, quel que soit le signe de l'écriture qui le tenterait." }
                             occurredAt:
                                 type: string
                                 format: date-time

@@ -93,6 +93,18 @@ class CoinTransactionRepository extends ServiceEntityRepository
         });
     }
 
+    /** Le reçu de vente lit son solde sous le même verrou que record, dans la transaction inventaire. */
+    public function lockedBalanceOf(Uuid $userId): int
+    {
+        \assert($this->getEntityManager()->getConnection()->isTransactionActive());
+        $this->getEntityManager()->getConnection()->executeStatement(
+            'SELECT pg_advisory_xact_lock(hashtext(:userId))',
+            ['userId' => $userId->toRfc4122()],
+        );
+
+        return $this->balanceOf($userId);
+    }
+
     /**
      * Le solde d'un joueur, par simple somme — c'est la définition du solde, voir le
      * docblock de {@see CoinTransaction}. Appelée sous le verrou par {@see record()}, elle

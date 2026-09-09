@@ -43,6 +43,7 @@ final readonly class Item
          * le snapshot publié n'a donc aucun verrou de niveau.
          */
         public int $shopMinimumLevel = 1,
+        public int $sellPriceCoins = 0,
     ) {
     }
 }

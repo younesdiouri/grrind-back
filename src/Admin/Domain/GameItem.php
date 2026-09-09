@@ -50,6 +50,9 @@ class GameItem
     #[ORM\Column(name: 'price_coins')]
     private int $priceCoins = 0;
 
+    #[ORM\Column(name: 'sell_price_coins')]
+    private int $sellPriceCoins = 0;
+
     /** @var list<array{type: string, value: int, discipline?: string}> */
     #[ORM\Column(type: Types::JSON)]
     private array $modifiers = [];
@@ -161,6 +164,16 @@ class GameItem
     public function setPriceCoins(int $priceCoins): void
     {
         $this->priceCoins = $priceCoins;
+    }
+
+    public function getSellPriceCoins(): int
+    {
+        return $this->sellPriceCoins;
+    }
+
+    public function setSellPriceCoins(int $sellPriceCoins): void
+    {
+        $this->sellPriceCoins = $sellPriceCoins;
     }
 
     /** @return list<array{type: string, value: int, discipline?: string}> */
