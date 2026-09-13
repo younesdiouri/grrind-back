@@ -82,6 +82,9 @@ final class CombatV2MigrationTest extends KernelTestCase
             self::assertSame(GameRulesetVersion::of($published), $db->fetchOne('SELECT version FROM game_ruleset'));
             self::assertSame(8, $db->fetchOne('SELECT revision FROM game_ruleset'));
             self::assertSame(16, $db->fetchOne("SELECT (snapshot->'combat'->'fighter'->>'base_damage')::int FROM game_ruleset"));
+            // Le validateur courant exige également les sources ajoutées après cette migration.
+            \assert(\is_array($published['combat']));
+            $published['combat']['formulas'] = \App\Tests\Combat\StatFormulaFixture::data();
             new ReflectionMethod(GameRulesetPublisher::class, 'validate')->invoke(null, $published);
         } finally {
             $db->rollBack();

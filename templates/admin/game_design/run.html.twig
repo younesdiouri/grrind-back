@@ -1,0 +1,44 @@
+{% extends 'admin/game_design/layout.html.twig' %}
+{% block body %}
+<h1>Expérience · {{ run.input.profile.name }}</h1><p>{{ run.createdAt|date('d/m/Y H:i') }} · Moteur {{ run.engineVersion }} · Entrées et règles figées.</p>
+<p><a href="{{ path('admin_game_design_run_archive', {id: run.id}) }}">Télécharger l’archive complète (entrées, règles et résultats)</a></p>
+<details><summary>Profil initial de l’expérience</summary><p>Force {{ run.input.profile.strength }} · Endurance {{ run.input.profile.endurance }} · Mobilité {{ run.input.profile.mobility }} · Dextérité {{ run.input.profile.dexterity }} · Vitalité imposée {{ run.input.profile.vitalityOverride ?? 'Aucune' }} · Équipement {{ run.input.profile.equipment|join(', ') ?: 'Aucun' }}</p></details>
+{% if run.kind.value == 'combat' %}
+<p>Graine initiale {{ run.input.seed }} · {{ run.input.samples }} combats par version. Chaque combat utilise la graine initiale + son indice.</p>
+{% for side, result in run.result %}
+<section class="panel"><h2>{{ side == 'published' ? 'Publié' : 'Brouillon' }}</h2><p>Version {{ result.version }}</p>
+<table><tr><th>Victoires</th><th>Défaites</th><th>Limites atteintes</th><th>Durée moyenne (ticks)</th><th>PV moyens joueur / ennemi</th></tr><tr><td>{{ result.wins }} ({{ (100 * result.wins / result.samples)|number_format(1, ',', ' ') }} %)</td><td>{{ result.defeats }}</td><td>{{ result.limits }}</td><td>{{ (result.totalTicks / result.samples)|number_format(1, ',', ' ') }}</td><td>{{ (result.totalPlayerHp / result.samples)|number_format(1, ',', ' ') }} / {{ (result.totalEnemyHp / result.samples)|number_format(1, ',', ' ') }}</td></tr></table>
+<h3>Distribution des PV restants du joueur</h3><ul>{% for bucket, count in result.histogram %}<li>{{ bucket }} : {{ count }}</li>{% endfor %}</ul>
+<h3>Valeurs utilisées</h3><p>Niveau dérivé {{ result.level }} · XP {{ result.totalXp }}.</p>
+<details><summary>Bonus d’équipement appliqués</summary><ul>{% for bonus in result.bonuses %}<li>{{ bonus.type }} : {{ bonus.value }}{% if bonus.discipline %} · {{ bonus.discipline }}{% endif %}</li>{% else %}<li>Aucun bonus.</li>{% endfor %}</ul><p>Attributs : bonus avant la formule ; statistiques directes : bonus après la formule, puis planchers et plafonds. Les multiplicateurs XP s’appliquent seulement aux séances.</p></details><table><tr><th>Statistique</th><th>Joueur</th><th>Adversaire</th></tr>{% for key,value in result.player %}<tr><td>{{ statLabels[key] ?? key }}</td><td>{{ value }}</td><td>{{ attribute(result.enemy,key) }}</td></tr>{% endfor %}</table>
+<details><summary>Attributs après équipement</summary><table>{% for key,value in result.attributes %}<tr><th>{{ statLabels[key] ?? key }}</th><td>Base {{ value.base }} · Équipement +{{ value.equipmentBonus }} · Total {{ value.effective }}</td></tr>{% endfor %}</table></details>
+<h3>Premier combat : {{ result.detail.result }}</h3><p>{{ result.detail.attackCount }} tentatives · {{ result.detail.elapsedTicks }} ticks · {{ result.detail.endReason }}</p>
+<details><summary>Déroulé complet</summary><ol>{% for event in result.detail.events|slice(eventOffset, 100) %}<li>{% for key,value in event %}<strong>{{ statLabels[key] ?? key }}</strong> {{ value is same as(true) ? 'oui' : (value is same as(false) ? 'non' : (value is iterable ? value|json_encode : value)) }}{% if not loop.last %} · {% endif %}{% endfor %}</li>{% endfor %}</ol><p>Page {{ eventPage }} · {{ result.detail.events|length }} événements au total. {% if eventPage > 1 %}<a href="{{ path('admin_game_design_run', {id: run.id, page: eventPage - 1}) }}">Page précédente</a>{% endif %} {% if result.detail.events|length > eventOffset + 100 %}<a href="{{ path('admin_game_design_run', {id: run.id, page: eventPage + 1}) }}">Page suivante</a>{% endif %}</p></details>
+</section>
+{% endfor %}
+{% else %}
+<p>Programme {{ run.input.program.name }} · Départ {{ run.input.program.startDate }} · Fuseau {{ run.input.program.timezone }} · {{ run.input.program.weeks }} semaines.</p>
+<p>Équipement fixe. Énergie journalière saisie, jours précédant le départ à zéro. Vitalité imposée ignorée. Bonus de série : 0 (mécanique non implémentée dans le jeu). Guildes, compétences, ligues, achats et loot ne sont pas simulés. La fenêtre d’antériorité d’import ne s’applique pas à ce calendrier fictif.</p>
+<h2>Comparer les trajectoires</h2><p><span style="color:#70d6c4">━━ Publié</span> · <span style="color:#ffb86c">┄┄ Brouillon</span>. Les tableaux ci-dessous donnent les valeurs exactes.</p>
+<div class="comparison-grid">
+{% for metric, label in {totalXp: 'XP cumulée', level: 'Niveau', vitality: 'Vitalité'} %}
+{% set maximum = 1 %}
+{% for side, result in run.result %}{% for week in result.weeks %}{% set maximum = max(maximum, attribute(week.state, metric)) %}{% endfor %}{% endfor %}
+<figure><figcaption>{{ label }}</figcaption><svg class="chart" viewBox="0 0 360 190" role="img" aria-label="{{ label }} par semaine, publié en vert et brouillon en orange">
+<path d="M40 10V160H350" fill="none" stroke="#516676"/><text x="0" y="20" fill="#bbcad6" font-size="12">{{ maximum }}</text><text x="25" y="162" fill="#bbcad6" font-size="12">0</text><text x="40" y="183" fill="#bbcad6" font-size="12">S1</text><text x="320" y="183" fill="#bbcad6" font-size="12">S{{ run.input.program.weeks }}</text>
+{% for side,result in run.result %}<polyline fill="none" stroke="{{ side == 'published' ? '#70d6c4' : '#ffb86c' }}" stroke-width="3" {% if side == 'draft' %}stroke-dasharray="6 4"{% endif %} points="{% for week in result.weeks %}{{ 40 + 310 * loop.index0 / max(1, run.input.program.weeks - 1) }},{{ 160 - 145 * attribute(week.state, metric) / maximum }} {% endfor %}"/>{% endfor %}
+</svg></figure>
+{% endfor %}
+</div>
+{% for side, result in run.result %}
+<section class="panel"><h2>{{ side == 'published' ? 'Publié' : 'Brouillon' }}</h2><p>Version {{ result.version }} · XP initiale {{ result.initialXp }}</p>
+<table><thead><tr><th>Semaine</th><th>XP gagnée / totale</th><th>Niveau / XP restante</th><th>Attributs F / E / M / D</th><th>Vitalité</th><th>Énergie moyenne</th><th>Combat</th></tr></thead><tbody>
+{% for week in result.weeks %}<tr><td>{{ week.week }} · {{ week.date }}</td><td>{{ week.xp }} / {{ week.state.totalXp }}</td><td>{{ week.state.level }} / {{ week.state.xpToNextLevel ?? 'Maximum' }}</td><td>{{ week.state.attributes|join(' / ') }}</td><td>{{ week.state.vitality }} (+{{ week.state.vitalityBonusPermille }} ‰)</td><td>{{ week.state.averageEnergy }} kcal</td><td><a href="{{ path('admin_game_design_week_combat', {id: run.id, week: week.week, side: side}) }}">Tester en combat</a></td></tr>
+<tr><td colspan="7"><details><summary>Statistiques de combat · semaine {{ week.week }}</summary><table>{% for key, value in week.state.fighter %}<tr><th>{{ statLabels[key] ?? key }}</th><td>{{ value }}</td></tr>{% endfor %}</table></details></td></tr>
+{% endfor %}</tbody></table>
+<details><summary>Détail de chaque séance ({{ result.sessions|length }})</summary>
+{% for session in result.sessions %}<article><h3>{{ session.at }} · {{ session.discipline }}</h3><p>{{ session.duration }} secondes enregistrées · {{ session.retained }} retenues · {{ session.xp }} XP{% if session.reason %} · {{ session.reason }}{% endif %}</p><ul>{% for line in session.breakdown %}<li>{{ line.source }} : {{ line.amount }} XP</li>{% endfor %}</ul><p>Total {{ session.state.totalXp }} XP · Niveau {{ session.state.level }} · {{ session.state.xpToNextLevel ?? 'Maximum' }} XP jusqu’au suivant · F/E/M/D {{ session.state.attributes|join(' / ') }} · Vitalité {{ session.state.vitality }}</p><details><summary>Statistiques de combat</summary><table>{% for key, value in session.state.fighter %}<tr><th>{{ statLabels[key] ?? key }}</th><td>{{ value }}</td></tr>{% endfor %}</table></details></article>{% endfor %}
+</details></section>
+{% endfor %}
+{% endif %}
+{% endblock %}

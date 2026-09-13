@@ -7,7 +7,6 @@ namespace App\Tests\Admin;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameRuleset;
 use App\Admin\Infrastructure\GameConfigurationReferenceGuard;
-use App\Admin\Infrastructure\GameRulesetPublisher;
 use App\Admin\UI\EasyAdmin\GameCrudController;
 use App\Tests\Support\ApiTestCase;
 use Doctrine\ORM\EntityManagerInterface;
@@ -29,7 +28,6 @@ final class GameCrudRollbackTest extends ApiTestCase
 
         $item->setPriceCoins(-1);
         $controller = new RollbackItemCrudController(
-            self::getContainer()->get(GameRulesetPublisher::class),
             self::getContainer()->get(GameConfigurationReferenceGuard::class),
             sys_get_temp_dir(),
         );

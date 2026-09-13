@@ -268,7 +268,7 @@ final class CombatCoverageTest extends KernelTestCase
         $modifiers = $container->get(ModifierResolver::class);
         self::assertInstanceOf(ModifierResolver::class, $modifiers);
 
-        return new FighterFactory(self::shippedRules(), $modifiers);
+        return new FighterFactory(self::getContainer()->get(\App\Shared\Application\GameRulesets::class), $modifiers);
     }
 
     private static function shippedSimulator(): BattleSimulator

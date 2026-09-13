@@ -218,7 +218,7 @@ final class RewardsCoverageTest extends KernelTestCase
         self::assertIsArray($fighter);
         $rules = CombatRules::fromSnapshot($fighter);
 
-        return new FighterFactory($rules, new ModifierResolver([
+        return new FighterFactory(self::getContainer()->get(\App\Shared\Application\GameRulesets::class), new ModifierResolver([
             new class($modifiers) implements ModifierContributor {
                 /**
                  * @param list<Modifier> $modifiers

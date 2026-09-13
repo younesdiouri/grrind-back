@@ -820,8 +820,11 @@ Les pièges qui se reproduisent. Les autres sont datés, corrigés, et vivent da
 `/admin` est un firewall Symfony stateful distinct du JWT mobile. Seul `ROLE_ADMIN` y entre ;
 la commande `app:user:grant-admin <email>` promeut un compte local existant et refuse un compte
 social sans mot de passe. Les données de balance éditables sont importées une fois dans les tables
-`game_*`. Toute mutation EasyAdmin reconstruit le snapshot dans une transaction et rejoue les
-constructeurs métier : une configuration incohérente ne devient jamais visible partiellement.
+`game_*`. Toute mutation EasyAdmin modifie le brouillon partagé avec une révision attendue.
+La publication explicite dans `/admin/game-design` verrouille ce brouillon, rejoue les
+constructeurs métier puis archive et remplace atomiquement le snapshot : une configuration
+incohérente ne devient jamais visible partiellement. Les formulaires et publications périmés
+sont refusés. Les images précédemment référencées restent disponibles.
 Le cache taggé n'est qu'une accélération : il est invalidé après le commit et toute panne
 retombe sur PostgreSQL. Le snapshot est indexé par sa révision dans les workers longs ; aucun
 catalogue ne rescane ni ne mélange une ancienne et une nouvelle publication. L'empreinte hybride
@@ -839,4 +842,32 @@ Créer le volume dans la région de la machine applicative, avant le premier dé
 `/data/game-images`. Une seule machine peut monter ce volume à la fois : ne pas augmenter le
 compte du process `app` au-delà de un tant que les images ne sont pas sorties vers un stockage
 objet. `placeholder.png` est servi même sur un volume fraîchement créé ; les uploads sont reçus
-dans `/data/game-images/.staging`, puis promus seulement avec la publication transactionnelle.
+dans `/data/game-images/.staging`, puis promus avec la sauvegarde transactionnelle du brouillon. Le publié continue à pointer
+vers ses images précédentes jusqu’à la publication explicite.
+
+### Atelier de game design (#277)
+
+`Admin` orchestre les expériences et conserve leurs données dans `game_design_*`.
+Il réutilise les fonctions pures des modules, sans leurs handlers ni repositories.
+`FrozenGameRulesets` porte chaque snapshot choisi pendant tout le calcul.
+`FighterDerivation` et `CombatSnapshot` sont communs aux combats réels et fictifs ;
+`WorkoutOverlapArbitration` est commun à l’import et au programme sportif.
+
+```mermaid
+flowchart LR
+    draft["game_* · brouillon"] --> prepare["prepare · validation commune"]
+    prepare --> publish["publication explicite + verrou"]
+    publish --> runtime["game_ruleset · jeu des joueurs"]
+    publish --> history["game_publication · archive"]
+    prepare --> frozen["deux snapshots gelés"]
+    runtime --> frozen
+    profile["profil + programme fictifs"] --> simulation["moteurs purs"]
+    frozen --> simulation
+    simulation --> result["game_design_run · entrées + résultats + version moteur"]
+    result --> week["état hebdomadaire → combat"]
+```
+
+Le laboratoire maintient son ledger et son énergie en mémoire ; il ne publie aucun
+événement métier. Son bonus de série est nul tant que la mécanique est absente du jeu.
+Les bornes techniques, l’archivage et les mesures HTTP figurent dans
+[le guide de l’atelier](docs/game-design.md).

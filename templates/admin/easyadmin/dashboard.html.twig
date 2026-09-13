@@ -3,7 +3,9 @@
 {% block main %}
     <div id="grrind-admin-dashboard">
         <h1>GRRIND · Administration</h1>
+        <p><a class="btn btn-primary" href="{{ path('admin_game_design_campaigns') }}">Campagnes d’équilibrage · profils aléatoires et KPI</a></p>
         <p>Choisissez une ressource à administrer ou à consulter.</p>
+        <p><a class="btn btn-primary" href="{{ path('admin_game_design') }}">Game design · brouillon et publication</a></p>
 
         {% for title, links in sections %}
             <section class="mb-5">

@@ -10,6 +10,7 @@ use App\Admin\UI\Form\CommunityType;
 use App\Admin\UI\Form\FighterType;
 use App\Admin\UI\Form\LootLuckType;
 use App\Admin\UI\Form\NotificationsType;
+use App\Admin\UI\Form\StatFormulasType;
 use App\Admin\UI\Form\TrainingType;
 use App\Admin\UI\Form\XpType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -39,6 +40,7 @@ final class SettingsCrudController extends GameCrudController
     public function configureFields(string $pageName): iterable
     {
         yield IntegerField::new('id')->onlyOnIndex();
+        yield StructuredField::new('formulas', 'Sources des statistiques')->setFormType(StatFormulasType::class)->hideOnIndex();
         yield StructuredField::new('fighter')->setFormType(FighterType::class)->hideOnIndex();
         yield StructuredField::new('lootLuck')->setFormType(LootLuckType::class)->hideOnIndex();
         yield StructuredField::new('training')->setFormType(TrainingType::class)->hideOnIndex();

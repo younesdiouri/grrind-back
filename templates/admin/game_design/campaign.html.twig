@@ -1,0 +1,47 @@
+{% extends 'admin/game_design/layout.html.twig' %}
+{% block title %}Campagne · {{ run.input.profile.name }} · GRRIND{% endblock %}
+{% block body %}
+{% set result = run.result %}{% set input = run.input %}
+<h1>Campagne · {{ input.profile.name }}</h1><p>{{ input.profiles|length }} profils × {{ input.enemies|length }} adversaires × {{ result.repetitions }} répétitions × 2 versions = <strong>{{ result.duels }} duels</strong>. {{ result.attemptBudget }} tentatives au maximum. Graine {{ input.seed }} · Moteur {{ run.engineVersion }}.</p>
+<p>Publié {{ result.versions.published }} · Brouillon {{ result.versions.draft }}. <a href="{{ path('admin_game_design_run_archive', {id:run.id}) }}">Télécharger les entrées, règles et résultats figés</a></p>
+<p>Panel exploratoire à budget individuel identique, équipement vide, vitalité calculée sans énergie récente. Aucun profil ni adversaire exclu. Une limite de tentatives compte comme défaite et figure dans les KPI.</p>
+{% if result.repetitions < 30 %}<p class="error">Faible effectif : {{ result.repetitions }} combats par cellule et version. Un taux de 0 % ou 100 % reste incertain ; consultez l’intervalle de Wilson à 95 % avant de conclure.</p>{% endif %}
+<p>Les intervalles décrivent le hasard du combat pour ce panel, pas la représentativité des joueurs. Le taux global est pondéré par les combats réellement exécutés ; il ne constitue pas un score d’équilibre.</p>
+{% if result.target is not null %}<p>Cible globale indicative choisie : <strong>{{ result.target }} %</strong>. Les écarts sont en points de pourcentage ; chaque adversaire peut avoir une intention différente.</p>{% else %}<p>Aucune cible de victoire définie. Une victoire plus fréquente ne signifie pas automatiquement un meilleur équilibre.</p>{% endif %}
+<h2>Vue d’ensemble</h2><div class="kpis">
+{% for side,label in {published:'Publié',draft:'Brouillon'} %}{% set stats = attribute(result.global,side) %}
+<div class="kpi"><h3>{{ label }}</h3><strong>{{ stats.winRate|number_format(1,',',' ') }} %</strong><p>{{ stats.wins }} victoires / {{ stats.n }} combats<br>IC 95 % [{{ stats.low|number_format(1,',',' ') }} ; {{ stats.high|number_format(1,',',' ') }}]</p>
+{% if result.target is not null %}<p>Écart à la cible : {{ (stats.winRate-result.target)|number_format(1,',',' ') }} points</p>{% endif %}
+<p>PV joueur moyens {{ stats.meanPlayerHpPercent|number_format(1,',',' ') }} % · ennemi {{ stats.meanEnemyHpPercent|number_format(1,',',' ') }} %</p>
+<p>Durée moyenne {{ stats.meanTicks|number_format(1,',',' ') }} ticks<br>Médiane {{ stats.medianTicks }} · P90 {{ stats.p90Ticks }}<br>Limites {{ stats.limitRate|number_format(1,',',' ') }} %</p>
+<p>Dispersion entre profils : σ {{ attribute(result.dispersion,side)|number_format(1,',',' ') }} points</p></div>
+{% endfor %}</div>
+<p>Delta global brouillon − publié : <strong>{{ (result.global.draft.winRate-result.global.published.winRate)|number_format(1,',',' ') }} points</strong>. La dispersion mesure l’hétérogénéité à budget égal ; elle n’indique pas seule si les profils sont souhaitables.</p>
+<h2>Carte de chaleur · profils × adversaires</h2><p>Intensité bleue = taux de victoire ; les nombres restent l’information de référence. Chaque cellule montre publié, brouillon, delta, IC 95 % et effectif. « Premier duel » rejoue la première graine avec les règles archivées.</p>
+<div class="table-scroll"><table class="heatmap"><caption>Taux de victoire par profil et adversaire</caption><thead><tr><th>Profil et attributs F / E / M / D</th>{% for enemy in input.enemies %}<th>{{ enemy }}</th>{% endfor %}</tr></thead><tbody>
+{% for profile in input.profiles %}{% set p = loop.index0 %}<tr><th scope="row">{{ profile.name }}<small>{{ profile.strength }} / {{ profile.endurance }} / {{ profile.mobility }} / {{ profile.dexterity }}<br>Budget {{ profile.strength+profile.endurance+profile.mobility+profile.dexterity }}</small></th>
+{% for enemy in input.enemies %}{% set index = p * input.enemies|length + loop.index0 %}{% set cell = result.cells[index] %}
+<td style="background:rgba(80,140,210,{{ 0.05+0.4*cell.draft.winRate/100 }})">
+{% for side,label in {published:'Publié',draft:'Brouillon'} %}{% set stats = attribute(cell,side) %}<strong>{{ label }} {{ stats.winRate|number_format(1,',',' ') }} %</strong><small>IC [{{ stats.low|number_format(1,',',' ') }} ; {{ stats.high|number_format(1,',',' ') }}] · n={{ stats.n }}</small>{% endfor %}
+<small>Δ {{ (cell.draft.winRate-cell.published.winRate)|number_format(1,',',' ') }} points</small>
+{% if result.target is not null %}<small>Brouillon − cible : {{ (cell.draft.winRate-result.target)|number_format(1,',',' ') }} points</small>{% endif %}
+<small>PV joueur {{ cell.published.meanPlayerHpPercent|number_format(1,',',' ') }} → {{ cell.draft.meanPlayerHpPercent|number_format(1,',',' ') }} %<br>Ticks {{ cell.published.meanTicks|number_format(1,',',' ') }} → {{ cell.draft.meanTicks|number_format(1,',',' ') }}<br>Limites {{ cell.published.limitRate|number_format(1,',',' ') }} → {{ cell.draft.limitRate|number_format(1,',',' ') }} %</small>
+<form method="post" action="{{ path('admin_game_design_campaign_detail', {id:run.id,cell:index}) }}"><input type="hidden" name="_token" value="{{ csrf_token('campaign-detail-'~run.id) }}"><button type="submit">Premier duel</button></form>
+</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div>
+<h2>Classements comparatifs</h2><p>Publié en vert, brouillon en orange. L’échelle va de 0 à 100 % ; les tableaux donnent les valeurs exactes. Profils par victoire décroissante, ennemis du plus difficile au plus facile dans le brouillon.</p>
+{% for kind,label in {profiles:'Profils à budget égal',enemies:'Adversaires'} %}
+<h3>{{ label }}</h3><div class="table-scroll"><table><tr><th>Nom</th><th>Comparaison (0–100 %)</th><th>Publié</th><th>Brouillon</th><th>Δ points</th><th>Effectif par version</th></tr>
+{% for row in attribute(result,kind) %}<tr><th scope="row">{{ row.name }}{% if kind == 'profiles' %}{% set profile = input.profiles[row.index] %}<small style="display:block">F/E/M/D {{ profile.strength }}/{{ profile.endurance }}/{{ profile.mobility }}/{{ profile.dexterity }} · Budget {{ profile.strength+profile.endurance+profile.mobility+profile.dexterity }}</small>{% endif %}</th><td>
+{% for side,color in {published:'#70d6c4',draft:'#ffb86c'} %}<div class="bar-track" aria-hidden="true" style="position:relative"><div class="bar-fill" style="width:{{ attribute(row,side).winRate }}%;background:{{ color }}"></div>{% if result.target is not null %}<span style="position:absolute;left:{{ result.target }}%;top:-2px;height:16px;border-left:2px solid white"></span>{% endif %}</div>{% endfor %}
+</td><td>{{ row.published.winRate|number_format(1,',',' ') }} %<small style="display:block">IC [{{ row.published.low|number_format(1,',',' ') }} ; {{ row.published.high|number_format(1,',',' ') }}]</small></td><td>{{ row.draft.winRate|number_format(1,',',' ') }} %<small style="display:block">IC [{{ row.draft.low|number_format(1,',',' ') }} ; {{ row.draft.high|number_format(1,',',' ') }}]</small></td><td>{{ (row.draft.winRate-row.published.winRate)|number_format(1,',',' ') }}</td><td>{{ row.draft.n }}</td></tr>{% endfor %}</table></div>
+{% endfor %}
+<h2>Distributions normalisées</h2><div class="comparison-grid">
+{% for metric,label in {distribution:'Taux de victoire des profils',hp:'PV restants du joueur par combat'} %}
+<section><h3>{{ label }}</h3><p>{{ metric == 'hp' ? 'PV restants divisés par les PV initiaux de chaque combattant, défaites comprises.' : 'Un profil compte une fois, sur tous ses adversaires.' }} Intervalles [borne basse ; borne haute[, dernier intervalle incluant 100 %.</p>
+<table><tr><th>Intervalle (%)</th><th>Publié</th><th>Brouillon</th><th>Distribution (0–100 % des observations)</th></tr>
+{% for i in 0..9 %}{% set a = metric == 'hp' ? result.global.published.hpHistogram[i] : result.distribution.published[i] %}{% set b = metric == 'hp' ? result.global.draft.hpHistogram[i] : result.distribution.draft[i] %}{% set total = metric == 'hp' ? result.global.draft.n : input.profiles|length %}
+<tr><th>{{ i*10 }}–{{ (i+1)*10 }}</th><td>{{ a }} ({{ (100*a/total)|number_format(1,',',' ') }} %)</td><td>{{ b }} ({{ (100*b/total)|number_format(1,',',' ') }} %)</td><td><div class="bar-track" aria-hidden="true"><div class="bar-fill" style="width:{{ 100*a/total }}%;background:#70d6c4"></div></div><div class="bar-track" aria-hidden="true"><div class="bar-fill" style="width:{{ 100*b/total }}%;background:#ffb86c"></div></div></td></tr>
+{% endfor %}</table></section>{% endfor %}
+</div>
+{% endblock %}

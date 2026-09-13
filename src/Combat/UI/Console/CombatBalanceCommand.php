@@ -59,7 +59,7 @@ final class CombatBalanceCommand extends Command
         $snapshot = $this->rulesets->snapshot();
         /** @var array{combat: array{fighter: array<string, int>}} $snapshot */
         $rules = CombatRules::fromSnapshot($snapshot['combat']['fighter']);
-        $factory = new FighterFactory($rules, new ModifierResolver([]));
+        $factory = new FighterFactory($this->rulesets, new ModifierResolver([]));
         $simulator = new BattleSimulator($rules);
         fputcsv($file, ['ruleset', 'budget', 'player', 'enemy', 'samples', 'player_hp', 'player_damage', 'wins', 'limits', 'mean_ticks', 'mean_attacks', 'mean_chain', 'max_chain'], escape: '');
         $fights = 0;

@@ -10,6 +10,8 @@ use Doctrine\ORM\Mapping as ORM;
 use LogicException;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity]
 #[ORM\HasLifecycleCallbacks]
@@ -26,15 +28,15 @@ class GameEnemy
     #[ORM\Column(name: 'minimum_level')] private int $minimumLevel = 1;
     #[ORM\Column] private int $hp = 1;
     #[ORM\Column] private int $damage = 0;
-    #[ORM\Column(name: 'mitigation_permille')] private int $mitigationPermille = 0;
-    #[ORM\Column(name: 'combo_permille')] private int $comboPermille = 0;
-    #[ORM\Column(name: 'dodge_permille')] private int $dodgePermille = 0;
-    #[ORM\Column(name: 'maintenance_permille')] private int $maintenancePermille = 0;
-    #[ORM\Column(name: 'critical_chance_permille')] private int $criticalChancePermille = 0;
-    #[ORM\Column(name: 'guard_permille')] private int $guardPermille = 0;
-    #[ORM\Column(name: 'critical_resistance_permille')] private int $criticalResistancePermille = 0;
-    #[ORM\Column(name: 'cooldown_reduction_permille')] private int $cooldownReductionPermille = 0;
-    #[ORM\Column(name: 'precision_permille')] private int $precisionPermille = 0;
+    #[ORM\Column(name: 'mitigation_permille')] #[Assert\Range(min: 0, max: 999)] private int $mitigationPermille = 0;
+    #[ORM\Column(name: 'combo_permille')] #[Assert\Range(min: 0, max: 999)] private int $comboPermille = 0;
+    #[ORM\Column(name: 'dodge_permille')] #[Assert\Range(min: 0, max: 999)] private int $dodgePermille = 0;
+    #[ORM\Column(name: 'maintenance_permille')] #[Assert\Range(min: 0, max: 999)] private int $maintenancePermille = 0;
+    #[ORM\Column(name: 'critical_chance_permille')] #[Assert\Range(min: 0, max: 999)] private int $criticalChancePermille = 0;
+    #[ORM\Column(name: 'guard_permille')] #[Assert\Range(min: 0, max: 999)] private int $guardPermille = 0;
+    #[ORM\Column(name: 'critical_resistance_permille')] #[Assert\Range(min: 0, max: 999)] private int $criticalResistancePermille = 0;
+    #[ORM\Column(name: 'cooldown_reduction_permille')] #[Assert\Range(min: 0, max: 999)] private int $cooldownReductionPermille = 0;
+    #[ORM\Column(name: 'precision_permille')] #[Assert\Range(min: 0, max: 999)] private int $precisionPermille = 0;
     #[ORM\Column(name: 'idle_image_path', length: 255, nullable: true)] private ?string $idleImagePath = null;
     #[ORM\Column(name: 'attack_image_path', length: 255, nullable: true)] private ?string $attackImagePath = null;
     #[ORM\Column(name: 'hit_image_path', length: 255, nullable: true)] private ?string $hitImagePath = null;
@@ -270,6 +272,15 @@ class GameEnemy
         }
         unset($translation);
         $this->translations = $translations;
+    }
+
+    #[Assert\Callback]
+    public function validateImagePack(ExecutionContextInterface $context): void
+    {
+        $count = \count(array_filter([$this->idleImagePath, $this->attackImagePath, $this->hitImagePath]));
+        if (0 !== $count && 3 !== $count) {
+            $context->buildViolation('Le pack doit contenir les trois poses.')->atPath('idleImagePath')->addViolation();
+        }
     }
 
     #[ORM\PreUpdate]

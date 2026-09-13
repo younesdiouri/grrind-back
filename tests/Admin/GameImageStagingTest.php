@@ -7,13 +7,10 @@ namespace App\Tests\Admin;
 use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Infrastructure\GameConfigurationReferenceGuard;
-use App\Admin\Infrastructure\GameRulesetPublisher;
 use App\Admin\UI\EasyAdmin\GameCrudController;
 use Doctrine\DBAL\Connection;
 use LogicException;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Cache\Adapter\ArrayAdapter;
-use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 
 final class GameImageStagingTest extends TestCase
 {
@@ -161,7 +158,7 @@ final class GameImageStagingTest extends TestCase
 
     private function controller(string $directory): ImageStagingCrudController
     {
-        return new ImageStagingCrudController(new GameRulesetPublisher(new TagAwareAdapter(new ArrayAdapter())), new GameConfigurationReferenceGuard($this->createStub(Connection::class)), $directory);
+        return new ImageStagingCrudController(new GameConfigurationReferenceGuard($this->createStub(Connection::class)), $directory);
     }
 
     private function temporaryDirectory(): string

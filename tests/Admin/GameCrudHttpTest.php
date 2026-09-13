@@ -13,6 +13,7 @@ use App\Admin\Domain\GameLootTable;
 use App\Admin\Domain\GameRuleset;
 use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
+use App\Admin\Infrastructure\GameDraft;
 use App\Admin\Infrastructure\GameRulesetPublisher;
 use App\Identity\Domain\Role;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
@@ -53,6 +54,7 @@ final class GameCrudHttpTest extends ApiTestCase
                     ['weight' => '1'],
                 ],
                 '_token' => $token,
+                '_draft_revision' => (string) self::getContainer()->get(GameDraft::class)->revision(),
             ],
         ]);
         self::assertResponseRedirects();
@@ -82,8 +84,7 @@ final class GameCrudHttpTest extends ApiTestCase
         $this->delete('/admin/loot-table/'.$updated->getId()->toRfc4122().'/edit', '/admin/loot-table/'.$updated->getId()->toRfc4122().'/delete');
         self::getContainer()->get('doctrine')->getManager()->clear();
         $stillPublished = $tables->findOneBy(['key' => $key, 'kind' => 'workout']);
-        self::assertInstanceOf(GameLootTable::class, $stillPublished);
-        self::assertFalse($stillPublished->isActive());
+        self::assertNull($stillPublished);
     }
 
     public function testConfigurationIndexesExposeSearchFiltersAndStableSorts(): void
@@ -208,12 +209,11 @@ final class GameCrudHttpTest extends ApiTestCase
         $deletePage = $this->client->request('GET', '/admin/title/'.$deactivated->getId()->toRfc4122().'/edit');
         $token = $deletePage->filter('#action-confirmation-form input[name="token"]')->attr('value');
         self::assertIsString($token);
-        $this->client->request('POST', '/admin/title/'.$deactivated->getId()->toRfc4122().'/delete', ['token' => $token]);
+        $this->client->request('POST', '/admin/title/'.$deactivated->getId()->toRfc4122().'/delete', ['token' => $token, '_draft_revision' => (string) self::getContainer()->get(GameDraft::class)->revision()]);
         self::assertResponseRedirects();
         self::getContainer()->get('doctrine')->getManager()->clear();
         $stillPublished = self::getContainer()->get('doctrine')->getRepository(GameTitle::class)->findOneBy(['key' => $key]);
-        self::assertInstanceOf(GameTitle::class, $stillPublished);
-        self::assertFalse($stillPublished->isActive());
+        self::assertNull($stillPublished);
     }
 
     public function testInactiveEnemyCanBeCreatedUpdatedAndDeletedThroughAdmin(): void
@@ -260,7 +260,7 @@ final class GameCrudHttpTest extends ApiTestCase
         self::assertNull(self::getContainer()->get('doctrine')->getRepository(GameEnemy::class)->findOneBy(['key' => $key]));
     }
 
-    public function testEnemyAndChestLootPairsArePublishedAtomicallyThroughAdmin(): void
+    public function testEnemyAndChestLootPairsArePreparedAtomicallyThroughAdmin(): void
     {
         $this->loginAdmin('pair-crud-admin@grrind.app');
         $manager = self::getContainer()->get('doctrine')->getManager();
@@ -290,7 +290,7 @@ final class GameCrudHttpTest extends ApiTestCase
         self::assertResponseStatusCodeSame(403);
 
         foreach ($pairs as [$url, $leftClass, $leftId, $rightClass, $rightId]) {
-            $this->client->request('POST', $url, ['token' => $token]);
+            $this->client->request('POST', $url, ['token' => $token, '_draft_revision' => (string) self::getContainer()->get(GameDraft::class)->revision()]);
             self::assertResponseRedirects();
             $manager->clear();
             $left = $manager->find($leftClass, $leftId);
@@ -300,7 +300,7 @@ final class GameCrudHttpTest extends ApiTestCase
             self::assertTrue($left->isActive());
             self::assertTrue($right->isActive());
 
-            $this->client->request('POST', $url, ['token' => $token]);
+            $this->client->request('POST', $url, ['token' => $token, '_draft_revision' => (string) self::getContainer()->get(GameDraft::class)->revision()]);
             self::assertResponseRedirects();
             $manager->clear();
             $left = $manager->find($leftClass, $leftId);
@@ -314,7 +314,7 @@ final class GameCrudHttpTest extends ApiTestCase
         $orphan = $this->inactiveEnemy('ORPHAN_ENEMY_'.$suffix, 7_000_003, 100);
         $manager->persist($orphan);
         $manager->flush();
-        $this->client->request('POST', '/admin/enemy/'.$orphan->getId()->toRfc4122().'/toggle-loot-pair', ['token' => $token]);
+        $this->client->request('POST', '/admin/enemy/'.$orphan->getId()->toRfc4122().'/toggle-loot-pair', ['token' => $token, '_draft_revision' => (string) self::getContainer()->get(GameDraft::class)->revision()]);
         self::assertResponseRedirects();
         $manager->clear();
         $orphan = $manager->find(GameEnemy::class, $orphan->getId());
@@ -430,7 +430,7 @@ final class GameCrudHttpTest extends ApiTestCase
             /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>}> $publishedItems */
             $publishedItems = $published->snapshot()['items'];
             $catalog = new \App\Rewards\Domain\ItemCatalog($publishedItems);
-            self::assertSame(7, $catalog->find($key)?->sellPriceCoins);
+            self::assertNull($catalog->find($key));
             $version = $published->version();
             $crawler = $this->client->request('GET', '/admin/item/'.$item->getId()->toRfc4122().'/edit');
             $edit = $crawler->filter('form[name="GameItem"]')->form();
@@ -439,10 +439,13 @@ final class GameCrudHttpTest extends ApiTestCase
             self::assertResponseRedirects();
             $changed = self::getContainer()->get('doctrine')->getRepository(GameRuleset::class)->find(1);
             self::assertInstanceOf(GameRuleset::class, $changed);
-            self::assertNotSame($version, $changed->version());
+            self::assertSame($version, $changed->version());
             /** @var list<array{key: string, sell_price_coins: int}> $changedItems */
             $changedItems = $changed->snapshot()['items'];
-            self::assertSame(9, array_column($changedItems, 'sell_price_coins', 'key')[$key]);
+            self::assertArrayNotHasKey($key, array_column($changedItems, 'sell_price_coins', 'key'));
+            $draftItem = self::getContainer()->get('doctrine')->getRepository(GameItem::class)->findOneBy(['key' => $key]);
+            self::assertInstanceOf(GameItem::class, $draftItem);
+            self::assertSame(9, $draftItem->getSellPriceCoins());
 
             $this->delete('/admin/item/'.$item->getId()->toRfc4122().'/edit', '/admin/item/'.$item->getId()->toRfc4122().'/delete');
             self::getContainer()->get('doctrine')->getManager()->clear();
@@ -742,7 +745,7 @@ final class GameCrudHttpTest extends ApiTestCase
         $page = $this->client->request('GET', $editUrl);
         $token = $page->filter('#action-confirmation-form input[name="token"]')->attr('value');
         self::assertIsString($token);
-        $this->client->request('POST', $deleteUrl, ['token' => $token]);
+        $this->client->request('POST', $deleteUrl, ['token' => $token, '_draft_revision' => (string) self::getContainer()->get(GameDraft::class)->revision()]);
         self::assertResponseRedirects();
     }
 

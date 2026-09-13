@@ -10,11 +10,13 @@ use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLevel;
 use App\Admin\Domain\GameLootTable;
+use App\Admin\Domain\GamePublication;
 use App\Admin\Domain\GameRuleset;
 use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\EnemyCatalog;
+use App\Combat\Domain\StatFormula;
 use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\TitleCatalog;
@@ -47,13 +49,41 @@ final readonly class GameRulesetPublisher
     {
     }
 
-    public function publish(EntityManagerInterface $manager): void
+    public function publish(EntityManagerInterface $manager, string $author = 'system'): void
     {
         $ruleset = $manager->find(GameRuleset::class, 1, LockMode::PESSIMISTIC_WRITE);
         if (!$ruleset instanceof GameRuleset) {
             throw new LogicException('Le snapshot de jeu initial est absent. Rejouer les migrations avant d’ouvrir EasyAdmin.');
         }
 
+        $manager->refresh($ruleset, LockMode::PESSIMISTIC_WRITE);
+        $snapshot = $this->prepare($manager);
+        $settings = $manager->find(GameSettings::class, 1);
+        \assert($settings instanceof GameSettings);
+        if (self::lootGameplay($ruleset->snapshot()) !== self::lootGameplay($snapshot)) {
+            $settings->incrementLootVersion();
+            $snapshot['loot']['version'] = $settings->lootVersion();
+        }
+        foreach ([GameItem::class, GameTitle::class, GameEnemy::class, GameLootTable::class, GameDiscipline::class] as $class) {
+            foreach ($manager->getRepository($class)->findAll() as $configuration) {
+                if ($configuration->isActive()) {
+                    $configuration->markPublishedActive();
+                }
+            }
+        }
+        $ruleset->publish($snapshot, GameRulesetVersion::of($snapshot));
+        $manager->persist(new GamePublication($ruleset->revision(), $author, $ruleset->version(), $snapshot));
+        $manager->flush();
+    }
+
+    /**
+     * La simulation valide exactement les mêmes règles sans modifier le publié ni les
+     * marqueurs historiques du catalogue. Le caller fige ce tableau pour toute l'opération.
+     *
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>}
+     */
+    public function prepare(EntityManagerInterface $manager): array
+    {
         /** @var list<GameItem> $items */ $items = $manager->getRepository(GameItem::class)->findBy([], ['sortOrder' => 'ASC']);
         /** @var list<GameTitle> $titles */ $titles = $manager->getRepository(GameTitle::class)->findBy([], ['sortOrder' => 'ASC']);
         /** @var list<GameEnemy> $enemies */ $enemies = $manager->getRepository(GameEnemy::class)->findBy([], ['sortOrder' => 'ASC']);
@@ -66,19 +96,7 @@ final readonly class GameRulesetPublisher
             throw new LogicException('Les réglages globaux initiaux sont absents. Rejouer les migrations avant d’ouvrir EasyAdmin.');
         }
 
-        foreach ([...$items, ...$titles, ...$enemies, ...$tables, ...$disciplines] as $configuration) {
-            if ($configuration->isActive()) {
-                $configuration->markPublishedActive();
-            }
-        }
-
         $snapshot = self::snapshot($items, $titles, $enemies, $tables, $disciplines, $levels, $activityTypes, $settings);
-        /** @var array<string, mixed> $previous */
-        $previous = $ruleset->snapshot();
-        if (self::lootGameplay($previous) !== self::lootGameplay($snapshot)) {
-            $settings->incrementLootVersion();
-            $snapshot['loot']['version'] = $settings->lootVersion();
-        }
         self::validate($snapshot);
         foreach ($enemies as $enemy) {
             foreach ([$enemy->getIdleImagePath(), $enemy->getAttackImagePath(), $enemy->getHitImagePath()] as $path) {
@@ -88,8 +106,7 @@ final readonly class GameRulesetPublisher
             }
         }
 
-        $ruleset->publish($snapshot, GameRulesetVersion::of($snapshot));
-        $manager->flush();
+        return $snapshot;
     }
 
     /** Le cache est une accélération : la publication DB réussie ne dépend jamais de lui. */
@@ -159,7 +176,7 @@ final readonly class GameRulesetPublisher
         usort($activityRows, static fn (array $left, array $right): int => [$left['source'], $left['provider_type']] <=> [$right['source'], $right['provider_type']]);
 
         return [
-            'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
+            'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['formulas' => $settings->getFormulas(), 'fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
             'training' => $settings->getTraining(), 'xp' => $settings->getXp(), 'attributes' => $settings->getAttributes(), 'disciplines' => $disciplineRows, 'levels' => $levelRows,
             'activity_types' => $activityRows, 'community' => $settings->getCommunity(), 'notifications' => $settings->getNotifications(),
         ];
@@ -209,6 +226,9 @@ final readonly class GameRulesetPublisher
         }
         new ItemCatalog($items);
         new TitleCatalog($titles);
+        /** @var array<string, array{source: string, combination: string, secondary: ?string}> $formulas */
+        $formulas = $snapshot['combat']['formulas'];
+        StatFormula::scores($formulas, ['strength' => 0, 'endurance' => 0, 'mobility' => 0, 'dexterity' => 0, 'vitality' => 0]);
         $combatRules = CombatRules::fromSnapshot($fighter);
         new EnemyCatalog($enemies, $bosses, combatRules: $combatRules);
         new LootLuckRules($lootLuck['floor_percent'], $lootLuck['cap_percent']);

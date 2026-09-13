@@ -33,6 +33,17 @@ use Symfony\Component\Uid\Uuid;
  */
 final class FighterFactoryTest extends TestCase
 {
+    public function testAChangedFormulaChangesTheRealPlayerDerivation(): void
+    {
+        $formulas = \App\Tests\Combat\StatFormulaFixture::data();
+        $formulas['hp'] = ['source' => 'strength', 'combination' => 'single', 'secondary' => null];
+        $factory = new FighterFactory(\App\Tests\Combat\CombatRulesFixture::rules(), new ModifierResolver([]), $formulas);
+
+        $fighter = $factory->forPlayer(self::progressionOf(strength: 1000, vitality: 200), self::playerId(), self::occurredAt());
+
+        self::assertSame(180, $fighter->hp);
+    }
+
     public function testStatisticsExplainTheSameAttributesUsedByCombat(): void
     {
         $factory = self::factoryOf(modifiers: [
@@ -360,6 +371,7 @@ final class FighterFactoryTest extends TestCase
                     }
                 },
             ]),
+            \App\Tests\Combat\StatFormulaFixture::data(),
         );
     }
 

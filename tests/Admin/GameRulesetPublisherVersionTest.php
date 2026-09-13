@@ -10,11 +10,66 @@ use App\Admin\Domain\GameRuleset;
 use App\Admin\Domain\GameSettings;
 use App\Admin\Infrastructure\GameRulesetPublisher;
 use App\Tests\Support\ApiTestCase;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 
 /** Le hash métier et la version de loot ne changent qu'avec les données qui les concernent. */
 final class GameRulesetPublisherVersionTest extends ApiTestCase
 {
+    public function testPublishedFormulasAreUsedByTheRuntimeFactory(): void
+    {
+        $manager = $this->manager();
+        $settings = $manager->find(GameSettings::class, 1);
+        self::assertInstanceOf(GameSettings::class, $settings);
+        $original = $settings->getFormulas();
+        $publisher = self::getContainer()->get(GameRulesetPublisher::class);
+        $factory = self::getContainer()->get(\App\Combat\Application\FighterFactory::class);
+        $profile = new \App\Shared\Application\PlayerProgression(1, 0, null, null, new \App\Shared\Domain\Activity\AttributeGains(1000, 0, 0, 0), 0, new \App\Shared\Domain\Activity\VitalityBreakdown(0, 0, 0));
+        $id = \Symfony\Component\Uid\Uuid::v7();
+        $at = new DateTimeImmutable();
+        $before = $factory->forPlayer($profile, $id, $at)->hp;
+        try {
+            $formulas = $original;
+            $formulas['hp'] = ['source' => 'strength', 'combination' => 'single', 'secondary' => null];
+            $settings->setFormulas($formulas);
+            $manager->flush();
+            self::assertSame($before, $factory->forPlayer($profile, $id, $at)->hp);
+            $this->publish($publisher, $manager);
+            self::assertSame($before + $settings->getFighter()['hp_per_1000_vitality'], $factory->forPlayer($profile, $id, $at)->hp);
+        } finally {
+            $settings->setFormulas($original);
+            $manager->flush();
+            $this->publish($publisher, $manager);
+        }
+    }
+
+    public function testPreparingADraftDoesNotPublishOrIncrementLootVersion(): void
+    {
+        $manager = $this->manager();
+        $publisher = self::getContainer()->get(GameRulesetPublisher::class);
+        $ruleset = $manager->find(GameRuleset::class, 1);
+        $settings = $manager->find(GameSettings::class, 1);
+        $table = $manager->getRepository(GameLootTable::class)->findOneBy([]);
+        self::assertInstanceOf(GameRulesetPublisher::class, $publisher);
+        self::assertInstanceOf(GameRuleset::class, $ruleset);
+        self::assertInstanceOf(GameSettings::class, $settings);
+        self::assertInstanceOf(GameLootTable::class, $table);
+        $revision = $ruleset->revision();
+        $snapshot = $ruleset->snapshot();
+        $lootVersion = $settings->lootVersion();
+        $entries = $table->getEntries();
+        ++$entries[0]['weight'];
+        $table->setEntries($entries);
+
+        $draft = $publisher->prepare($manager);
+
+        self::assertNotSame($snapshot, $draft);
+        self::assertSame($revision, $ruleset->revision());
+        self::assertSame($snapshot, $ruleset->snapshot());
+        self::assertSame($lootVersion, $settings->lootVersion());
+        $manager->clear();
+    }
+
     public function testPresentationAndNoopPublicationKeepTheGameplayAndLootVersions(): void
     {
         $manager = $this->manager();
