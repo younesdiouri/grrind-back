@@ -8,7 +8,7 @@
     </style>
 </head>
 <body>
-<nav><a href="{{ path('admin') }}">Administration</a><a href="{{ path('admin_game_design') }}">Game design</a></nav>
+<nav><a href="{{ path('admin') }}">Administration</a><a href="{{ path('admin_game_design') }}">Game design</a><a href="{{ path('admin_game_design_profiles') }}">Profils et expériences</a></nav>
 {% for message in app.flashes('success') %}<p class="success" role="status">{{ message }}</p>{% endfor %}
 {% block body %}{% endblock %}
 </body>

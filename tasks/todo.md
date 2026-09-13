@@ -27,15 +27,15 @@ sont les zones probables, à limiter à environ cinq fichiers par incrément lor
   - Acceptation : parité avant/après, formule publiée modifiée prise en compte par le jeu.
   - Zones : FighterFactory, snapshot, migration, tests/Combat.
   - Vérifier : intégration runtime et migration ; dépendance : formules et snapshot.
-- [ ] Éditer les formules dans l'administration.
+- [x] Éditer les formules dans l'administration.
   - Acceptation : choix d'attributs/opérations, coefficients et exemples sans JSON manuel.
   - Zones : formulaire, SettingsCrudController, template, tests/Admin.
   - Vérifier : formulaire valide/invalide ; dépendance : formules intégrées.
-- [ ] Ajouter sauvegarde et édition de profils fictifs.
+- [x] Ajouter sauvegarde et édition de profils fictifs.
   - Acceptation : profil nommé cohérent, références validées, aucun compte de jeu créé.
   - Zones : entité, migration, formulaire, CRUD, tests/Admin.
   - Vérifier : persistance et validation ; dépendance : snapshot.
-- [ ] Exécuter et afficher un combat détaillé sur snapshot choisi.
+- [x] Exécuter et afficher un combat détaillé sur snapshot choisi.
   - Acceptation : mêmes règles que le jeu, graine reproductible, aucun effet métier.
   - Zones : service simulation, contrôleur, formulaire, template, tests.
   - Vérifier : parité, isolation et HTTP ; dépendance : profils et dérivation.

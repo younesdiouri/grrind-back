@@ -1,0 +1,10 @@
+{% extends 'admin/game_design/layout.html.twig' %}
+{% block body %}
+<h1>Profils et expériences</h1>
+<p>Des personnages fictifs, sans compte, inventaire ni récompense réelle.</p>
+<a class="button" href="{{ path('admin_game_design_profile_new') }}">Créer un profil</a>
+<table><thead><tr><th>Profil</th><th>Attributs</th><th>Actions</th></tr></thead><tbody>
+{% for profile in profiles %}<tr><td>{{ profile.name }}</td><td>F {{ profile.strength }} · E {{ profile.endurance }} · M {{ profile.mobility }} · D {{ profile.dexterity }}</td><td><a href="{{ path('admin_game_design_profile_edit', {id: profile.id}) }}">Modifier</a> · <a href="{{ path('admin_game_design_combat', {id: profile.id}) }}">Combats</a></td></tr>{% else %}<tr><td colspan="3">Aucun profil enregistré.</td></tr>{% endfor %}
+</tbody></table>
+<h2>Expériences sauvegardées</h2><ul>{% for run in runs %}<li><a href="{{ path('admin_game_design_run', {id: run.id}) }}">{{ run.createdAt|date('d/m/Y H:i') }} · {{ run.kind.value }} · {{ run.input.profile.name }}</a></li>{% else %}<li>Aucune expérience.</li>{% endfor %}</ul>
+{% endblock %}

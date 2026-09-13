@@ -11,7 +11,15 @@ final class CombatRulesFixture
     /** @param array<string, int> $overrides */
     public static function rules(array $overrides = []): CombatRules
     {
-        return CombatRules::fromSnapshot(array_replace([
+        return CombatRules::fromSnapshot(self::snapshot($overrides));
+    }
+
+    /** @param array<string, int> $overrides
+     * @return array<string, int>
+     */
+    public static function snapshot(array $overrides = []): array
+    {
+        return array_replace([
             'base_hp' => 140,
             'hp_per_1000_vitality' => 40,
             'base_damage' => 16,
@@ -40,6 +48,6 @@ final class CombatRulesFixture
             'combo_half_saturation' => 10000,
             'precision_cap_permille' => 500,
             'precision_half_saturation' => 10000,
-        ], $overrides));
+        ], $overrides);
     }
 }

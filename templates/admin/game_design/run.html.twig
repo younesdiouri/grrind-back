@@ -1,0 +1,17 @@
+{% extends 'admin/game_design/layout.html.twig' %}
+{% block body %}
+<h1>Expérience · {{ run.input.profile.name }}</h1><p>{{ run.createdAt|date('d/m/Y H:i') }} · Moteur {{ run.engineVersion }} · Entrées et règles figées.</p>
+{% if run.kind.value == 'combat' %}
+<p>Graine initiale {{ run.input.seed }} · {{ run.input.samples }} combats par version. Chaque combat utilise la graine initiale + son indice.</p>
+{% for side, result in run.result %}
+<section class="panel"><h2>{{ side == 'published' ? 'Publié' : 'Brouillon' }}</h2><p>Version {{ result.version }}</p>
+<table><tr><th>Victoires</th><th>Défaites</th><th>Limites atteintes</th><th>Durée moyenne (ticks)</th><th>PV moyens joueur / ennemi</th></tr><tr><td>{{ result.wins }} ({{ (100 * result.wins / result.samples)|number_format(1, ',') }} %)</td><td>{{ result.defeats }}</td><td>{{ result.limits }}</td><td>{{ (result.totalTicks / result.samples)|number_format(1, ',') }}</td><td>{{ (result.totalPlayerHp / result.samples)|number_format(1, ',') }} / {{ (result.totalEnemyHp / result.samples)|number_format(1, ',') }}</td></tr></table>
+<h3>Distribution des PV restants du joueur</h3><ul>{% for bucket, count in result.histogram %}<li>{{ bucket }} : {{ count }}</li>{% endfor %}</ul>
+<h3>Valeurs utilisées</h3><table><tr><th>Statistique</th><th>Joueur</th><th>Adversaire</th></tr>{% for key,value in result.player %}<tr><td>{{ key }}</td><td>{{ value }}</td><td>{{ attribute(result.enemy,key) }}</td></tr>{% endfor %}</table>
+<details><summary>Attributs après équipement</summary><table>{% for key,value in result.attributes %}<tr><th>{{ key }}</th><td>Base {{ value.base }} · Équipement +{{ value.equipmentBonus }} · Total {{ value.effective }}</td></tr>{% endfor %}</table></details>
+<h3>Premier combat : {{ result.detail.result }}</h3><p>{{ result.detail.attackCount }} tentatives · {{ result.detail.elapsedTicks }} ticks · {{ result.detail.endReason }}</p>
+<details><summary>Déroulé complet</summary><ol>{% for event in result.detail.events %}<li>{% for key,value in event %}<strong>{{ key }}</strong> {{ value is iterable ? value|json_encode : value }}{% if not loop.last %} · {% endif %}{% endfor %}</li>{% endfor %}</ol></details>
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}
