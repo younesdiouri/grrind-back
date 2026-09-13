@@ -1,0 +1,28 @@
+{% extends 'admin/game_design/layout.html.twig' %}
+{% block body %}
+<h1>Lot · {{ run.input.name }}</h1><p>{{ profiles|length }} profils enregistrés · Budget individuel {{ run.input.total }} · Graine {{ run.input.seed }}. Le lot reste identique après toute modification des règles.</p>
+<details><summary>Voir les profils et leurs répartitions</summary>{% include 'admin/game_design/_cohort_profiles.html.twig' %}</details>
+<h2>2. Choisir les adversaires et le budget de comparaison</h2><p>La campagne utilise le même équipement vide, les mêmes profils, adversaires et graines sur deux snapshots figés au lancement. Un adversaire manquant d’un côté bloque toute la campagne.</p>
+{{ form_start(form) }}{{ form_errors(form) }}{{ form_row(form.enemies) }}{{ form_row(form.repetitions) }}{{ form_row(form.seed) }}{{ form_row(form.target) }}
+<div class="panel" id="campaign-budget" data-profiles="{{ profiles|length }}" data-pair-cost="{{ pairCost }}" data-max-attempts="{{ maxAttempts }}" data-max-duels="{{ maxDuels }}" role="status" aria-live="polite"></div>
+{{ form_row(form.launch) }}{{ form_end(form) }}
+<script>
+const budget = document.getElementById('campaign-budget');
+const form = budget.closest('form');
+function updateBudget() {
+ const profiles = Number(budget.dataset.profiles);
+ const enemies = form.querySelectorAll('input[name="form[enemies][]"]:checked').length;
+ const repetitions = Number(form.querySelector('[name="form[repetitions]"]').value);
+ const pairs = profiles * enemies;
+ const max = pairs ? Math.min(1000, Math.floor(Number(budget.dataset.maxAttempts)/(Number(budget.dataset.pairCost)*pairs)), Math.floor(Number(budget.dataset.maxDuels)/(2*pairs))) : 0;
+ const duels = 2*pairs*repetitions;
+ const attempts = pairs*repetitions*Number(budget.dataset.pairCost);
+ budget.textContent = profiles+' profils × '+enemies+' adversaires × '+repetitions+' répétitions × 2 versions = '+duels+' duels. Maximum réalisable : '+max+' répétitions par cellule. Coût maximal : '+attempts+' / '+budget.dataset.maxAttempts+' tentatives. '+(repetitions < 30 ? 'Faible effectif par cellule : interprétez les intervalles de confiance avant de conclure.' : '');
+ if (repetitions > max || max === 0) budget.textContent += ' Réduisez la matrice ou les répétitions avant le lancement.';
+}
+form.addEventListener('input', updateBudget);
+form.addEventListener('change', updateBudget);
+updateBudget();
+</script>
+<noscript><p>Budget global : {{ maxAttempts }} tentatives et {{ maxDuels }} duels. Le serveur vérifie le coût de la matrice avant tout calcul.</p></noscript>
+{% endblock %}

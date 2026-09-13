@@ -185,3 +185,30 @@ réécrire l'historique des joueurs, exécuter du code saisi dans une formule, e
 
 Après validation de cette proposition, déléguer l'implémentation complète à l'agent developer
 selon AGENTS.md. Il prend en charge tests, QA, commits, push et PR ; pas de fusion automatique.
+
+## Extension validée — campagnes d’équilibrage
+
+Extension explicitement autorisée : lots reproductibles à budget d’attributs constant,
+profils diversifiés et aperçu avant sauvegarde, campagnes multi-profils/multi-ennemis,
+comparaison sur snapshots et graines identiques, cible globale facultative, carte de
+chaleur, classements et distributions avec alternatives textuelles. Les effectifs,
+Wilson 95 %, PV normalisés, durées et limites restent visibles, sans score universel
+d’équilibre. Budget combiné : 500000 tentatives et 20000 duels maximum, 50 profils,
+10 ennemis, 1000 répétitions au plus. Défaut : 20 profils et jusqu’à 20 répétitions.
+
+- [x] Générateur déterministe avec conservation exacte et profils spécialistes.
+- [x] Agrégations partagées, parité moteur, Wilson et bornes globales testés.
+- [x] Navigation visible et parcours aperçu → lot → campagne → détail/archives.
+- [x] KPI comparatifs, F/E/M/D et budget, incertitude et cible indicative.
+- [x] Isolation HTTP et conservation des snapshots après publication.
+- [x] Mesure de la matrice maximale : 608 ms, rendu 52 ms, pic 64,5 MiB.
+- [x] Validation globale et livraison sur la PR #278.
+
+Limite de validation : rendu serveur testé ; vérification visuelle de l’extension
+en navigateur indisponible dans cette session (CUA sans navigateur, permissions
+macOS Chrome en attente). Aucune fusion ni déploiement.
+
+Preuves extension : suite complète 1355 tests / 25260 assertions ; après correction
+de typage limitée au test, test ciblé 5 tests / 441 assertions. QA complète (PHPStan
+maximal, CS, Deptrac), génération OpenAPI sans modification du contrat mobile et
+build de production réussis. Aucun changement de code métier après la suite complète.

@@ -62,6 +62,71 @@ Le premier combat conserve sa timeline complète, consultable par pages de 100 �
 Les séries donnent victoires, défaites, limites atteintes, durée virtuelle et PV moyens,
 ainsi qu’une distribution des PV restants. Les ticks sont du temps de jeu virtuel.
 
+## Campagnes d’équilibrage
+
+L’entrée **Campagnes d’équilibrage** est visible dans le menu d’administration,
+l’accueil de l’atelier et les profils. Prévisualiser un lot, l’enregistrer, choisir les
+ennemis puis lancer la campagne. La prévisualisation n’écrit rien ; le lot enregistré
+est immuable et réutilisable. Il ne crée aucun compte ni profil de joueur.
+
+Le générateur propose 20 profils, 10000 points chacun et la graine 42. Choisir entre
+1 et 50 profils et un budget total entre 1 et 100000000. Chaque répartition conserve
+exactement force + endurance + mobilité + dextérité. Trois profils sur quatre utilisent
+des coupures aléatoires du budget ; le quatrième concentre 70–95 % sur un attribut,
+en alternant les quatre spécialités. Ce mélange explore volontairement les extrêmes :
+il ne représente pas la population des joueurs. Même graine, taille et budget donnent
+le même lot. Les graphiques affichent les quatre attributs et leur total.
+
+Le lot combat sans équipement, sans override de vitalité et sans programme sportif.
+Les ennemis sélectionnés doivent exister dans les deux snapshots. Tous les profils,
+objets éventuels et ennemis sont validés avant le premier duel ; aucune cellule n’est
+exclue silencieusement. Chaque paire profil/ennemi utilise ses propres graines, communes
+au publié et au brouillon. Le résultat conserve le lot, les snapshots et les graines.
+L’historique affiche les 50 derniers lots et campagnes ; les anciennes adresses et
+archives restent accessibles. « Premier duel » ouvre le détail avec les règles figées,
+même après édition ou publication. Un changement de version du moteur bloque ce rejeu,
+mais pas la lecture de l’archive.
+
+La carte de chaleur compare les taux publié/brouillon et leur delta. Les classements
+comportent des barres comparatives ; les distributions regroupent les taux de victoire
+par profil et les PV restants du joueur en dix classes, normalisées en pourcentage.
+Les PV moyens du joueur **et** de l’ennemi sont rapportés à leurs PV initiaux respectifs.
+Les nombres et tableaux constituent l’alternative textuelle aux graphiques HTML/CSS.
+Les taux globaux comptent les combats réellement exécutés. Durée virtuelle moyenne,
+médiane, p90, taux de limite d’attaques et dispersion des taux entre profils complètent
+ces indicateurs. Les quantiles utilisent le rang supérieur.
+
+Chaque cellule expose son effectif et son intervalle de Wilson à 95 %, y compris pour
+0 % ou 100 % de victoires. Ces intervalles décrivent l’aléa des combats pour un scénario
+fixé : ils ne prouvent pas un équilibre universel, ni la représentativité du lot.
+Les comparaisons multiples et les graines appariées ne sont pas un test de significativité
+du delta. Une alerte signale moins de 30 répétitions par cellule ; au-delà, la précision
+reste à apprécier avec les intervalles. Une cible globale de victoire peut être saisie
+entre 0 et 100 %, sans valeur imposée. Les écarts à cette cible sont indicatifs : des
+ennemis de difficultés différentes ne devraient pas nécessairement avoir le même taux.
+
+Le budget **global**, pour P profils et E ennemis (1–10), limite les répétitions à :
+
+`min(1000, floor(500000 / (P × E × (maxAttacksPublié + maxAttacksBrouillon))), floor(20000 / (2 × P × E)))`.
+
+Le formulaire affiche duels, maximum de répétitions et tentatives avant lancement,
+et les recalcule à la sélection des ennemis. Le serveur applique les mêmes limites.
+Le défaut est 20 profils × 1 ennemi × 20 répétitions × 2 versions = **800 duels** ;
+les répétitions sont automatiquement abaissées à l’ouverture si les règles coûtent plus
+cher. Ajouter des ennemis peut imposer de réduire les répétitions. Les campagnes ne
+conservent pas toutes les timelines ; leur premier duel est recalculable à la demande.
+
+Mesure locale du 13 septembre 2026 : 50 profils × 10 ennemis × 1 répétition × 2,
+500000 tentatives effectivement atteintes : **608 ms** de calcul et sauvegarde,
+**52 ms** pour rendre les 500 cellules, **64,5 MiB** au pic. Ce plafond permet le calcul
+synchrone borné ; il ne constitue pas un SLA de production.
+
+Les tests couvrent génération, conservation et diversité, Wilson, agrégations pondérées,
+parité avec le moteur, budget combiné, préflight, CSRF, isolation des tables métier,
+parcours HTTP et rejeu après publication. Le rendu serveur des graphiques est vérifié.
+La vérification visuelle en navigateur de cette extension reste à faire : aucune surface
+navigateur CUA disponible et permissions macOS Chrome en attente lors de cette session.
+
 ## Programmes sportifs
 
 Créer un programme nommé avec une date de départ, un fuseau IANA, 1 à 52 semaines et
@@ -101,7 +166,7 @@ achats, loot et acquisition de contenus ne sont pas simulés.
 de **toutes** les autres tables avant/après les parcours HTTP.
 
 Chaque résultat est immuable et téléchargeable : entrées complètes, deux snapshots,
-résultats et identifiant de moteur `gd1-combat2-mt19937`. Modifier le profil ou le
+résultats et identifiant de moteur `gd2-combat2-mt19937` (les archives `gd1` restent consultables). Modifier le profil ou le
 programme n’altère pas ses expériences précédentes. La garantie de reproduction
 porte sur cette même version du moteur. Si un calcul partagé ou le RNG change,
 incrémenter `GameDesignRun::ENGINE_VERSION` ; les résultats déjà enregistrés restent

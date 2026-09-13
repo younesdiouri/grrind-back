@@ -48,15 +48,15 @@ final class GameDesignCombat
      *
      * @return array{published: array<string, mixed>, draft: array<string, mixed>}
      */
-    public function compare(array $published, array $draft, array $profile, string $enemyKey, ?array $customEnemy, int $samples, int $seed): array
+    public function compare(array $published, array $draft, array $profile, string $enemyKey, ?array $customEnemy, int $samples, int $seed, bool $keepDetail = true): array
     {
         if ($samples < 1 || $samples > self::maximumSamples($published, $draft) || $seed < 0 || $seed > 2147482000) {
             throw new InvalidArgumentException('Nombre de combats ou graine hors limites. Le budget global est de 500 000 tentatives pour les deux versions.');
         }
 
         return [
-            'published' => $this->series($published, $profile, $enemyKey, $customEnemy, $samples, $seed),
-            'draft' => $this->series($draft, $profile, $enemyKey, $customEnemy, $samples, $seed),
+            'published' => $this->series($published, $profile, $enemyKey, $customEnemy, $samples, $seed, $keepDetail),
+            'draft' => $this->series($draft, $profile, $enemyKey, $customEnemy, $samples, $seed, $keepDetail),
         ];
     }
 
@@ -66,7 +66,7 @@ final class GameDesignCombat
      *
      * @return array<string, mixed>
      */
-    private function series(array $snapshot, array $profile, string $enemyKey, ?array $customEnemy, int $samples, int $seed): array
+    private function series(array $snapshot, array $profile, string $enemyKey, ?array $customEnemy, int $samples, int $seed, bool $keepDetail = true): array
     {
         $rulesets = new FrozenGameRulesets($snapshot, GameRulesetVersion::of($snapshot));
         $resolved = GameDesignInputs::fighter($profile, $rulesets);
@@ -83,6 +83,7 @@ final class GameDesignCombat
         $wins = $limits = $ticks = $playerHp = $enemyHp = 0;
         $histogram = ['0 %' => 0, '1–25 %' => 0, '26–50 %' => 0, '51–75 %' => 0, '76–100 %' => 0];
         $detail = [];
+        $observations = [];
         for ($index = 0; $index < $samples; ++$index) {
             $outcome = $simulator->fight($player, $enemy, new Randomizer(new Mt19937($seed + $index)));
             $remaining = [$player->hp, $enemy->hp];
@@ -99,7 +100,8 @@ final class GameDesignCombat
             $percent = intdiv($remaining[0] * 100, $player->hp);
             $bucket = 0 === $remaining[0] ? '0 %' : ($percent <= 25 ? '1–25 %' : ($percent <= 50 ? '26–50 %' : ($percent <= 75 ? '51–75 %' : '76–100 %')));
             ++$histogram[$bucket];
-            if (0 === $index) {
+            $observations[] = ['win' => BattleResult::Victory === $outcome->result, 'limit' => BattleEndReason::AttackLimit === $outcome->endReason, 'ticks' => $outcome->elapsedTicks, 'playerHpPercent' => 100.0 * $remaining[0] / $player->hp, 'enemyHpPercent' => 100.0 * $remaining[1] / $enemy->hp];
+            if ($keepDetail && 0 === $index) {
                 $detail = ['result' => $outcome->result->value, 'endReason' => $outcome->endReason->value, 'elapsedTicks' => $outcome->elapsedTicks, 'attackCount' => $outcome->attackCount, 'playerHp' => $remaining[0], 'enemyHp' => $remaining[1], 'events' => array_map(CombatSnapshot::event(...), $outcome->timeline)];
             }
         }
@@ -107,6 +109,6 @@ final class GameDesignCombat
         $progression = GameDesignInputs::progression($profile, $rulesets);
         $bonuses = array_map(static fn (\App\Shared\Domain\Modifier\Modifier $modifier): array => ['type' => $modifier->type->value, 'value' => $modifier->value, 'discipline' => $modifier->discipline?->value], GameDesignInputs::modifiers($profile['equipment'], $rulesets));
 
-        return ['level' => $progression->level, 'totalXp' => $progression->attributes->total(), 'bonuses' => $bonuses, 'version' => $rulesets->version(), 'samples' => $samples, 'seed' => $seed, 'wins' => $wins, 'defeats' => $samples - $wins, 'limits' => $limits, 'totalTicks' => $ticks, 'totalPlayerHp' => $playerHp, 'totalEnemyHp' => $enemyHp, 'histogram' => $histogram, 'attributes' => $resolved['attributes'], 'player' => CombatSnapshot::fighter($player), 'enemy' => CombatSnapshot::fighter($enemy), 'detail' => $detail];
+        return [...($keepDetail ? [] : ['observations' => $observations]), 'level' => $progression->level, 'totalXp' => $progression->attributes->total(), 'bonuses' => $bonuses, 'version' => $rulesets->version(), 'samples' => $samples, 'seed' => $seed, 'wins' => $wins, 'defeats' => $samples - $wins, 'limits' => $limits, 'totalTicks' => $ticks, 'totalPlayerHp' => $playerHp, 'totalEnemyHp' => $enemyHp, 'histogram' => $histogram, 'attributes' => $resolved['attributes'], 'player' => CombatSnapshot::fighter($player), 'enemy' => CombatSnapshot::fighter($enemy), 'detail' => $detail];
     }
 }

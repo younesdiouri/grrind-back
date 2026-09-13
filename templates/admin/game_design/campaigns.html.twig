@@ -1,0 +1,10 @@
+{% extends 'admin/game_design/layout.html.twig' %}
+{% block title %}Campagnes d’équilibrage · GRRIND{% endblock %}
+{% block body %}
+<h1>Campagnes d’équilibrage</h1><p>Explorez plusieurs profils au même budget d’attributs contre plusieurs adversaires. Comparez les règles, les écarts à votre cible et l’incertitude de chaque résultat.</p>
+<div class="panel"><h2>1. Générer un lot de profils</h2><p>Un quart de spécialistes (70–95 % sur un attribut), les autres répartitions par coupes aléatoires. Ce panel cherche les contrastes ; il ne représente pas la population réelle. Même graine et mêmes paramètres : mêmes profils.</p>
+{{ form_start(form) }}{{ form_errors(form) }}{{ form_row(form.name) }}{{ form_row(form.count) }}{{ form_row(form.total) }}{{ form_row(form.seed) }}{{ form_row(form.preview) }}
+{% if profiles %}<h3>Aperçu — rien n’est encore enregistré</h3>{% include 'admin/game_design/_cohort_profiles.html.twig' %}{{ form_row(form.save) }}{% else %}{% do form.save.setRendered %}{% endif %}
+{{ form_end(form) }}</div>
+<h2>Lots et campagnes enregistrés</h2><table><tr><th>Nom</th><th>Type</th><th>Date</th><th>Ouvrir</th></tr>{% for run in runs %}<tr><td>{{ run.input.profile.name }}</td><td>{{ run.kind.value == 'cohort' ? 'Lot de profils' : 'Campagne' }}</td><td>{{ run.createdAt|date('d/m/Y H:i') }}</td><td><a href="{{ path('admin_game_design_run', {id:run.id}) }}">Consulter</a></td></tr>{% else %}<tr><td colspan="4">Aucun lot enregistré.</td></tr>{% endfor %}</table>
+{% endblock %}

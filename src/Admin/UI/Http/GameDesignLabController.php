@@ -161,6 +161,12 @@ final class GameDesignLabController extends AbstractController
     #[Route('/admin/game-design/runs/{id}', name: 'admin_game_design_run', methods: ['GET'])]
     public function run(Request $request, GameDesignRun $run): Response
     {
+        if (GameDesignRunKind::Campaign === $run->kind()) {
+            return $this->redirectToRoute('admin_game_design_campaign', ['id' => $run->getId()]);
+        }
+        if (GameDesignRunKind::Cohort === $run->kind()) {
+            return $this->redirectToRoute('admin_game_design_cohort', ['id' => $run->getId()]);
+        }
         $page = max(1, min(201, $request->query->getInt('page', 1)));
 
         return $this->render('admin/game_design/run.html.twig', ['run' => $run, 'eventPage' => $page, 'eventOffset' => ($page - 1) * 100]);

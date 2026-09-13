@@ -18,7 +18,7 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Table(name: 'game_design_run')]
 class GameDesignRun
 {
-    public const string ENGINE_VERSION = 'gd1-combat2-mt19937';
+    public const string ENGINE_VERSION = 'gd2-combat2-mt19937';
     #[ORM\Id] #[ORM\Column(type: UuidType::NAME)] private Uuid $id;
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)] private DateTimeImmutable $createdAt;
     #[ORM\Column(length: 40)] private string $engineVersion = self::ENGINE_VERSION;
