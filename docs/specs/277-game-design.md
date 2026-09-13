@@ -1,6 +1,6 @@
 # #277 — Atelier de game design
 
-Statut : validé par le porteur du projet ; implémentation en cours.
+Statut : validé par le porteur du projet ; implémentation et validations terminées le 13 septembre 2026.
 Ticket : https://github.com/younesdiouri/grrind-back/issues/277
 
 ## Objectif et décisions confirmées

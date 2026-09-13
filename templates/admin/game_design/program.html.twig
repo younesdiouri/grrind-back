@@ -1,0 +1,29 @@
+{% extends 'admin/game_design/layout.html.twig' %}
+{% block body %}
+<h1>Programme sportif</h1><p>La semaine se répète à partir de la date choisie. Les horaires sont locaux ; une séance traversant le changement d’heure conserve sa durée réelle.</p>
+{{ form_start(form) }}{{ form_errors(form) }}
+{{ form_row(form.name) }}{{ form_row(form.startDate) }}{{ form_row(form.timezone) }}{{ form_row(form.weeks) }}
+<h2>Séances hebdomadaires</h2><p>Maximum 14. Les créneaux qui se chevauchent sont départagés comme à l’import du jeu ; les séances ignorées restent visibles.</p>
+{{ form_errors(form.sessions) }}
+<div id="sessions" data-prototype="{{ form_widget(form.sessions.vars.prototype)|e('html_attr') }}">
+{% for session in form.sessions %}<div class="panel session">{{ form_widget(session) }}<button type="button" class="remove">Retirer la séance</button></div>{% endfor %}
+</div>
+{% do form.sessions.setRendered %}
+<button type="button" id="add-session">Ajouter une séance</button>
+<h2>Énergie journalière</h2>{{ form_row(form.energy) }}{{ form_row(form.save) }}
+{{ form_end(form) }}
+<script>
+const sessions = document.getElementById('sessions');
+let nextIndex = {{ form.sessions|length }};
+document.getElementById('add-session').addEventListener('click', () => {
+    if (sessions.children.length >= 14) return;
+    const panel = document.createElement('div');
+    panel.className = 'panel session';
+    panel.innerHTML = sessions.dataset.prototype.replaceAll('__name__', nextIndex++) + '<button type="button" class="remove">Retirer la séance</button>';
+    sessions.append(panel);
+});
+sessions.addEventListener('click', event => {
+    if (event.target.matches('.remove')) event.target.closest('.session').remove();
+});
+</script>
+{% endblock %}

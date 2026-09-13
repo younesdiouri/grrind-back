@@ -39,29 +39,42 @@ sont les zones probables, à limiter à environ cinq fichiers par incrément lor
   - Acceptation : mêmes règles que le jeu, graine reproductible, aucun effet métier.
   - Zones : service simulation, contrôleur, formulaire, template, tests.
   - Vérifier : parité, isolation et HTTP ; dépendance : profils et dérivation.
-- [ ] Comparer des séries de combats et conserver les paramètres des résultats.
+- [x] Comparer des séries de combats et conserver les paramètres des résultats.
   - Acceptation : deux snapshots figés, graines communes, statistiques et budget de travail.
   - Zones : service séries, résultat, migration, template, tests.
   - Vérifier : reproductibilité, publication concurrente, charge ; dépendance : combat détaillé.
-- [ ] Sauvegarder un programme sportif répétable.
+- [x] Sauvegarder un programme sportif répétable.
   - Acceptation : jours/heures/sport/métriques/énergie/fuseau validés, limites affichées.
   - Zones : entité programme, migration, formulaire, contrôleur, tests.
   - Vérifier : calendrier et données invalides ; dépendance : profils.
-- [ ] Extraire les calculs communs nécessaires à la progression fictive.
+- [x] Extraire les calculs communs nécessaires à la progression fictive.
   - Acceptation : aucune duplication des règles XP, durée, série ou vitalité.
   - Zones : Progression, Training et services de bonus existants ; subdiviser par calcul.
   - Vérifier : tests actuels et cas de parité ; dépendance : snapshot explicite.
-- [ ] Exécuter chronologiquement le programme avec un état fictif.
+- [x] Exécuter chronologiquement le programme avec un état fictif.
   - Acceptation : jours de repos, plafonds, séries et bonus traités sans écriture métier.
   - Zones : orchestrateur, état fictif, résultats, tests progression.
   - Vérifier : scénarios multi-semaines et isolation ; dépendance : calculs communs/programme.
-- [ ] Afficher et comparer la progression, puis utiliser une semaine en combat.
+- [x] Afficher et comparer la progression, puis utiliser une semaine en combat.
   - Acceptation : tableaux/courbes XP/niveaux/attributs, hypothèses visibles, lien opérationnel.
   - Zones : contrôleur, présentation résultats, templates, tests HTTP.
   - Vérifier : parcours web complet ; dépendance : progression et combats.
-- [ ] Finaliser migrations, documentation et validation globale.
+- [x] Finaliser migrations, documentation et validation globale.
   - Acceptation : critères de la spec vérifiés, tests/QA réussis, coût mesuré.
   - Zones : README, ARCHITECTURE, documentation dédiée, contrat si modifié.
   - Vérifier : make test, make qa, make openapi, make build-prod via rtk.
-- [ ] Committer, pousser et ouvrir la PR selon AGENTS.md ; rendre preuves et limitations.
+- [x] Committer, pousser et ouvrir la PR selon AGENTS.md ; rendre preuves et limitations.
   - Acceptation : PR ouverte, aucune fusion ; dépendance : validation globale réussie.
+
+Constat validé avec l’architecte : aucune mécanique de série/streak n’existe encore dans le jeu.
+Le laboratoire affiche donc un bonus nul ; il ne crée pas une règle absente du runtime.
+
+## Preuves de livraison
+
+- `rtk make test` : 1347 tests, 24737 assertions, sans échec.
+- `rtk make qa` : PHPStan maximal, CS et Deptrac sans erreur.
+- `rtk make openapi` : contrat régénéré, inchangé pour l’API mobile.
+- `rtk make build-prod` : image de production construite.
+- Navigateur local : profil, ajout dynamique de séance, programme, courbes et semaine vers combat.
+- HTTP : publication, conflits, CSRF, archives, bornes et absence d’écritures métier.
+- Mesures aux plafonds documentées dans docs/game-design.md.

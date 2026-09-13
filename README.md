@@ -117,3 +117,9 @@ Les uploads passent par le volume `var/game-images` et la route
 publique `/game-images/{name}`. Les URLs absolues utilisent le contexte HTTP existant ; en
 production, le proxy de confiance transmet HTTPS. Aucune migration ne copie les assets ni
 n'active Al-Kasal : son paramétrage de contenu et le raccordement mobile restent séparés.
+
+## Game design
+
+L’atelier intégré à `/admin/game-design` permet de préparer un brouillon, comparer des
+combats et des programmes sportifs fictifs, puis publier les règles. Voir le
+[guide du game designer](docs/game-design.md) pour les parcours, limites et mesures.

@@ -842,4 +842,32 @@ Créer le volume dans la région de la machine applicative, avant le premier dé
 `/data/game-images`. Une seule machine peut monter ce volume à la fois : ne pas augmenter le
 compte du process `app` au-delà de un tant que les images ne sont pas sorties vers un stockage
 objet. `placeholder.png` est servi même sur un volume fraîchement créé ; les uploads sont reçus
-dans `/data/game-images/.staging`, puis promus seulement avec la publication transactionnelle.
+dans `/data/game-images/.staging`, puis promus avec la sauvegarde transactionnelle du brouillon. Le publié continue à pointer
+vers ses images précédentes jusqu’à la publication explicite.
+
+### Atelier de game design (#277)
+
+`Admin` orchestre les expériences et conserve leurs données dans `game_design_*`.
+Il réutilise les fonctions pures des modules, sans leurs handlers ni repositories.
+`FrozenGameRulesets` porte chaque snapshot choisi pendant tout le calcul.
+`FighterDerivation` et `CombatSnapshot` sont communs aux combats réels et fictifs ;
+`WorkoutOverlapArbitration` est commun à l’import et au programme sportif.
+
+```mermaid
+flowchart LR
+    draft["game_* · brouillon"] --> prepare["prepare · validation commune"]
+    prepare --> publish["publication explicite + verrou"]
+    publish --> runtime["game_ruleset · jeu des joueurs"]
+    publish --> history["game_publication · archive"]
+    prepare --> frozen["deux snapshots gelés"]
+    runtime --> frozen
+    profile["profil + programme fictifs"] --> simulation["moteurs purs"]
+    frozen --> simulation
+    simulation --> result["game_design_run · entrées + résultats + version moteur"]
+    result --> week["état hebdomadaire → combat"]
+```
+
+Le laboratoire maintient son ledger et son énergie en mémoire ; il ne publie aucun
+événement métier. Son bonus de série est nul tant que la mécanique est absente du jeu.
+Les bornes techniques, l’archivage et les mesures HTTP figurent dans
+[le guide de l’atelier](docs/game-design.md).

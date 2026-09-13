@@ -129,6 +129,52 @@ final class GameDesignHttpTest extends ApiTestCase
         self::assertSame($run->result(), new \App\Admin\Domain\GameDesignCombat()->compare($snapshots['published'], $snapshots['draft'], $input['profile'], $input['enemyKey'], $input['customEnemy'], $input['samples'], $input['seed']));
     }
 
+    public function testAProgramCanBeSavedComparedAndUsedForCombatFromAWeek(): void
+    {
+        $this->openAccount('sport-designer@grrind.app');
+        $users = self::getContainer()->get(UserRepository::class);
+        $user = $users->ofEmail('sport-designer@grrind.app');
+        self::assertNotNull($user);
+        $user->grant(Role::Admin);
+        $users->commit();
+        $this->client->loginUser($user, 'admin');
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $profile = new \App\Admin\Domain\GameDesignProfile();
+        $profile->setName('Sportive');
+        $manager->persist($profile);
+        $manager->flush();
+        $page = $this->client->request('GET', '/admin/game-design/programs/new');
+        self::assertResponseIsSuccessful();
+        $form = $page->selectButton('Enregistrer le programme')->form();
+        $values = $form->getPhpValues();
+        self::assertIsArray($values['game_design_program']);
+        $values['game_design_program']['name'] = 'Course hebdomadaire';
+        $values['game_design_program']['weeks'] = '2';
+        $values['game_design_program']['sessions'] = [
+            ['day' => '1', 'hour' => '8', 'minute' => '0', 'discipline' => 'RUNNING', 'duration' => '3600', 'distance' => '10000', 'elevation' => '100'],
+        ];
+        $values['game_design_program']['energy'] = array_fill(0, 7, '500');
+        $this->client->request('POST', '/admin/game-design/programs/new', $values);
+        self::assertResponseRedirects('/admin/game-design/profiles');
+        $page = $this->client->followRedirect();
+        $page = $this->client->click($page->selectLink('Progression')->link());
+        self::assertResponseIsSuccessful();
+        $this->client->submit($page->selectButton('Comparer la progression')->form());
+        self::assertResponseRedirects();
+        $page = $this->client->followRedirect();
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Course hebdomadaire');
+        self::assertSelectorTextContains('body', 'Bonus de série : 0');
+        $page = $this->client->click($page->selectLink('Tester en combat')->first()->link());
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'semaine 1');
+        $this->client->submit($page->selectButton('Comparer les combats')->form());
+        self::assertResponseRedirects();
+        $this->client->followRedirect();
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'semaine 1');
+    }
+
     public function testTheWorkshopRequiresAnAdminSession(): void
     {
         $this->client->request('GET', '/admin/game-design');

@@ -104,6 +104,9 @@ final class GameDesignCombat
             }
         }
 
-        return ['version' => $rulesets->version(), 'samples' => $samples, 'seed' => $seed, 'wins' => $wins, 'defeats' => $samples - $wins, 'limits' => $limits, 'totalTicks' => $ticks, 'totalPlayerHp' => $playerHp, 'totalEnemyHp' => $enemyHp, 'histogram' => $histogram, 'attributes' => $resolved['attributes'], 'player' => CombatSnapshot::fighter($player), 'enemy' => CombatSnapshot::fighter($enemy), 'detail' => $detail];
+        $progression = GameDesignInputs::progression($profile, $rulesets);
+        $bonuses = array_map(static fn (\App\Shared\Domain\Modifier\Modifier $modifier): array => ['type' => $modifier->type->value, 'value' => $modifier->value, 'discipline' => $modifier->discipline?->value], GameDesignInputs::modifiers($profile['equipment'], $rulesets));
+
+        return ['level' => $progression->level, 'totalXp' => $progression->attributes->total(), 'bonuses' => $bonuses, 'version' => $rulesets->version(), 'samples' => $samples, 'seed' => $seed, 'wins' => $wins, 'defeats' => $samples - $wins, 'limits' => $limits, 'totalTicks' => $ticks, 'totalPlayerHp' => $playerHp, 'totalEnemyHp' => $enemyHp, 'histogram' => $histogram, 'attributes' => $resolved['attributes'], 'player' => CombatSnapshot::fighter($player), 'enemy' => CombatSnapshot::fighter($enemy), 'detail' => $detail];
     }
 }

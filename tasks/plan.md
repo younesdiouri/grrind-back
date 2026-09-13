@@ -1,6 +1,6 @@
 # Plan — #277 Atelier de game design
 
-Validé avec docs/specs/277-game-design.md ; implémentation en cours.
+Validé avec docs/specs/277-game-design.md ; implémentation et validations terminées le 13 septembre 2026.
 
 ## Ordre et dépendances
 
