@@ -1,0 +1,67 @@
+# Tâches — #277
+
+Périmètre validé ; chaque ligne est un incrément à tester avant le suivant. Les fichiers indiqués
+sont les zones probables, à limiter à environ cinq fichiers par incrément lors de l'exécution.
+
+- [ ] Extraire la préparation et validation de snapshot sans publication.
+  - Acceptation : snapshot validable sans changement de révision publiée.
+  - Zones : GameRulesetPublisher, nouveau service, tests/Admin.
+  - Vérifier : tests de validation et absence de mutation ; dépendance : aucune.
+- [ ] Transformer les sauvegardes CRUD en brouillon avec révision attendue.
+  - Acceptation : sauvegarde invisible au runtime, édition périmée refusée.
+  - Zones : GameCrudController, entité de révision, migration, tests/Admin.
+  - Vérifier : tests HTTP et concurrence ; dépendance : préparation snapshot.
+- [ ] Ajouter aperçu des différences et action de publication.
+  - Acceptation : publication atomique de la révision examinée, auteur/date visibles.
+  - Zones : contrôleur publication, publisher, template, tests/Admin.
+  - Vérifier : CSRF, rollback, conflit et cache ; dépendance : brouillon.
+- [ ] Garantir les références et images du publié pendant les éditions.
+  - Acceptation : supprimer/remplacer au brouillon ne casse pas le jeu publié.
+  - Zones : guard, gestion images, tests/Admin et lecteurs identifiés.
+  - Vérifier : scénarios images et références ; dépendance : brouillon.
+- [ ] Définir et tester les formules structurées de statistiques.
+  - Acceptation : opérations explicites, arithmétique bornée et résultats actuels reproductibles.
+  - Zones : Combat/Domain, tests/Combat/Domain.
+  - Vérifier : cas tabulés et valeurs limites ; dépendance : aucune.
+- [ ] Brancher les formules sur les combattants réels et migrer les valeurs initiales.
+  - Acceptation : parité avant/après, formule publiée modifiée prise en compte par le jeu.
+  - Zones : FighterFactory, snapshot, migration, tests/Combat.
+  - Vérifier : intégration runtime et migration ; dépendance : formules et snapshot.
+- [ ] Éditer les formules dans l'administration.
+  - Acceptation : choix d'attributs/opérations, coefficients et exemples sans JSON manuel.
+  - Zones : formulaire, SettingsCrudController, template, tests/Admin.
+  - Vérifier : formulaire valide/invalide ; dépendance : formules intégrées.
+- [ ] Ajouter sauvegarde et édition de profils fictifs.
+  - Acceptation : profil nommé cohérent, références validées, aucun compte de jeu créé.
+  - Zones : entité, migration, formulaire, CRUD, tests/Admin.
+  - Vérifier : persistance et validation ; dépendance : snapshot.
+- [ ] Exécuter et afficher un combat détaillé sur snapshot choisi.
+  - Acceptation : mêmes règles que le jeu, graine reproductible, aucun effet métier.
+  - Zones : service simulation, contrôleur, formulaire, template, tests.
+  - Vérifier : parité, isolation et HTTP ; dépendance : profils et dérivation.
+- [ ] Comparer des séries de combats et conserver les paramètres des résultats.
+  - Acceptation : deux snapshots figés, graines communes, statistiques et budget de travail.
+  - Zones : service séries, résultat, migration, template, tests.
+  - Vérifier : reproductibilité, publication concurrente, charge ; dépendance : combat détaillé.
+- [ ] Sauvegarder un programme sportif répétable.
+  - Acceptation : jours/heures/sport/métriques/énergie/fuseau validés, limites affichées.
+  - Zones : entité programme, migration, formulaire, contrôleur, tests.
+  - Vérifier : calendrier et données invalides ; dépendance : profils.
+- [ ] Extraire les calculs communs nécessaires à la progression fictive.
+  - Acceptation : aucune duplication des règles XP, durée, série ou vitalité.
+  - Zones : Progression, Training et services de bonus existants ; subdiviser par calcul.
+  - Vérifier : tests actuels et cas de parité ; dépendance : snapshot explicite.
+- [ ] Exécuter chronologiquement le programme avec un état fictif.
+  - Acceptation : jours de repos, plafonds, séries et bonus traités sans écriture métier.
+  - Zones : orchestrateur, état fictif, résultats, tests progression.
+  - Vérifier : scénarios multi-semaines et isolation ; dépendance : calculs communs/programme.
+- [ ] Afficher et comparer la progression, puis utiliser une semaine en combat.
+  - Acceptation : tableaux/courbes XP/niveaux/attributs, hypothèses visibles, lien opérationnel.
+  - Zones : contrôleur, présentation résultats, templates, tests HTTP.
+  - Vérifier : parcours web complet ; dépendance : progression et combats.
+- [ ] Finaliser migrations, documentation et validation globale.
+  - Acceptation : critères de la spec vérifiés, tests/QA réussis, coût mesuré.
+  - Zones : README, ARCHITECTURE, documentation dédiée, contrat si modifié.
+  - Vérifier : make test, make qa, make openapi, make build-prod via rtk.
+- [ ] Committer, pousser et ouvrir la PR selon AGENTS.md ; rendre preuves et limitations.
+  - Acceptation : PR ouverte, aucune fusion ; dépendance : validation globale réussie.

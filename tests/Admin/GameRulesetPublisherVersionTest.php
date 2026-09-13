@@ -15,6 +15,33 @@ use Doctrine\ORM\EntityManagerInterface;
 /** Le hash métier et la version de loot ne changent qu'avec les données qui les concernent. */
 final class GameRulesetPublisherVersionTest extends ApiTestCase
 {
+    public function testPreparingADraftDoesNotPublishOrIncrementLootVersion(): void
+    {
+        $manager = $this->manager();
+        $publisher = self::getContainer()->get(GameRulesetPublisher::class);
+        $ruleset = $manager->find(GameRuleset::class, 1);
+        $settings = $manager->find(GameSettings::class, 1);
+        $table = $manager->getRepository(GameLootTable::class)->findOneBy([]);
+        self::assertInstanceOf(GameRulesetPublisher::class, $publisher);
+        self::assertInstanceOf(GameRuleset::class, $ruleset);
+        self::assertInstanceOf(GameSettings::class, $settings);
+        self::assertInstanceOf(GameLootTable::class, $table);
+        $revision = $ruleset->revision();
+        $snapshot = $ruleset->snapshot();
+        $lootVersion = $settings->lootVersion();
+        $entries = $table->getEntries();
+        ++$entries[0]['weight'];
+        $table->setEntries($entries);
+
+        $draft = $publisher->prepare($manager);
+
+        self::assertNotSame($snapshot, $draft);
+        self::assertSame($revision, $ruleset->revision());
+        self::assertSame($snapshot, $ruleset->snapshot());
+        self::assertSame($lootVersion, $settings->lootVersion());
+        $manager->clear();
+    }
+
     public function testPresentationAndNoopPublicationKeepTheGameplayAndLootVersions(): void
     {
         $manager = $this->manager();

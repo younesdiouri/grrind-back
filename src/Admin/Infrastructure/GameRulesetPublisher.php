@@ -54,6 +54,32 @@ final readonly class GameRulesetPublisher
             throw new LogicException('Le snapshot de jeu initial est absent. Rejouer les migrations avant d’ouvrir EasyAdmin.');
         }
 
+        $snapshot = $this->prepare($manager);
+        $settings = $manager->find(GameSettings::class, 1);
+        \assert($settings instanceof GameSettings);
+        if (self::lootGameplay($ruleset->snapshot()) !== self::lootGameplay($snapshot)) {
+            $settings->incrementLootVersion();
+            $snapshot['loot']['version'] = $settings->lootVersion();
+        }
+        foreach ([GameItem::class, GameTitle::class, GameEnemy::class, GameLootTable::class, GameDiscipline::class] as $class) {
+            foreach ($manager->getRepository($class)->findAll() as $configuration) {
+                if ($configuration->isActive()) {
+                    $configuration->markPublishedActive();
+                }
+            }
+        }
+        $ruleset->publish($snapshot, GameRulesetVersion::of($snapshot));
+        $manager->flush();
+    }
+
+    /**
+     * La simulation valide exactement les mêmes règles sans modifier le publié ni les
+     * marqueurs historiques du catalogue. Le caller fige ce tableau pour toute l'opération.
+     *
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>}
+     */
+    public function prepare(EntityManagerInterface $manager): array
+    {
         /** @var list<GameItem> $items */ $items = $manager->getRepository(GameItem::class)->findBy([], ['sortOrder' => 'ASC']);
         /** @var list<GameTitle> $titles */ $titles = $manager->getRepository(GameTitle::class)->findBy([], ['sortOrder' => 'ASC']);
         /** @var list<GameEnemy> $enemies */ $enemies = $manager->getRepository(GameEnemy::class)->findBy([], ['sortOrder' => 'ASC']);
@@ -66,19 +92,7 @@ final readonly class GameRulesetPublisher
             throw new LogicException('Les réglages globaux initiaux sont absents. Rejouer les migrations avant d’ouvrir EasyAdmin.');
         }
 
-        foreach ([...$items, ...$titles, ...$enemies, ...$tables, ...$disciplines] as $configuration) {
-            if ($configuration->isActive()) {
-                $configuration->markPublishedActive();
-            }
-        }
-
         $snapshot = self::snapshot($items, $titles, $enemies, $tables, $disciplines, $levels, $activityTypes, $settings);
-        /** @var array<string, mixed> $previous */
-        $previous = $ruleset->snapshot();
-        if (self::lootGameplay($previous) !== self::lootGameplay($snapshot)) {
-            $settings->incrementLootVersion();
-            $snapshot['loot']['version'] = $settings->lootVersion();
-        }
         self::validate($snapshot);
         foreach ($enemies as $enemy) {
             foreach ([$enemy->getIdleImagePath(), $enemy->getAttackImagePath(), $enemy->getHitImagePath()] as $path) {
@@ -88,8 +102,7 @@ final readonly class GameRulesetPublisher
             }
         }
 
-        $ruleset->publish($snapshot, GameRulesetVersion::of($snapshot));
-        $manager->flush();
+        return $snapshot;
     }
 
     /** Le cache est une accélération : la publication DB réussie ne dépend jamais de lui. */
