@@ -8,6 +8,11 @@ use App\Admin\Domain\GamePublication;
 use App\Admin\Domain\GameRulesetDiff;
 use App\Admin\Infrastructure\GameDesignWorkspace;
 use App\Admin\Infrastructure\GameDraft;
+use App\Combat\Domain\CombatRules;
+use App\Combat\Domain\FighterDerivation;
+use App\Shared\Application\PlayerProgression;
+use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Activity\VitalityBreakdown;
 use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
 use LogicException;
@@ -57,8 +62,23 @@ final class GameDesignController extends AbstractController
             'form' => $form,
             'preview' => $preview,
             'error' => $error,
+            'example' => null === $preview ? [] : $this->example($preview['draft']),
             'changes' => null === $preview ? [] : GameRulesetDiff::between($preview['published'], $preview['draft']),
             'publications' => $manager->getRepository(GamePublication::class)->findBy([], ['publishedAt' => 'DESC'], 20),
         ]);
+    }
+
+    /** @param array<string, mixed> $snapshot
+     * @return array<string, int>
+     */
+    private function example(array $snapshot): array
+    {
+        /** @var array{combat: array{fighter: array<string, int>, formulas: array<string, array{source: string, combination: string, secondary: ?string}>}} $snapshot */
+        $profile = new PlayerProgression(1, 0, null, null, new AttributeGains(1000, 2000, 3000, 4000), 5000, new VitalityBreakdown(5000, 0, 5000));
+        $resolved = FighterDerivation::resolve($profile, [], CombatRules::fromSnapshot($snapshot['combat']['fighter']), $snapshot['combat']['formulas']);
+        /** @var array<string, int> $values */
+        $values = get_object_vars($resolved['fighter']);
+
+        return $values;
     }
 }

@@ -19,11 +19,11 @@ sont les zones probables, à limiter à environ cinq fichiers par incrément lor
   - Acceptation : supprimer/remplacer au brouillon ne casse pas le jeu publié.
   - Zones : guard, gestion images, tests/Admin et lecteurs identifiés.
   - Vérifier : scénarios images et références ; dépendance : brouillon.
-- [ ] Définir et tester les formules structurées de statistiques.
+- [x] Définir et tester les formules structurées de statistiques.
   - Acceptation : opérations explicites, arithmétique bornée et résultats actuels reproductibles.
   - Zones : Combat/Domain, tests/Combat/Domain.
   - Vérifier : cas tabulés et valeurs limites ; dépendance : aucune.
-- [ ] Brancher les formules sur les combattants réels et migrer les valeurs initiales.
+- [x] Brancher les formules sur les combattants réels et migrer les valeurs initiales.
   - Acceptation : parité avant/après, formule publiée modifiée prise en compte par le jeu.
   - Zones : FighterFactory, snapshot, migration, tests/Combat.
   - Vérifier : intégration runtime et migration ; dépendance : formules et snapshot.

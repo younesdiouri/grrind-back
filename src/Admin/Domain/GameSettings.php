@@ -13,6 +13,8 @@ use Doctrine\ORM\Mapping as ORM;
 class GameSettings
 {
     #[ORM\Id] #[ORM\Column] private int $id = 1;
+    /** @var array<string, array{source: string, combination: string, secondary: ?string}> */
+    #[ORM\Column(type: Types::JSON)] private array $formulas = [];
     /** @var array<string, int> */ #[ORM\Column(type: Types::JSON)] private array $fighter = [];
     /** @var array{floor_percent: int, cap_percent: int} */ #[ORM\Column(name: 'loot_luck', type: Types::JSON)] private array $lootLuck = ['floor_percent' => 0, 'cap_percent' => 200];
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $training = [];
@@ -24,6 +26,18 @@ class GameSettings
     public function __toString(): string
     {
         return 'Réglages globaux';
+    }
+
+    /** @return array<string, array{source: string, combination: string, secondary: ?string}> */
+    public function getFormulas(): array
+    {
+        return $this->formulas;
+    }
+
+    /** @param array<string, array{source: string, combination: string, secondary: ?string}> $formulas */
+    public function setFormulas(array $formulas): void
+    {
+        $this->formulas = $formulas;
     }
 
     public function getId(): int

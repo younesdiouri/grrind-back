@@ -18,6 +18,11 @@
 {{ form(form) }}
 </section>
 {% else %}{{ form_errors(form) }}{% endif %}
+{% if example %}
+<h2>Exemple calculé avec le brouillon</h2>
+<p>Force 1 000 · Endurance 2 000 · Mobilité 3 000 · Dextérité 4 000 · Vitalité 5 000, sans équipement. Les taux sont en millièmes (100 = 10 %).</p>
+<table><thead><tr><th>Statistique</th><th>Valeur dérivée</th></tr></thead><tbody>{% for stat, value in example %}<tr><td>{{ stat }}</td><td>{{ value }}</td></tr>{% endfor %}</tbody></table>
+{% endif %}
 <h2>Dernières publications</h2>
 <table><thead><tr><th>Révision</th><th>Date</th><th>Auteur</th><th>Version</th></tr></thead><tbody>
 {% for publication in publications %}<tr><td>{{ publication.revision }}</td><td>{{ publication.publishedAt|date('d/m/Y H:i:s T') }}</td><td>{{ publication.author }}</td><td>{{ publication.version }}</td></tr>

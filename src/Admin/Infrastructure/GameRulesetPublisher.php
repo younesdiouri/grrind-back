@@ -16,6 +16,7 @@ use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
 use App\Combat\Domain\CombatRules;
 use App\Combat\Domain\EnemyCatalog;
+use App\Combat\Domain\StatFormula;
 use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\TitleCatalog;
@@ -175,7 +176,7 @@ final readonly class GameRulesetPublisher
         usort($activityRows, static fn (array $left, array $right): int => [$left['source'], $left['provider_type']] <=> [$right['source'], $right['provider_type']]);
 
         return [
-            'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
+            'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['formulas' => $settings->getFormulas(), 'fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
             'training' => $settings->getTraining(), 'xp' => $settings->getXp(), 'attributes' => $settings->getAttributes(), 'disciplines' => $disciplineRows, 'levels' => $levelRows,
             'activity_types' => $activityRows, 'community' => $settings->getCommunity(), 'notifications' => $settings->getNotifications(),
         ];
@@ -225,6 +226,9 @@ final readonly class GameRulesetPublisher
         }
         new ItemCatalog($items);
         new TitleCatalog($titles);
+        /** @var array<string, array{source: string, combination: string, secondary: ?string}> $formulas */
+        $formulas = $snapshot['combat']['formulas'];
+        StatFormula::scores($formulas, ['strength' => 0, 'endurance' => 0, 'mobility' => 0, 'dexterity' => 0, 'vitality' => 0]);
         $combatRules = CombatRules::fromSnapshot($fighter);
         new EnemyCatalog($enemies, $bosses, combatRules: $combatRules);
         new LootLuckRules($lootLuck['floor_percent'], $lootLuck['cap_percent']);
