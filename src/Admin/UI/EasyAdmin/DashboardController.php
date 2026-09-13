@@ -60,6 +60,7 @@ final class DashboardController extends AbstractDashboardController
 
     public function configureMenuItems(): iterable
     {
+        yield MenuItem::linkToRoute('Game design', 'fa fa-flask', 'admin_game_design');
         yield MenuItem::linkToDashboard('Configuration du jeu', 'fa fa-gamepad');
         foreach (self::CONFIGURATION_CRUDS as $controller => $crud) {
             yield MenuItem::linkTo($controller, $crud['label'], $crud['icon']);

@@ -8,7 +8,7 @@ use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLootTable;
 use App\Admin\Infrastructure\GameConfigurationReferenceGuard;
-use App\Admin\Infrastructure\GameRulesetPublisher;
+use App\Admin\Infrastructure\GameDraft;
 use Doctrine\DBAL\Exception as DbalException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -17,9 +17,12 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Exception\EntityRemoveException;
 use InvalidArgumentException;
 use LogicException;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
+use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,7 +30,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
 
-/** Toute mutation EasyAdmin passe par la publication transactionnelle, jamais par un flush isolé. */
+/** Toute mutation prépare le brouillon ; seule la publication explicite touche les joueurs. */
 /** @extends AbstractCrudController<object> */
 abstract class GameCrudController extends AbstractCrudController
 {
@@ -37,7 +40,9 @@ abstract class GameCrudController extends AbstractCrudController
     /** @var FormInterface<mixed>|null */
     private ?FormInterface $submittedForm = null;
 
-    public function __construct(private readonly GameRulesetPublisher $publisher, private readonly GameConfigurationReferenceGuard $references, protected readonly string $gameImageDirectory, private readonly ?ManagerRegistry $doctrine = null)
+    private ?int $actionRevision = null;
+
+    public function __construct(private readonly GameConfigurationReferenceGuard $references, protected readonly string $gameImageDirectory, private readonly ?ManagerRegistry $doctrine = null, private readonly ?GameDraft $draft = null)
     {
     }
 
@@ -97,6 +102,7 @@ abstract class GameCrudController extends AbstractCrudController
     /** @param AdminContext<object> $context */
     public function delete(AdminContext $context): KeyValueStore|Response
     {
+        $this->actionRevision = $context->getRequest()->request->getInt('_draft_revision', -1);
         try {
             return parent::delete($context);
         } catch (EntityRemoveException $exception) {
@@ -111,12 +117,12 @@ abstract class GameCrudController extends AbstractCrudController
         $this->promotedImages = [];
         try {
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
+                $this->lockDraft($entityManager);
                 $entityManager->persist($entityInstance);
                 $this->finalizeStagedImage($entityInstance);
                 $entityManager->flush();
-                $this->publisher->publish($entityManager);
+                $this->draftFor($entityManager)->advance();
             });
-            $this->publisher->invalidateAfterCommit();
             $this->promotedImages = [];
         } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             $this->compensateImage($entityInstance, null);
@@ -141,12 +147,12 @@ abstract class GameCrudController extends AbstractCrudController
         }
         try {
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
+                $this->lockDraft($entityManager);
                 $this->references->lockForMutation($entityInstance);
                 $this->finalizeStagedImage($entityInstance);
                 $entityManager->flush();
-                $this->publisher->publish($entityManager);
+                $this->draftFor($entityManager)->advance();
             });
-            $this->publisher->invalidateAfterCommit();
             $this->promotedImages = [];
         } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             $this->compensateImage($entityInstance, $oldImage);
@@ -161,12 +167,12 @@ abstract class GameCrudController extends AbstractCrudController
     {
         try {
             $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
+                $this->lockDraft($entityManager);
                 $this->references->assertDeletable($entityInstance);
                 $entityManager->remove($entityInstance);
                 $entityManager->flush();
-                $this->publisher->publish($entityManager);
+                $this->draftFor($entityManager)->advance();
             });
-            $this->publisher->invalidateAfterCommit();
         } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             throw new EntityRemoveException(['entity_name' => $entityInstance::class, 'message' => $exception->getMessage()], $exception);
         }
@@ -183,6 +189,7 @@ abstract class GameCrudController extends AbstractCrudController
     #[AdminRoute(path: '/{entityId}/toggle-loot-pair', name: 'toggle_loot_pair', options: ['methods' => ['POST']])]
     public function toggleLootPair(AdminContext $context): Response
     {
+        $this->actionRevision = $context->getRequest()->request->getInt('_draft_revision', -1);
         $token = $context->getRequest()->request->get('token');
         if (!$this->isCsrfTokenValid('ea-toggle-loot-pair', \is_string($token) ? $token : null)) {
             throw new AccessDeniedHttpException('Le jeton CSRF de publication de la paire est invalide.');
@@ -195,6 +202,7 @@ abstract class GameCrudController extends AbstractCrudController
             $target = $this->lootPairFor($entity);
             $manager = $this->managerFor($entity);
             $manager->wrapInTransaction(function () use ($manager, $entity, $target): void {
+                $this->lockDraft($manager);
                 // Verrouiller les deux lignes avant leur flush évite qu'un DELETE concurrent
                 // enlève une paire pendant que cette demande attend sur PostgreSQL.
                 $this->references->lockForMutation($entity);
@@ -206,15 +214,40 @@ abstract class GameCrudController extends AbstractCrudController
                 $entity->setActive($active);
                 $target->setActive($active);
                 $manager->flush();
-                $this->publisher->publish($manager);
+                $this->draftFor($manager)->advance();
             });
-            $this->publisher->invalidateAfterCommit();
             $this->addFlash('success', $entity->isActive() ? 'La paire de loot est activée.' : 'La paire de loot est désactivée.');
         } catch (InvalidArgumentException|LogicException|DbalException $exception) {
             $this->addFlash('danger', $this->formError($exception));
         }
 
         return $this->redirectToRoute($context->getDashboardRouteName());
+    }
+
+    /** @param EntityDto<object> $entityDto
+     * @param AdminContext<object> $context
+     *
+     * @return FormBuilderInterface<object>
+     */
+    public function createEditFormBuilder(EntityDto $entityDto, KeyValueStore $formOptions, AdminContext $context): FormBuilderInterface
+    {
+        $entity = $entityDto->getInstance();
+        \assert(null !== $entity);
+
+        return parent::createEditFormBuilder($entityDto, $formOptions, $context)->add('_draft_revision', HiddenType::class, ['mapped' => false, 'data' => (string) $this->draftFor($this->managerFor($entity))->revision()]);
+    }
+
+    /** @param EntityDto<object> $entityDto
+     * @param AdminContext<object> $context
+     *
+     * @return FormBuilderInterface<object>
+     */
+    public function createNewFormBuilder(EntityDto $entityDto, KeyValueStore $formOptions, AdminContext $context): FormBuilderInterface
+    {
+        $entity = $entityDto->getInstance();
+        \assert(null !== $entity);
+
+        return parent::createNewFormBuilder($entityDto, $formOptions, $context)->add('_draft_revision', HiddenType::class, ['mapped' => false, 'data' => (string) $this->draftFor($this->managerFor($entity))->revision()]);
     }
 
     /** @param FormInterface<mixed> $form Le formulaire soumis reste réaffichable après compensation des uploads déplacés. */
@@ -289,6 +322,22 @@ abstract class GameCrudController extends AbstractCrudController
             }
         }
         $this->promotedImages = [];
+    }
+
+    private function draftFor(EntityManagerInterface $manager): GameDraft
+    {
+        return $this->draft ?? new GameDraft($manager->getConnection());
+    }
+
+    private function lockDraft(EntityManagerInterface $manager): void
+    {
+        $draft = $this->draftFor($manager);
+        $expected = $this->actionRevision ?? $draft->revision();
+        if (null !== $this->submittedForm) {
+            $value = $this->submittedForm->get('_draft_revision')->getData();
+            $expected = \is_string($value) && ctype_digit($value) ? (int) $value : -1;
+        }
+        $draft->lock($expected);
     }
 
     /** @return FormInterface<mixed> */

@@ -3,19 +3,19 @@
 Périmètre validé ; chaque ligne est un incrément à tester avant le suivant. Les fichiers indiqués
 sont les zones probables, à limiter à environ cinq fichiers par incrément lors de l'exécution.
 
-- [ ] Extraire la préparation et validation de snapshot sans publication.
+- [x] Extraire la préparation et validation de snapshot sans publication.
   - Acceptation : snapshot validable sans changement de révision publiée.
   - Zones : GameRulesetPublisher, nouveau service, tests/Admin.
   - Vérifier : tests de validation et absence de mutation ; dépendance : aucune.
-- [ ] Transformer les sauvegardes CRUD en brouillon avec révision attendue.
+- [x] Transformer les sauvegardes CRUD en brouillon avec révision attendue.
   - Acceptation : sauvegarde invisible au runtime, édition périmée refusée.
   - Zones : GameCrudController, entité de révision, migration, tests/Admin.
   - Vérifier : tests HTTP et concurrence ; dépendance : préparation snapshot.
-- [ ] Ajouter aperçu des différences et action de publication.
+- [x] Ajouter aperçu des différences et action de publication.
   - Acceptation : publication atomique de la révision examinée, auteur/date visibles.
   - Zones : contrôleur publication, publisher, template, tests/Admin.
   - Vérifier : CSRF, rollback, conflit et cache ; dépendance : brouillon.
-- [ ] Garantir les références et images du publié pendant les éditions.
+- [x] Garantir les références et images du publié pendant les éditions.
   - Acceptation : supprimer/remplacer au brouillon ne casse pas le jeu publié.
   - Zones : guard, gestion images, tests/Admin et lecteurs identifiés.
   - Vérifier : scénarios images et références ; dépendance : brouillon.

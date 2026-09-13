@@ -15,6 +15,7 @@ class GameRuleset
 {
     #[ORM\Id] #[ORM\Column] private int $id = 1;
     #[ORM\Column] private int $revision = 1;
+    #[ORM\Column] private int $draftRevision = 1;
     #[ORM\Column(length: 32)] private string $version = '';
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $snapshot = [];
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)] private DateTimeImmutable $publishedAt;
@@ -26,6 +27,11 @@ class GameRuleset
     public function revision(): int
     {
         return $this->revision;
+    }
+
+    public function draftRevision(): int
+    {
+        return $this->draftRevision;
     }
 
     public function version(): string

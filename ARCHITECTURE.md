@@ -820,8 +820,11 @@ Les pièges qui se reproduisent. Les autres sont datés, corrigés, et vivent da
 `/admin` est un firewall Symfony stateful distinct du JWT mobile. Seul `ROLE_ADMIN` y entre ;
 la commande `app:user:grant-admin <email>` promeut un compte local existant et refuse un compte
 social sans mot de passe. Les données de balance éditables sont importées une fois dans les tables
-`game_*`. Toute mutation EasyAdmin reconstruit le snapshot dans une transaction et rejoue les
-constructeurs métier : une configuration incohérente ne devient jamais visible partiellement.
+`game_*`. Toute mutation EasyAdmin modifie le brouillon partagé avec une révision attendue.
+La publication explicite dans `/admin/game-design` verrouille ce brouillon, rejoue les
+constructeurs métier puis archive et remplace atomiquement le snapshot : une configuration
+incohérente ne devient jamais visible partiellement. Les formulaires et publications périmés
+sont refusés. Les images précédemment référencées restent disponibles.
 Le cache taggé n'est qu'une accélération : il est invalidé après le commit et toute panne
 retombe sur PostgreSQL. Le snapshot est indexé par sa révision dans les workers longs ; aucun
 catalogue ne rescane ni ne mélange une ancienne et une nouvelle publication. L'empreinte hybride

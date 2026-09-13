@@ -10,6 +10,7 @@ use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLevel;
 use App\Admin\Domain\GameLootTable;
+use App\Admin\Domain\GamePublication;
 use App\Admin\Domain\GameRuleset;
 use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
@@ -47,13 +48,14 @@ final readonly class GameRulesetPublisher
     {
     }
 
-    public function publish(EntityManagerInterface $manager): void
+    public function publish(EntityManagerInterface $manager, string $author = 'system'): void
     {
         $ruleset = $manager->find(GameRuleset::class, 1, LockMode::PESSIMISTIC_WRITE);
         if (!$ruleset instanceof GameRuleset) {
             throw new LogicException('Le snapshot de jeu initial est absent. Rejouer les migrations avant d’ouvrir EasyAdmin.');
         }
 
+        $manager->refresh($ruleset, LockMode::PESSIMISTIC_WRITE);
         $snapshot = $this->prepare($manager);
         $settings = $manager->find(GameSettings::class, 1);
         \assert($settings instanceof GameSettings);
@@ -69,6 +71,7 @@ final readonly class GameRulesetPublisher
             }
         }
         $ruleset->publish($snapshot, GameRulesetVersion::of($snapshot));
+        $manager->persist(new GamePublication($ruleset->revision(), $author, $ruleset->version(), $snapshot));
         $manager->flush();
     }
 

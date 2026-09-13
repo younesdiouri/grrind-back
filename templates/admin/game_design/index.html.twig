@@ -1,0 +1,26 @@
+{% extends 'admin/game_design/layout.html.twig' %}
+{% block body %}
+<h1>Atelier de game design</h1>
+<p>Les formulaires de configuration modifient le brouillon partagé. Les joueurs utilisent uniquement les règles publiées.</p>
+<p><a href="{{ path('admin') }}">Modifier les catalogues, niveaux et réglages</a></p>
+{% if error %}
+    <div class="error" role="alert"><strong>Brouillon à corriger</strong><p>{{ error }}</p>La simulation et la publication restent indisponibles jusqu’à correction. Les règles publiées restent intactes.</div>
+{% endif %}
+{% if preview %}
+<section class="panel">
+<h2>Publier le brouillon {{ preview.revision }}</h2>
+<p>Révision actuellement publiée : {{ preview.publishedRevision }}. Examinez les différences avant de publier l’ensemble. La publication inclut aussi les réglages de communauté et de notifications des formulaires existants.</p>
+{% if changes %}
+<table><thead><tr><th>Réglage</th><th>Publié</th><th>Brouillon</th></tr></thead><tbody>
+{% for change in changes %}<tr><td>{{ change.path }}</td><td>{{ change.before }}</td><td>{{ change.after }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Aucune différence de configuration.</p>{% endif %}
+{{ form(form) }}
+</section>
+{% else %}{{ form_errors(form) }}{% endif %}
+<h2>Dernières publications</h2>
+<table><thead><tr><th>Révision</th><th>Date</th><th>Auteur</th><th>Version</th></tr></thead><tbody>
+{% for publication in publications %}<tr><td>{{ publication.revision }}</td><td>{{ publication.publishedAt|date('d/m/Y H:i:s T') }}</td><td>{{ publication.author }}</td><td>{{ publication.version }}</td></tr>
+{% else %}<tr><td colspan="4">Aucune publication archivée depuis l’ouverture de l’atelier.</td></tr>{% endfor %}
+</tbody></table>
+{% endblock %}
