@@ -71,9 +71,11 @@ Si l'un de ces interdits bloque le ticket, remonte le conflit au parent au lieu 
    une durée se recalcule depuis les deux bornes du fournisseur. L'XP est un ledger append-only ;
    une invalidation écrit une transaction négative et `progression_snapshot` reste un cache
    reconstructible.
-4. La balance du jeu est du config-as-code. Courbes, coefficients, tables de loot, arbres et
-   catalogue vivent sous `config/game/v1/`, chargés et validés au boot. N'ajoute ni constante
-   de classe ni valeur de balance en base.
+4. La balance du jeu est versionnée et publiée, conformément à CLAUDE.md. Les paramètres
+   restés sous `config/game/v1/` sont validés au boot ; les catalogues et réglages administrables
+   vivent dans `game_*`. Le runtime lit uniquement le snapshot publié et conserve la même
+   révision pendant une opération. N'ajoute pas de constante de balance dans le code.
+   Les brouillons et simulations prévus par un ticket restent isolés du snapshot publié.
 5. Respecte Deptrac : un module ne connaît que `Shared`. Aucun import direct d'une entité d'un
    autre module. La communication passe par un événement de domaine implémentant `DomainEvent`
    ou par un port explicite justifié dans son docblock.
@@ -127,7 +129,7 @@ chemins structurants se valent ou lorsque deux exigences se contredisent et que 
 changerait le travail. Fais tout le reste qui reste sûr et cohérent, ouvre la PR avec ce qui
 tient, puis décris explicitement le blocage.
 
-N'invente aucune règle de jeu absente du ticket et de `config/game/v1/`. Si un statut d'erreur
+N'invente aucune règle de jeu absente du ticket et des sources de configuration décrites dans CLAUDE.md. Si un statut d'erreur
 n'est pas tranché, rappelle-toi que les décisions les plus coûteuses du projet sont des 404 là
 où l'on attendrait un 403 ; si le doute persiste, remonte-le.
 """
