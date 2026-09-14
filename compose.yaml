@@ -40,6 +40,7 @@ services:
       - bin/console
       - messenger:consume
       - outbox
+      - scheduler_alam
       - --memory-limit=128M
       - --time-limit=3600
       - -v

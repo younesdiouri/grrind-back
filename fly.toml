@@ -44,7 +44,7 @@ primary_region = 'cdg'
 # `WorkoutImported` en attente, aucune annonce de guilde jamais partie.
 [processes]
   app = ""
-  worker = "php bin/console messenger:consume outbox scheduler_risala --time-limit=3600 --memory-limit=128M"
+  worker = "php bin/console messenger:consume outbox scheduler_risala scheduler_alam --time-limit=3600 --memory-limit=128M"
 
 [http_service]
   internal_port = 80

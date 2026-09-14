@@ -21,5 +21,7 @@ namespace App\Progression\Domain;
 enum XpAwardReason: string
 {
     /** La marche : elle n'alimente que Vitality, jamais l'XP — voir le docblock de `XpRates`. */
+    case AlamWindow = 'ALAM_WINDOW';
+
     case NoXpFeedsVitality = 'NO_XP_FEEDS_VITALITY';
 }

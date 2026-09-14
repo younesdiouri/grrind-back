@@ -181,3 +181,6 @@ deptrac: ## Vérifie les frontières entre modules
 
 combat-balance: ## Compare les profils de combat (SAMPLES=100), CSV dans var/combat-balance-v2.csv
 	$(RUN_TEST) bin/console app:combat:balance --samples=$(or $(SAMPLES),100)
+
+web-restart: ## Recharge le serveur web local sans arrêter la base
+	$(DC) restart php

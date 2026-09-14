@@ -111,6 +111,101 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  /api/guild/alam:
+    get:
+      tags:
+        - Alam
+      operationId: get_alam_current
+      responses:
+        '200':
+          description: 'Semaine collective et capacité de lancement manuel.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlamCurrent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/guild/alam/runs:
+    get:
+      tags:
+        - Alam
+      operationId: get_alam_history
+      parameters:
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+            minimum: 1
+        -
+          name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+      responses:
+        '200':
+          description: 'Historique des éditions de la guilde.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlamPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Alam
+      operationId: post_alam_manual
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: 'Édition manuelle distincte, résultats et récompenses figés.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlamRun'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  '/api/guild/alam/runs/{id}':
+    get:
+      tags:
+        - Alam
+      operationId: get_alam_show
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Journal durable live/replay ; lecture réservée aux participants et membres actuels.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlamRun'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   '/api/guilds/{id}/chat/subscription':
     post:
       tags:
@@ -919,6 +1014,53 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/crafting/recipes:
+    get:
+      tags:
+        - Récompenses
+      operationId: get_rewards_crafting_recipes
+      responses:
+        '200':
+          description: 'Recettes publiées, coûts et quantités possédées.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CraftingRecipes'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/crafting:
+    post:
+      tags:
+        - Récompenses
+      operationId: post_rewards_crafting_create
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CraftItemRequest'
+      responses:
+        '201':
+          description: 'Fabrication atomique, quantités possédées après échange.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CraftingReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: 'recipe-unavailable, insufficient-crafting-resources ou validation.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   /api/inventory:
     get:
       tags:
@@ -1286,6 +1428,362 @@ components:
           type: string
           format: uuid
       type: object
+    AlamGauge:
+      required:
+        - attribute
+        - current
+        - target
+        - progressPermille
+      properties:
+        attribute:
+          type: string
+          enum:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+            - vitality
+        current:
+          type: integer
+        target:
+          type: integer
+        progressPermille:
+          type: integer
+      type: object
+    AlamParticipant:
+      required:
+        - playerId
+        - displayName
+        - avatarUrl
+        - contribution
+        - gauges
+      properties:
+        playerId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        contribution:
+          type: integer
+        gauges:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamGauge'
+        activitySummary:
+          type: array
+          items:
+            required:
+              - discipline
+              - sessions
+              - durationSeconds
+            properties:
+              discipline:
+                type: string
+              sessions:
+                type: integer
+              durationSeconds:
+                type: integer
+            type: object
+      type: object
+    AlamDrop:
+      required:
+        - playerId
+        - itemKey
+        - name
+        - kind
+        - rarity
+        - imageUrl
+        - quantity
+      properties:
+        playerId:
+          type: string
+          format: uuid
+        itemKey:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+            - RESOURCE
+            - EQUIPMENT
+        rarity:
+          type: string
+          enum:
+            - COMMON
+            - UNCOMMON
+            - RARE
+            - EPIC
+            - LEGENDARY
+        imageUrl:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+      type: object
+    AlamEvent:
+      required:
+        - id
+        - offsetMs
+        - encounterIndex
+        - action
+        - actorId
+        - targetId
+        - text
+      properties:
+        id:
+          type: string
+        offsetMs:
+          type: integer
+        encounterIndex:
+          type: integer
+        action:
+          type: string
+          enum:
+            - ARRIVAL
+            - EFFORT
+            - VICTORY
+            - DEFEAT
+            - DROP
+        actorId:
+          type: string
+          nullable: true
+        targetId:
+          type: string
+          nullable: true
+        text:
+          type: string
+      type: object
+    AlamEncounter:
+      required:
+        - index
+        - enemyKey
+        - enemyName
+        - thresholdPermille
+        - won
+        - probabilityMillionths
+        - progressPermille
+        - drops
+        - narration
+      properties:
+        index:
+          type: integer
+        enemyKey:
+          type: string
+        enemyName:
+          type: string
+        thresholdPermille:
+          type: integer
+        won:
+          type: boolean
+        probabilityMillionths:
+          type: integer
+        progressPermille:
+          type: integer
+        drops:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamDrop'
+        narration:
+          type: string
+      type: object
+    AlamRun:
+      required:
+        - id
+        - guildId
+        - mode
+        - status
+        - weekStartsAt
+        - collectionEndsAt
+        - revealedAt
+        - presentationStartsAt
+        - presentationEndsAt
+        - frozenTargetCount
+        - rulesetVersion
+        - gauges
+        - participants
+        - encounters
+        - events
+        - narrationSource
+        - serverNow
+      properties:
+        id:
+          type: string
+          format: uuid
+        guildId:
+          type: string
+          format: uuid
+        mode:
+          type: string
+          enum:
+            - WEEKLY
+            - MANUAL
+        status:
+          type: string
+          enum:
+            - COLLECTING
+            - RESOLVED
+        weekStartsAt:
+          type: string
+          format: date-time
+        collectionEndsAt:
+          type: string
+          format: date-time
+        revealedAt:
+          type: string
+          format: date-time
+        presentationStartsAt:
+          type: string
+          format: date-time
+          nullable: true
+        presentationEndsAt:
+          type: string
+          format: date-time
+          nullable: true
+        frozenTargetCount:
+          type: integer
+        rulesetVersion:
+          type: string
+        gauges:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamGauge'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamParticipant'
+        encounters:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamEncounter'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamEvent'
+        narrationSource:
+          type: string
+          enum:
+            - LOCAL
+            - OPENAI
+        serverNow:
+          type: string
+          format: date-time
+      type: object
+    AlamCurrent:
+      required:
+        - serverNow
+        - canLaunchManual
+        - pollAfterSeconds
+        - current
+      properties:
+        serverNow:
+          type: string
+          format: date-time
+        canLaunchManual:
+          type: boolean
+        pollAfterSeconds:
+          type: integer
+        current:
+          $ref: '#/components/schemas/AlamRun'
+      type: object
+    AlamPage:
+      required:
+        - runs
+        - nextCursor
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamRun'
+        nextCursor:
+          type: string
+          nullable: true
+      type: object
+    CraftingCost:
+      required:
+        - item
+        - quantity
+        - ownedQuantity
+      properties:
+        item:
+          $ref: '#/components/schemas/DroppedItem'
+        quantity:
+          type: integer
+          minimum: 1
+        ownedQuantity:
+          type: integer
+          minimum: 0
+      type: object
+    CraftingResult:
+      required:
+        - item
+        - quantity
+      properties:
+        item:
+          $ref: '#/components/schemas/DroppedItem'
+        quantity:
+          type: integer
+          minimum: 1
+      type: object
+    CraftingRecipe:
+      required:
+        - key
+        - result
+        - costs
+        - canCraft
+      properties:
+        key:
+          type: string
+        result:
+          $ref: '#/components/schemas/CraftingResult'
+        costs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CraftingCost'
+        canCraft:
+          type: boolean
+      type: object
+    CraftingRecipes:
+      required:
+        - recipes
+        - rulesetVersion
+      properties:
+        recipes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CraftingRecipe'
+        rulesetVersion:
+          type: string
+      type: object
+    CraftingReceipt:
+      required:
+        - id
+        - recipeKey
+        - result
+        - costs
+        - rulesetVersion
+        - craftedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipeKey:
+          type: string
+        result:
+          $ref: '#/components/schemas/CraftingCost'
+        costs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CraftingCost'
+        rulesetVersion:
+          type: string
+        craftedAt:
+          type: string
+          format: date-time
+      type: object
     GuildMessage:
       required:
         - id
@@ -1336,6 +1834,10 @@ components:
             - 'https://grrind.app/problems/too-many-requests'
             - 'https://grrind.app/problems/unsupported-media-type'
             - 'https://grrind.app/problems/validation-failed'
+            - 'https://grrind.app/problems/recipe-unavailable'
+            - 'https://grrind.app/problems/insufficient-crafting-resources'
+            - 'https://grrind.app/problems/alam-manual-disabled'
+            - 'https://grrind.app/problems/alam-run-not-found'
             - 'https://grrind.app/problems/internal-error'
             - 'https://grrind.app/problems/idempotency-key-required'
             - 'https://grrind.app/problems/idempotency-key-in-flight'
@@ -2228,6 +2730,7 @@ components:
           enum:
             - EQUIPMENT
             - CHEST
+            - RESOURCE
         name:
           description: 'Déjà traduit dans la langue du joueur — rien à recharger côté client.'
           type: string
@@ -2309,6 +2812,7 @@ components:
           enum:
             - EQUIPMENT
             - CHEST
+            - RESOURCE
         name:
           description: 'Déjà traduit dans la langue du joueur — rien à recharger côté client.'
           type: string
@@ -2719,6 +3223,7 @@ components:
               nullable: true
               enum:
                 - NO_XP_FEEDS_VITALITY
+                - ALAM_WINDOW
           type: object
         attributes:
           description: "Les cinq caractéristiques du personnage, chacune avec son avant et son\naprès — même raison que le palier de niveau : une jauge qui repartirait de\nzéro mentirait à tout joueur qui n'y était pas.\n\n**Vitality n'a pas de `gained`.** Elle ne reçoit jamais d'XP directement —\nc'est une caractéristique dérivée des quatre autres, qui mesure l'équilibre\nde la pratique. Elle peut donc bouger sans que **cette** séance lui ait\nrien crédité : un joueur qui varie ses sports la voit sauter même le jour\noù la répartition de sa séance n'y touche pas directement.\n"
@@ -3526,6 +4031,18 @@ components:
           maximum: 50
           minimum: 1
       type: object
+    AlamHistoryQuery:
+      properties:
+        limit:
+          type: integer
+          default: 20
+          maximum: 50
+          minimum: 1
+        cursor:
+          type: string
+          nullable: true
+          default: null
+      type: object
     SendChatMessageRequest:
       properties:
         clientId:
@@ -3754,6 +4271,13 @@ components:
           default: null
           maxLength: 64
       type: object
+    CraftItemRequest:
+      properties:
+        recipeKey:
+          type: string
+          default: ''
+          maxLength: 64
+      type: object
     EquipItemRequest:
       properties:
         itemKey:
@@ -3974,6 +4498,8 @@ security:
 tags:
   -
     name: Combat
+  -
+    name: Alam
   -
     name: 'Chat de guilde'
   -

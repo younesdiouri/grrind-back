@@ -8,6 +8,7 @@ use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use InvalidArgumentException;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
@@ -43,10 +44,14 @@ use Symfony\Component\Uid\Uuid;
  * exemplaire, c'est relire ce tirage-là.
  *
  * **`$lootRollId` est nullable depuis la boutique (#229).** `null` veut dire « acquis
- * autrement qu'au tirage » — un achat, aujourd'hui la seule autre voie. Cette ligne ne perd
+ * autrement qu'au tirage » — un achat ou une fabrication. Cette ligne ne perd
  * rien pour autant : un achat n'a simplement aucun tirage à raconter, il a sa propre trace au
  * ledger de pièces (`CoinTransaction::$sourceId` pointe vers cette ligne d'inventaire, pas
  * l'inverse). Migration destructive assumée — voir son docblock.
+ *
+ * Les fabrications et récompenses de raid (#279) ont leurs propres audits :
+ * CraftingAudit conserve l’échange, AlamGrant la provenance édition/rencontre/joueur.
+ * Elles réutilisent cette pile avec une provenance de tirage nulle.
  *
  * **`$lootRollId` et `$obtainedAt` figent la *première* acquisition, jamais la dernière.**
  * Une ligne peut recevoir plusieurs tirages du même objet au fil du temps — {@see
@@ -181,6 +186,22 @@ class InventoryItem
     public function unequip(): void
     {
         $this->slot = null;
+    }
+
+    public function grantQuantity(int $quantity): void
+    {
+        if ($quantity < 1) {
+            throw new InvalidArgumentException('Une quantité accordée doit être positive.');
+        }
+        $this->quantity += $quantity;
+    }
+
+    public function consumeQuantity(int $quantity): void
+    {
+        if ($quantity < 1 || $quantity > $this->quantity) {
+            throw new InvalidArgumentException('La consommation doit être positive et couverte par le stock.');
+        }
+        $this->quantity -= $quantity;
     }
 
     public function id(): Uuid

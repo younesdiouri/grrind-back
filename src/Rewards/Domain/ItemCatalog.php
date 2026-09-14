@@ -61,7 +61,7 @@ use InvalidArgumentException;
  *
  * ## Un coffre est un objet, distingué par `kind` (#230)
  *
- * `kind: EQUIPMENT | CHEST` — `EQUIPMENT` par défaut, absent des neuf objets livrés avant ce
+ * `kind: EQUIPMENT | CHEST | RESOURCE` — `EQUIPMENT` par défaut, absent des neuf objets livrés avant ce
  * ticket. Un coffre est un tirage qu'on ouvre, pas un objet qu'on porte, et trois mensonges de
  * config s'y refusent au démarrage, voir {@see slot()} et {@see modifiers()} :
  *
@@ -69,6 +69,10 @@ use InvalidArgumentException;
  *   - `slot` absent d'un `EQUIPMENT` : c'est l'inverse, un équipement sans emplacement ne se
  *     porterait nulle part ;
  *   - un modificateur posé sur un coffre : un coffre ne s'équipe pas, il n'a rien à modifier.
+ *
+ * Les ressources de crafting (#279) suivent les mêmes contraintes de slot et de
+ * modificateurs que les coffres : elles financent une recette sans renforcer le joueur.
+ * Leur nature distincte empêche de les ouvrir ou de les vendre comme un équipement.
  *
  * **Une table de coffre est exigée, mais pas ici.** `ItemsSection` ne voit que ce fichier —
  * même limite que documentée sur `LootTables` pour le snapshot publié — donc « un coffre doit avoir
@@ -277,7 +281,7 @@ final class ItemCatalog
      */
     private static function slot(string $itemKey, ItemKind $kind, ?string $slot): ?EquipmentSlot
     {
-        if (ItemKind::Chest === $kind) {
+        if (ItemKind::Equipment !== $kind) {
             if (null !== $slot) {
                 throw new InvalidArgumentException(\sprintf('"%s" est un coffre : un coffre n\'a pas d\'emplacement, "slot" doit être absent.', $itemKey));
             }
@@ -302,7 +306,7 @@ final class ItemCatalog
     {
         // Un coffre ne s'équipe pas — voir « Un coffre est un objet » dans le docblock de la
         // classe pour le troisième mensonge de config que ce refus couvre.
-        if (ItemKind::Chest === $kind && [] !== $modifiers) {
+        if (ItemKind::Equipment !== $kind && [] !== $modifiers) {
             throw new InvalidArgumentException(\sprintf('"%s" est un coffre : un coffre ne s\'équipe pas, il ne peut porter aucun modificateur.', $itemKey));
         }
 

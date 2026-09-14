@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Training\Application;
 
+use App\Shared\Application\GameRulesets;
 use App\Shared\Application\SessionDrops;
 use App\Shared\Application\SessionRewards;
 use App\Shared\Domain\Activity\ActivityTypeMap;
 use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Alam\AlamCalendar;
+use App\Shared\Domain\Alam\AlamRules;
 use App\Shared\Domain\Event\WorkoutImported;
 use App\Training\Domain\ImportSkipReason;
 use App\Training\Domain\Workout;
@@ -79,6 +82,7 @@ final readonly class ImportWorkoutsHandler
         #[Target('event.bus')]
         private MessageBusInterface $events,
         private ClockInterface $clock,
+        private ?GameRulesets $gameRulesets = null,
     ) {
     }
 
@@ -284,17 +288,28 @@ final readonly class ImportWorkoutsHandler
      */
     private function factOf(Workout $workout): WorkoutImported
     {
+        $seconds = $workout->durationSeconds();
+        if (null !== $this->gameRulesets) {
+            /** @var array<string, mixed>|null $alam */
+            $alam = $this->gameRulesets->snapshot()['alam'] ?? null;
+            if (null !== $alam) {
+                $seconds = new AlamCalendar(new AlamRules($alam))->retainedSeconds($workout->startedAt(), $workout->endedAt());
+            }
+        }
+        $seconds = $this->rules->isTooShort($seconds) ? 0 : $seconds;
+        $fraction = $seconds / max(1, $workout->durationSeconds());
+
         return new WorkoutImported(
             $workout->id(),
             $workout->userId(),
             $workout->discipline(),
             $workout->startedAt(),
             $workout->endedAt(),
-            $this->rules->retainedDuration($workout->durationSeconds()),
+            $this->rules->isTooShort($seconds) ? 0 : $this->rules->retainedDuration($seconds),
             $workout->source(),
             $workout->trust(),
-            $workout->distanceMeters(),
-            $workout->elevationGainMeters(),
+            null === $workout->distanceMeters() ? null : (int) floor($workout->distanceMeters() * $fraction),
+            null === $workout->elevationGainMeters() ? null : (int) floor($workout->elevationGainMeters() * $fraction),
         );
     }
 }

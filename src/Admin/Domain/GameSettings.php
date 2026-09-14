@@ -22,6 +22,7 @@ class GameSettings
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $attributes = [];
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $community = [];
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $notifications = [];
+    /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $alam = [];
     #[ORM\Column(name: 'loot_version')] private int $lootVersion = 1;
     public function __toString(): string
     {
@@ -127,6 +128,18 @@ class GameSettings
     public function setNotifications(array $notifications): void
     {
         $this->notifications = $notifications;
+    }
+
+    /** @return array<string, mixed> */
+    public function getAlam(): array
+    {
+        return $this->alam;
+    }
+
+    /** @param array<string, mixed> $alam */
+    public function setAlam(array $alam): void
+    {
+        $this->alam = $alam;
     }
 
     public function lootVersion(): int

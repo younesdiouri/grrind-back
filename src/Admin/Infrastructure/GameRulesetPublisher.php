@@ -11,6 +11,7 @@ use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLevel;
 use App\Admin\Domain\GameLootTable;
 use App\Admin\Domain\GamePublication;
+use App\Admin\Domain\GameRecipe;
 use App\Admin\Domain\GameRuleset;
 use App\Admin\Domain\GameSettings;
 use App\Admin\Domain\GameTitle;
@@ -21,13 +22,16 @@ use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\TitleCatalog;
 use App\Progression\Domain\XpRates;
+use App\Rewards\Domain\CraftingRecipes;
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Domain\LootLuckRules;
 use App\Rewards\Domain\LootTables;
+use App\Shared\Application\FrozenGameRulesets;
 use App\Shared\Domain\Activity\ActivityTypeMap;
 use App\Shared\Domain\Activity\AttributeSplit;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\Vitality;
+use App\Shared\Domain\Alam\AlamRules;
 use App\Shared\Domain\Timezone;
 use App\Shared\Infrastructure\Config\DatabaseGameRulesets;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
@@ -64,7 +68,7 @@ final readonly class GameRulesetPublisher
             $settings->incrementLootVersion();
             $snapshot['loot']['version'] = $settings->lootVersion();
         }
-        foreach ([GameItem::class, GameTitle::class, GameEnemy::class, GameLootTable::class, GameDiscipline::class] as $class) {
+        foreach ([GameRecipe::class, GameItem::class, GameTitle::class, GameEnemy::class, GameLootTable::class, GameDiscipline::class] as $class) {
             foreach ($manager->getRepository($class)->findAll() as $configuration) {
                 if ($configuration->isActive()) {
                     $configuration->markPublishedActive();
@@ -80,7 +84,7 @@ final readonly class GameRulesetPublisher
      * La simulation valide exactement les mêmes règles sans modifier le publié ni les
      * marqueurs historiques du catalogue. Le caller fige ce tableau pour toute l'opération.
      *
-     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>}
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>}
      */
     public function prepare(EntityManagerInterface $manager): array
     {
@@ -96,7 +100,8 @@ final readonly class GameRulesetPublisher
             throw new LogicException('Les réglages globaux initiaux sont absents. Rejouer les migrations avant d’ouvrir EasyAdmin.');
         }
 
-        $snapshot = self::snapshot($items, $titles, $enemies, $tables, $disciplines, $levels, $activityTypes, $settings);
+        /** @var list<GameRecipe> $recipes */ $recipes = $manager->getRepository(GameRecipe::class)->findBy([], ['sortOrder' => 'ASC']);
+        $snapshot = self::snapshot($items, $titles, $enemies, $tables, $disciplines, $levels, $activityTypes, $settings, $recipes);
         self::validate($snapshot);
         foreach ($enemies as $enemy) {
             foreach ([$enemy->getIdleImagePath(), $enemy->getAttackImagePath(), $enemy->getHitImagePath()] as $path) {
@@ -131,11 +136,12 @@ final readonly class GameRulesetPublisher
      * @param list<GameLootTable>    $tables
      * @param list<GameDiscipline>   $disciplines
      * @param list<GameLevel>        $levels
+     * @param list<GameRecipe>       $recipes
      * @param list<GameActivityType> $activityTypes
      *
-     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>}
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>}
      */
-    private static function snapshot(array $items, array $titles, array $enemies, array $tables, array $disciplines, array $levels, array $activityTypes, GameSettings $settings): array
+    private static function snapshot(array $items, array $titles, array $enemies, array $tables, array $disciplines, array $levels, array $activityTypes, GameSettings $settings, array $recipes): array
     {
         $itemRows = array_map(static fn (GameItem $item): array => [
             'key' => $item->getKey(), 'active' => $item->isActive(), 'rarity' => $item->getRarity(), 'kind' => $item->getKind(), 'slot' => $item->getSlot(),
@@ -176,13 +182,15 @@ final readonly class GameRulesetPublisher
         usort($activityRows, static fn (array $left, array $right): int => [$left['source'], $left['provider_type']] <=> [$right['source'], $right['provider_type']]);
 
         return [
+            'recipes' => array_map(static fn (GameRecipe $recipe): array => ['key' => $recipe->getKey(), 'active' => $recipe->isActive(), 'result_item' => $recipe->getResultItem(), 'quantity' => $recipe->getQuantity(), 'costs' => $recipe->publishedCosts()], $recipes),
+            'alam' => $settings->getAlam(),
             'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['formulas' => $settings->getFormulas(), 'fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
             'training' => $settings->getTraining(), 'xp' => $settings->getXp(), 'attributes' => $settings->getAttributes(), 'disciplines' => $disciplineRows, 'levels' => $levelRows,
             'activity_types' => $activityRows, 'community' => $settings->getCommunity(), 'notifications' => $settings->getNotifications(),
         ];
     }
 
-    /** @param array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>} $snapshot */
+    /** @param array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes?: list<array<string, mixed>>, alam?: array<string, mixed>} $snapshot */
     private static function validate(array $snapshot): void
     {
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */ $items = $snapshot['items'];
@@ -225,6 +233,15 @@ final readonly class GameRulesetPublisher
             }
         }
         new ItemCatalog($items);
+        new CraftingRecipes($snapshot['recipes'] ?? [], ItemCatalog::runtime(new FrozenGameRulesets($snapshot, 'validation')));
+        // Les archives antérieures au raid restent validables pour les migrations historiques.
+        if (isset($snapshot['alam'])) {
+            $alam = new AlamRules($snapshot['alam']);
+            $resource = ItemCatalog::runtime(new FrozenGameRulesets($snapshot, 'validation'))->findAvailable($alam->text('resource_key'));
+            if (null === $resource || \App\Rewards\Domain\ItemKind::Resource !== $resource->kind) {
+                throw new LogicException('La ressource du raid doit être une ressource active du catalogue.');
+            }
+        }
         new TitleCatalog($titles);
         /** @var array<string, array{source: string, combination: string, secondary: ?string}> $formulas */
         $formulas = $snapshot['combat']['formulas'];

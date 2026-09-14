@@ -20,6 +20,10 @@ services:
     App\:
         resource: '../src/'
 
+    App\Shared\Application\AlamContributions: '@App\Progression\Infrastructure\AlamWeeklyContributions'
+    App\Shared\Application\AlamEfforts: '@App\Training\Infrastructure\AlamWorkoutEfforts'
+    App\Shared\Application\AlamRewards: '@App\Rewards\Infrastructure\Drop\AlamInventoryRewards'
+
     App\Community\Application\ChatImageStorage: '@App\Community\Infrastructure\Storage\LocalChatImageStorage'
 
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'

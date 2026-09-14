@@ -80,6 +80,9 @@ final readonly class LedgerSessionRewards implements SessionRewards
 
     public function creditFor(WorkoutImported $workout): SessionReward
     {
+        if (0 === $workout->durationSeconds) {
+            return $this->uncredited($workout, XpAwardReason::AlamWindow);
+        }
         if (!$this->rates->credits($workout->discipline)) {
             return $this->uncredited($workout);
         }
@@ -175,7 +178,7 @@ final readonly class LedgerSessionRewards implements SessionRewards
      * refuse la même écriture pour la même raison. `LevelStanding` et les caractéristiques
      * neutres reprennent donc le geste de cette classe-là plutôt que d'en inventer un.
      */
-    private function uncredited(WorkoutImported $workout): SessionReward
+    private function uncredited(WorkoutImported $workout, XpAwardReason $reason = XpAwardReason::NoXpFeedsVitality): SessionReward
     {
         $snapshot = $this->snapshots->ofPlayer($workout->userId);
 
@@ -207,7 +210,7 @@ final readonly class LedgerSessionRewards implements SessionRewards
             vitalityBefore: $vitality,
             vitalityAfter: $vitality,
             rulesetVersion: $this->version(),
-            reason: XpAwardReason::NoXpFeedsVitality->value,
+            reason: $reason->value,
         );
     }
 

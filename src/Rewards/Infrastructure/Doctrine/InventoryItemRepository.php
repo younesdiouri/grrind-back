@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rewards\Infrastructure\Doctrine;
 
 use App\Rewards\Domain\EquipmentSlot;
+use App\Rewards\Domain\Exception\InsufficientCraftingResources;
 use App\Rewards\Domain\Exception\ItemEquipped;
 use App\Rewards\Domain\Exception\ItemNotOwned;
 use App\Rewards\Domain\InventoryItem;
@@ -12,6 +13,7 @@ use App\Rewards\Domain\Item;
 use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use InvalidArgumentException;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
@@ -91,6 +93,49 @@ class InventoryItemRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
 
             return $item;
+        });
+    }
+
+    /** La ressource arrive en pile ; le verrou est partagé avec vente, achat et équipement. */
+    public function grantQuantity(Uuid $userId, string $itemKey, int $quantity, DateTimeImmutable $obtainedAt): InventoryItem
+    {
+        return $this->transactional(function () use ($userId, $itemKey, $quantity, $obtainedAt): InventoryItem {
+            if ($quantity < 1) {
+                throw new InvalidArgumentException('Une quantité accordée doit être positive.');
+            }
+            $this->lock($userId);
+            $owned = $this->ofPlayerAndItem($userId, $itemKey);
+            if (null === $owned) {
+                $owned = InventoryItem::firstGrant($userId, $itemKey, null, $obtainedAt);
+                $this->getEntityManager()->persist($owned);
+                if ($quantity > 1) {
+                    $owned->grantQuantity($quantity - 1);
+                }
+            } else {
+                $this->getEntityManager()->refresh($owned);
+                $owned->grantQuantity($quantity);
+            }
+            $this->getEntityManager()->flush();
+
+            return $owned;
+        });
+    }
+
+    public function consumeQuantity(Uuid $userId, string $itemKey, int $quantity): InventoryItem
+    {
+        return $this->transactional(function () use ($userId, $itemKey, $quantity): InventoryItem {
+            $this->lock($userId);
+            $owned = $this->ofPlayerAndItem($userId, $itemKey);
+            if (null !== $owned) {
+                $this->getEntityManager()->refresh($owned);
+            }
+            if (null === $owned || $owned->quantity() < $quantity) {
+                throw new InsufficientCraftingResources($itemKey);
+            }
+            $owned->consumeQuantity($quantity);
+            $this->getEntityManager()->flush();
+
+            return $owned;
         });
     }
 
