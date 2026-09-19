@@ -209,6 +209,36 @@ class WorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les séances qui chevauchent une fenêtre, dans l'ordre du sport — la jauge d'une
+     * édition de guilde s'en sert à chaque relecture, pour chacun de ses membres.
+     *
+     * **Le chevauchement, et non l'appartenance.** Une séance commencée avant l'ouverture
+     * de la semaine compte pour la part qui tombe dedans ; c'est l'appelant qui la ramène
+     * à ses bornes. La filtrer sur `startedAt >= :start` perdrait cette part.
+     *
+     * `idx_workout_user_started` sert la requête.
+     *
+     * @return list<Workout>
+     */
+    public function overlapping(Uuid $userId, DateTimeImmutable $start, DateTimeImmutable $end): array
+    {
+        /** @var list<Workout> $workouts */
+        $workouts = $this->createQueryBuilder('w')
+            ->andWhere('w.userId = :userId')
+            ->andWhere('w.startedAt < :end')
+            ->andWhere('w.endedAt > :start')
+            ->orderBy('w.startedAt', 'ASC')
+            ->addOrderBy('w.id', 'ASC')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->getQuery()
+            ->getResult();
+
+        return $workouts;
+    }
+
+    /**
      * Ce qui rend l'outbox atomique : l'`INSERT` de l'événement, écrit par le transport
      * Doctrine sur cette connexion, partage le `COMMIT` de la séance.
      *

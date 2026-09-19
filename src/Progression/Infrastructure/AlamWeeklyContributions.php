@@ -18,7 +18,9 @@ use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\AttributeSplit;
 use App\Shared\Domain\Activity\Vitality;
 use DateTimeImmutable;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\Uid\Uuid;
 
 /** Rejoue les sources non invalidées dans l'ordre sportif, sans modificateurs et sans lire un total de personnage. */
 final readonly class AlamWeeklyContributions implements AlamContributions
@@ -33,15 +35,18 @@ final readonly class AlamWeeklyContributions implements AlamContributions
         $vitality = Vitality::runtime($rules);
         $result = [];
         foreach ($players as $player) {
-            /** @var list<string> $ids */
-            $ids = $this->connection->fetchFirstColumn('SELECT source_id FROM xp_transaction WHERE user_id = :player AND occurred_at < :until GROUP BY source_id HAVING SUM(duration_seconds) > 0 ORDER BY MIN(occurred_at), source_id', ['player' => $player->toRfc4122(), 'until' => $end->format('c')]);
+            $efforts = $this->efforts->within($player, $start, $end, $rules);
+            $credited = $this->credited($player, array_column($efforts, 'sourceId'));
             $totals = ['strength' => 0, 'endurance' => 0, 'mobility' => 0, 'dexterity' => 0];
             $secondsByDay = [];
             $xpByDay = [];
             $sessions = 0;
             $sports = [];
             $zone = $this->timezones->of($player)->toDateTimeZone();
-            foreach ($this->efforts->within($ids, $start, $end, $rules) as $effort) {
+            foreach ($efforts as $effort) {
+                if (!isset($credited[$effort->sourceId])) {
+                    continue;
+                }
                 $day = $effort->start->setTimezone($zone)->format('Y-m-d');
                 $discipline = $effort->discipline->value;
                 $award = $calculator->calculate($effort->discipline, $effort->seconds, [], new DailyLoad($secondsByDay[$day] ?? 0, $xpByDay[$day][$discipline] ?? 0), $effort->distance, $effort->elevation);
@@ -83,5 +88,30 @@ final readonly class AlamWeeklyContributions implements AlamContributions
         }
 
         return max(1, $active);
+    }
+
+    /**
+     * Les sources dont le ledger garde une durée nette positive : une invalidation écrit une
+     * transaction négative qui annule la sienne, et la séance disparaît d'elle-même de la jauge.
+     *
+     * Le filtre porte sur les séances déjà retenues par la fenêtre, jamais sur tout le ledger.
+     *
+     * @param list<string> $sourceIds
+     *
+     * @return array<string, true>
+     */
+    private function credited(Uuid $player, array $sourceIds): array
+    {
+        if ([] === $sourceIds) {
+            return [];
+        }
+        /** @var list<string> $ids */
+        $ids = $this->connection->fetchFirstColumn(
+            'SELECT source_id FROM xp_transaction WHERE user_id = :player AND source_id IN (:sources) GROUP BY source_id HAVING SUM(duration_seconds) > 0',
+            ['player' => $player->toRfc4122(), 'sources' => $sourceIds],
+            ['sources' => ArrayParameterType::STRING],
+        );
+
+        return array_fill_keys($ids, true);
     }
 }

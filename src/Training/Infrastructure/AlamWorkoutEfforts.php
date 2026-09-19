@@ -12,6 +12,7 @@ use App\Shared\Domain\Alam\AlamRules;
 use App\Training\Domain\WorkoutRules;
 use App\Training\Infrastructure\Doctrine\WorkoutRepository;
 use DateTimeImmutable;
+use Symfony\Component\Uid\Uuid;
 
 /** L'édition réapplique la même exclusion calendaire que l'import, depuis les bornes fournisseur. */
 final readonly class AlamWorkoutEfforts implements AlamEfforts
@@ -20,17 +21,14 @@ final readonly class AlamWorkoutEfforts implements AlamEfforts
     {
     }
 
-    public function within(array $sourceIds, DateTimeImmutable $start, DateTimeImmutable $end, GameRulesets $rules): array
+    public function within(Uuid $player, DateTimeImmutable $start, DateTimeImmutable $end, GameRulesets $rules): array
     {
-        if ([] === $sourceIds) {
-            return [];
-        }
         /** @var array<string, mixed> $alam */
         $alam = $rules->snapshot()['alam'];
         $calendar = new AlamCalendar(new AlamRules($alam));
         $workoutRules = WorkoutRules::runtime($rules);
         $efforts = [];
-        foreach ($this->workouts->findBy(['id' => $sourceIds], ['startedAt' => 'ASC', 'id' => 'ASC']) as $workout) {
+        foreach ($this->workouts->overlapping($player, $start, $end) as $workout) {
             $from = max($start, $workout->startedAt());
             $until = min($end, $workout->endedAt());
             $seconds = $calendar->retainedSeconds($from, $until);
@@ -38,7 +36,7 @@ final readonly class AlamWorkoutEfforts implements AlamEfforts
                 continue;
             }
             $fraction = $seconds / max(1, $workout->durationSeconds());
-            $efforts[] = new AlamEffort($workout->discipline(), $from, $until, $workoutRules->retainedDuration($seconds), null === $workout->distanceMeters() ? null : (int) floor($workout->distanceMeters() * $fraction), null === $workout->elevationGainMeters() ? null : (int) floor($workout->elevationGainMeters() * $fraction));
+            $efforts[] = new AlamEffort($workout->id()->toRfc4122(), $workout->discipline(), $from, $until, $workoutRules->retainedDuration($seconds), null === $workout->distanceMeters() ? null : (int) floor($workout->distanceMeters() * $fraction), null === $workout->elevationGainMeters() ? null : (int) floor($workout->elevationGainMeters() * $fraction));
         }
 
         return $efforts;

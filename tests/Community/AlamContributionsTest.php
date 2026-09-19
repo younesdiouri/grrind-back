@@ -46,6 +46,34 @@ final class AlamContributionsTest extends ApiTestCase
         self::assertSame(1, $contributions->activeCount([], $start, $end));
     }
 
+    /**
+     * La jauge borne les séances sur la fenêtre, et le chevauchement n'est pas
+     * l'appartenance : une séance commencée avant l'ouverture compte pour sa part
+     * dedans. Filtrer sur `startedAt >= :start` la ferait disparaître entièrement.
+     */
+    public function testAWorkoutStraddlingTheOpeningCountsForItsInsidePartOnly(): void
+    {
+        $player = $this->openAccount();
+        $started = new DateTimeImmutable('-2 days 07:00:00');
+        $payload = ['workouts' => [['externalId' => 'straddles', 'activityType' => 'running', 'source' => 'APPLE_HEALTH', 'startedAt' => $started->format('c'), 'endedAt' => $started->modify('+90 minutes')->format('c'), 'distanceMeters' => 15000]]];
+        self::assertSame(200, $this->post('/api/workouts/import', $payload, $player->headers + ['Idempotency-Key' => 'straddles'])->getStatusCode());
+        $rulesets = self::getContainer()->get(GameRulesets::class);
+        $rules = new FrozenGameRulesets($rulesets->snapshot(), $rulesets->version());
+        $contributions = self::getContainer()->get(AlamContributions::class);
+        $end = $started->modify('+1 day');
+        $id = $player->id->toRfc4122();
+
+        $whole = $contributions->between([$player->id], $started, $end, $rules)[$id];
+        $straddling = $contributions->between([$player->id], $started->modify('+30 minutes'), $end, $rules)[$id];
+        $afterwards = $contributions->between([$player->id], $started->modify('+90 minutes'), $end, $rules)[$id];
+
+        self::assertSame(1, $straddling['sessions']);
+        self::assertGreaterThan(0, $straddling['total']);
+        self::assertLessThan($whole['total'], $straddling['total']);
+        self::assertSame(0, $afterwards['sessions']);
+        self::assertSame(0, $afterwards['total']);
+    }
+
     public function testResolutionLocksTheSameProgressionRowsAsConcurrentImports(): void
     {
         $player = $this->openAccount();
