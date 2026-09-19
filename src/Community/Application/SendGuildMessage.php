@@ -53,6 +53,11 @@ final readonly class SendGuildMessage
                 $message = new GuildMessage($guild, $authorId, $clientId, $this->messages->nextPosition($guild), $text, $fingerprint, $this->clock->now(), $key);
                 $this->messages->add($message);
                 $this->bus->dispatch(new ChatChanged($guildId->toRfc4122()));
+                // Deux messages pour un même fait, et non un seul enrichi : `ChatChanged`
+                // part vers un topic Mercure qu'un ancien membre peut encore écouter, donc
+                // il ne porte aucun contenu ni rien qui permette d'en retrouver. Celui-ci
+                // ne quitte jamais le serveur — voir son docblock (#281).
+                $this->bus->dispatch(new AnnounceGuildMessage($message->id()->toRfc4122()));
 
                 return $message;
             });

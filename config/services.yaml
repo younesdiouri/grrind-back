@@ -451,6 +451,14 @@ when@test:
             arguments:
                 $pushSender: '@App\Tests\Support\SpyingPushSender'
 
+        # Public pour que le test du #281 rejoue une annonce déjà consommée — la seule
+        # façon d'éprouver le « au moins une fois » de l'outbox sans provoquer une vraie
+        # panne au milieu de la boucle d'envoi.
+        App\Community\Application\AnnounceGuildMessageHandler:
+            public: true
+            arguments:
+                $pushSender: '@App\Tests\Support\SpyingPushSender'
+
         # `$disciplines` répété : la redéclaration d'un service déjà défini plus haut ne
         # fusionne pas ses arguments, elle les remplace.
         App\Shared\Domain\Activity\CreditingDisciplines:
