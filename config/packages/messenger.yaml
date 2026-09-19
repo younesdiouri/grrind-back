@@ -104,6 +104,11 @@ framework:
             App\Community\Application\AnnounceRisala: outbox
             App\Community\Application\AnnounceRisalaTurn: outbox
 
+            # Le push d'un message de chat (#281), publié dans la transaction de l'envoi et
+            # consommé après son `COMMIT` — sans `DelayStamp` : une conversation ne se
+            # diffère pas, et rien d'autre n'est en file pour ce fait.
+            App\Community\Application\AnnounceGuildMessage: outbox
+
             # Même geste, côté `Shared` (#131) : un déclencheur sans charge utile, jamais
             # traité avant le `DelayStamp` posé par `ExpoPushSender` ou par le handler
             # lui-même — voir le docblock de `CheckExpoPushReceipts`.

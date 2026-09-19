@@ -18,6 +18,12 @@ final class GuildMessageRepository extends ServiceEntityRepository
         parent::__construct($registry, GuildMessage::class);
     }
 
+    /** Le message seul, sans son contexte d'adhésion : l'appelant relit la guilde par lui-même. */
+    public function ofId(Uuid $id): ?GuildMessage
+    {
+        return $this->find($id);
+    }
+
     public function replay(Guild $guild, Uuid $author, Uuid $client): ?GuildMessage
     {
         return $this->findOneBy(['guild' => $guild, 'authorId' => $author, 'clientId' => $client]);

@@ -37,4 +37,14 @@ enum NotificationCategory: string
 
     /** La Risāla de la semaine est partie. À toute la guilde, au même instant. */
     case RisalaRevealed = 'RISALA_REVEALED';
+
+    /**
+     * Un message de chat, à toute la guilde sauf son auteur (#281).
+     *
+     * **Séparée de `GuildActivity` alors que les deux viennent de la guilde**, pour la
+     * raison qui sépare déjà les deux Risālāt : une annonce de séance est du bavardage
+     * qu'on peut vouloir faire taire, un message est quelqu'un qui s'adresse à vous. Les
+     * fondre obligerait à choisir entre les deux.
+     */
+    case GuildChat = 'GUILD_CHAT';
 }

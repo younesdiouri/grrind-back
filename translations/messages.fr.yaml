@@ -8,3 +8,6 @@ risala_revealed:
 risala_turn:
     title: 'À toi de jouer'
     body: '📜 Choisis la Risāla de ta guilde avant le %deadline%'
+guild_chat:
+    message: '💬 %author% : %text%'
+    image: '💬 %author% a envoyé une image'

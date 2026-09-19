@@ -26,7 +26,7 @@ final class MeTest extends ApiTestCase
         self::assertSame('en', $body['locale']);
         // Toutes les catégories vivantes sont rendues, même celles encore activées par défaut.
         self::assertSame(
-            ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            ['GUILD_ACTIVITY' => true, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true, 'GUILD_CHAT' => true],
             $body['notificationPreferences'],
             'Le défaut à l\'inscription est activé (#132).',
         );
@@ -128,7 +128,7 @@ final class MeTest extends ApiTestCase
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
         self::assertSame(
-            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true, 'GUILD_CHAT' => true],
             self::decode($response)['notificationPreferences'],
         );
     }
@@ -148,7 +148,7 @@ final class MeTest extends ApiTestCase
         $this->send('PATCH', '/api/me', ['displayName' => 'Bobby'], $headers);
 
         self::assertSame(
-            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true, 'GUILD_CHAT' => true],
             self::decode($this->get('/api/me', $headers))['notificationPreferences'],
         );
     }
@@ -164,7 +164,7 @@ final class MeTest extends ApiTestCase
         ], $headers);
 
         self::assertSame(
-            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true],
+            ['GUILD_ACTIVITY' => false, 'RISALA_TURN' => true, 'RISALA_REVEALED' => true, 'GUILD_CHAT' => true],
             self::decode($this->get('/api/me', $headers))['notificationPreferences'],
         );
     }

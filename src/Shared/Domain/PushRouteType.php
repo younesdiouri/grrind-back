@@ -28,4 +28,16 @@ enum PushRouteType: string
      * guildes, la route sait déjà laquelle ouvrir, sans qu'un push en vol devienne ambigu.
      */
     case GuildRisalat = 'GUILD_RISALAT';
+
+    /**
+     * Le chat d'une guilde (#281). `targetId` porte l'identifiant de la **guilde** et non
+     * celui du message, pour la même raison que `GuildRisalat` : l'écran est propre à la
+     * guilde et ne prend pas d'élément — `GET /api/guilds/mine/chat` n'accepte aucun
+     * identifiant de message, seulement une pagination par position.
+     *
+     * Ouvrir sur le message lui-même demanderait au client de savoir remonter une
+     * conversation jusqu'à une position donnée, ce qu'il ne sait pas faire aujourd'hui.
+     * Le jour où il le saura, c'est un champ de plus, pas une route de plus.
+     */
+    case GuildChat = 'GUILD_CHAT';
 }

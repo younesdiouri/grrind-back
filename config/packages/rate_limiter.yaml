@@ -42,3 +42,22 @@ framework:
             policy: 'sliding_window'
             limit: 20
             interval: '60 minutes'
+
+        # ————— Notifier une guilde qu'un message a été écrit (#281) —————————————————————
+        #
+        # Le seul plafond de ce chemin, puisqu'il n'y a **aucune agrégation** en amont :
+        # un push par message, c'est le ticket. Ce qu'il protège n'est donc pas une guilde
+        # active, c'est un fil qui s'emballe — une conversation à trois qui dure une heure,
+        # ou quelqu'un qui envoie quarante messages d'affilée.
+        #
+        # La clé est le destinataire, comme pour `guild_activity_push` : c'est son
+        # téléphone qui sonne. Un auteur bavard n'épuise donc pas le quota des autres
+        # guildes auxquelles ses co-équipiers appartiendront un jour.
+        #
+        # Soixante par heure, soit un message par minute soutenu : au-delà, la personne est
+        # dans l'app en train de lire, pas en train d'attendre qu'on l'avertisse. Le
+        # `groupingKey` partagé fait le reste — un seul bandeau, toujours le dernier.
+        guild_chat_push:
+            policy: 'sliding_window'
+            limit: 60
+            interval: '60 minutes'
