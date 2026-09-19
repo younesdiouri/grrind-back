@@ -277,13 +277,14 @@ final class ItemCatalog
 
     /**
      * Résout et vérifie `slot` — voir « Un coffre est un objet » dans le docblock de la
-     * classe pour les deux refus.
+     * classe pour les deux refus. La règle vaut pour tout ce qui ne s'équipe pas : depuis
+     * le #279 une ressource de fabrication la partage, et le refus la nomme.
      */
     private static function slot(string $itemKey, ItemKind $kind, ?string $slot): ?EquipmentSlot
     {
         if (ItemKind::Equipment !== $kind) {
             if (null !== $slot) {
-                throw new InvalidArgumentException(\sprintf('"%s" est un coffre : un coffre n\'a pas d\'emplacement, "slot" doit être absent.', $itemKey));
+                throw new InvalidArgumentException(\sprintf('"%s" est un %s : il ne se porte pas, "slot" doit être absent.', $itemKey, self::nature($kind)));
             }
 
             return null;
@@ -297,6 +298,12 @@ final class ItemCatalog
             ?? throw new InvalidArgumentException(\sprintf('Emplacement d\'équipement inconnu pour "%s" : "%s".', $itemKey, $slot));
     }
 
+    /** Le mot du refus : un message qui parle de coffre à propos d'une ressource envoie l'admin chercher au mauvais endroit. */
+    private static function nature(ItemKind $kind): string
+    {
+        return ItemKind::Chest === $kind ? 'coffre' : 'ressource';
+    }
+
     /**
      * @param list<array{type: string, value: int, discipline?: string}> $modifiers
      *
@@ -305,9 +312,10 @@ final class ItemCatalog
     private static function modifiers(string $itemKey, ItemKind $kind, array $modifiers): array
     {
         // Un coffre ne s'équipe pas — voir « Un coffre est un objet » dans le docblock de la
-        // classe pour le troisième mensonge de config que ce refus couvre.
+        // classe pour le troisième mensonge de config que ce refus couvre. Une ressource
+        // non plus : elle finance une recette, elle ne renforce personne.
         if (ItemKind::Equipment !== $kind && [] !== $modifiers) {
-            throw new InvalidArgumentException(\sprintf('"%s" est un coffre : un coffre ne s\'équipe pas, il ne peut porter aucun modificateur.', $itemKey));
+            throw new InvalidArgumentException(\sprintf('"%s" est un %s : il ne s\'équipe pas, il ne peut porter aucun modificateur.', $itemKey, self::nature($kind)));
         }
 
         return array_map(

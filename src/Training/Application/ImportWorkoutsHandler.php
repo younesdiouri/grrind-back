@@ -82,7 +82,9 @@ final readonly class ImportWorkoutsHandler
         #[Target('event.bus')]
         private MessageBusInterface $events,
         private ClockInterface $clock,
-        private ?GameRulesets $gameRulesets = null,
+        // Obligatoire, et pas seulement par principe : l'exclusion calendaire ci-dessous
+        // est une règle de jeu, et une dépendance facultative la désactiverait sans un bruit.
+        private GameRulesets $gameRulesets,
     ) {
     }
 
@@ -289,12 +291,12 @@ final readonly class ImportWorkoutsHandler
     private function factOf(Workout $workout): WorkoutImported
     {
         $seconds = $workout->durationSeconds();
-        if (null !== $this->gameRulesets) {
-            /** @var array<string, mixed>|null $alam */
-            $alam = $this->gameRulesets->snapshot()['alam'] ?? null;
-            if (null !== $alam) {
-                $seconds = new AlamCalendar(new AlamRules($alam))->retainedSeconds($workout->startedAt(), $workout->endedAt());
-            }
+        // Un ruleset publié avant le raid (#279) n'a pas de section `alam` : ses archives
+        // restent lisibles, et l'import retombe alors sur la durée mesurée.
+        /** @var array<string, mixed>|null $alam */
+        $alam = $this->gameRulesets->snapshot()['alam'] ?? null;
+        if (null !== $alam) {
+            $seconds = new AlamCalendar(new AlamRules($alam))->retainedSeconds($workout->startedAt(), $workout->endedAt());
         }
         $seconds = $this->rules->isTooShort($seconds) ? 0 : $seconds;
         $fraction = $seconds / max(1, $workout->durationSeconds());

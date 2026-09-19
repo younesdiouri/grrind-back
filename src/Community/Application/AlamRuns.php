@@ -26,6 +26,7 @@ use DateTimeImmutable;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
+use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Uid\Uuid;
@@ -63,7 +64,9 @@ final readonly class AlamRuns
 
     public function manual(Uuid $player, string $requestKey): AlamRun
     {
-        $durableKey = hash('sha256', $player->toRfc4122().':'.$requestKey);
+        // Le même découpage que IdempotencyListener::keyOf() : la clé durable et la clé
+        // HTTP ne peuvent pas différer d'un espace, sinon un rejeu crée une seconde édition.
+        $durableKey = hash('sha256', $player->toRfc4122().':'.trim($requestKey));
         $existing = $this->em->getRepository(AlamRun::class)->findOneBy(['requestKey' => $durableKey]);
         if (null !== $existing) {
             return $existing;
@@ -125,9 +128,15 @@ final readonly class AlamRuns
     public function history(Uuid $player, int $limit, ?Cursor $cursor): array
     {
         $guild = $this->guildOf($player);
-        $query = $this->em->createQueryBuilder()->select('r')->from(AlamRun::class, 'r')->where('r.guildId = :guild')->setParameter('guild', $guild->id()->toRfc4122())->orderBy('r.id', 'DESC')->setMaxResults($limit + 1);
+        // Révélation puis identifiant, comme les deux autres historiques : le curseur désigne
+        // un couple, et l'ordonner sur le seul UUID v7 tiendrait par coïncidence — les
+        // éditions naissent à leur révélation aujourd'hui, une reprise pourrait les antidater.
+        $query = $this->em->createQueryBuilder()->select('r')->from(AlamRun::class, 'r')->where('r.guildId = :guild')->setParameter('guild', $guild->id(), UuidType::NAME)->orderBy('r.revealedAt', 'DESC')->addOrderBy('r.id', 'DESC')->setMaxResults($limit + 1);
         if (null !== $cursor) {
-            $query->andWhere('r.id < :cursor')->setParameter('cursor', $cursor->id->toRfc4122());
+            $query
+                ->andWhere('r.revealedAt < :cursorAt OR (r.revealedAt = :cursorAt AND r.id < :cursorId)')
+                ->setParameter('cursorAt', $cursor->at)
+                ->setParameter('cursorId', $cursor->id, UuidType::NAME);
         }
         /** @var list<AlamRun> $runs */
         $runs = $query->getQuery()->getResult();
@@ -161,7 +170,12 @@ final readonly class AlamRuns
         foreach ($pending as $run) {
             if ($run->collectionEndsAt <= $this->clock->now()) {
                 $this->em->wrapInTransaction(function () use ($run): void {
+                    // Une guilde dissoute pendant sa semaine laisse son édition en l'état :
+                    // la résoudre sur un roster vide figerait un raid sans personne dedans.
                     $guild = $this->guilds->lockForUpdate($run->guildId);
+                    if (null === $guild) {
+                        return;
+                    }
                     $this->em->refresh($run, LockMode::PESSIMISTIC_WRITE);
                     if (null === $run->resolvedAt) {
                         $this->resolveLocked($run, $guild, $this->clock->now());
@@ -195,14 +209,14 @@ final readonly class AlamRuns
         return $run;
     }
 
-    private function resolveLocked(AlamRun $run, ?Guild $guild, DateTimeImmutable $now): void
+    private function resolveLocked(AlamRun $run, Guild $guild, DateTimeImmutable $now): void
     {
         if (null !== $run->resolvedAt) {
             return;
         }
-        $players = null === $guild ? [] : array_map(static fn (GuildMembership $member): Uuid => $member->playerId(), $guild->members());
+        $players = array_map(static fn (GuildMembership $member): Uuid => $member->playerId(), $guild->members());
         $this->contributions->lock($players, new FrozenGameRulesets($run->rules, $run->rulesetVersion));
-        [$participants, $totals] = null === $guild ? [[], []] : $this->roster($run, $guild);
+        [$participants, $totals] = $this->roster($run, $guild);
         $run->result = $this->resolution->resolve($run, $participants, $totals, $now);
         $run->resolvedAt = $now;
         $this->em->flush();
