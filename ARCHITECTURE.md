@@ -871,3 +871,23 @@ Le laboratoire maintient son ledger et son énergie en mémoire ; il ne publie a
 événement métier. Son bonus de série est nul tant que la mécanique est absente du jeu.
 Les bornes techniques, l’archivage et les mesures HTTP figurent dans
 [le guide de l’atelier](docs/game-design.md).
+
+
+### ʿĀlam al-Nafs et fabrication (#279)
+
+`Community` révèle les éditions et conserve leur snapshot de règles, effectif cible,
+graine et résultat. `AlamContributions` traverse vers `Progression`, qui rejoue les
+sources non invalidées avec `XpCalculator` sans modificateurs ; `AlamEfforts` traverse
+vers `Training` pour les bornes fournisseur et métriques minimales. `AlamCalendar`
+est commun à l’import et au raid. Les lignes de progression verrouillées sérialisent
+le figement avec les imports ; le verrou guilde sérialise les changements de roster.
+
+`AlamRewards` crédite les inventaires dans `Rewards`, avec une provenance unique
+édition/rencontre/joueur. La fabrication consomme les ressources et produit l’objet
+sous le verrou inventaire, puis écrit un audit et un reçu durable. Les clés HTTP
+restent liées aux faits même si la réponse se perd après COMMIT.
+
+Le scheduler `alam` résout les échéances persistées sans client connecté. L’outbox
+porte la narration : OpenAI intervient après le COMMIT des faits, avec fallback local.
+Les souvenirs sont des faits structurés bornés, jamais des sorties du modèle.
+Voir [le guide opérationnel](docs/alam-al-nafs.md) et le contrat généré.

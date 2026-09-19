@@ -1,0 +1,11 @@
+{% extends '@EasyAdmin/page/content.html.twig' %}
+{% block content_title %}ʿĀlam al-Nafs{% endblock %}
+{% block main %}
+<p>Les réglages du raid se modifient dans le brouillon global puis se publient. Une édition révélée conserve ses règles.</p>
+{{ form(form) }}
+{% for run in runs %}
+<article class="card my-3 p-3"><h2>{{ run.mode }} · {{ run.revealedAt|date('d/m/Y H:i') }}</h2><p>{{ run.id }} · Guilde {{ run.guildId }} · {{ run.status }} · {{ run.frozenTargetCount }} actifs figés</p>
+{% for encounter in run.encounters %}<p>Rencontre {{ encounter.index }} : {{ encounter.won ? 'Victoire' : 'Défaite' }} · {{ encounter.narration }}</p>{% for drop in encounter.drops %}<p>{{ drop.playerId }} : {{ drop.quantity }} × {{ drop.name }}</p>{% endfor %}{% endfor %}
+<details><summary>Journal et snapshot de présentation</summary><pre>{{ run|json_encode(constant('JSON_PRETTY_PRINT')) }}</pre></details></article>
+{% else %}<p>Aucune édition révélée.</p>{% endfor %}
+{% endblock %}

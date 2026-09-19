@@ -9,6 +9,7 @@ use App\Admin\Domain\GameDiscipline;
 use App\Admin\Domain\GameEnemy;
 use App\Admin\Domain\GameItem;
 use App\Admin\Domain\GameLootTable;
+use App\Admin\Domain\GameRecipe;
 use App\Admin\Domain\GameTitle;
 use Doctrine\DBAL\Connection;
 use LogicException;
@@ -37,7 +38,11 @@ final readonly class GameConfigurationReferenceGuard
             throw new LogicException('Suppression refusée : cette configuration a déjà été publiée active et peut être référencée par une opération en cours.');
         }
         [$label, $key, $queries] = match (true) {
+            $configuration instanceof GameRecipe => ['recette', $configuration->getKey(), [
+                ['SELECT 1 FROM rewards_crafting_audit WHERE recipe_key = ? LIMIT 1', [$configuration->getKey()]],
+            ]],
             $configuration instanceof GameItem => ['item', $configuration->getKey(), [
+                ['SELECT 1 FROM game_recipe WHERE result_item = ? OR costs::jsonb @> ?::jsonb LIMIT 1', [$configuration->getKey(), json_encode([['item' => $configuration->getKey()]], \JSON_THROW_ON_ERROR)]],
                 ['SELECT 1 FROM rewards_inventory_item WHERE item_key = ? LIMIT 1', [$configuration->getKey()]],
                 ['SELECT 1 FROM game_loot_table WHERE entries::jsonb @> ?::jsonb LIMIT 1', [json_encode([['item' => $configuration->getKey()]], \JSON_THROW_ON_ERROR)]],
                 ["SELECT 1 FROM rewards_loot_roll WHERE jsonb_exists(result->'items', ?) LIMIT 1", [$configuration->getKey()]],
@@ -77,7 +82,7 @@ final readonly class GameConfigurationReferenceGuard
      */
     public function lockForMutation(object $configuration): void
     {
-        if (!$configuration instanceof GameItem && !$configuration instanceof GameTitle && !$configuration instanceof GameEnemy && !$configuration instanceof GameLootTable && !$configuration instanceof GameDiscipline && !$configuration instanceof GameActivityType) {
+        if (!$configuration instanceof GameRecipe && !$configuration instanceof GameItem && !$configuration instanceof GameTitle && !$configuration instanceof GameEnemy && !$configuration instanceof GameLootTable && !$configuration instanceof GameDiscipline && !$configuration instanceof GameActivityType) {
             return;
         }
         $state = $this->lockCurrentState($configuration);
@@ -96,6 +101,7 @@ final readonly class GameConfigurationReferenceGuard
     private function lockCurrentState(object $configuration): array
     {
         [$table, $id] = match (true) {
+            $configuration instanceof GameRecipe => ['game_recipe', $configuration->getId()->toRfc4122()],
             $configuration instanceof GameItem => ['game_item', $configuration->getId()->toRfc4122()],
             $configuration instanceof GameTitle => ['game_title', $configuration->getId()->toRfc4122()],
             $configuration instanceof GameEnemy => ['game_enemy', $configuration->getId()->toRfc4122()],

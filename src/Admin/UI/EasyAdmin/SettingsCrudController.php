@@ -39,6 +39,7 @@ final class SettingsCrudController extends GameCrudController
 
     public function configureFields(string $pageName): iterable
     {
+        yield StructuredField::new('alam', 'ʿĀlam al-Nafs')->setFormType(\App\Admin\UI\Form\AlamSettingsType::class)->hideOnIndex();
         yield IntegerField::new('id')->onlyOnIndex();
         yield StructuredField::new('formulas', 'Sources des statistiques')->setFormType(StatFormulasType::class)->hideOnIndex();
         yield StructuredField::new('fighter')->setFormType(FighterType::class)->hideOnIndex();

@@ -61,7 +61,7 @@ use InvalidArgumentException;
  *
  * ## Un coffre est un objet, distingué par `kind` (#230)
  *
- * `kind: EQUIPMENT | CHEST` — `EQUIPMENT` par défaut, absent des neuf objets livrés avant ce
+ * `kind: EQUIPMENT | CHEST | RESOURCE` — `EQUIPMENT` par défaut, absent des neuf objets livrés avant ce
  * ticket. Un coffre est un tirage qu'on ouvre, pas un objet qu'on porte, et trois mensonges de
  * config s'y refusent au démarrage, voir {@see slot()} et {@see modifiers()} :
  *
@@ -69,6 +69,10 @@ use InvalidArgumentException;
  *   - `slot` absent d'un `EQUIPMENT` : c'est l'inverse, un équipement sans emplacement ne se
  *     porterait nulle part ;
  *   - un modificateur posé sur un coffre : un coffre ne s'équipe pas, il n'a rien à modifier.
+ *
+ * Les ressources de crafting (#279) suivent les mêmes contraintes de slot et de
+ * modificateurs que les coffres : elles financent une recette sans renforcer le joueur.
+ * Leur nature distincte empêche de les ouvrir ou de les vendre comme un équipement.
  *
  * **Une table de coffre est exigée, mais pas ici.** `ItemsSection` ne voit que ce fichier —
  * même limite que documentée sur `LootTables` pour le snapshot publié — donc « un coffre doit avoir
@@ -273,13 +277,14 @@ final class ItemCatalog
 
     /**
      * Résout et vérifie `slot` — voir « Un coffre est un objet » dans le docblock de la
-     * classe pour les deux refus.
+     * classe pour les deux refus. La règle vaut pour tout ce qui ne s'équipe pas : depuis
+     * le #279 une ressource de fabrication la partage, et le refus la nomme.
      */
     private static function slot(string $itemKey, ItemKind $kind, ?string $slot): ?EquipmentSlot
     {
-        if (ItemKind::Chest === $kind) {
+        if (ItemKind::Equipment !== $kind) {
             if (null !== $slot) {
-                throw new InvalidArgumentException(\sprintf('"%s" est un coffre : un coffre n\'a pas d\'emplacement, "slot" doit être absent.', $itemKey));
+                throw new InvalidArgumentException(\sprintf('"%s" est un %s : il ne se porte pas, "slot" doit être absent.', $itemKey, self::nature($kind)));
             }
 
             return null;
@@ -293,6 +298,12 @@ final class ItemCatalog
             ?? throw new InvalidArgumentException(\sprintf('Emplacement d\'équipement inconnu pour "%s" : "%s".', $itemKey, $slot));
     }
 
+    /** Le mot du refus : un message qui parle de coffre à propos d'une ressource envoie l'admin chercher au mauvais endroit. */
+    private static function nature(ItemKind $kind): string
+    {
+        return ItemKind::Chest === $kind ? 'coffre' : 'ressource';
+    }
+
     /**
      * @param list<array{type: string, value: int, discipline?: string}> $modifiers
      *
@@ -301,9 +312,10 @@ final class ItemCatalog
     private static function modifiers(string $itemKey, ItemKind $kind, array $modifiers): array
     {
         // Un coffre ne s'équipe pas — voir « Un coffre est un objet » dans le docblock de la
-        // classe pour le troisième mensonge de config que ce refus couvre.
-        if (ItemKind::Chest === $kind && [] !== $modifiers) {
-            throw new InvalidArgumentException(\sprintf('"%s" est un coffre : un coffre ne s\'équipe pas, il ne peut porter aucun modificateur.', $itemKey));
+        // classe pour le troisième mensonge de config que ce refus couvre. Une ressource
+        // non plus : elle finance une recette, elle ne renforce personne.
+        if (ItemKind::Equipment !== $kind && [] !== $modifiers) {
+            throw new InvalidArgumentException(\sprintf('"%s" est un %s : il ne s\'équipe pas, il ne peut porter aucun modificateur.', $itemKey, self::nature($kind)));
         }
 
         return array_map(

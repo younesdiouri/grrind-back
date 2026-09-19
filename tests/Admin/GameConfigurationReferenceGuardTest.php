@@ -46,13 +46,13 @@ final class GameConfigurationReferenceGuardTest extends TestCase
     /** @return iterable<string, array{Closure(): object, int}> */
     public static function configurations(): iterable
     {
-        yield 'item, inventaire/loot/config/bataille' => [static function (): GameItem {
+        yield 'item, inventaire/loot/config/recette/bataille' => [static function (): GameItem {
             $item = new GameItem();
             $item->setKey('FREE_ITEM');
             $item->setActive(false);
 
             return $item;
-        }, 4];
+        }, 5];
         yield 'titre, déblocage/sélection' => [static function (): GameTitle {
             $title = new GameTitle();
             $title->setKey('FREE_TITLE');

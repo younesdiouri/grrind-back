@@ -138,6 +138,51 @@ when@dev:
                             Passé ce délai, on le renouvelle avec le refresh token.
 
                 schemas:
+                    AlamGauge: {"type": "object", "required": ["attribute", "current", "target", "progressPermille"], "properties": {"attribute": {"type": "string", "enum": ["strength", "endurance", "mobility", "dexterity", "vitality"]}, "current": {"type": "integer"}, "target": {"type": "integer"}, "progressPermille": {"type": "integer"}}}
+                    AlamParticipant: {"type": "object", "required": ["playerId", "displayName", "avatarUrl", "contribution", "gauges"], "properties": {"playerId": {"type": "string", "format": "uuid"}, "displayName": {"type": "string"}, "avatarUrl": {"type": "string", "nullable": true}, "contribution": {"type": "integer"}, "gauges": {"type": "array", "items": {"$ref": "#/components/schemas/AlamGauge"}}, "activitySummary": {"type": "array", "items": {"type": "object", "required": ["discipline", "sessions", "durationSeconds"], "properties": {"discipline": {"type": "string"}, "sessions": {"type": "integer"}, "durationSeconds": {"type": "integer"}}}}}}
+                    AlamDrop: {"type": "object", "required": ["playerId", "itemKey", "name", "kind", "rarity", "imageUrl", "quantity"], "properties": {"playerId": {"type": "string", "format": "uuid"}, "itemKey": {"type": "string"}, "name": {"type": "string"}, "kind": {"type": "string", "enum": ["RESOURCE", "EQUIPMENT"]}, "rarity": {"type": "string", "enum": ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"]}, "imageUrl": {"type": "string", "nullable": true}, "quantity": {"type": "integer"}}}
+                    AlamEvent: {"type": "object", "required": ["id", "offsetMs", "encounterIndex", "action", "actorId", "targetId", "text"], "properties": {"id": {"type": "string"}, "offsetMs": {"type": "integer"}, "encounterIndex": {"type": "integer"}, "action": {"type": "string", "enum": ["ARRIVAL", "EFFORT", "VICTORY", "DEFEAT", "DROP"]}, "actorId": {"type": "string", "nullable": true}, "targetId": {"type": "string", "nullable": true}, "text": {"type": "string"}}}
+                    AlamEncounter: {"type": "object", "required": ["index", "enemyKey", "enemyName", "thresholdPermille", "won", "probabilityMillionths", "progressPermille", "drops", "narration"], "properties": {"index": {"type": "integer"}, "enemyKey": {"type": "string"}, "enemyName": {"type": "string"}, "thresholdPermille": {"type": "integer"}, "won": {"type": "boolean"}, "probabilityMillionths": {"type": "integer"}, "progressPermille": {"type": "integer"}, "drops": {"type": "array", "items": {"$ref": "#/components/schemas/AlamDrop"}}, "narration": {"type": "string"}}}
+                    AlamRun: {"type": "object", "required": ["id", "guildId", "mode", "status", "weekStartsAt", "collectionEndsAt", "revealedAt", "presentationStartsAt", "presentationEndsAt", "frozenTargetCount", "rulesetVersion", "gauges", "participants", "encounters", "events", "narrationSource", "serverNow"], "properties": {"id": {"type": "string", "format": "uuid"}, "guildId": {"type": "string", "format": "uuid"}, "mode": {"type": "string", "enum": ["WEEKLY", "MANUAL"]}, "status": {"type": "string", "enum": ["COLLECTING", "RESOLVED"]}, "weekStartsAt": {"type": "string", "format": "date-time"}, "collectionEndsAt": {"type": "string", "format": "date-time"}, "revealedAt": {"type": "string", "format": "date-time"}, "presentationStartsAt": {"type": "string", "format": "date-time", "nullable": true}, "presentationEndsAt": {"type": "string", "format": "date-time", "nullable": true}, "frozenTargetCount": {"type": "integer"}, "rulesetVersion": {"type": "string"}, "gauges": {"type": "array", "items": {"$ref": "#/components/schemas/AlamGauge"}}, "participants": {"type": "array", "items": {"$ref": "#/components/schemas/AlamParticipant"}}, "encounters": {"type": "array", "items": {"$ref": "#/components/schemas/AlamEncounter"}}, "events": {"type": "array", "items": {"$ref": "#/components/schemas/AlamEvent"}}, "narrationSource": {"type": "string", "enum": ["LOCAL", "OPENAI"]}, "serverNow": {"type": "string", "format": "date-time"}}}
+                    AlamCurrent: {"type": "object", "required": ["serverNow", "canLaunchManual", "pollAfterSeconds", "current"], "properties": {"serverNow": {"type": "string", "format": "date-time"}, "canLaunchManual": {"type": "boolean"}, "pollAfterSeconds": {"type": "integer"}, "current": {"$ref": "#/components/schemas/AlamRun"}}}
+                    AlamPage: {"type": "object", "required": ["runs", "nextCursor"], "properties": {"runs": {"type": "array", "items": {"$ref": "#/components/schemas/AlamRun"}}, "nextCursor": {"type": "string", "nullable": true}}}
+                    CraftingCost:
+                        type: object
+                        required: [item, quantity, ownedQuantity]
+                        properties:
+                            item: { $ref: '#/components/schemas/DroppedItem' }
+                            quantity: { type: integer, minimum: 1 }
+                            ownedQuantity: { type: integer, minimum: 0 }
+                    CraftingResult:
+                        type: object
+                        required: [item, quantity]
+                        properties:
+                            item: { $ref: '#/components/schemas/DroppedItem' }
+                            quantity: { type: integer, minimum: 1 }
+                    CraftingRecipe:
+                        type: object
+                        required: [key, result, costs, canCraft]
+                        properties:
+                            key: { type: string }
+                            result: { $ref: '#/components/schemas/CraftingResult' }
+                            costs: { type: array, items: { $ref: '#/components/schemas/CraftingCost' } }
+                            canCraft: { type: boolean }
+                    CraftingRecipes:
+                        type: object
+                        required: [recipes, rulesetVersion]
+                        properties:
+                            recipes: { type: array, items: { $ref: '#/components/schemas/CraftingRecipe' } }
+                            rulesetVersion: { type: string }
+                    CraftingReceipt:
+                        type: object
+                        required: [id, recipeKey, result, costs, rulesetVersion, craftedAt]
+                        properties:
+                            id: { type: string, format: uuid }
+                            recipeKey: { type: string }
+                            result: { $ref: '#/components/schemas/CraftingCost' }
+                            costs: { type: array, items: { $ref: '#/components/schemas/CraftingCost' } }
+                            rulesetVersion: { type: string }
+                            craftedAt: { type: string, format: date-time }
                     GuildMessage:
                         type: object
                         required: [id, clientId, cursor, authorId, text, createdAt, imageUrl]
@@ -185,6 +230,10 @@ when@dev:
                                     - https://grrind.app/problems/too-many-requests
                                     - https://grrind.app/problems/unsupported-media-type
                                     - https://grrind.app/problems/validation-failed
+                                    - https://grrind.app/problems/recipe-unavailable
+                                    - https://grrind.app/problems/insufficient-crafting-resources
+                                    - https://grrind.app/problems/alam-manual-disabled
+                                    - https://grrind.app/problems/alam-run-not-found
                                     - https://grrind.app/problems/internal-error
                                     # Idempotence
                                     - https://grrind.app/problems/idempotency-key-required
@@ -1061,7 +1110,7 @@ when@dev:
                             key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
                             kind:
                                 type: string
-                                enum: [EQUIPMENT, CHEST]
+                                enum: [EQUIPMENT, CHEST, RESOURCE]
                                 description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
                             name: { type: string, example: "Chaussures de course usées", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
                             rarity:
@@ -1103,7 +1152,7 @@ when@dev:
                             key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
                             kind:
                                 type: string
-                                enum: [EQUIPMENT, CHEST]
+                                enum: [EQUIPMENT, CHEST, RESOURCE]
                                 description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
                             name: { type: string, example: "Chaussures de course usées", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
                             rarity:
@@ -1359,7 +1408,7 @@ when@dev:
                                     reason:
                                         type: string
                                         nullable: true
-                                        enum: [NO_XP_FEEDS_VITALITY]
+                                        enum: [NO_XP_FEEDS_VITALITY, ALAM_WINDOW]
                                         description: |
                                             `null` pour toute séance créditée normalement — y compris une séance
                                             entièrement écrêtée par le plafond quotidien, dont `breakdown` porte déjà

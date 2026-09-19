@@ -75,6 +75,7 @@ deptrac:
     Combat:
       - Shared
     Admin:
+      - Community
       - Shared
       - Identity
       - Training
