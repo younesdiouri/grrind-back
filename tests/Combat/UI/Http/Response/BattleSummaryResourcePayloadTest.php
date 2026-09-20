@@ -37,7 +37,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'name'], array_keys($enemy));
+        self::assertSame(['key', 'playerId', 'name'], array_keys($enemy));
     }
 
     /** `rewards` rend `Battle::$reward` à l'identique de `BattleResource` (#227). */

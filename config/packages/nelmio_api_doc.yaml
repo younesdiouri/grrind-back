@@ -312,6 +312,13 @@ when@dev:
                                     # `GET /api/enemies`, il n'y a rien à protéger.
                                     - https://grrind.app/problems/enemy-key-unknown
                                     - https://grrind.app/problems/enemy-level-too-low
+                                    # Le défi PvP (#283). `opponent-not-found` couvre l'inconnu, le
+                                    # non-co-équipier et l'UUID malformé — même raisonnement que
+                                    # `player-not-found`, jamais de 403. `cannot-challenge-yourself`
+                                    # est le seul des deux à être un 422 : l'UUID est celui de
+                                    # l'appelant, il n'y a rien à cacher sur son existence.
+                                    - https://grrind.app/problems/opponent-not-found
+                                    - https://grrind.app/problems/cannot-challenge-yourself
                                     # Le ledger de pièces (#225), et la boutique qui le dépense (#229) :
                                     # son premier vrai consommateur, voir le docblock de
                                     # `CoinTransactionRepository::record()`.
@@ -1677,13 +1684,30 @@ when@dev:
                             **Le nom arrive traduit**, comme les titres : le client n'a pas de table de
                             correspondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du
                             catalogue DB publié, pas une donnée d'affichage.
-                        required: [key, name, hp, damage, mitigationPercent, comboPercent, dodgePercent, maintenancePercent, criticalChancePercent, guardPercent, criticalResistancePercent, cooldownReductionPercent, precisionPercent]
+
+                            **`key` et `playerId` sont exclusifs, et l'un des deux est toujours nul.**
+                            Un combat PvE porte `key`, un défi PvP porte `playerId` et un `name` qui est le
+                            **pseudo du défié au moment du combat** — jamais relu depuis son compte : un
+                            combat déjà joué est un fait écrit, et son rejeu ne dépend ni d'un renommage
+                            postérieur ni de la présence de ce compte. Un joueur n'a ni `imageUrls` ni
+                            `introduction` : les deux valent `null`, comme pour un ennemi sans présentation
+                            publiée, et l'animation est la même.
+                        required: [key, playerId, name, hp, damage, mitigationPercent, comboPercent, dodgePercent, maintenancePercent, criticalChancePercent, guardPercent, criticalResistancePercent, cooldownReductionPercent, precisionPercent]
                         properties:
-                            key: { type: string, example: SAND_JACKAL }
+                            key:
+                                type: string
+                                nullable: true
+                                example: SAND_JACKAL
+                                description: "L'entrée du catalogue, ou `null` pour un défi PvP."
+                            playerId:
+                                type: string
+                                format: uuid
+                                nullable: true
+                                description: "Le co-équipier défié, ou `null` pour un combat PvE."
                             name:
                                 type: string
                                 example: Chacal des sables
-                                description: "Déjà traduit, dans la langue négociée sur `Accept-Language`."
+                                description: "Déjà traduit, dans la langue négociée sur `Accept-Language` — ou le pseudo du défié, snapshoté."
                             hp: { type: integer, example: 180 }
                             damage: { type: integer, example: 22 }
                             mitigationPercent: { type: integer, example: 10 }
@@ -1776,8 +1800,13 @@ when@dev:
                     Battle:
                         type: object
                         description: |
-                            Un combat PvE joué et jugé — ce que rendent `POST /api/battles` et
-                            `GET /api/battles/{id}`, à l'identique.
+                            Un combat joué et jugé — ce que rendent `POST /api/battles`,
+                            `POST /api/players/{id}/battles` et `GET /api/battles/{id}`, à l'identique.
+
+                            **Un défi PvP a exactement cette forme** : c'est ce qui permet au client de
+                            l'animer avec le composant écrit pour le PvE, sans une branche. `enemy.key` et
+                            `enemy.playerId` disent lequel des deux on regarde, et `rewards` est vide pour un
+                            défi — un défi ne rapporte rien en v1.
 
                             **L'ordre des champs est l'ordre de l'animation**, et c'est un contrat, pas une
                             convention d'écriture — même règle que `RewardSummary`.
@@ -1833,9 +1862,10 @@ when@dev:
                                     n'ont pas leur place dans une ligne de liste. Le nom vient de la clé du
                                     snapshot, jamais de `EnemyCatalog` : un combat déjà joué est un fait écrit,
                                     voir la description de `Battle`.
-                                required: [key, name]
+                                required: [key, playerId, name]
                                 properties:
-                                    key: { type: string, example: SAND_JACKAL }
+                                    key: { type: string, nullable: true, example: SAND_JACKAL, description: "`null` pour un défi PvP." }
+                                    playerId: { type: string, format: uuid, nullable: true, description: "Le co-équipier défié, `null` pour un combat PvE." }
                                     name: { type: string, example: 'Chacal des sables' }
                             attackCount: { type: integer, example: 7, description: "Toutes les tentatives, esquives et combos compris." }
                             actionCount: { type: integer, example: 5, description: "Actions régulières ; une chaîne Combo appartient à une seule action." }

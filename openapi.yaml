@@ -4,6 +4,43 @@ info:
   description: "L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.\n\n**Le serveur arbitre l'horloge.** L'import accepte les bornes du **fournisseur santé** — une\nséance a eu lieu avant que Grrind en entende parler, aucune horloge serveur n'existe pour un\nfait passé. Ce qu'il n'accepte pas, c'est une **durée** : elle se recalcule des deux bornes.\nLe reste de l'arbitrage — fenêtre d'antériorité, chevauchements, plancher et plafond — refuse\nce qui ne tient pas debout.\n\n**Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un\nen-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse\nd'origine sans rien réexécuter.\n\n**Les erreurs sont en `application/problem+json`** (RFC 9457). Le membre `type` est un\nidentifiant stable sur lequel un client peut brancher un comportement ; le `detail` est du\ntexte, il peut changer.\n"
   version: 1.0.0
 paths:
+  '/api/players/{id}/battles':
+    post:
+      tags:
+        - Combat
+      operationId: post_combat_battle_challenge
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: 'Le défi est joué et écrit. Exactement la charge utile de `POST /api/battles` : `enemy.key` vaut `null`, `enemy.playerId` porte le défié, `enemy.name` son pseudo au moment du combat.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Battle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "Ce joueur n'existe pas, **ou n'est pas un co-équipier** (`opponent-not-found`).\nLes deux cas rendent la même réponse, et **jamais 403** : un 403 confirmerait qu'un\ncompte porte cet UUID, et les UUID v7 encodent leur instant de création — l'API\ndeviendrait un moyen d'énumérer les comptes ouverts un jour donné."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: 'On ne se défie pas soi-même (`cannot-challenge-yourself`).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   /api/enemies:
     get:
       tags:
@@ -1869,6 +1906,8 @@ components:
             - 'https://grrind.app/problems/battle-not-found'
             - 'https://grrind.app/problems/enemy-key-unknown'
             - 'https://grrind.app/problems/enemy-level-too-low'
+            - 'https://grrind.app/problems/opponent-not-found'
+            - 'https://grrind.app/problems/cannot-challenge-yourself'
             - 'https://grrind.app/problems/insufficient-coin-balance'
             - 'https://grrind.app/problems/item-not-owned'
             - 'https://grrind.app/problems/item-not-sellable'
@@ -3608,9 +3647,10 @@ components:
       nullable: true
       additionalProperties: false
     BattleEnemy:
-      description: "L'adversaire : les mêmes champs qu'un `BattleFighter`, plus son identité.\n\n**Le nom arrive traduit**, comme les titres : le client n'a pas de table de\ncorrespondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du\ncatalogue DB publié, pas une donnée d'affichage.\n"
+      description: "L'adversaire : les mêmes champs qu'un `BattleFighter`, plus son identité.\n\n**Le nom arrive traduit**, comme les titres : le client n'a pas de table de\ncorrespondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du\ncatalogue DB publié, pas une donnée d'affichage.\n\n**`key` et `playerId` sont exclusifs, et l'un des deux est toujours nul.**\nUn combat PvE porte `key`, un défi PvP porte `playerId` et un `name` qui est le\n**pseudo du défié au moment du combat** — jamais relu depuis son compte : un\ncombat déjà joué est un fait écrit, et son rejeu ne dépend ni d'un renommage\npostérieur ni de la présence de ce compte. Un joueur n'a ni `imageUrls` ni\n`introduction` : les deux valent `null`, comme pour un ennemi sans présentation\npubliée, et l'animation est la même.\n"
       required:
         - key
+        - playerId
         - name
         - hp
         - damage
@@ -3625,10 +3665,17 @@ components:
         - precisionPercent
       properties:
         key:
+          description: "L'entrée du catalogue, ou `null` pour un défi PvP."
           type: string
           example: SAND_JACKAL
+          nullable: true
+        playerId:
+          description: 'Le co-équipier défié, ou `null` pour un combat PvE.'
+          type: string
+          format: uuid
+          nullable: true
         name:
-          description: 'Déjà traduit, dans la langue négociée sur `Accept-Language`.'
+          description: 'Déjà traduit, dans la langue négociée sur `Accept-Language` — ou le pseudo du défié, snapshoté.'
           type: string
           example: 'Chacal des sables'
         hp:
@@ -3786,7 +3833,7 @@ components:
           type: object
       type: object
     Battle:
-      description: "Un combat PvE joué et jugé — ce que rendent `POST /api/battles` et\n`GET /api/battles/{id}`, à l'identique.\n\n**L'ordre des champs est l'ordre de l'animation**, et c'est un contrat, pas une\nconvention d'écriture — même règle que `RewardSummary`.\n"
+      description: "Un combat joué et jugé — ce que rendent `POST /api/battles`,\n`POST /api/players/{id}/battles` et `GET /api/battles/{id}`, à l'identique.\n\n**Un défi PvP a exactement cette forme** : c'est ce qui permet au client de\nl'animer avec le composant écrit pour le PvE, sans une branche. `enemy.key` et\n`enemy.playerId` disent lequel des deux on regarde, et `rewards` est vide pour un\ndéfi — un défi ne rapporte rien en v1.\n\n**L'ordre des champs est l'ordre de l'animation**, et c'est un contrat, pas une\nconvention d'écriture — même règle que `RewardSummary`.\n"
       required:
         - id
         - result
@@ -3873,11 +3920,19 @@ components:
           description: "La clé et le nom traduit seulement — pas les statistiques de combat, qui\nn'ont pas leur place dans une ligne de liste. Le nom vient de la clé du\nsnapshot, jamais de `EnemyCatalog` : un combat déjà joué est un fait écrit,\nvoir la description de `Battle`.\n"
           required:
             - key
+            - playerId
             - name
           properties:
             key:
+              description: '`null` pour un défi PvP.'
               type: string
               example: SAND_JACKAL
+              nullable: true
+            playerId:
+              description: 'Le co-équipier défié, `null` pour un combat PvE.'
+              type: string
+              format: uuid
+              nullable: true
             name:
               type: string
               example: 'Chacal des sables'

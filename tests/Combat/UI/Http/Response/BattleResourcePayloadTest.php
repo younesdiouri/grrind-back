@@ -50,7 +50,7 @@ final class BattleResourcePayloadTest extends TestCase
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction'], array_keys($enemy));
+        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction'], array_keys($enemy));
 
         self::assertNull($enemy['imageUrls']);
         self::assertNull($enemy['introduction']);
@@ -132,6 +132,44 @@ final class BattleResourcePayloadTest extends TestCase
         // Le stub ne connaît que `sand_jackal.name` : toute autre clé revient inchangée,
         // exactement comme le ferait le repli du vrai traducteur Symfony.
         self::assertSame('ghost_enemy.name', $enemy['name']);
+    }
+
+    /**
+     * Un défi PvP (#283) rend **la même forme**, au couple `key`/`playerId` près : c'est ce
+     * qui permet au client de l'animer avec le composant écrit pour le PvE.
+     */
+    public function testADuelRendersTheSameShapeWithThePlayerInsteadOfACatalogueKey(): void
+    {
+        $opponentId = Uuid::v7();
+        $duel = Battle::duel(
+            Uuid::v7(),
+            Uuid::v7(),
+            new AttributeGains(10, 20, 30, 40),
+            500,
+            new Fighter(150, 12, 105, 55, 20),
+            $opponentId,
+            'Carla',
+            new Fighter(120, 10, 50, 40, 30),
+            new BattleOutcome(BattleResult::Victory, [new BattleStarted(150, 120), new BattleFinished(BattleResult::Victory)], 1),
+            random_bytes(32),
+            'v1-000000000000',
+            new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
+        );
+
+        $payload = BattleResource::from($duel, new EnemyTranslator(self::stubTranslator(), self::rulesets()))->toArray();
+
+        $enemy = $payload['enemy'];
+        self::assertIsArray($enemy);
+        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction'], array_keys($enemy));
+        self::assertNull($enemy['key']);
+        self::assertSame($opponentId->toRfc4122(), $enemy['playerId']);
+        // Le pseudo snapshoté, jamais une clé passée au traducteur.
+        self::assertSame('Carla', $enemy['name']);
+        self::assertNull($enemy['imageUrls']);
+        self::assertNull($enemy['introduction']);
+
+        // Un défi ne rapporte rien en v1 — la forme reste complète.
+        self::assertSame(['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]], $payload['rewards']);
     }
 
     private static function resource(): BattleResource

@@ -609,6 +609,18 @@ gagnant en cas d'égalité. Le loot exige une victoire par KO. La timeline, les 
 résolus, la graine, la version publiée et `algorithmVersion=v2` sont persistés ensemble.
 L'historique affiche la timeline enregistrée sans simulation.
 
+### Le défi PvP réutilise tout (#283)
+
+`POST /api/players/{id}/battles` oppose deux joueurs sans toucher au moteur : `BattleSimulator`
+reçoit deux `Fighter` et ne sait pas d'où ils viennent, donc le défieur prend la place du joueur
+et le défié celle de l'ennemi. Les deux combattants passent par `FighterFactory::forPlayer()` —
+équipement, compétences, Vitality, modificateurs — et le défié n'a rien à faire : son combattant
+est dérivé de son état à l'instant du défi. La ligne écrite est un `Battle`, distingué par la
+seule colonne `opponent_id` ; le pseudo du défié est snapshoté dans `enemy_snapshot`, jamais relu.
+L'autorisation « co-équipier » traverse la frontière par le port `Shared\Application\Teammates`,
+implémenté par `Community` : `Combat` ne connaît toujours pas les guildes. Un défi ne rapporte
+rien et n'apparaît que dans l'historique du défieur.
+
 La migration de développement supprime uniquement les combats v1 et leurs réponses
 idempotentes identifiées par UUID/propriétaire, sans cascade sur les causes de loot,
 inventaires ou monnaies. Brouillons et snapshot publié sont convertis séparément ; le
@@ -730,6 +742,11 @@ défaire. Le raisonnement complet est dans le docblock du fichier concerné.
   `SUM(CASE WHEN reason = COMPLETED THEN 1 ELSE -1 END)`, donc une troisième raison *retirerait*
   une séance au relevé qui débloque les titres. L'append-only protège les crédits contre la
   réécriture, il n'oblige pas à enregistrer les non-événements.
+- **Un défi PvP ne rapporte rien, et le défié ne le voit pas.** Les deux ressemblent à des
+  oublis ; ce sont les deux décisions du #283. Sans cooldown ni finalité, une récompense ferait du
+  défi la meilleure source de revenu du jeu — meilleure que le PvE, puisque l'adversaire ne se
+  choisit pas par palier. Et notifier le défié réclamerait une mécanique de mode de jeu — accepter,
+  refuser, prendre sa revanche — que rien ne définit encore.
 - **Sur un chevauchement, c'est l'enregistrement le plus complet qui gagne**, pas le premier
   arrivé — mais **jamais** contre une ligne déjà en base. Deux applications ne démarrent jamais à
   la même seconde, donc « le premier » revient à tirer au sort ; détrôner une ligne déjà créditée
