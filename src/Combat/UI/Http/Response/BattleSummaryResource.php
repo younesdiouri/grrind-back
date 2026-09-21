@@ -38,7 +38,11 @@ final readonly class BattleSummaryResource
 
     public static function from(Battle $battle, EnemyTranslator $translator, ?ItemImageUrlResolver $items = null): self
     {
-        return new self($battle, $translator->nameOf($battle->enemySnapshot()['key']), $items);
+        $key = $battle->enemySnapshot()['key'];
+
+        // Un défi PvP (#283) porte son pseudo sur la ligne — voir le docblock de
+        // `BattleResource`, même geste et même raison.
+        return new self($battle, null === $key ? ($battle->enemySnapshot()['name'] ?? '') : $translator->nameOf($key), $items);
     }
 
     /**
@@ -53,6 +57,7 @@ final readonly class BattleSummaryResource
             'result' => $this->battle->result()->value,
             'enemy' => [
                 'key' => $this->battle->enemySnapshot()['key'],
+                'playerId' => $this->battle->opponentId()?->toRfc4122(),
                 'name' => $this->enemyName,
             ],
             'attackCount' => $this->battle->attackCount(),

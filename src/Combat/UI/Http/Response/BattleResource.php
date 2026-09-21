@@ -35,6 +35,12 @@ use DateTimeInterface;
  * `translations/enemies.*.yaml` — dégradé et lisible, jamais un 500. Même principe que
  * `RisalaResource`, qui rend `senderDisplayName` à `null` plutôt que de faire dépendre un
  * défi déjà envoyé de la présence actuelle de son expéditeur dans la guilde.
+ *
+ * **Un défi PvP (#283) passe par la même ressource, et c'est le point.** `enemy` garde sa
+ * forme exacte — `name` vaut le pseudo snapshoté, `imageUrls` et `introduction` valent `null`
+ * comme pour un ennemi sans présentation publiée — pour que le client anime un défi avec le
+ * composant qu'il a déjà écrit, sans une branche. Ce qui les distingue est un couple :
+ * `key` nul et `playerId` renseigné pour un défi, l'inverse pour un combat PvE.
  */
 final readonly class BattleResource
 {
@@ -50,7 +56,17 @@ final readonly class BattleResource
 
     public static function from(Battle $battle, EnemyTranslator $translator, ?ItemImageUrlResolver $items = null): self
     {
-        return new self($battle, $translator->nameOf($battle->enemySnapshot()['key']), $items, $translator->imageUrlsOf($battle->enemySnapshot()['key']), $translator->introductionOf($battle->enemySnapshot()['key']));
+        $key = $battle->enemySnapshot()['key'];
+
+        // Un défi PvP (#283) n'a pas d'entrée de catalogue derrière lui : le pseudo est
+        // snapshoté sur la ligne, et il n'y a ni illustration ni texte d'introduction à
+        // résoudre. Le traducteur n'est donc pas consulté — il n'aurait rien à traduire, et
+        // lui passer une clé nulle demanderait à `EnemyTranslator` de connaître le PvP.
+        if (null === $key) {
+            return new self($battle, $battle->enemySnapshot()['name'] ?? '', $items, null, null);
+        }
+
+        return new self($battle, $translator->nameOf($key), $items, $translator->imageUrlsOf($key), $translator->introductionOf($key));
     }
 
     /**
@@ -74,7 +90,9 @@ final readonly class BattleResource
             // docblock de la classe pour pourquoi le nom est résolu ici plutôt que rendu tel
             // quel depuis le snapshot.
             'enemy' => array_merge(
-                ['key' => $enemySnapshot['key'], 'name' => $this->enemyName],
+                // `key` **ou** `playerId` : l'un des deux est toujours nul, et c'est ce qui
+                // dit au client s'il affronte une entrée du catalogue ou un co-équipier.
+                ['key' => $enemySnapshot['key'], 'playerId' => $this->battle->opponentId()?->toRfc4122(), 'name' => $this->enemyName],
                 FighterResource::from($enemySnapshot['fighter'])->toArray(),
                 ['imageUrls' => $this->imageUrls, 'introduction' => $this->introduction],
             ),

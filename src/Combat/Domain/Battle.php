@@ -98,6 +98,24 @@ use Symfony\Component\Uid\Uuid;
  * en premier et le fait entrer par la signature plutôt que de rouvrir cette classe à une
  * seconde construction ou à une mutation après coup, ce que sa règle « jamais mutée après »
  * refuse par ailleurs.
+ *
+ * ## Un défi PvP est un `Battle`, pas une seconde entité (#283)
+ *
+ * Le moteur oppose deux {@see Fighter} et ne sait pas d'où ils viennent : un défi lancé à un
+ * co-équipier s'écrit donc sur cette table, avec le même historique et la même route de
+ * rejeu, plutôt que dans un `Duel` qui aurait dupliqué la timeline, la graine, les compteurs
+ * et leur sérialisation. Ce que la ligne porte en plus est **une** colonne, `$opponentId`, et
+ * c'est elle qui distingue les deux formes : nulle pour un combat PvE, renseignée pour un défi.
+ *
+ * `$enemySnapshot` porte alors `key: null` — il n'y a pas d'entrée de catalogue derrière un
+ * joueur — et `name`, le **pseudo au moment du combat**. Le pseudo est snapshoté pour la
+ * raison exacte qui fait que le nom d'un ennemi se traduit depuis la clé du snapshot et non
+ * depuis le catalogue courant : un combat déjà joué est un fait écrit, et le relire ne doit
+ * dépendre ni d'un renommage ultérieur, ni de la présence du compte adverse.
+ *
+ * `$playerId` reste **le défieur**, toujours : c'est lui qui a lancé le combat, c'est dans son
+ * historique que la ligne apparaît, et `BattleResult` reste rendu de son point de vue. Le
+ * défié ne voit rien — décision du #283, à rouvrir le jour où le PvP aura une finalité.
  */
 #[ORM\Entity(repositoryClass: BattleRepository::class)]
 #[ORM\Table(name: 'combat_battle')]
@@ -119,6 +137,14 @@ class Battle
     private Uuid $playerId;
 
     /**
+     * Le joueur défié, ou `null` pour un combat PvE — voir « Un défi PvP est un `Battle` »
+     * dans le docblock de la classe. Pas de clé étrangère, comme `$playerId` : Deptrac
+     * interdit à `Combat` de connaître `Identity`, et la base suit le même découpage.
+     */
+    #[ORM\Column(type: UuidType::NAME, nullable: true)]
+    private ?Uuid $opponentId = null;
+
+    /**
      * Les quatre caractéristiques, la Vitality, et le `Fighter` qui en a été dérivé — voir
      * {@see playerSnapshotOf()}.
      *
@@ -131,7 +157,7 @@ class Battle
      * La clé de l'ennemi du catalogue, et son `Fighter` au moment du combat — voir
      * {@see enemySnapshotOf()}.
      *
-     * @var array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @var array{key: string|null, name?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     #[ORM\Column(type: Types::JSONB)]
     private array $enemySnapshot;
@@ -185,7 +211,7 @@ class Battle
 
     /**
      * @param array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}} $playerSnapshot
-     * @param array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}                                                                                    $enemySnapshot
+     * @param array{key: string|null, name?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}                                                                $enemySnapshot
      * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}                                                                                                                                                                                                                                                                                      $reward
      */
     private function __construct(
@@ -198,6 +224,7 @@ class Battle
         string $seed,
         string $rulesetVersion,
         DateTimeImmutable $foughtAt,
+        ?Uuid $opponentId = null,
     ) {
         if (self::SEED_LENGTH_BYTES !== \strlen($seed)) {
             throw new InvalidArgumentException(\sprintf('La graine d\'un combat doit faire %d octets, %d reçus.', self::SEED_LENGTH_BYTES, \strlen($seed)));
@@ -205,6 +232,7 @@ class Battle
 
         $this->id = $id;
         $this->playerId = $playerId;
+        $this->opponentId = $opponentId;
         $this->playerSnapshot = $playerSnapshot;
         $this->enemySnapshot = $enemySnapshot;
         $this->result = $outcome->result;
@@ -261,6 +289,52 @@ class Battle
         );
     }
 
+    /**
+     * Un défi lancé à un co-équipier (#283) — voir « Un défi PvP est un `Battle` » dans le
+     * docblock de la classe.
+     *
+     * Deux points de construction plutôt qu'un `conclude()` à paramètres nullables : ce qui
+     * change entre les deux n'est pas une option, c'est la nature de l'adversaire. Un `Enemy`
+     * du catalogue et un joueur défié n'ont ni les mêmes champs ni la même provenance, et une
+     * signature qui accepterait les deux laisserait passer l'appel qui ne renseigne ni l'un
+     * ni l'autre.
+     *
+     * `$opponentName` est le pseudo **tel qu'il est au moment du combat**, résolu par
+     * l'appelant via {@see \App\Shared\Application\PlayerProfiles} : cette classe ne
+     * consulte jamais un port, et un combat relu ne doit pas dépendre d'un renommage postérieur.
+     *
+     * `$reward` n'est pas un paramètre : un défi ne rapporte rien en v1 — voir le docblock de
+     * {@see \App\Combat\Application\ChallengePlayerHandler} pour pourquoi ce n'est pas un
+     * oubli. La forme vide est écrite ici, jamais une clé absente.
+     */
+    public static function duel(
+        Uuid $id,
+        Uuid $challengerId,
+        AttributeGains $challengerAttributes,
+        int $challengerVitality,
+        Fighter $challenger,
+        Uuid $opponentId,
+        string $opponentName,
+        Fighter $opponent,
+        BattleOutcome $outcome,
+        string $seed,
+        string $rulesetVersion,
+        DateTimeImmutable $foughtAt,
+    ): self {
+        return new self(
+            $id,
+            $challengerId,
+            self::playerSnapshotOf($challengerAttributes, $challengerVitality, $challenger),
+            ['key' => null, 'name' => $opponentName, 'fighter' => CombatSnapshot::fighter($opponent)],
+            $outcome,
+            ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
+            $seed,
+            $rulesetVersion,
+            $foughtAt,
+            $opponentId,
+        );
+    }
+
     public function id(): Uuid
     {
         return $this->id;
@@ -269,6 +343,12 @@ class Battle
     public function playerId(): Uuid
     {
         return $this->playerId;
+    }
+
+    /** `null` pour un combat PvE — voir le docblock de la classe. */
+    public function opponentId(): ?Uuid
+    {
+        return $this->opponentId;
     }
 
     /**
@@ -280,7 +360,7 @@ class Battle
     }
 
     /**
-     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @return array{key: string|null, name?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     public function enemySnapshot(): array
     {
@@ -365,7 +445,7 @@ class Battle
     }
 
     /**
-     * @return array{key: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @return array{key: string|null, name?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     private static function enemySnapshotOf(Enemy $enemy, Fighter $fighter): array
     {

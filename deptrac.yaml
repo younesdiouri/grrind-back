@@ -70,8 +70,9 @@ deptrac:
     # n'apparaissent ici. Ce qu'elle affiche d'un membre arrive par les ports de `Shared`.
     Community:
       - Shared
-    # Le combat PvE oppose un joueur à un ennemi du catalogue de config-as-code : aucun
-    # module métier n'a encore à y contribuer.
+    # Le combat oppose un joueur à un ennemi du catalogue, ou à un co-équipier depuis le
+    # #283 — et dans ce second cas il ne connaît toujours pas `Community` : la question
+    # « sont-ils co-équipiers » entre par le port `Shared\Application\Teammates`.
     Combat:
       - Shared
     Admin:

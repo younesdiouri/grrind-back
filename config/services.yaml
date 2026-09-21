@@ -44,6 +44,10 @@ services:
         arguments:
             $rulesetVersion: '@App\Shared\Application\GameRulesets'
 
+    App\Combat\Application\ChallengePlayerHandler:
+        arguments:
+            $rulesetVersion: '@App\Shared\Application\GameRulesets'
+
     App\Training\UI\Http\ImportWorkoutsController:
         arguments:
             $rulesetVersion: '@App\Shared\Application\GameRulesets'

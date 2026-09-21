@@ -197,7 +197,7 @@ final class ListBattlesTest extends ApiTestCase
 
         $enemy = $battle['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'name'], array_keys($enemy));
+        self::assertSame(['key', 'playerId', 'name'], array_keys($enemy));
     }
 
     /**
