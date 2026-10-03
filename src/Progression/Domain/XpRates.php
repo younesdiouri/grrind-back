@@ -50,16 +50,29 @@ final class XpRates
     /** @var array<string, true> valeur de discipline → présente si elle ne crédite pas d'XP */
     private array $nonCrediting;
 
+    /** @var list<array{from_bpm: int, bonus_percent: int}> */
+    private array $heartRateBonus;
+
     /**
-     * @param int                                                                                                                  $baseXpPerHour 60 : une minute, un point
+     * @param int                                                                                                                  $baseXpPerHour  60 : une minute, un point
      * @param list<array{discipline: string, daily_cap_xp?: int, xp_per_km?: int, xp_per_100m_elevation?: int, credits_xp?: bool}> $disciplines
+     * @param list<array{from_bpm: int, bonus_percent: int}>                                                                       $heartRateBonus paliers croissants, le plus haut atteint s'applique
      */
     public function __construct(
         private int $baseXpPerHour,
         array $disciplines,
         ?GameRulesets $rulesets = null,
+        array $heartRateBonus = [],
     ) {
         $this->useRuntimeRulesets($rulesets);
+        $previous = null;
+        foreach ($heartRateBonus as $tier) {
+            if ($tier['bonus_percent'] < 1 || (null !== $previous && ($tier['from_bpm'] <= $previous['from_bpm'] || $tier['bonus_percent'] <= $previous['bonus_percent']))) {
+                throw new InvalidArgumentException('Les paliers cardiaques doivent croître en bpm comme en bonus, à partir de 1 %.');
+            }
+            $previous = $tier;
+        }
+        $this->heartRateBonus = $heartRateBonus;
         if ($baseXpPerHour < 1) {
             throw new InvalidArgumentException('Une heure de pratique doit valoir au moins 1 XP.');
         }
@@ -226,6 +239,31 @@ final class XpRates
         return intdiv(max(0, $distanceMeters) * $this->perKilometre[$discipline->value], 1000);
     }
 
+    /**
+     * Le bonus cardiaque (#164), en pourcentage du socle : le palier le plus haut que la
+     * FC moyenne atteint, ou zéro. **FC brute**, pas relative au joueur — aucun profil ne
+     * porte d'âge ni de FC de repos, et c'est un bonus, jamais un malus : une séance sans
+     * cardio, ou au cœur lent, vaut son socle nu, exactement comme une distance non mesurée.
+     */
+    public function heartRateBonusPercentOf(?int $averageHeartRate): int
+    {
+        if ($this->isRuntimeRuleset()) {
+            return $this->runtimeValue()->heartRateBonusPercentOf($averageHeartRate);
+        }
+        if (null === $averageHeartRate) {
+            return 0;
+        }
+
+        $percent = 0;
+        foreach ($this->heartRateBonus as $tier) {
+            if ($averageHeartRate >= $tier['from_bpm']) {
+                $percent = $tier['bonus_percent'];
+            }
+        }
+
+        return $percent;
+    }
+
     /** Le pendant exact pour le dénivelé positif, par tranche de 100 mètres. */
     public function elevationBonusOf(Discipline $discipline, ?int $elevationGainMeters): int
     {
@@ -243,7 +281,7 @@ final class XpRates
     /** @param array<string, mixed> $snapshot */
     private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
     {
-        /** @var array{base_xp_per_hour: int} $xp */
+        /** @var array{base_xp_per_hour: int, heart_rate_bonus?: list<array{from_bpm: int, bonus_percent: int}>} $xp */
         $xp = $snapshot['xp'];
         /** @var list<array{discipline: string, active: bool, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int}> $disciplines */
         $disciplines = $snapshot['disciplines'];
@@ -262,6 +300,6 @@ final class XpRates
             return $rate;
         }, $disciplines);
 
-        return new self($xp['base_xp_per_hour'], $rates, $rulesets);
+        return new self($xp['base_xp_per_hour'], $rates, $rulesets, $xp['heart_rate_bonus'] ?? []);
     }
 }

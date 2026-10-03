@@ -105,6 +105,14 @@ final class XpRatesTest extends TestCase
         $rates->dailyCapOf(Discipline::Running);
     }
 
+    /** Des paliers qui ne croissent pas laisseraient un palier haut masqué par un plus bas. */
+    public function testRefusesHeartRateTiersThatDoNotGrow(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new XpRates(90, self::everyDiscipline(), null, [['from_bpm' => 150, 'bonus_percent' => 20], ['from_bpm' => 130, 'bonus_percent' => 10]]);
+    }
+
     #[DataProvider('distanceCases')]
     public function testConvertsMetresIntoPoints(Discipline $discipline, ?int $distanceMeters, int $expected): void
     {

@@ -258,7 +258,7 @@ final readonly class GameRulesetPublisher
         if ($training['minimum_duration_seconds'] >= $training['maximum_duration_seconds']) {
             throw new LogicException('Le plancher de durée doit rester strictement sous le plafond.');
         }
-        /** @var array{base_xp_per_hour: int, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int} $xp */
+        /** @var array{base_xp_per_hour: int, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int, heart_rate_bonus?: list<array{from_bpm: int, bonus_percent: int}>} $xp */
         $xp = $snapshot['xp'];
         /** @var list<array{discipline: string, active: bool, credits_xp: bool, daily_cap_xp: ?int, xp_per_km: ?int, xp_per_100m_elevation: ?int, split: ?array<string, int>}> $disciplines */
         $disciplines = $snapshot['disciplines'];
@@ -291,7 +291,7 @@ final readonly class GameRulesetPublisher
             }
         }
         new WorkoutRules($training['minimum_duration_seconds'], $training['maximum_duration_seconds'], $training['import_window_days']);
-        new XpRates($xp['base_xp_per_hour'], $rates);
+        new XpRates($xp['base_xp_per_hour'], $rates, null, $xp['heart_rate_bonus'] ?? []);
         new DiminishingReturns($xp['diminishing_returns'], $xp['diminishing_returns_beyond_percent']);
         new AttributeSplit($splits, $rates);
         /** @var array{vitality: array{floor_permille: int, window_days: int, target_active_kcal: int, bonus_cap_permille: int}} $attributes */

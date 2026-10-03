@@ -97,6 +97,7 @@ final readonly class LedgerSessionRewards implements SessionRewards
             $workout->occurredAt(),
             $workout->distanceMeters,
             $workout->elevationGainMeters,
+            $workout->averageHeartRate,
         ));
 
         $snapshot = $granted->snapshot;

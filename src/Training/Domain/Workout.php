@@ -92,10 +92,11 @@ class Workout
      * Des entiers, jamais de flottant sur une valeur de jeu persistée : mètres et
      * battements par minute. Le kilomètre décimal n'existe qu'à l'affichage.
      *
-     * Les calories et la fréquence cardiaque n'entrent dans aucun calcul aujourd'hui.
-     * Elles sont stockées quand même parce qu'elles ne sont **pas rattrapables** :
-     * Apple ne les redonnera pas pour un workout déjà importé, et une décision de game
-     * design dans six mois ne peut pas ressusciter un historique qu'on n'a pas écrit.
+     * La fréquence cardiaque moyenne entre dans le bonus cardiaque (#164). Les calories
+     * n'entrent dans aucun calcul aujourd'hui ; elles sont stockées quand même parce
+     * qu'elles ne sont **pas rattrapables** : Apple ne les redonnera pas pour un workout
+     * déjà importé, et une décision de game design dans six mois ne peut pas ressusciter
+     * un historique qu'on n'a pas écrit.
      */
     #[ORM\Column(nullable: true)]
     private ?int $distanceMeters = null;

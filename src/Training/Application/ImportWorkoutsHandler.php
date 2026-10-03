@@ -312,6 +312,8 @@ final readonly class ImportWorkoutsHandler
             $workout->trust(),
             null === $workout->distanceMeters() ? null : (int) floor($workout->distanceMeters() * $fraction),
             null === $workout->elevationGainMeters() ? null : (int) floor($workout->elevationGainMeters() * $fraction),
+            // Une moyenne ne se rabote pas au prorata : elle reste la même sur la part retenue.
+            $workout->averageHeartRate(),
         );
     }
 }
