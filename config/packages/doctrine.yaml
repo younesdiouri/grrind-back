@@ -42,6 +42,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Progression/Domain'
                 prefix: 'App\Progression\Domain'
                 alias: Progression
+            Engagement:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Engagement/Domain'
+                prefix: 'App\Engagement\Domain'
+                alias: Engagement
             Community:
                 type: attribute
                 is_bundle: false

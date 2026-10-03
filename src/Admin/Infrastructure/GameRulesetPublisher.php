@@ -84,7 +84,7 @@ final readonly class GameRulesetPublisher
      * La simulation valide exactement les mêmes règles sans modifier le publié ni les
      * marqueurs historiques du catalogue. Le caller fige ce tableau pour toute l'opération.
      *
-     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>}
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>}
      */
     public function prepare(EntityManagerInterface $manager): array
     {
@@ -129,6 +129,22 @@ final readonly class GameRulesetPublisher
         }
     }
 
+    /** @param array<string, mixed> $streak */
+    private static function validateStreak(array $streak, ItemCatalog $catalog): void
+    {
+        if (!\is_int($streak['minimum_daily_seconds'] ?? null) || $streak['minimum_daily_seconds'] < 1) {
+            throw new LogicException('La durée qui fait un jour sportif doit être un nombre de secondes positif.');
+        }
+        $chests = $streak['chests'] ?? null;
+        foreach (['COMMON', 'RARE', 'EPIC', 'LEGENDARY'] as $rarity) {
+            $key = \is_array($chests) ? ($chests[$rarity] ?? null) : null;
+            $chest = \is_string($key) ? $catalog->findAvailable($key) : null;
+            if (null === $chest || \App\Rewards\Domain\ItemKind::Chest !== $chest->kind) {
+                throw new LogicException(\sprintf('Le coffre de streak %s doit être un coffre actif du catalogue.', $rarity));
+            }
+        }
+    }
+
     /**
      * @param list<GameItem>         $items
      * @param list<GameTitle>        $titles
@@ -139,7 +155,7 @@ final readonly class GameRulesetPublisher
      * @param list<GameRecipe>       $recipes
      * @param list<GameActivityType> $activityTypes
      *
-     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>}
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>}
      */
     private static function snapshot(array $items, array $titles, array $enemies, array $tables, array $disciplines, array $levels, array $activityTypes, GameSettings $settings, array $recipes): array
     {
@@ -184,13 +200,14 @@ final readonly class GameRulesetPublisher
         return [
             'recipes' => array_map(static fn (GameRecipe $recipe): array => ['key' => $recipe->getKey(), 'active' => $recipe->isActive(), 'result_item' => $recipe->getResultItem(), 'quantity' => $recipe->getQuantity(), 'costs' => $recipe->publishedCosts()], $recipes),
             'alam' => $settings->getAlam(),
+            'streak' => $settings->getStreak(),
             'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['formulas' => $settings->getFormulas(), 'fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
             'training' => $settings->getTraining(), 'xp' => $settings->getXp(), 'attributes' => $settings->getAttributes(), 'disciplines' => $disciplineRows, 'levels' => $levelRows,
             'activity_types' => $activityRows, 'community' => $settings->getCommunity(), 'notifications' => $settings->getNotifications(),
         ];
     }
 
-    /** @param array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes?: list<array<string, mixed>>, alam?: array<string, mixed>} $snapshot */
+    /** @param array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes?: list<array<string, mixed>>, alam?: array<string, mixed>, streak?: array<string, mixed>} $snapshot */
     private static function validate(array $snapshot): void
     {
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */ $items = $snapshot['items'];
@@ -250,6 +267,11 @@ final readonly class GameRulesetPublisher
         new EnemyCatalog($enemies, $bosses, combatRules: $combatRules);
         new LootLuckRules($lootLuck['floor_percent'], $lootLuck['cap_percent']);
         self::validateActiveReferences($items, $enemies, $bosses, $workout, $adversary, $chest);
+        // Les archives antérieures au streak (#286) n'ont pas de section : seules les
+        // publications qui la portent doivent pointer chaque palier sur un coffre actif.
+        if (isset($snapshot['streak'])) {
+            self::validateStreak($snapshot['streak'], ItemCatalog::runtime(new FrozenGameRulesets($snapshot, 'validation')));
+        }
         $lootVersion = $snapshot['loot']['version'];
         \assert(\is_int($lootVersion));
         new LootTables($lootVersion, $workout, $adversary, $chest, $items, $enemies, $bosses);

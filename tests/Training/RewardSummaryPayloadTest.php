@@ -9,6 +9,8 @@ use App\Shared\Application\DroppedItemModifier;
 use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
+use App\Shared\Application\SessionStreak;
+use App\Shared\Application\StreakState;
 use App\Shared\Application\XpLine;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
@@ -106,16 +108,20 @@ final class RewardSummaryPayloadTest extends TestCase
         self::assertNotSame($vitality['before'], $vitality['after']);
     }
 
-    /**
-     * Deux clés présentes et vides jusqu'aux Lots 5 et 7. Les ajouter plus tard
-     * obligerait un client déjà déployé à les traiter comme optionnelles pour toujours.
-     */
+    /** Les arbres arrivent au Lot 7 : la clé est déjà là, vide, jamais absente. */
     public function testTheFutureFieldsAreDeclaredEmptyAndNotAbsent(): void
     {
-        $payload = self::summary()->toArray();
+        self::assertSame([], self::summary()->toArray()['unlockableNodes']);
+    }
 
-        self::assertNull($payload['streak']);
-        self::assertSame([], $payload['unlockableNodes']);
+    /** Le streak (#286) s'anime dans cet ordre : le jour, la série avant, après, puis le coffre. */
+    public function testTheStreakBlockFollowsTheAnimationOrder(): void
+    {
+        $streak = self::summary()->toArray()['streak'];
+
+        self::assertIsArray($streak);
+        self::assertSame(['sportDay', 'dayCounted', 'before', 'after', 'chests'], array_keys($streak));
+        self::assertSame(['startedOn' => '2026-08-07', 'days' => 6, 'weeksCompleted' => 1, 'sportDaysInLast7' => 6, 'nextChestRarity' => 'RARE'], $streak['after']);
     }
 
     /**
@@ -205,6 +211,6 @@ final class RewardSummaryPayloadTest extends TestCase
             coinsAfter: 52,
         );
 
-        return RewardSummaryResource::from(new SessionCompletion($workout, $reward, $drop));
+        return RewardSummaryResource::from(new SessionCompletion($workout, $reward, $drop, new SessionStreak('2026-08-12', true, new StreakState('2026-08-07', 5, 0, 5, 'COMMON'), new StreakState('2026-08-07', 6, 1, 6, 'RARE'), [])));
     }
 }

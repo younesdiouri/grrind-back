@@ -31,7 +31,7 @@ flowchart TB
         training["<b>Training</b><br/>workouts · import santé<br/>arbitrage · historique"]
         progression["<b>Progression</b><br/>ledger XP · niveaux<br/>titres · arbres"]
         rewards["<b>Rewards</b><br/>loot · inventaire<br/><i>pas encore écrit</i>"]
-        engagement["<b>Engagement</b><br/>streak · ligues<br/><i>pas encore écrit</i>"]
+        engagement["<b>Engagement</b><br/>streak · ligues"]
         community["<b>Community</b><br/>guildes · adhésions<br/>invitations"]
         shared["<b>Shared</b><br/>vocabulaire d'activité · événements de domaine<br/>ports · idempotence · horloge"]
     end
@@ -49,7 +49,7 @@ flowchart TB
     community --> shared
 
     classDef todo stroke-dasharray:4 4,opacity:0.5
-    class rewards,engagement todo
+    class rewards todo
 ```
 
 **À retenir.** Il n'y a **aucune flèche entre deux modules métier**. Quand l'un a besoin de
@@ -260,18 +260,16 @@ flowchart TB
     ledger --> snap["reprojeter le <b>snapshot</b><br/><i>sur SUM(ledger), jamais un +=</i>"]
     snap --> titles["évaluer les <b>titres</b><br/><i>après l'écriture : la séance qui vient<br/>d'être créditée compte pour son titre</i>"]
     titles --> loot["tirer le <b>loot</b><br/><i>table éligible la plus exigeante,<br/>une graine par workout</i>"]
-    loot --> streak["mettre à jour le <b>streak</b>"]
+    loot --> streak["mettre à jour le <b>streak</b><br/><i>relu des jours sportifs,<br/>coffre de la semaine acquise</i>"]
     streak --> obx["écrire les événements dans l'<b>outbox</b>"]
     obx --> done(["COMMIT → RewardSummary"])
 
-    classDef todo stroke-dasharray:4 4,opacity:0.5
-    class streak todo
 ```
 
-**Ce qui existe aujourd'hui**, c'est tout sauf la case en pointillés, et c'est branché sur
-l'import : `ImportWorkoutsHandler` ouvre la transaction, écrit chaque workout, appelle
-`GrantXpHandler` par le port `SessionRewards` puis `LootRoller` par le port `SessionDrops`
-(#226), et rend le `SyncSummary`. Ce bloc-là est **répété une fois par workout crédité**,
+**Tout est branché sur l'import** : `ImportWorkoutsHandler` ouvre la transaction, écrit chaque
+workout, appelle `GrantXpHandler` par le port `SessionRewards`, `LootRoller` par le port
+`SessionDrops` (#226), puis `StreakTracker` par le port `SessionStreaks` (#286), et rend le
+`SyncSummary`. Ce bloc-là est **répété une fois par workout crédité**,
 dans l'ordre chronologique — le verrou n'est pris qu'au premier.
 
 **Le port, et pourquoi il en faut un.** Deptrac interdit à `Training` d'importer
@@ -279,8 +277,11 @@ dans l'ordre chronologique — le verrou n'est pris qu'au premier.
 consomme *après* le COMMIT, alors qu'un crédit ou un tirage doit être annulé si la suite
 échoue et que la réponse doit le porter. `SessionRewards` et `SessionDrops` vivent donc
 dans `Shared`, `Progression` et `Rewards` les implémentent chacun le sien, `Training` ne
-connaît que les interfaces. Le streak (Lot 5) ajoutera le sien de la même façon, entre le
-loot et l'outbox.
+connaît que les interfaces. Le streak (#286) a ajouté le sien de la même façon, entre le loot
+et l'outbox : `SessionStreaks`, implémenté par `Engagement`, qui lit lui-même les jours
+sportifs (`SportSessions`, côté `Training`) et crédite ses coffres (`StreakChests`, côté
+`Rewards`). La série n'est pas stockée : elle se relit des séances à chaque fois, parce
+qu'elles arrivent en retard et dans le désordre — seuls les coffres attribués le sont.
 
 ```mermaid
 flowchart LR
@@ -331,8 +332,8 @@ une synchronisation de dix séances aussi simple à animer qu'une seule. `totals
 timeline — « +847 XP · niveau 10 → 15 » — et n'en est jamais la source : il est dérivé de la
 liste, et vaut `null` quand rien n'a été crédité.
 
-`loot` et `coins` se remplissent depuis le #226 ; `streak` et `unlockableNodes` restent présents
-et vides jusqu'aux Lots 5 et 7 : une clé qui apparaîtrait plus tard obligerait un client déjà
+`loot` et `coins` se remplissent depuis le #226, `streak` depuis le #286 ; `unlockableNodes`
+reste présent et vide jusqu'au Lot 7 : une clé qui apparaîtrait plus tard obligerait un client déjà
 déployé à la rendre optionnelle pour toujours. `coins` se place entre `loot` et `streak` — le
 loot se révèle, puis les pièces tombent dedans — et porte le même geste `{gained, before, after}`
 que les jauges de caractéristiques et le palier de niveau, pour la même raison : une bourse qui
@@ -362,7 +363,10 @@ niveaux à franchir, ce qui est un cas normal (#79).
       "titlesUnlocked": [ /* PlayerTitle, déjà traduit — rien à recharger */ ],
       "loot": [ /* DroppedItem : clé, nom traduit, rareté, emplacement, modificateurs, prix — vide si rien n'est tombé */ ],
       "coins": { "gained": 12, "before": 40, "after": 52 },   // avant/après lus sur le solde réel, jamais `before + gained`
-      "streak": null, "unlockableNodes": [],
+      "streak": { "sportDay": "2026-08-12", "dayCounted": true,
+                  "before": { /* StreakState */ }, "after": { /* StreakState */ },
+                  "chests": [ /* DroppedItem : le coffre de la semaine acquise, vide le plus souvent */ ] },
+      "unlockableNodes": [],
       "rulesetVersion": "…"
     }
     // … un par workout crédité, dans l'ordre chronologique

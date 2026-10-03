@@ -752,6 +752,20 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  /api/streak:
+    get:
+      tags:
+        - Engagement
+      operationId: get_streak_state
+      responses:
+        '200':
+          description: 'La série en cours, relue des jours sportifs — aucun compteur stocké.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreakState'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/devices:
     post:
       tags:
@@ -2709,6 +2723,39 @@ components:
           type: integer
           example: 5108
       type: object
+    StreakState:
+      description: "Une série de régularité (#286), relue des jours sportifs. Un jour sportif cumule\n30 minutes de sport valide (la marche ne compte pas). La série casse dès que\ndeux jours manqués tombent à moins de 7 jours d'écart ; le jour courant n'est pas\nencore manqué. Chaque semaine de la série à 6 jours sportifs rapporte un coffre :\ncommun, rare, épique, puis légendaire chaque semaine.\n"
+      required:
+        - startedOn
+        - days
+        - weeksCompleted
+        - sportDaysInLast7
+        - nextChestRarity
+      properties:
+        startedOn:
+          description: 'Premier jour de la série en cours ; `null` sans série.'
+          type: string
+          format: date
+          example: '2026-08-07'
+          nullable: true
+        days:
+          description: "Jours écoulés depuis `startedOn`, aujourd'hui compris."
+          type: integer
+          example: 6
+        weeksCompleted:
+          type: integer
+          example: 1
+        sportDaysInLast7:
+          type: integer
+          example: 6
+        nextChestRarity:
+          type: string
+          enum:
+            - COMMON
+            - RARE
+            - EPIC
+            - LEGENDARY
+      type: object
     DroppedItemModifier:
       description: 'Un effet porté par un objet tombé — même vocabulaire que `ModifierType`, jamais un mécanisme parallèle.'
       required:
@@ -3228,7 +3275,7 @@ components:
           nullable: true
       type: object
     RewardSummary:
-      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq\njauges de caractéristiques montent**, le niveau bascule, le titre tombe, le loot\nse révèle, **puis** les pièces tombent dedans. Un champ déplacé change la mise\nen scène.\n\n`attributes` se place entre `xp` et `level`, et nulle part ailleurs : les\ncaractéristiques sont la conséquence directe de l'XP qui vient de tomber, le\nniveau celui du **total** qu'elles composent — il vient donc après la\nrépartition qui l'alimente.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, les titres déjà\ntraduits, et `loot` qui porte de quoi afficher chaque objet sans recharger le\ncatalogue. `attributes` suit la même règle, Vitality comprise.\n\n**`coins` se place entre `loot` et `streak`, jamais ailleurs** — même geste que\nles jauges de caractéristiques et le palier de niveau, `{gained, before, after}`,\net pour la même raison : une bourse qui repartirait du solde final ne s'anime\npas. `before`/`after` sont lus sur le solde réel du joueur, jamais reconstitués\ndepuis `gained`.\n\n**Une séance sans tirage** — non créditée, ou sans table éligible — porte\n`loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime\nla même séquence dans tous les cas.\n\n`streak` et `unlockableNodes` restent **présents et vides** jusqu'aux Lots 5 et\n7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la\nrendre optionnelle pour toujours.\n"
+      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq\njauges de caractéristiques montent**, le niveau bascule, le titre tombe, le loot\nse révèle, **puis** les pièces tombent dedans. Un champ déplacé change la mise\nen scène.\n\n`attributes` se place entre `xp` et `level`, et nulle part ailleurs : les\ncaractéristiques sont la conséquence directe de l'XP qui vient de tomber, le\nniveau celui du **total** qu'elles composent — il vient donc après la\nrépartition qui l'alimente.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, les titres déjà\ntraduits, et `loot` qui porte de quoi afficher chaque objet sans recharger le\ncatalogue. `attributes` suit la même règle, Vitality comprise.\n\n**`coins` se place entre `loot` et `streak`, jamais ailleurs** — même geste que\nles jauges de caractéristiques et le palier de niveau, `{gained, before, after}`,\net pour la même raison : une bourse qui repartirait du solde final ne s'anime\npas. `before`/`after` sont lus sur le solde réel du joueur, jamais reconstitués\ndepuis `gained`.\n\n**Une séance sans tirage** — non créditée, ou sans table éligible — porte\n`loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime\nla même séquence dans tous les cas.\n\n**`streak` suit `coins` (#286)** : le jour sportif, la série avant, la série\naprès, puis le coffre de la semaine s'il tombe. `unlockableNodes` reste\n**présent et vide** jusqu'au Lot 7.\n"
       required:
         - session
         - xp
@@ -3369,9 +3416,32 @@ components:
               example: 52
           type: object
         streak:
-          description: "Lot 5 : toujours `null` aujourd'hui."
+          description: "Ce que la séance a fait à la série de régularité (#286), dans l'ordre de l'animation. Présent pour chaque séance, marche comprise — qui ne compte simplement pas."
+          required:
+            - sportDay
+            - dayCounted
+            - before
+            - after
+            - chests
+          properties:
+            sportDay:
+              description: 'Le jour local du sport, dans le fuseau du joueur.'
+              type: string
+              format: date
+              example: '2026-08-12'
+            dayCounted:
+              description: 'Ce jour atteint 30 minutes de sport valide, cette séance comprise.'
+              type: boolean
+            before:
+              $ref: '#/components/schemas/StreakState'
+            after:
+              $ref: '#/components/schemas/StreakState'
+            chests:
+              description: "Le coffre de la semaine de régularité qui vient d'être acquise — vide le plus souvent. Déjà crédité à l'inventaire, il s'ouvre par `POST /api/inventory/chests/{key}/open`."
+              type: array
+              items:
+                $ref: '#/components/schemas/DroppedItem'
           type: object
-          nullable: true
         unlockableNodes:
           description: "Lot 7 : toujours vide aujourd'hui."
           type: array
@@ -4562,6 +4632,8 @@ tags:
     name: 'Chat de guilde'
   -
     name: Guildes
+  -
+    name: Engagement
   -
     name: Appareils
   -

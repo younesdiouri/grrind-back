@@ -23,6 +23,7 @@ class GameSettings
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $community = [];
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $notifications = [];
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $alam = [];
+    /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] private array $streak = [];
     #[ORM\Column(name: 'loot_version')] private int $lootVersion = 1;
     public function __toString(): string
     {
@@ -140,6 +141,18 @@ class GameSettings
     public function setAlam(array $alam): void
     {
         $this->alam = $alam;
+    }
+
+    /** @return array<string, mixed> */
+    public function getStreak(): array
+    {
+        return $this->streak;
+    }
+
+    /** @param array<string, mixed> $streak */
+    public function setStreak(array $streak): void
+    {
+        $this->streak = $streak;
     }
 
     public function lootVersion(): int

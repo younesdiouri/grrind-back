@@ -8,6 +8,7 @@ use App\Shared\Application\DroppedItem;
 use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
+use App\Shared\Application\SessionStreak;
 use App\Shared\Application\XpLine;
 use App\Training\Application\SessionCompletion;
 
@@ -45,11 +46,12 @@ use App\Training\Application\SessionCompletion;
  * docblock d'`App\Shared\Domain\Activity\Vitality` pour pourquoi elle peut bouger sans que
  * cette séance lui ait rien crédité.
  *
- * **`loot` se remplit depuis le #226, `coins` l'accompagne ; `streak` et `unlockableNodes`
- * restent présents et vides.** La série arrive au Lot 5, les arbres au Lot 7 : les ajouter
- * plus tard obligerait le client déjà déployé à traiter des champs qui apparaissent, donc à
- * les rendre optionnels pour toujours ; les déclarer maintenant coûte deux clés et fige la
- * forme.
+ * **`loot` se remplit depuis le #226, `coins` l'accompagne, `streak` depuis le #286 ;
+ * `unlockableNodes` reste présent et vide** jusqu'aux arbres (Lot 7) : l'ajouter plus tard
+ * obligerait le client déjà déployé à traiter un champ qui apparaît.
+ *
+ * **`streak` vient après `coins`** : le jour sportif, la série avant, la série après, puis
+ * le coffre de la semaine s'il tombe — voir {@see SessionStreak}.
  *
  * **`coins` se place entre `loot` et `streak`, jamais ailleurs.** Même geste que les jauges
  * de caractéristiques et le palier de niveau — `{gained, before, after}` — et la même
@@ -81,6 +83,7 @@ final readonly class RewardSummaryResource
         public WorkoutResource $session,
         public SessionReward $reward,
         public SessionDrop $drop,
+        public SessionStreak $streak,
     ) {
     }
 
@@ -90,6 +93,7 @@ final readonly class RewardSummaryResource
             WorkoutResource::from($completion->session),
             $completion->reward,
             $completion->drop,
+            $completion->streak,
         );
     }
 
@@ -172,7 +176,7 @@ final readonly class RewardSummaryResource
             ),
             // Entre `loot` et `streak`, jamais ailleurs — voir le docblock de la classe.
             'coins' => self::gauge($this->drop->coinsGained, $this->drop->coinsBefore, $this->drop->coinsAfter),
-            'streak' => null,
+            'streak' => $this->streak->toArray(),
             'unlockableNodes' => [],
             // Sous quel équilibrage ces montants ont été accordés. Le client l'affiche dans
             // un rapport de bug ; c'est ce qui rend une capture d'écran exploitable.
