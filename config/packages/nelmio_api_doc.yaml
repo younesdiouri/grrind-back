@@ -1083,6 +1083,22 @@ when@dev:
                             after: { type: integer, example: 5108 }
 
                     # ————— Rewards (#226) —————————————————————————————————————————————————
+                    StreakState:
+                        type: object
+                        description: |
+                            Une série de régularité (#286), relue des jours sportifs. Un jour sportif cumule
+                            30 minutes de sport valide (la marche ne compte pas). La série casse dès que
+                            deux jours manqués tombent à moins de 7 jours d'écart ; le jour courant n'est pas
+                            encore manqué. Chaque semaine de la série à 6 jours sportifs rapporte un coffre :
+                            commun, rare, épique, puis légendaire chaque semaine.
+                        required: [startedOn, days, weeksCompleted, sportDaysInLast7, nextChestRarity]
+                        properties:
+                            startedOn: { type: string, format: date, nullable: true, example: '2026-08-07', description: 'Premier jour de la série en cours ; `null` sans série.' }
+                            days: { type: integer, example: 6, description: "Jours écoulés depuis `startedOn`, aujourd'hui compris." }
+                            weeksCompleted: { type: integer, example: 1 }
+                            sportDaysInLast7: { type: integer, example: 6 }
+                            nextChestRarity: { type: string, enum: [COMMON, RARE, EPIC, LEGENDARY] }
+
                     DroppedItemModifier:
                         type: object
                         description: "Un effet porté par un objet tombé — même vocabulaire que `ModifierType`, jamais un mécanisme parallèle."
@@ -1400,9 +1416,9 @@ when@dev:
                             `loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime
                             la même séquence dans tous les cas.
 
-                            `streak` et `unlockableNodes` restent **présents et vides** jusqu'aux Lots 5 et
-                            7. Une clé qui apparaîtrait plus tard obligerait un client déjà déployé à la
-                            rendre optionnelle pour toujours.
+                            **`streak` suit `coins` (#286)** : le jour sportif, la série avant, la série
+                            après, puis le coffre de la semaine s'il tombe. `unlockableNodes` reste
+                            **présent et vide** jusqu'au Lot 7.
                         required: [session, xp, attributes, level, titlesUnlocked, loot, coins, streak, unlockableNodes, rulesetVersion]
                         properties:
                             session: { $ref: '#/components/schemas/Workout' }
@@ -1500,7 +1516,19 @@ when@dev:
                                     gained: { type: integer, example: 12, description: "Peut valoir zéro : aucune table éligible, ou séance non créditée." }
                                     before: { type: integer, example: 40 }
                                     after: { type: integer, example: 52 }
-                            streak: { type: object, nullable: true, description: 'Lot 5 : toujours `null` aujourd''hui.' }
+                            streak:
+                                type: object
+                                description: "Ce que la séance a fait à la série de régularité (#286), dans l'ordre de l'animation. Présent pour chaque séance, marche comprise — qui ne compte simplement pas."
+                                required: [sportDay, dayCounted, before, after, chests]
+                                properties:
+                                    sportDay: { type: string, format: date, example: '2026-08-12', description: 'Le jour local du sport, dans le fuseau du joueur.' }
+                                    dayCounted: { type: boolean, description: "Ce jour atteint 30 minutes de sport valide, cette séance comprise." }
+                                    before: { $ref: '#/components/schemas/StreakState' }
+                                    after: { $ref: '#/components/schemas/StreakState' }
+                                    chests:
+                                        type: array
+                                        description: "Le coffre de la semaine de régularité qui vient d'être acquise — vide le plus souvent. Déjà crédité à l'inventaire, il s'ouvre par `POST /api/inventory/chests/{key}/open`."
+                                        items: { $ref: '#/components/schemas/DroppedItem' }
                             unlockableNodes: { type: array, description: 'Lot 7 : toujours vide aujourd''hui.', items: { type: object } }
                             rulesetVersion:
                                 type: string

@@ -24,6 +24,12 @@ services:
     App\Shared\Application\AlamEfforts: '@App\Training\Infrastructure\AlamWorkoutEfforts'
     App\Shared\Application\AlamRewards: '@App\Rewards\Infrastructure\Drop\AlamInventoryRewards'
 
+    # Le streak (#286) : `Training` fournit les jours sportifs, `Rewards` crédite le coffre,
+    # `Engagement` décide — et aucun des trois ne nomme les autres.
+    App\Shared\Application\SportSessions: '@App\Training\Infrastructure\StreakSportSessions'
+    App\Shared\Application\StreakChests: '@App\Rewards\Infrastructure\Drop\StreakChestGrants'
+    App\Shared\Application\SessionStreaks: '@App\Engagement\Application\StreakTracker'
+
     App\Community\Application\ChatImageStorage: '@App\Community\Infrastructure\Storage\LocalChatImageStorage'
 
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'

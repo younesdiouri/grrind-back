@@ -6,6 +6,7 @@ namespace App\Training\Application;
 
 use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
+use App\Shared\Application\SessionStreak;
 use App\Training\Domain\Workout;
 
 /**
@@ -16,7 +17,7 @@ use App\Training\Domain\Workout;
  * bouger entre-temps — et le `RewardSummary` (#22) doit décrire un instant, pas deux.
  *
  * `reward` et `drop` sont peuplées par un module chacune — `Progression` et `Rewards`
- * (#226) — et le streak (Lot 5) s'ajoutera de la même façon, en champ voisin.
+ * (#226) — et `streak` par `Engagement` (#286), de la même façon.
  */
 final readonly class SessionCompletion
 {
@@ -24,6 +25,7 @@ final readonly class SessionCompletion
         public Workout $session,
         public SessionReward $reward,
         public SessionDrop $drop,
+        public SessionStreak $streak,
     ) {
     }
 }

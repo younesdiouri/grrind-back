@@ -11,6 +11,7 @@ use App\Admin\UI\Form\FighterType;
 use App\Admin\UI\Form\LootLuckType;
 use App\Admin\UI\Form\NotificationsType;
 use App\Admin\UI\Form\StatFormulasType;
+use App\Admin\UI\Form\StreakSettingsType;
 use App\Admin\UI\Form\TrainingType;
 use App\Admin\UI\Form\XpType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -49,5 +50,6 @@ final class SettingsCrudController extends GameCrudController
         yield StructuredField::new('attributes')->setFormType(AttributesType::class)->hideOnIndex();
         yield StructuredField::new('community')->setFormType(CommunityType::class)->hideOnIndex();
         yield StructuredField::new('notifications')->setFormType(NotificationsType::class)->hideOnIndex();
+        yield StructuredField::new('streak', 'Streak')->setFormType(StreakSettingsType::class)->hideOnIndex();
     }
 }
