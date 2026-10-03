@@ -47,3 +47,5 @@ phpstan.neon
 ###> deptrac/deptrac ###
 /.deptrac.cache
 ###< deptrac/deptrac ###
+
+/.claude/settings.local.json

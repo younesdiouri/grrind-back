@@ -42,7 +42,7 @@ Ce que cette phase autorise, sans avoir à le demander ni à s'en excuser :
 - une migration destructive, un renommage sans reprise de données, un `db-reset` ;
 - couper une mécanique avant que son remplacement existe ;
 - changer une valeur du contrat client, tant que le ticket côté app suit ;
-- **fusionner soi-même sur `main`** une PR qu'on vient de relire, sans redemander.
+- **fusionner soi-même sur `main` et déployer sur Fly**, sans redemander.
 
 Ce qu'elle n'autorise pas, et qui reste à signaler avec la même exigence qu'après le lancement :
 une **logique fausse**, un **contrat qui ment**, un **invariant cassé**. Ceux-là survivent à la
@@ -432,42 +432,33 @@ Le mapping Doctrine n'a **pas** d'`auto_mapping` : chaque module déclare le sie
 `config/packages/doctrine.yaml` au moment de son lot. Idem pour les layers Deptrac, déjà déclarés
 dans `deptrac.yaml` pour les sept modules.
 
-## Qui écrit quoi : l'architecte et le développeur
+## Comment on travaille : on cadre, puis ça part
 
-Le travail se fait à deux, et la séparation n'est pas une répartition de charge — c'est **une
-relecture par quelqu'un qui n'a pas écrit le code**.
+Il n'y a **pas d'agent développeur ni de relecture croisée**. Celui qui cadre le ticket est celui
+qui l'implémente, le fusionne et le déploie. Un sous-agent ne se lance que si l'auteur le demande,
+pour une tâche précise.
 
 ```
-        Architecte  ──────────────►  developer-sonnet  ──────────────►  PR  ──────────────►  Architecte
-        (Opus)        délègue         (.claude/agents/)     ouvre                              revue finale
-                                                                                               et fusion
-   ticket rédigé,                 implémentation, tests,                              relit contre le ticket,
-   périmètre tranché              lint, typecheck, commits                            fusionne ou renvoie
+cadrer le ticket  ──►  implémenter  ──►  make qa / test / openapi  ──►  PR + fusion sur main  ──►  flyctl deploy
 ```
 
-**L'architecte** rédige le ticket avant qu'une ligne soit écrite : le *pourquoi*, le périmètre en
-cases à cocher, et surtout **ce qu'on ne fait pas**. Un ticket qui laisse le comment ouvert est
-normal ; un ticket qui laisse le pourquoi ouvert ne part pas.
+**Le cadrage est la seule barrière humaine**, donc il se fait sérieusement : le ticket porte le
+*pourquoi*, le périmètre en cases à cocher, et surtout **ce qu'on ne fait pas**. Un ticket qui
+laisse le comment ouvert est normal ; un ticket qui laisse le pourquoi ouvert ne part pas.
 
-**`developer-sonnet`** implémente le ticket en entier et ouvre la PR. Il ne fusionne jamais, il
-ne réduit jamais le périmètre de lui-même, et il **remonte au lieu de contourner** quand un
-invariant du client lui barre la route. Sa fiche vit dans `.claude/agents/developer-sonnet.md`
-et porte les six interdits sous une forme opérationnelle.
+**Une fois cadré, on va jusqu'au bout sans redemander** : branche, commits, push, PR, fusion
+sur `main`, puis déploiement Fly (skill `deploy`) dès que la fusion touche ce qui tourne en prod.
+Aucune de ces étapes n'attend la review de l'auteur.
 
-**La revue finale revient à l'architecte**, et elle se fait *contre le ticket* : ce qui est coché
-l'est-il vraiment, ce qui ne l'est pas est-il expliqué, et la PR a-t-elle tranché quelque chose
-qui aurait dû remonter. C'est là, et pas dans le CI, que les décisions de produit se tiennent.
-
-**Et l'architecte fusionne lui-même sur `main`**, dans la foulée de sa revue, sans demander la
-permission de le faire. La revue *est* l'autorisation ; redemander après l'avoir donnée n'ajoute
-aucune sécurité, ça ajoute un aller-retour. Ce qui reste à remonter avant de fusionner est la
-seule chose qui compte : une PR qui a tranché quelque chose que le ticket ne tranchait pas.
+**Ce qui remonte avant de fusionner**, et seulement ça : une décision que le ticket ne tranchait
+pas, ou un invariant de ce fichier qui barre la route. Dans ce cas, on s'arrête et on demande
+plutôt que de contourner ou de réduire le périmètre en silence.
 
 ## Il n'y a pas de CI, et les barrières tournent avant le push
 
 Le workflow GitHub Actions a été supprimé (#178) : il rejouait, sur une image reconstruite à
 chaque fois, exactement ce que `make qa` et `make test` font en local en une fraction du temps.
-Le développeur les lance **avant de pousser**, et c'est la version qui fait foi — pas une seconde
+On les lance **avant de pousser**, et c'est la version qui fait foi — pas une seconde
 exécution plus lente sur une machine qu'on ne regarde qu'après coup.
 
 ```bash

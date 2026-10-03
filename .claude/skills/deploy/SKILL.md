@@ -19,12 +19,11 @@ Puis un test de fumée (voir la dernière section). **Un déploiement n'est pas 
 qu'une requête réelle n'a pas répondu** : `fly deploy` dit seulement que des machines ont
 démarré, pas que l'app sert quoi que ce soit.
 
-## Confirmer avant de lancer
+## Quand lancer
 
-`fly deploy` est une action de production sortante. Ne la déclenche pas sur une intention
-vague (« il faudrait déployer un jour ») : demande confirmation, sauf si l'utilisateur a
-dit explicitement de lancer. L'accord donné une fois ne vaut pas pour le déploiement
-suivant.
+**Sans demander**, dès qu'une fusion sur `main` touche ce qui tourne en prod (code, config,
+migration, `fly.toml`) — c'est la dernière étape du workflow de `CLAUDE.md`, pas une action à
+faire valider. Toujours depuis `main` à jour. Une fusion qui ne touche que la doc ne se déploie pas.
 
 ## Le contexte, en une carte
 
