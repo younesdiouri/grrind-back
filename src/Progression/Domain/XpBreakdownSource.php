@@ -37,6 +37,13 @@ enum XpBreakdownSource: string
     case Distance = 'DISTANCE';
     case Elevation = 'ELEVATION';
 
+    /**
+     * Le bonus cardiaque (#164) : un pourcentage du socle rogné, selon le palier que la FC
+     * moyenne atteint. Après le terrain, avant le personnage — c'est encore ce que la
+     * séance vaut. Absent sans cardio, comme une distance non mesurée.
+     */
+    case HeartRate = 'HEART_RATE';
+
     case Streak = 'STREAK';
     case Item = 'ITEM';
     case Skill = 'SKILL';

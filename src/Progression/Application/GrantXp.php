@@ -44,6 +44,7 @@ final readonly class GrantXp
          */
         public ?int $distanceMeters = null,
         public ?int $elevationGainMeters = null,
+        public ?int $averageHeartRate = null,
     ) {
     }
 }

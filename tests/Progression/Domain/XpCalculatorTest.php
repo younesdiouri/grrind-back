@@ -210,6 +210,29 @@ final class XpCalculatorTest extends TestCase
     }
 
     /**
+     * Le bonus cardiaque (#164) : le palier le plus haut atteint, en pourcentage du socle.
+     * Sans cardio ou sous le premier palier, le socle nu — jamais de malus.
+     *
+     * @param list<array{XpBreakdownSource, int}> $expectedLines
+     */
+    #[DataProvider('heartRates')]
+    public function testTheHeartRateAddsTheHighestTierReached(?int $averageHeartRate, array $expectedLines): void
+    {
+        $award = self::calculator()->calculate(Discipline::Strength, 3600, [], DailyLoad::untouched(), averageHeartRate: $averageHeartRate);
+
+        self::assertSame($expectedLines, self::linesOf($award->breakdown->lines));
+    }
+
+    /** @return iterable<string, array{?int, list<array{XpBreakdownSource, int}>}> */
+    public static function heartRates(): iterable
+    {
+        yield 'non mesurée' => [null, [[XpBreakdownSource::Base, 90]]];
+        yield 'sous le premier palier' => [129, [[XpBreakdownSource::Base, 90]]];
+        yield 'premier palier' => [130, [[XpBreakdownSource::Base, 90], [XpBreakdownSource::HeartRate, 9]]];
+        yield 'au-delà du second' => [172, [[XpBreakdownSource::Base, 90], [XpBreakdownSource::HeartRate, 18]]];
+    }
+
+    /**
      * Le dénivelé n'est déclaré que sur la randonnée, où il *est* l'effort.
      */
     public function testTheElevationAddsItsOwnLineWhereTheDisciplineDeclaresIt(): void
@@ -524,7 +547,7 @@ final class XpCalculatorTest extends TestCase
             ['discipline' => 'FOOTBALL', 'daily_cap_xp' => 150],
             ['discipline' => 'COURT_SPORTS', 'daily_cap_xp' => 150],
             ['discipline' => 'RACKET_SPORTS', 'daily_cap_xp' => 150],
-        ]);
+        ], null, [['from_bpm' => 130, 'bonus_percent' => 10], ['from_bpm' => 150, 'bonus_percent' => 20]]);
     }
 
     private static function diminishing(): DiminishingReturns

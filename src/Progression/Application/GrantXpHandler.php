@@ -81,6 +81,7 @@ final readonly class GrantXpHandler
                 $this->dailyLoad->of($command->userId, $command->discipline, $command->occurredAt),
                 $command->distanceMeters,
                 $command->elevationGainMeters,
+                $command->averageHeartRate,
             );
 
             $this->ledger->add(XpTransaction::creditFor(

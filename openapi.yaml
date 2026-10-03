@@ -2673,12 +2673,13 @@ components:
         - amount
       properties:
         source:
-          description: "`BASE` est le temps — une minute vaut un point. `DISTANCE` et `ELEVATION`\nsont ce que le terrain ajoute, et n'apparaissent que sur les disciplines où\nune montre les mesure de façon fiable. Les cinq suivantes sont les\ncontributeurs de modificateurs ; les deux dernières, les garde-fous.\n"
+          description: "`BASE` est le temps — une minute vaut un point. `DISTANCE` et `ELEVATION`\nsont ce que le terrain ajoute, et n'apparaissent que sur les disciplines où\nune montre les mesure de façon fiable. `HEART_RATE` est le bonus cardiaque,\nabsent quand la FC moyenne n'est pas mesurée. Les cinq suivantes sont les\ncontributeurs de modificateurs ; les deux dernières, les garde-fous.\n"
           type: string
           enum:
             - BASE
             - DISTANCE
             - ELEVATION
+            - HEART_RATE
             - STREAK
             - ITEM
             - SKILL

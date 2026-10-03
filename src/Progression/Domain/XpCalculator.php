@@ -51,12 +51,14 @@ use App\Shared\Domain\Modifier\ModifierType;
  * 3. **la distance et le dénivelé**, qui s'ajoutent au socle **sans être rabotés** : ils
  *    mesurent une quantité de terrain, pas du temps, et dix kilomètres restent dix
  *    kilomètres quelle que soit l'heure à laquelle on les a courus ;
- * 4. **les bonus**, en pourcentage du socle **après** rabotage — et non du sous-total
+ * 4. **le bonus cardiaque** (#164), en pourcentage du socle rogné, quand la FC moyenne
+ *    atteint un palier — c'est encore ce que la séance vaut, pas ce que le personnage ajoute ;
+ * 5. **les bonus**, en pourcentage du socle **après** rabotage — et non du sous-total
  *    incluant le terrain, sans quoi un même streak vaudrait trois fois plus sur un trail
  *    que sur une séance de fonte, pour une raison que personne ne pourrait raconter ;
- * 5. **le plafond quotidien** de la discipline, qui écrête le total et borne le seul côté
+ * 6. **le plafond quotidien** de la discipline, qui écrête le total et borne le seul côté
  *    que les rendements décroissants ne bornent pas ;
- * 6. **la répartition en caractéristiques** (#159), qui se pose en tout dernier, sur le
+ * 7. **la répartition en caractéristiques** (#159), qui se pose en tout dernier, sur le
  *    montant final déjà écrêté.
  *
  * Placer les rendements décroissants avant les bonus plutôt qu'après donne exactement le
@@ -108,6 +110,7 @@ final readonly class XpCalculator
      * @param DailyLoad      $today               ce que le joueur a déjà fait dans **sa** journée
      * @param ?int           $distanceMeters      `null` est « non mesuré », jamais zéro
      * @param ?int           $elevationGainMeters idem : aucune montre ne mesure tout
+     * @param ?int           $averageHeartRate    idem, en bpm
      */
     public function calculate(
         Discipline $discipline,
@@ -116,6 +119,7 @@ final readonly class XpCalculator
         DailyLoad $today,
         ?int $distanceMeters = null,
         ?int $elevationGainMeters = null,
+        ?int $averageHeartRate = null,
     ): XpAward {
         $fullBase = $this->rates->baseFor($durationSeconds);
         $base = $this->rates->baseFor($this->diminishing->retain($today->secondsSoFar, $durationSeconds));
@@ -139,6 +143,10 @@ final readonly class XpCalculator
 
         if (0 !== $elevation = $this->rates->elevationBonusOf($discipline, $elevationGainMeters)) {
             $lines[] = new XpBreakdownLine(XpBreakdownSource::Elevation, $elevation);
+        }
+
+        if (0 !== $cardio = intdiv($base * $this->rates->heartRateBonusPercentOf($averageHeartRate), 100)) {
+            $lines[] = new XpBreakdownLine(XpBreakdownSource::HeartRate, $cardio);
         }
 
         foreach (self::bonusPercentages($discipline, $modifiers) as $source => $percentage) {
