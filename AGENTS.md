@@ -1,17 +1,13 @@
 @/Users/younesdiouri/.codex/RTK.md
 
-# Codex workflow: architect and implementation agent
+# Codex workflow
 
-For implementation-ready tickets, the primary Codex thread is the architect.
-It delegates the full implementation to the project custom agent `developer`, defined in
-`.codex/agents/developer.toml`, and gives it the ticket number plus every decision or
-constraint that is not already explicit in the ticket.
+Read `CLAUDE.md` first: it is the source of truth for this repo, including the workflow.
 
-`developer` owns the implementation, tests, required QA, commits, push, and PR. It never
-merges. Once the required tests and QA pass, it pushes the branch and opens the PR directly,
-without waiting for a cross-review or approval from the primary thread. While it is working, the
-primary thread must not edit the same scope in parallel. The primary thread reports the resulting
-PR and validation evidence to the user; no cross-agent review is required.
+There is no implementation agent and no cross-review. The thread that scopes a ticket
+implements it, runs `make qa`, `make test` and `make openapi`, pushes, opens the PR, merges it
+into `main`, and deploys to Fly (`.claude/skills/deploy/SKILL.md`) when the merge touches what
+runs in production. None of these steps waits for the author's review.
 
-Use this delegation workflow only after the ticket and its scope are ready. Exploration,
-architecture decisions, and ticket writing remain with the primary thread.
+Stop and ask only when a decision is not settled by the ticket, or when an invariant of
+`CLAUDE.md` blocks the way. Spawn a sub-agent only when the author asks for one.
