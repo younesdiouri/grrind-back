@@ -3,7 +3,10 @@
 # --------------------------------------------------------------------------
 # Base : FrankenPHP + extensions communes dev/prod
 # --------------------------------------------------------------------------
-FROM dunglas/frankenphp:1-php8.4 AS base
+# Version figée (#291) : le tag flottant `1-php8.4` a ramené au build un module Mercure qui refuse
+# les directives `publisher_jwt` / `subscriber_jwt` du Caddyfile, et la prod n'a plus démarré.
+# Une montée se fait exprès, en même temps que la config Mercure qu'elle exige.
+FROM dunglas/frankenphp:1.12.7-php8.4 AS base
 
 WORKDIR /app
 
