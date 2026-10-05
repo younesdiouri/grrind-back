@@ -41,6 +41,7 @@ final class AppearanceTest extends ApiTestCase
         $appearances = self::decode($response)['appearances'];
         self::assertIsArray($appearances);
         self::assertSame(array_column(Appearance::cases(), 'value'), array_column($appearances, 'key'));
+        self::assertSame('murid/v2', Appearance::Murid->directory());
 
         foreach ($appearances as $model) {
             self::assertIsArray($model);
