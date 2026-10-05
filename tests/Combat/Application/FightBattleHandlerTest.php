@@ -18,10 +18,12 @@ use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Shared\Application\BattleDrop;
 use App\Shared\Application\BattleDrops;
 use App\Shared\Application\GameRulesets;
+use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgression;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Vitality;
+use App\Shared\Domain\Appearance;
 use App\Tests\Combat\CombatRulesFixture;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
@@ -88,7 +90,7 @@ final class FightBattleHandlerTest extends KernelTestCase
         self::assertInstanceOf(ClockInterface::class, $clock);
         $drops = $this->createMock(BattleDrops::class);
         $drops->expects(self::once())->method('rollFor')->with(self::anything(), self::anything(), false, self::anything(), self::anything())->willReturn(BattleDrop::none(77));
-        $handler = new FightBattleHandler($progressions, $fighters, $enemies, new BattleSimulator(CombatRulesFixture::rules(['max_attacks' => 1])), $this->battles, $drops, $this->rulesetVersion, $clock);
+        $handler = new FightBattleHandler($progressions, $fighters, $enemies, new BattleSimulator(CombatRulesFixture::rules(['max_attacks' => 1])), $this->battles, $drops, $this->rulesetVersion, $clock, $container->get(PlayerProfiles::class));
         $battle = $handler(new FightBattle(Uuid::v7()));
         self::assertSame(BattleResult::Victory, $battle->result());
         self::assertSame(BattleEndReason::AttackLimit, $battle->endReason());
@@ -181,6 +183,7 @@ final class FightBattleHandlerTest extends KernelTestCase
                 $seed,
                 $this->rulesetVersion,
                 $now,
+                Appearance::Murid,
             );
 
             $this->battles->add($battle);

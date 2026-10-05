@@ -766,6 +766,20 @@ paths:
                 $ref: '#/components/schemas/StreakState'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/appearances:
+    get:
+      tags:
+        - Profil
+      operationId: get_identity_appearances
+      responses:
+        '200':
+          description: 'Les modèles de héros disponibles et leurs poses.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppearanceCatalog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/devices:
     post:
       tags:
@@ -1507,6 +1521,7 @@ components:
         - playerId
         - displayName
         - avatarUrl
+        - appearance
         - contribution
         - gauges
       properties:
@@ -1518,6 +1533,11 @@ components:
         avatarUrl:
           type: string
           nullable: true
+        appearance:
+          description: 'Figée à la résolution (#289) ; poses dans GET /api/appearances, miniatures pour la guilde.'
+          allOf:
+            -
+              $ref: '#/components/schemas/Appearance'
         contribution:
           type: integer
         gauges:
@@ -1614,6 +1634,7 @@ components:
         - index
         - enemyKey
         - enemyName
+        - imageUrls
         - thresholdPermille
         - won
         - probabilityMillionths
@@ -1627,6 +1648,11 @@ components:
           type: string
         enemyName:
           type: string
+        imageUrls:
+          description: "Poses du boss lues dans le catalogue figé de l'édition, null sans présentation publiée (#289)."
+          allOf:
+            -
+              $ref: '#/components/schemas/EnemyImageUrls'
         thresholdPermille:
           type: integer
         won:
@@ -2310,6 +2336,7 @@ components:
         - title
         - nextTitle
         - notificationPreferences
+        - appearance
       properties:
         id:
           type: string
@@ -2344,6 +2371,11 @@ components:
           allOf:
             -
               $ref: '#/components/schemas/PlayerTitle'
+        appearance:
+          description: 'Le modèle de héros porté (#289), modifiable par `PATCH /api/me`. Les images sont dans `GET /api/appearances`.'
+          allOf:
+            -
+              $ref: '#/components/schemas/Appearance'
         notificationPreferences:
           description: "Toutes les catégories vivantes : le client lit l'état exact de chacune plutôt\nque de connaître le défaut. Clé = valeur de `NotificationCategory`, valeur =\nactivée.\n"
           type: object
@@ -3698,6 +3730,59 @@ components:
           description: 'Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
           type: integer
       type: object
+    AppearancePoses:
+      description: 'Trois PNG RGBA carrés, même cadrage et même ligne de sol. `hit` est le coup reçu ; une esquive utilise `idle`.'
+      required:
+        - idle
+        - attack
+        - hit
+      properties:
+        idle:
+          type: string
+          format: uri
+        attack:
+          type: string
+          format: uri
+        hit:
+          type: string
+          format: uri
+      type: object
+      additionalProperties: false
+    AppearanceViews:
+      description: "**De dos** pour le joueur lui-même, **de face** pour qui l'affronte."
+      required:
+        - back
+        - front
+      properties:
+        back:
+          $ref: '#/components/schemas/AppearancePoses'
+        front:
+          $ref: '#/components/schemas/AppearancePoses'
+      type: object
+    AppearanceModel:
+      description: 'Un modèle de héros complet, purement cosmétique. `imageUrls` en 1024 px, `thumbnailUrls` en 256 px pour afficher une guilde entière.'
+      required:
+        - key
+        - imageUrls
+        - thumbnailUrls
+      properties:
+        key:
+          $ref: '#/components/schemas/Appearance'
+        imageUrls:
+          $ref: '#/components/schemas/AppearanceViews'
+        thumbnailUrls:
+          $ref: '#/components/schemas/AppearanceViews'
+      type: object
+    AppearanceCatalog:
+      description: 'Tous les modèles que `PATCH /api/me` accepte. Le profil, les combats et Ālam ne portent que la clé.'
+      required:
+        - appearances
+      properties:
+        appearances:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppearanceModel'
+      type: object
     EnemyImageUrls:
       description: 'Pack publié complet ou null. URLs absolues publiques, HTTPS en production. hit est la pose de coup reçu ; une esquive utilise idle. La présentation courante est aussi utilisée au rejeu.'
       required:
@@ -3734,6 +3819,7 @@ components:
         - criticalResistancePercent
         - cooldownReductionPercent
         - precisionPercent
+        - appearance
       properties:
         key:
           description: "L'entrée du catalogue, ou `null` pour un défi PvP."
@@ -3782,6 +3868,12 @@ components:
         precisionPercent:
           description: 'Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
           type: integer
+        appearance:
+          description: 'Le héros du défié au moment du combat (#289), `null` face à un ennemi du catalogue. Ses poses **de face** sont dans `GET /api/appearances` ; `imageUrls` reste `null` pour un joueur.'
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/Appearance'
         imageUrls:
           $ref: '#/components/schemas/EnemyImageUrls'
         introduction:
@@ -3954,7 +4046,17 @@ components:
           type: string
           format: date-time
         player:
-          $ref: '#/components/schemas/BattleFighter'
+          description: "Le combattant de l'appelant, et le héros qu'il portait au combat (#289)."
+          allOf:
+            -
+              $ref: '#/components/schemas/BattleFighter'
+            -
+              required:
+                - appearance
+              properties:
+                appearance:
+                  $ref: '#/components/schemas/Appearance'
+              type: object
         enemy:
           $ref: '#/components/schemas/BattleEnemy'
         events:
@@ -4302,6 +4404,10 @@ components:
           nullable: true
           default: null
       type: object
+    Appearance:
+      type: string
+      enum:
+        - MURID
     UpdateProfileRequest:
       properties:
         displayName:
@@ -4325,6 +4431,12 @@ components:
           items:
             $ref: '#/components/schemas/NotificationPreferenceRequest'
           default: []
+        appearance:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/Appearance'
+          default: null
       type: object
     RegisterRequest:
       properties:
@@ -4635,11 +4747,11 @@ tags:
   -
     name: Engagement
   -
+    name: Profil
+  -
     name: Appareils
   -
     name: Authentification
-  -
-    name: Profil
   -
     name: Progression
   -

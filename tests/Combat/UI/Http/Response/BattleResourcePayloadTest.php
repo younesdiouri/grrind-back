@@ -18,6 +18,7 @@ use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Response\BattleResource;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Appearance;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
@@ -46,14 +47,17 @@ final class BattleResourcePayloadTest extends TestCase
 
         $player = $payload['player'];
         self::assertIsArray($player);
-        self::assertSame(['hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent'], array_keys($player));
+        self::assertSame(['hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'appearance'], array_keys($player));
+        self::assertSame('MURID', $player['appearance']);
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction'], array_keys($enemy));
+        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction', 'appearance'], array_keys($enemy));
 
         self::assertNull($enemy['imageUrls']);
         self::assertNull($enemy['introduction']);
+        // Un ennemi du catalogue n'a pas de héros.
+        self::assertNull($enemy['appearance']);
 
         $events = $payload['events'];
         self::assertIsArray($events);
@@ -154,19 +158,23 @@ final class BattleResourcePayloadTest extends TestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
+            Appearance::Murid,
+            Appearance::Murid,
         );
 
         $payload = BattleResource::from($duel, new EnemyTranslator(self::stubTranslator(), self::rulesets()))->toArray();
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction'], array_keys($enemy));
+        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction', 'appearance'], array_keys($enemy));
         self::assertNull($enemy['key']);
         self::assertSame($opponentId->toRfc4122(), $enemy['playerId']);
         // Le pseudo snapshoté, jamais une clé passée au traducteur.
         self::assertSame('Carla', $enemy['name']);
         self::assertNull($enemy['imageUrls']);
         self::assertNull($enemy['introduction']);
+        // Le héros du défié, figé au combat (#289) : ses poses de face sont au catalogue.
+        self::assertSame('MURID', $enemy['appearance']);
 
         // Un défi ne rapporte rien en v1 — la forme reste complète.
         self::assertSame(['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]], $payload['rewards']);
@@ -205,6 +213,7 @@ final class BattleResourcePayloadTest extends TestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
+            Appearance::Murid,
         );
     }
 

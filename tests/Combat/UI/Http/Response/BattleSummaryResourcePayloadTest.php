@@ -15,6 +15,7 @@ use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Combat\UI\Http\Response\BattleSummaryResource;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Appearance;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
@@ -123,6 +124,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
+            Appearance::Murid,
         );
     }
 
@@ -147,6 +149,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
+            Appearance::Murid,
         );
     }
 

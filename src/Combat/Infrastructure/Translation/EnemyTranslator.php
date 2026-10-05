@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Combat\Infrastructure\Translation;
 
+use App\Shared\Application\EnemyImageUrls;
 use App\Shared\Application\GameRulesets;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\Service\ResetInterface;
@@ -63,20 +64,7 @@ final class EnemyTranslator implements ResetInterface
     /** @return array{idle: string, attack: string, hit: string}|null */
     public function imageUrlsOf(string $key): ?array
     {
-        $paths = $this->enemies()[$key]['image_paths'] ?? null;
-        if (!\is_array($paths) || null === $this->urls) {
-            return null;
-        }
-        $urls = [];
-        foreach (['idle', 'attack', 'hit'] as $pose) {
-            $path = $paths[$pose] ?? null;
-            if (!\is_string($path) || '' === $path || 'placeholder.png' === $path) {
-                return null;
-            }
-            $urls[$pose] = $this->urls->generate('game_image', ['name' => $path], UrlGeneratorInterface::ABSOLUTE_URL);
-        }
-
-        return $urls;
+        return null === $this->urls ? null : EnemyImageUrls::of($this->enemies()[$key]['image_paths'] ?? null, $this->urls);
     }
 
     public function introductionOf(string $key): ?string

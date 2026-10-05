@@ -17,7 +17,9 @@ use App\Shared\Application\BattleDrop;
 use App\Shared\Application\BattleDrops;
 use App\Shared\Application\DroppedItem;
 use App\Shared\Application\GameRulesets;
+use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
+use App\Shared\Domain\Appearance;
 use Psr\Clock\ClockInterface;
 use Random\Engine\Xoshiro256StarStar;
 use Random\Randomizer;
@@ -106,6 +108,7 @@ final readonly class FightBattleHandler
         private BattleDrops $drops,
         private string|GameRulesets $rulesetVersion,
         private ClockInterface $clock,
+        private PlayerProfiles $profiles,
     ) {
     }
 
@@ -120,6 +123,7 @@ final readonly class FightBattleHandler
         $progression = $progressions[$command->playerId->toRfc4122()];
 
         $player = $this->fighters->forPlayer($progression, $command->playerId, $now);
+        $appearance = $this->profiles->of([$command->playerId])[$command->playerId->toRfc4122()]->appearance ?? Appearance::default();
 
         // Aucune ligne n'est encore écrite à ce stade : un refus ici — clé inconnue,
         // niveau insuffisant — ne laisse aucune trace, voir le docblock de la classe.
@@ -152,6 +156,7 @@ final readonly class FightBattleHandler
             $victory,
             $seed,
             $now,
+            $appearance,
         ): Battle {
             $drop = $this->drops->rollFor($command->playerId, $enemy->key, $victory, $id, $now);
 
@@ -168,6 +173,7 @@ final readonly class FightBattleHandler
                 $seed,
                 $this->version(),
                 $now,
+                $appearance,
             );
 
             $this->battles->add($battle);

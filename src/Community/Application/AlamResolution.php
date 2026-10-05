@@ -9,6 +9,7 @@ use App\Community\Domain\AlamNarrationSource;
 use App\Community\Domain\AlamOutcome;
 use App\Community\Domain\AlamRun;
 use App\Shared\Application\AlamRewards;
+use App\Shared\Application\EnemyImageUrls;
 use App\Shared\Application\FrozenGameRulesets;
 use App\Shared\Domain\Alam\AlamRules;
 use DateTimeImmutable;
@@ -41,6 +42,9 @@ final readonly class AlamResolution
         $random = new Randomizer(new Xoshiro256StarStar($seed));
         $frozen = new FrozenGameRulesets($run->rules, $run->rulesetVersion);
         $catalog = $this->catalog($run);
+        // Résolue une fois, figée dans chaque rencontre comme le reste (#289) : le rejeu montre
+        // le boss tel qu'il était illustré ce jour-là, même si le back-office l'a changé depuis.
+        $imageUrls = $this->enemyImageUrls($run, $rules->text('enemy_key'));
         $encounters = [];
         $events = [];
         $active = array_filter($participants, static fn (array $player): bool => $player['contribution'] > 0);
@@ -85,7 +89,7 @@ final readonly class AlamResolution
             }
             $narration = $won ? 'Les efforts de la guilde repoussent Al-Kasal.' : 'Al-Kasal résiste. Chaque effort conserve sa récompense.';
             $events[] = self::event($run, \count($events), $offset + intdiv($duration, 3) - 2000, $index, $won ? AlamAction::Victory : AlamAction::Defeat, null, null, $narration);
-            $encounters[] = ['index' => $index, 'enemyKey' => $rules->text('enemy_key'), 'enemyName' => 'Al-Kasal', 'thresholdPermille' => $threshold, 'won' => $won, 'probabilityMillionths' => $probability, 'progressPermille' => $progress, 'drops' => $drops, 'narration' => $narration];
+            $encounters[] = ['index' => $index, 'enemyKey' => $rules->text('enemy_key'), 'enemyName' => 'Al-Kasal', 'imageUrls' => $imageUrls, 'thresholdPermille' => $threshold, 'won' => $won, 'probabilityMillionths' => $probability, 'progressPermille' => $progress, 'drops' => $drops, 'narration' => $narration];
         }
         usort($events, static fn (array $left, array $right): int => $left['offsetMs'] <=> $right['offsetMs']);
 
@@ -112,6 +116,21 @@ final readonly class AlamResolution
     {
         // Un contributeur positif conserve une chance représentable même au dernier millionième.
         return 0 === $basePermille ? 0 : max(1, min(1000000, (int) floor($basePermille * 1000 * $weight)));
+    }
+
+    /** @return array{idle: string, attack: string, hit: string}|null */
+    private function enemyImageUrls(AlamRun $run, string $key): ?array
+    {
+        $combat = $run->rules['combat'] ?? [];
+        foreach (\is_array($combat) ? [$combat['bosses'] ?? [], $combat['enemies'] ?? []] : [] as $enemies) {
+            foreach (\is_array($enemies) ? $enemies : [] as $enemy) {
+                if (\is_array($enemy) && ($enemy['key'] ?? null) === $key) {
+                    return EnemyImageUrls::of($enemy['image_paths'] ?? null, $this->urls);
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

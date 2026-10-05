@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Identity\Domain;
 
 use App\Identity\Infrastructure\Doctrine\UserRepository;
+use App\Shared\Domain\Appearance;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\Timezone;
 use DateTimeImmutable;
@@ -73,6 +74,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $registeredAt;
+
+    /** Cosmétique, sans effet de jeu — voir {@see Appearance}. */
+    #[ORM\Column(length: 32, enumType: Appearance::class, options: ['default' => 'MURID'])]
+    private Appearance $appearance = Appearance::Murid;
 
     /**
      * Les catégories de notification que le joueur a coupées — présence, pas absence :
@@ -199,6 +204,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function locale(): Locale
     {
         return $this->locale;
+    }
+
+    public function appearance(): Appearance
+    {
+        return $this->appearance;
+    }
+
+    public function changeAppearance(Appearance $appearance): void
+    {
+        $this->appearance = $appearance;
     }
 
     public function rename(string $displayName): void

@@ -57,4 +57,24 @@ final class AlamResolutionTest extends TestCase
             self::assertSame('RESOURCE', $encounter['drops'][0]['kind']);
         }
     }
+
+    /** Le boss est illustré depuis le catalogue figé de l'édition, jamais depuis le courant (#289). */
+    public function testEncountersFreezeTheBossPosesOfTheRunSnapshot(): void
+    {
+        $rules = AlamOutcomeTest::rules()->values;
+        \assert(\is_string($rules['enemy_key']));
+        $now = new DateTimeImmutable('2026-09-14 10:00:00 UTC');
+        $urls = $this->createStub(UrlGeneratorInterface::class);
+        $urls->method('generate')->willReturnCallback(static fn (string $route, array $parameters): string => 'https://example.test/'.(\is_string($parameters['name'] ?? null) ? $parameters['name'] : ''));
+        $resolution = new AlamResolution($this->createStub(AlamRewards::class), $urls);
+        $boss = ['key' => $rules['enemy_key'], 'image_paths' => ['idle' => 'a.png', 'attack' => 'b.png', 'hit' => 'c.png']];
+
+        foreach ([[$boss], [['image_paths' => null] + $boss], []] as $position => $bosses) {
+            $run = new AlamRun(Uuid::v7(), AlamMode::Manual, $now->modify('-1 day'), $now, $now, 1, 'test', ['alam' => $rules, 'items' => [], 'combat' => ['bosses' => $bosses]]);
+            $result = $resolution->resolve($run, [], [], $now);
+            self::assertIsArray($result['encounters']);
+            self::assertIsArray($result['encounters'][0]);
+            self::assertSame(0 === $position ? ['idle' => 'https://example.test/a.png', 'attack' => 'https://example.test/b.png', 'hit' => 'https://example.test/c.png'] : null, $result['encounters'][0]['imageUrls']);
+        }
+    }
 }

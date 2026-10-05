@@ -139,10 +139,10 @@ when@dev:
 
                 schemas:
                     AlamGauge: {"type": "object", "required": ["attribute", "current", "target", "progressPermille"], "properties": {"attribute": {"type": "string", "enum": ["strength", "endurance", "mobility", "dexterity", "vitality"]}, "current": {"type": "integer"}, "target": {"type": "integer"}, "progressPermille": {"type": "integer"}}}
-                    AlamParticipant: {"type": "object", "required": ["playerId", "displayName", "avatarUrl", "contribution", "gauges"], "properties": {"playerId": {"type": "string", "format": "uuid"}, "displayName": {"type": "string"}, "avatarUrl": {"type": "string", "nullable": true}, "contribution": {"type": "integer"}, "gauges": {"type": "array", "items": {"$ref": "#/components/schemas/AlamGauge"}}, "activitySummary": {"type": "array", "items": {"type": "object", "required": ["discipline", "sessions", "durationSeconds"], "properties": {"discipline": {"type": "string"}, "sessions": {"type": "integer"}, "durationSeconds": {"type": "integer"}}}}}}
+                    AlamParticipant: {"type": "object", "required": ["playerId", "displayName", "avatarUrl", "appearance", "contribution", "gauges"], "properties": {"playerId": {"type": "string", "format": "uuid"}, "displayName": {"type": "string"}, "avatarUrl": {"type": "string", "nullable": true}, "appearance": {"description": "Figée à la résolution (#289) ; poses dans GET /api/appearances, miniatures pour la guilde.", "allOf": [{"$ref": "#/components/schemas/Appearance"}]}, "contribution": {"type": "integer"}, "gauges": {"type": "array", "items": {"$ref": "#/components/schemas/AlamGauge"}}, "activitySummary": {"type": "array", "items": {"type": "object", "required": ["discipline", "sessions", "durationSeconds"], "properties": {"discipline": {"type": "string"}, "sessions": {"type": "integer"}, "durationSeconds": {"type": "integer"}}}}}}
                     AlamDrop: {"type": "object", "required": ["playerId", "itemKey", "name", "kind", "rarity", "imageUrl", "quantity"], "properties": {"playerId": {"type": "string", "format": "uuid"}, "itemKey": {"type": "string"}, "name": {"type": "string"}, "kind": {"type": "string", "enum": ["RESOURCE", "EQUIPMENT"]}, "rarity": {"type": "string", "enum": ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"]}, "imageUrl": {"type": "string", "nullable": true}, "quantity": {"type": "integer"}}}
                     AlamEvent: {"type": "object", "required": ["id", "offsetMs", "encounterIndex", "action", "actorId", "targetId", "text"], "properties": {"id": {"type": "string"}, "offsetMs": {"type": "integer"}, "encounterIndex": {"type": "integer"}, "action": {"type": "string", "enum": ["ARRIVAL", "EFFORT", "VICTORY", "DEFEAT", "DROP"]}, "actorId": {"type": "string", "nullable": true}, "targetId": {"type": "string", "nullable": true}, "text": {"type": "string"}}}
-                    AlamEncounter: {"type": "object", "required": ["index", "enemyKey", "enemyName", "thresholdPermille", "won", "probabilityMillionths", "progressPermille", "drops", "narration"], "properties": {"index": {"type": "integer"}, "enemyKey": {"type": "string"}, "enemyName": {"type": "string"}, "thresholdPermille": {"type": "integer"}, "won": {"type": "boolean"}, "probabilityMillionths": {"type": "integer"}, "progressPermille": {"type": "integer"}, "drops": {"type": "array", "items": {"$ref": "#/components/schemas/AlamDrop"}}, "narration": {"type": "string"}}}
+                    AlamEncounter: {"type": "object", "required": ["index", "enemyKey", "enemyName", "imageUrls", "thresholdPermille", "won", "probabilityMillionths", "progressPermille", "drops", "narration"], "properties": {"index": {"type": "integer"}, "enemyKey": {"type": "string"}, "enemyName": {"type": "string"}, "imageUrls": {"description": "Poses du boss lues dans le catalogue figé de l'édition, null sans présentation publiée (#289).", "allOf": [{"$ref": "#/components/schemas/EnemyImageUrls"}]}, "thresholdPermille": {"type": "integer"}, "won": {"type": "boolean"}, "probabilityMillionths": {"type": "integer"}, "progressPermille": {"type": "integer"}, "drops": {"type": "array", "items": {"$ref": "#/components/schemas/AlamDrop"}}, "narration": {"type": "string"}}}
                     AlamRun: {"type": "object", "required": ["id", "guildId", "mode", "status", "weekStartsAt", "collectionEndsAt", "revealedAt", "presentationStartsAt", "presentationEndsAt", "frozenTargetCount", "rulesetVersion", "gauges", "participants", "encounters", "events", "narrationSource", "serverNow"], "properties": {"id": {"type": "string", "format": "uuid"}, "guildId": {"type": "string", "format": "uuid"}, "mode": {"type": "string", "enum": ["WEEKLY", "MANUAL"]}, "status": {"type": "string", "enum": ["COLLECTING", "RESOLVED"]}, "weekStartsAt": {"type": "string", "format": "date-time"}, "collectionEndsAt": {"type": "string", "format": "date-time"}, "revealedAt": {"type": "string", "format": "date-time"}, "presentationStartsAt": {"type": "string", "format": "date-time", "nullable": true}, "presentationEndsAt": {"type": "string", "format": "date-time", "nullable": true}, "frozenTargetCount": {"type": "integer"}, "rulesetVersion": {"type": "string"}, "gauges": {"type": "array", "items": {"$ref": "#/components/schemas/AlamGauge"}}, "participants": {"type": "array", "items": {"$ref": "#/components/schemas/AlamParticipant"}}, "encounters": {"type": "array", "items": {"$ref": "#/components/schemas/AlamEncounter"}}, "events": {"type": "array", "items": {"$ref": "#/components/schemas/AlamEvent"}}, "narrationSource": {"type": "string", "enum": ["LOCAL", "OPENAI"]}, "serverNow": {"type": "string", "format": "date-time"}}}
                     AlamCurrent: {"type": "object", "required": ["serverNow", "canLaunchManual", "pollAfterSeconds", "current"], "properties": {"serverNow": {"type": "string", "format": "date-time"}, "canLaunchManual": {"type": "boolean"}, "pollAfterSeconds": {"type": "integer"}, "current": {"$ref": "#/components/schemas/AlamRun"}}}
                     AlamPage: {"type": "object", "required": ["runs", "nextCursor"], "properties": {"runs": {"type": "array", "items": {"$ref": "#/components/schemas/AlamRun"}}, "nextCursor": {"type": "string", "nullable": true}}}
@@ -682,7 +682,7 @@ when@dev:
 
                     UserProfile:
                         type: object
-                        required: [id, email, displayName, timezone, locale, registeredAt, title, nextTitle, notificationPreferences]
+                        required: [id, email, displayName, timezone, locale, registeredAt, title, nextTitle, notificationPreferences, appearance]
                         properties:
                             id: { type: string, format: uuid }
                             email: { type: string, format: email }
@@ -704,6 +704,9 @@ when@dev:
                                 description: "Le plus proche d'aboutir parmi ceux qui restent. `null` quand il les a tous."
                                 nullable: true
                                 allOf: [{ $ref: '#/components/schemas/PlayerTitle' }]
+                            appearance:
+                                description: "Le modèle de héros porté (#289), modifiable par `PATCH /api/me`. Les images sont dans `GET /api/appearances`."
+                                allOf: [{ $ref: '#/components/schemas/Appearance' }]
                             notificationPreferences:
                                 type: object
                                 description: |
@@ -1694,6 +1697,42 @@ when@dev:
                             cooldownReductionPercent: { type: integer, description: "Réduction du délai entre actions régulières. Pourcentage entier tronqué depuis les millièmes serveur." }
                             precisionPercent: { type: integer, description: "Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur." }
 
+                    AppearancePoses:
+                        type: object
+                        description: "Trois PNG RGBA carrés, même cadrage et même ligne de sol. `hit` est le coup reçu ; une esquive utilise `idle`."
+                        required: [idle, attack, hit]
+                        additionalProperties: false
+                        properties:
+                            idle: { type: string, format: uri }
+                            attack: { type: string, format: uri }
+                            hit: { type: string, format: uri }
+
+                    AppearanceViews:
+                        type: object
+                        description: "**De dos** pour le joueur lui-même, **de face** pour qui l'affronte."
+                        required: [back, front]
+                        properties:
+                            back: { $ref: '#/components/schemas/AppearancePoses' }
+                            front: { $ref: '#/components/schemas/AppearancePoses' }
+
+                    AppearanceModel:
+                        type: object
+                        description: "Un modèle de héros complet, purement cosmétique. `imageUrls` en 1024 px, `thumbnailUrls` en 256 px pour afficher une guilde entière."
+                        required: [key, imageUrls, thumbnailUrls]
+                        properties:
+                            key: { $ref: '#/components/schemas/Appearance' }
+                            imageUrls: { $ref: '#/components/schemas/AppearanceViews' }
+                            thumbnailUrls: { $ref: '#/components/schemas/AppearanceViews' }
+
+                    AppearanceCatalog:
+                        type: object
+                        description: "Tous les modèles que `PATCH /api/me` accepte. Le profil, les combats et Ālam ne portent que la clé."
+                        required: [appearances]
+                        properties:
+                            appearances:
+                                type: array
+                                items: { $ref: '#/components/schemas/AppearanceModel' }
+
                     EnemyImageUrls:
                         type: object
                         nullable: true
@@ -1721,7 +1760,7 @@ when@dev:
                             postérieur ni de la présence de ce compte. Un joueur n'a ni `imageUrls` ni
                             `introduction` : les deux valent `null`, comme pour un ennemi sans présentation
                             publiée, et l'animation est la même.
-                        required: [key, playerId, name, hp, damage, mitigationPercent, comboPercent, dodgePercent, maintenancePercent, criticalChancePercent, guardPercent, criticalResistancePercent, cooldownReductionPercent, precisionPercent]
+                        required: [key, playerId, name, hp, damage, mitigationPercent, comboPercent, dodgePercent, maintenancePercent, criticalChancePercent, guardPercent, criticalResistancePercent, cooldownReductionPercent, precisionPercent, appearance]
                         properties:
                             key:
                                 type: string
@@ -1748,6 +1787,10 @@ when@dev:
                             criticalResistancePercent: { type: integer, description: "Réduction relative de la chance de critique adverse. Pourcentage entier tronqué depuis les millièmes serveur." }
                             cooldownReductionPercent: { type: integer, description: "Réduction du délai entre actions régulières. Pourcentage entier tronqué depuis les millièmes serveur." }
                             precisionPercent: { type: integer, description: "Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur." }
+                            appearance:
+                                description: "Le héros du défié au moment du combat (#289), `null` face à un ennemi du catalogue. Ses poses **de face** sont dans `GET /api/appearances` ; `imageUrls` reste `null` pour un joueur."
+                                nullable: true
+                                allOf: [{ $ref: '#/components/schemas/Appearance' }]
                             imageUrls: { $ref: '#/components/schemas/EnemyImageUrls' }
                             introduction:
                                 type: string
@@ -1855,7 +1898,14 @@ when@dev:
                                 type: string
                                 format: date-time
                                 description: "L'instant de la requête : contrairement à un workout, un combat n'a aucune antériorité au serveur."
-                            player: { $ref: '#/components/schemas/BattleFighter' }
+                            player:
+                                description: "Le combattant de l'appelant, et le héros qu'il portait au combat (#289)."
+                                allOf:
+                                    - $ref: '#/components/schemas/BattleFighter'
+                                    - type: object
+                                      required: [appearance]
+                                      properties:
+                                          appearance: { $ref: '#/components/schemas/Appearance' }
                             enemy: { $ref: '#/components/schemas/BattleEnemy' }
                             events:
                                 type: array
