@@ -8,6 +8,7 @@ use App\Progression\Domain\XpBreakdownSource;
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRoute;
 use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Appearance;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
 use App\Shared\UI\Http\ProblemDetails;
@@ -213,6 +214,12 @@ final class OpenApiContractTest extends KernelTestCase
             'Le schéma "Discipline" ne sort plus de l\'enum PHP, dans le même ordre. Vérifie que '
             .'ChooseRisalaRequest type toujours sa propriété avec Discipline, puis `make openapi`.',
         );
+    }
+
+    /** Même garantie que `Discipline` : le schéma sort de l'enum, `UpdateProfileRequest` le type (#289). */
+    public function testTheAppearanceSchemaStillComesFromTheEnum(): void
+    {
+        self::assertSame(array_column(Appearance::cases(), 'value'), $this->schema('Appearance')['enum']);
     }
 
     public function testUserProfileDeclaresThePersistedLocale(): void

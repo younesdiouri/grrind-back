@@ -13,6 +13,7 @@ use App\Combat\Domain\Enemy;
 use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Appearance;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
 
@@ -62,6 +63,7 @@ trait Battles
             random_bytes(32),
             'v1-000000000000',
             $foughtAt,
+            Appearance::Murid,
         );
 
         $repository->add($battle);

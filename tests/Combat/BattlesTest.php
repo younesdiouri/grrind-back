@@ -13,6 +13,7 @@ use App\Combat\Domain\Enemy;
 use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
 use App\Shared\Domain\Activity\AttributeGains;
+use App\Shared\Domain\Appearance;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
@@ -254,6 +255,7 @@ final class BattlesTest extends ApiTestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable(),
+            Appearance::Murid,
         );
 
         $repository->add($battle);

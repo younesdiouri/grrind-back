@@ -73,6 +73,7 @@ final readonly class MeController
             $request->timezone,
             $request->locale,
             self::preferencesOf($request->notificationPreferences),
+            $request->appearance,
         ));
 
         return new JsonResponse(UserResource::from($updated, $this->titles->of($updated->id()))->toArray());

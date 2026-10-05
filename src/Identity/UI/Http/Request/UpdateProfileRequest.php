@@ -6,6 +6,7 @@ namespace App\Identity\UI\Http\Request;
 
 use App\Identity\Domain\Locale;
 use App\Identity\Domain\User;
+use App\Shared\Domain\Appearance;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -32,6 +33,9 @@ final readonly class UpdateProfileRequest
         // cas nominal d'un PATCH qui ne touche pas aux préférences.
         #[Assert\Valid]
         public array $notificationPreferences = [],
+        // Typé, comme `ChooseRisalaRequest::$discipline` : le Serializer refuse seul une clé
+        // hors du catalogue, en 422, et le schéma `Appearance` du contrat sort de l'enum.
+        public ?Appearance $appearance = null,
     ) {
     }
 }

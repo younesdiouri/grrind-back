@@ -21,6 +21,7 @@ use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Domain\Alam\AlamCalendar;
 use App\Shared\Domain\Alam\AlamRules;
+use App\Shared\Domain\Appearance;
 use App\Shared\UI\Http\Cursor;
 use DateTimeImmutable;
 use Doctrine\DBAL\LockMode;
@@ -223,7 +224,7 @@ final readonly class AlamRuns
         $this->bus->dispatch(new NarrateAlam($run->id->toRfc4122()));
     }
 
-    /** @return array{list<array{playerId: string, displayName: string, avatarUrl: ?string, contribution: int, gauges: list<array{attribute: string, current: int, target: int, progressPermille: int}>}>, array<string, int>} */
+    /** @return array{list<array{playerId: string, displayName: string, avatarUrl: ?string, appearance: string, contribution: int, gauges: list<array{attribute: string, current: int, target: int, progressPermille: int}>}>, array<string, int>} */
     private function roster(AlamRun $run, Guild $guild): array
     {
         $players = array_map(static fn (GuildMembership $member): Uuid => $member->playerId(), $guild->members());
@@ -237,7 +238,7 @@ final readonly class AlamRuns
             foreach ($contribution['attributes'] as $key => $value) {
                 $totals[$key] = ($totals[$key] ?? 0) + $value;
             }
-            $participants[] = ['playerId' => $id, 'displayName' => $profiles[$id]->displayName ?? 'Aventurier', 'avatarUrl' => null, 'contribution' => $contribution['total'], 'activitySummary' => $contribution['sports'], 'gauges' => AlamResolution::gauges($contribution['attributes'], $this->rulesOf($run)->targets(1))];
+            $participants[] = ['playerId' => $id, 'displayName' => $profiles[$id]->displayName ?? 'Aventurier', 'avatarUrl' => null, 'appearance' => $profiles[$id]->appearance->value ?? Appearance::default()->value, 'contribution' => $contribution['total'], 'activitySummary' => $contribution['sports'], 'gauges' => AlamResolution::gauges($contribution['attributes'], $this->rulesOf($run)->targets(1))];
         }
 
         return [$participants, $totals];

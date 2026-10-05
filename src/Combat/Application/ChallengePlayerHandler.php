@@ -13,6 +13,7 @@ use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Application\Teammates;
+use App\Shared\Domain\Appearance;
 use Psr\Clock\ClockInterface;
 use Random\Engine\Xoshiro256StarStar;
 use Random\Randomizer;
@@ -101,8 +102,8 @@ final readonly class ChallengePlayerHandler
 
         // Un co-équipier sans compte serait une adhésion orpheline — impossible aujourd'hui.
         // Le même 404 reste la seule réponse qui n'en dise pas plus que les autres.
-        $opponent = $this->profiles->of([$command->opponentId])[$command->opponentId->toRfc4122()]
-            ?? throw new OpponentNotFound();
+        $profiles = $this->profiles->of([$command->challengerId, $command->opponentId]);
+        $opponent = $profiles[$command->opponentId->toRfc4122()] ?? throw new OpponentNotFound();
 
         $now = $this->clock->now();
 
@@ -138,6 +139,8 @@ final readonly class ChallengePlayerHandler
             $seed,
             \is_string($this->rulesetVersion) ? $this->rulesetVersion : $this->rulesetVersion->version(),
             $now,
+            $profiles[$command->challengerId->toRfc4122()]->appearance ?? Appearance::default(),
+            $opponent->appearance,
         );
 
         $this->battles->add($battle);

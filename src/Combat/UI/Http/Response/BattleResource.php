@@ -7,6 +7,7 @@ namespace App\Combat\UI\Http\Response;
 use App\Combat\Domain\Battle;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Shared\Application\ItemImageUrlResolver;
+use App\Shared\Domain\Appearance;
 use DateTimeInterface;
 
 /**
@@ -85,7 +86,12 @@ final readonly class BattleResource
             'endReason' => $this->battle->endReason()->value,
             'algorithmVersion' => $this->battle->algorithmVersion(),
             'foughtAt' => $this->battle->foughtAt()->format(DateTimeInterface::ATOM),
-            'player' => FighterResource::from($this->battle->playerSnapshot()['fighter'])->toArray(),
+            // L'apparence ferme la marche (#289) : une clé du catalogue `GET /api/appearances`,
+            // figée au combat. Un combat antérieur à #289 n'en porte pas et montre le défaut.
+            'player' => [
+                ...FighterResource::from($this->battle->playerSnapshot()['fighter'])->toArray(),
+                'appearance' => Appearance::fromSnapshot($this->battle->playerSnapshot()['appearance'] ?? null)->value,
+            ],
             // `key` et `name` d'abord, puis les mêmes quatre champs que `player` — voir le
             // docblock de la classe pour pourquoi le nom est résolu ici plutôt que rendu tel
             // quel depuis le snapshot.
@@ -95,6 +101,9 @@ final readonly class BattleResource
                 ['key' => $enemySnapshot['key'], 'playerId' => $this->battle->opponentId()?->toRfc4122(), 'name' => $this->enemyName],
                 FighterResource::from($enemySnapshot['fighter'])->toArray(),
                 ['imageUrls' => $this->imageUrls, 'introduction' => $this->introduction],
+                // Le héros du défié pour un duel, `null` face au catalogue — même règle que
+                // `key` / `playerId`.
+                ['appearance' => null === $enemySnapshot['key'] ? Appearance::fromSnapshot($enemySnapshot['appearance'] ?? null)->value : null],
             ),
             'events' => BattleEventResource::listOf($this->battle->timeline()),
             'rewards' => $this->rewards(),

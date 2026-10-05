@@ -33,6 +33,10 @@ final readonly class UpdateProfileHandler
             $user->prefer(Locale::from($command->locale));
         }
 
+        if (null !== $command->appearance) {
+            $user->changeAppearance($command->appearance);
+        }
+
         foreach ($command->notificationPreferences as $categoryValue => $enabled) {
             $user->setNotificationPreference(NotificationCategory::from($categoryValue), $enabled);
         }

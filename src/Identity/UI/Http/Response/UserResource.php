@@ -32,6 +32,7 @@ final readonly class UserResource
         public string $registeredAt,
         public PlayerTitleStanding $titles,
         public array $notificationPreferences,
+        public string $appearance,
     ) {
     }
 
@@ -46,6 +47,7 @@ final readonly class UserResource
             $user->registeredAt()->format(DateTimeInterface::ATOM),
             $titles,
             self::preferencesOf($user),
+            $user->appearance()->value,
         );
     }
 
@@ -66,6 +68,8 @@ final readonly class UserResource
             'title' => $this->titles->active?->toArray(),
             'nextTitle' => $this->titles->next?->toArray(),
             'notificationPreferences' => $this->notificationPreferences,
+            // La clé seule : les images sont dans `GET /api/appearances`, chargé une fois.
+            'appearance' => $this->appearance,
         ];
     }
 
