@@ -8,8 +8,8 @@ namespace App\Shared\Domain;
  * Le modèle de héros qu'un joueur a choisi — purement cosmétique, aucun calcul ne le lit (#289).
  *
  * **Des modèles complets, pas des calques.** Chaque cas est une illustration finie, servie en
- * trois poses (`idle`, `attack`, `hit`), de dos pour le joueur lui-même et de face pour qui
- * l'affronte, en pleine taille et en miniature de 256 px.
+ * trois poses (`idle`, `attack`, `hit`), `back` pour le joueur et `front` pour son adversaire,
+ * en pleine taille et en miniature de 256 px.
  *
  * **Un enum et des fichiers statiques, pas une entrée du snapshot publié.** L'apparence ne
  * touche aucune valeur de jeu : elle n'a rien à faire dans le `rulesetVersion`, et le back-office
@@ -38,13 +38,13 @@ enum Appearance: string
      * Le dossier sous `public/appearances/`. Il porte la version de l'illustration : remplacer
      * les PNG change l'URL, sinon les clients garderaient l'ancienne image en cache.
      *
-     * `murid/v1` : silhouettes vectorielles provisoires, tirées de la planche de concept. Les
-     * illustrations peintes, au pipeline d'Al-Kasal, arriveront en `murid/v2`.
+     * `murid/v2` : illustrations peintes latérales, `back` regarde à droite, `front` à gauche.
+     * Les silhouettes `murid/v1` restent accessibles pour les URL déjà chargées.
      */
     public function directory(): string
     {
         return match ($this) {
-            self::Murid => 'murid/v1',
+            self::Murid => 'murid/v2',
         };
     }
 }
