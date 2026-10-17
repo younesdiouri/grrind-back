@@ -98,6 +98,24 @@ final class AppearanceTest extends ApiTestCase
         }
     }
 
+    public function testTheTwoFlippersHaveOppositeOrientationsAndMatchingMirroredPivots(): void
+    {
+        $catalog = self::decode($this->get('/api/appearances', $this->openAccount()->headers));
+        self::assertIsArray($catalog['equipment']);
+        $item = array_find($catalog['equipment'], static fn ($entry): bool => \is_array($entry) && 'ACADEMIC_FLIPPERS' === $entry['key']);
+        self::assertIsArray($item);
+        self::assertIsArray($item['layers']);
+        /** @var array{sourceUrls:array{back:string,front:string},pivot:array{x:float}}|null $rear */
+        $rear = array_find($item['layers'], static fn ($layer): bool => \is_array($layer) && 'footRear' === $layer['attachment']);
+        /** @var array{sourceUrls:array{back:string,front:string},pivot:array{x:float}}|null $front */
+        $front = array_find($item['layers'], static fn ($layer): bool => \is_array($layer) && 'footFront' === $layer['attachment']);
+        self::assertIsArray($rear);
+        self::assertIsArray($front);
+        self::assertSame($front['sourceUrls']['front'], $rear['sourceUrls']['back']);
+        self::assertSame($front['sourceUrls']['back'], $rear['sourceUrls']['front']);
+        self::assertEqualsWithDelta(1 - $front['pivot']['x'], $rear['pivot']['x'], 0.000001);
+    }
+
     private static function fileFor(string $url): string
     {
         self::assertMatchesRegularExpression('#^https?://[^/]+/artwork/#', $url);

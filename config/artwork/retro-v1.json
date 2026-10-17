@@ -3032,12 +3032,12 @@
           "aspectRatio": 1.9393939393939394,
           "scale": 1.0,
           "pivot": {
-            "x": 0.18,
+            "x": 0.82,
             "y": 0.38
           },
           "sourceUrls": {
-            "back": "/artwork/items/flipper/v1/back.png",
-            "front": "/artwork/items/flipper/v1/front.png"
+            "back": "/artwork/items/flipper/v1/front.png",
+            "front": "/artwork/items/flipper/v1/back.png"
           }
         },
         {
