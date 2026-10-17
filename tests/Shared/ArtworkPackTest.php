@@ -48,4 +48,25 @@ final class ArtworkPackTest extends TestCase
         $pack->setManifestJson(json_encode($manifest, \JSON_THROW_ON_ERROR));
         self::assertGreaterThan(0, $validator->validate($pack)->count());
     }
+
+    public function testSharedGuardAcceptsOneCalibrationAndRejectsConflictingStates(): void
+    {
+        $source = file_get_contents(\dirname(__DIR__, 2).'/config/artwork/retro-v2.json');
+        self::assertIsString($source);
+        /** @var list<array{key:string,name:string,manifest:array<string,mixed>}> $rows */
+        $rows = json_decode($source, true, flags: \JSON_THROW_ON_ERROR);
+        $pack = new GameArtworkPack();
+        $pack->setKey($rows[0]['key']);
+        $pack->setVersion('v2');
+        $pack->setName($rows[0]['name']);
+        $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
+        $pack->setManifestJson(json_encode($rows[0]['manifest'], \JSON_THROW_ON_ERROR));
+        self::assertCount(0, $validator->validate($pack));
+
+        /** @var array{imageUrls:array{back:array<string,string>}} $manifest */
+        $manifest = $rows[0]['manifest'];
+        $manifest['imageUrls']['back']['attack'] = $manifest['imageUrls']['back']['idle'];
+        $pack->setManifestJson(json_encode($manifest, \JSON_THROW_ON_ERROR));
+        self::assertGreaterThan(0, $validator->validate($pack)->count());
+    }
 }

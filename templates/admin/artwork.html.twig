@@ -12,7 +12,8 @@
   <button type="submit">Importer un PNG</button>
   <output id="art-upload-result"></output>
  </form>
- <p>Quatre sportifs, sept poses, deux orientations. Choisir des objets pour inspecter leur superposition réelle.</p>
+ <p>Quatre sportifs pieds nus, une garde par identité, deux orientations. Les sept états partagent cette garde : le combat anime le corps et les objets ensemble, avec une prise d’arme fixe.</p>
+ <p>V1 visible : coiffe ou lunettes, arme, chaussures et cape. Ceintures, gourdes et sacs de taille sont retirés du rendu. Les anciennes versions restent archivées pour les replays.</p>
  <div class="artwork-controls"><label>Avatar <select id="art-avatar"></select></label><label>Orientation <select id="art-view"><option value="back">Joueur · vers la droite</option><option value="front">Adversaire · vers la gauche</option></select></label></div>
  <div id="art-items" class="artwork-items"></div>
  <div id="art-grid" class="artwork-grid"></div>
@@ -30,7 +31,7 @@
  const avatarSelect=document.getElementById('art-avatar'),viewSelect=document.getElementById('art-view');
  const chosen=new Map(),poses=['idle','attack','hit','critical','dodge','combo','replay'];
  const labels={idle:'Garde',attack:'Attaque',hit:'Coup reçu',critical:'Critique',dodge:'Esquive',combo:'Combo',replay:'Relance'};
- for(const avatar of catalog.appearances){const option=document.createElement('option');option.value=avatar.key;option.textContent=avatar.name;avatarSelect.append(option);}
+ for(const avatar of catalog.appearances.filter(a=>a.selectable)){const option=document.createElement('option');option.value=avatar.key;option.textContent=avatar.name;avatarSelect.append(option);}
  function image(src){const element=document.createElement('img');element.src=src;element.alt='';return element;}
  function render(){
   const avatar=catalog.appearances.find(a=>a.key===avatarSelect.value),view=viewSelect.value;

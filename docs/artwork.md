@@ -1,41 +1,56 @@
-# Packs graphiques sportifs rétro
+# Packs graphiques sportifs rétro — V2
 
-Le catalogue graphique est indépendant du ruleset numérique : GET /api/appearances.
-Quatre avatars sans équipement, sept poses par orientation et huit objets séparés.
-Les PNG versionnés sont sous public/artwork/ ; le manifeste initial est dans
-config/artwork/retro-v1.json. Le client et les scripts de fabrication sont dans grrind-app,
-docs/design/retro-avatar-packs.md. Aucun rééquilibrage des caractéristiques.
+Le catalogue graphique (GET /api/appearances) reste indépendant du ruleset numérique.
+La référence de fabrication est ../grrind-app/docs/design/retro-avatar-packs.md et le
+calibrage courant config/artwork/retro-v2.json. Les PNG vivent sous public/artwork/.
+
+Quatre bases pieds nus : STRENGTH_V2, RUNNER_V2, CLIMBER_V2, SWIMMER_V2. Une garde par
+identité est partagée entre les sept états de combat, animés ensemble avec leurs calques.
+Les objets visibles sont trois coiffes/lunettes, Haltère ego, Palmes académiques et la
+Cape du voyageur (item existant TRAVELERS_CLOAK). Ceinture, gourde et sac à magnésie sont
+retirés du choix graphique ; leurs inventaires et caractéristiques restent intacts.
+Les profils V1 passent à la V2 correspondante. Les packs V1 inactifs restent lisibles pour
+leurs anciens replays, sans être présentés dans l’atelier ou les nouveaux choix.
 
 ## Administration
 
-- /admin/artwork : sélectionner avatar, orientation et pièces ; contrôler les sept poses.
-  Import PNG protégé par session admin + CSRF, 2 Mo/2048 px, type réel et décodage contrôlés.
-  Le chemin retourné /game-images/<sha1>.png peut être collé dans un manifeste.
-- Menu « Avatars et calques » : créer/modifier les packs, disponibilités, ordre et JSON.
-  Les clés/type/version sont immuables après création. Les avatars incluent leur version
-  dans leur clé, par exemple RUNNER_V1. Conserver les anciennes versions pour les replays.
-- Les caractéristiques, prix, emplacement et traductions canoniques restent dans le catalogue
-  des items, avec son mécanisme habituel de brouillon/publication. Le pack graphique n’en
-  publie aucun et n’ajoute pas à lui seul un nouvel objet de jeu.
+/admin/artwork compose les vrais calques des avatars actifs. Le menu « Avatars et calques »
+édite nom, disponibilité, ordre et manifeste JSON ; clé/type/version sont immuables.
+L’import PNG exige admin + CSRF, un vrai PNG décodable, au plus 2 Mo et 2048 px ; le chemin
+retourné /game-images/<sha1>.png peut être utilisé dans le JSON. Les prix/modificateurs et
+noms canoniques restent dans le catalogue numérique avec publication séparée.
 
-Un avatar déclare imageUrls, thumbnailUrls et attachments pour back (droite) et front
-(gauche), avec idle/attack/hit/critical/dodge/combo/replay. foregroundUrls ajoute les masques
-des mains après les objets. Chaque ancrage porte x/y/span/rotate sur un canevas normalisé.
-Un objet déclare slot, iconUrl, compatibleAppearances et layers. Chaque calque déclare
-attachment, plane, aspectRatio, scale, pivot et sourceUrls. L’aperçu utilise ces vrais calques.
-La version active d’équipement la plus récente sert aux nouveaux snapshots ; désactiver la
-précédente évite les doublons dans l’atelier. Une version inactive continue de servir les replays.
-Créer de nouveaux chemins pour une nouvelle DA ; les PNG sont mis en cache.
+Un avatar fournit imageUrls, thumbnailUrls, attachments pour back (droite) / front (gauche),
+et idle/attack/hit/critical/dodge/combo/replay. La V2 référence la même image de garde dans
+chaque état. Les ancrages eyes/head/hand/shoulder/footFront/footRear portent x/y/span/rotate.
+Aucun ancrage de taille n’est prévu en V1 visible. foregroundUrls reste un champ historique
+facultatif pour les anciens replays ; les nouveaux corps n’en ont pas besoin.
 
-## Import local et migrations
+L’objet déclare slot, iconUrl, compatibleAppearances et layers, avec attachment, plane,
+aspectRatio, scale, pivot et sourceUrls. L’arme verticale passe derrière le poing fermé,
+dégagé du torse ; la cape derrière les épaules ; coiffes et chaussons devant. Les palmes
+emploient deux perspectives distinctes (pied de face, pied de côté). Le miroir inverse x,
+rotate et pivot.x pour l’ensemble ; il ne remplace pas ces deux perspectives.
 
-make console c=app:artwork:import réimporte les douze packs du manifeste ; il ne modifie pas
-les inventaires ni les chiffres de jeu. Il peut écraser le calibrage de ces mêmes versions :
-exporter les réglages admin à conserver avant de le relancer. Le fichier initial d’une migration
-publiée reste figé ; les calibrages ultérieurs vont dans un nouveau manifeste/version.
+## Import et versions
 
-Les migrations ajoutent le catalogue graphique et les huit objets cosmétiques, sans modificateur,
-pour une pièce chacun. Ce prix symbolique respecte l’invariant existant de boutique à prix
-strictement positif ; ce n’est pas un équilibrage. Elles remplacent MURID dans les profils par
-STRENGTH_V1 ; les vieux snapshots bénéficient du même repli à la lecture. Aucune base n’est
-réinitialisée et aucune progression, séance ou ligne d’inventaire n’est effacée.
+make console c=app:artwork:import charge par défaut les dix packs V2. Cette commande peut
+écraser leur calibrage admin : exporter les valeurs à conserver avant réimport. Les données
+des migrations publiées restent figées ; toute nouvelle DA incompatible reçoit des chemins
+et versions distincts. Désactiver la version précédente évite les doublons dans l’atelier.
+Les combats figent l’apparence et key+artworkVersion ; un item sans pack actif garde sa clé
+mais artworkVersion=null dans les nouveaux combats. Aucun inventaire n’est effacé.
+
+## Contrôle visuel
+
+Les captures V1 ont été rejetées par l’auteur malgré les tests techniques : elles ne sont
+pas des références positives. Contrôler maintenant les pieds réellement enveloppés, le
+contact poignée/poing, la cape portée aux épaules, les contours et le cumul des objets,
+puis le combat mobile à taille réelle dans les deux orientations. La présence de sept
+lignes identiques dans une planche ne constitue pas sept validations indépendantes.
+Les preuves courantes sont dans ../grrind-app/docs/design/proofs/retro-v2-*.png.
+
+Le manifeste de garde utilise `stanceMode: "guard"` et uniquement `idle` dans chaque série
+d’images et d’ancrages. Le catalogue développe les sept états à la lecture, sans changer le
+contrat HTTP. Les autres états dans un manifeste de garde sont refusés pour éviter des
+calibrages contradictoires ; omettre ce mode conserve les poses indépendantes historiques.
