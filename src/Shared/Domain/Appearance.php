@@ -7,7 +7,7 @@ namespace App\Shared\Domain;
 /** Identifiants de présentation ouverts : ajouter un avatar ne demande pas de nouvelle enum. */
 final class Appearance
 {
-    public const string DEFAULT = 'STRENGTH_V2';
+    public const string DEFAULT = 'STRENGTH_V3';
     public const array POSES = ['idle', 'attack', 'hit', 'critical', 'dodge', 'combo', 'replay'];
 
     public static function default(): string

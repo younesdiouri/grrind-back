@@ -16,7 +16,7 @@ final class AppearanceTest extends ApiTestCase
     {
         $headers = $this->openAccount()->headers;
         self::assertSame(Appearance::DEFAULT, self::decode($this->get('/api/me', $headers))['appearance']);
-        foreach (['STRENGTH_V2', 'RUNNER_V2', 'CLIMBER_V2', 'SWIMMER_V2'] as $key) {
+        foreach (['STRENGTH_V3', 'RUNNER_V3', 'CLIMBER_V3', 'SWIMMER_V3'] as $key) {
             $response = $this->send('PATCH', '/api/me', ['appearance' => $key], $headers);
             self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
             self::assertSame($key, self::decode($response)['appearance']);
@@ -30,14 +30,14 @@ final class AppearanceTest extends ApiTestCase
         self::assertSame(422, $this->send('PATCH', '/api/me', ['appearance' => 'GOLDEN_KNIGHT'], $headers)->getStatusCode());
         $connection = self::getContainer()->get(Connection::class);
         self::assertInstanceOf(Connection::class, $connection);
-        $connection->executeStatement("UPDATE game_artwork_pack SET active = FALSE WHERE pack_key = 'RUNNER_V2'");
+        $connection->executeStatement("UPDATE game_artwork_pack SET active = FALSE WHERE pack_key = 'RUNNER_V3'");
         try {
-            self::assertSame(422, $this->send('PATCH', '/api/me', ['appearance' => 'RUNNER_V2'], $headers)->getStatusCode());
+            self::assertSame(422, $this->send('PATCH', '/api/me', ['appearance' => 'RUNNER_V3'], $headers)->getStatusCode());
             $catalog = self::decode($this->get('/api/appearances', $headers));
             self::assertIsArray($catalog['appearances']);
-            self::assertContains('RUNNER_V2', array_column($catalog['appearances'], 'key'));
+            self::assertContains('RUNNER_V3', array_column($catalog['appearances'], 'key'));
         } finally {
-            $connection->executeStatement("UPDATE game_artwork_pack SET active = TRUE WHERE pack_key = 'RUNNER_V2'");
+            $connection->executeStatement("UPDATE game_artwork_pack SET active = TRUE WHERE pack_key = 'RUNNER_V3'");
         }
     }
 
@@ -159,6 +159,46 @@ final class AppearanceTest extends ApiTestCase
             }
         } finally {
             $connection->executeStatement("UPDATE game_artwork_pack SET manifest_json = ? WHERE pack_key = 'STRENGTH_V2'", [$source]);
+        }
+    }
+
+    public function testPublishedPosesAreDistinctAndAdminCalibrationOnlyChangesTheChosenPose(): void
+    {
+        $headers = $this->openAccount()->headers;
+        $catalog = self::decode($this->get('/api/appearances', $headers));
+        self::assertIsArray($catalog['appearances']);
+        foreach ($catalog['appearances'] as $model) {
+            self::assertIsArray($model);
+            if (true !== $model['selectable']) {
+                continue;
+            }
+            /** @var array{back:array<string,string>,front:array<string,string>} $urls */
+            $urls = $model['imageUrls'];
+            foreach ($urls as $series) {
+                $hashes = array_map(static fn (string $url): string|false => hash_file('sha256', self::fileFor($url)), $series);
+                self::assertCount(\count(GameArtworkPack::POSES), array_unique($hashes), 'Les poses publiées ne doivent pas répéter une garde.');
+            }
+        }
+        $connection = self::getContainer()->get(Connection::class);
+        self::assertInstanceOf(Connection::class, $connection);
+        $source = $connection->fetchOne("SELECT manifest_json FROM game_artwork_pack WHERE pack_key = 'STRENGTH_V3'");
+        self::assertIsString($source);
+        /** @var array{attachments:array<string,array<string,array<string,array<string,int|float>>>>} $manifest */
+        $manifest = json_decode($source, true, flags: \JSON_THROW_ON_ERROR);
+        $idle = $manifest['attachments']['back']['hand']['idle'];
+        $manifest['attachments']['back']['hand']['attack']['x'] = 0.77;
+        try {
+            $connection->executeStatement("UPDATE game_artwork_pack SET manifest_json = ? WHERE pack_key = 'STRENGTH_V3'", [json_encode($manifest, \JSON_THROW_ON_ERROR)]);
+            $updated = self::decode($this->get('/api/appearances', $headers));
+            self::assertIsArray($updated['appearances']);
+            $avatar = array_find($updated['appearances'], static fn ($row): bool => \is_array($row) && 'STRENGTH_V3' === $row['key']);
+            self::assertIsArray($avatar);
+            /** @var array<string,array<string,array<string,array<string,int|float>>>> $anchors */
+            $anchors = $avatar['attachments'];
+            self::assertSame(0.77, $anchors['back']['hand']['attack']['x']);
+            self::assertSame($idle, $anchors['back']['hand']['idle']);
+        } finally {
+            $connection->executeStatement("UPDATE game_artwork_pack SET manifest_json = ? WHERE pack_key = 'STRENGTH_V3'", [$source]);
         }
     }
 

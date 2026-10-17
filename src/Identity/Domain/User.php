@@ -76,7 +76,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private DateTimeImmutable $registeredAt;
 
     /** Cosmétique, sans effet de jeu — voir {@see Appearance}. */
-    #[ORM\Column(length: 64, options: ['default' => 'STRENGTH_V2'])]
+    #[ORM\Column(length: 64, options: ['default' => 'STRENGTH_V3'])]
     private string $appearance = Appearance::DEFAULT;
 
     /**
