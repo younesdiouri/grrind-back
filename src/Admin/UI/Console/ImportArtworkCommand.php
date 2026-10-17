@@ -30,7 +30,7 @@ final class ImportArtworkCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('file', InputArgument::OPTIONAL, 'Manifeste de packs JSON.', 'config/artwork/retro-v1.json');
+        $this->addArgument('file', InputArgument::OPTIONAL, 'Manifeste de packs JSON.', 'config/artwork/retro-v2.json');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

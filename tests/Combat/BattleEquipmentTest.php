@@ -25,7 +25,7 @@ final class BattleEquipmentTest extends ApiTestCase
         $this->grant($player, 'CROWN_OF_THE_TIRELESS');
         $this->equip($player, 'PURSUIT_GOGGLES');
         $dressed = $this->fight($player);
-        self::assertSame(['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v1']], self::equipmentOf($dressed, 'player'));
+        self::assertSame(['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v2']], self::equipmentOf($dressed, 'player'));
 
         $dressedId = $dressed['id'];
         self::assertIsString($dressedId);
@@ -64,7 +64,7 @@ final class BattleEquipmentTest extends ApiTestCase
         $fought = self::decode($response);
         $foughtId = $fought['id'];
         self::assertIsString($foughtId);
-        $head = ['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v1']];
+        $head = ['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v2']];
         self::assertSame($head, self::equipmentOf($fought, 'player'));
         self::assertSame($head, self::equipmentOf($fought, 'enemy'));
 
@@ -76,6 +76,18 @@ final class BattleEquipmentTest extends ApiTestCase
         $next = self::decode($this->post($path, [], $player->headers + ['Idempotency-Key' => 'duel-remplace']));
         self::assertSame([], self::equipmentOf($next, 'player'));
         self::assertSame(['HEAD' => ['key' => 'CROWN_OF_THE_TIRELESS', 'artworkVersion' => null]], self::equipmentOf($next, 'enemy'));
+    }
+
+    public function testRetiredWaistArtworkDoesNotRemoveTheEquippedInventoryItem(): void
+    {
+        $player = $this->openAccount();
+        $this->grant($player, 'ALL_PURPOSE_FLASK');
+        $this->equip($player, 'ALL_PURPOSE_FLASK', 'ACCESSORY');
+        self::assertSame(['ACCESSORY' => ['key' => 'ALL_PURPOSE_FLASK', 'artworkVersion' => null]], self::equipmentOf($this->fight($player), 'player'));
+        $inventory = self::decode($this->get('/api/inventory', $player->headers));
+        self::assertIsArray($inventory['equipment']);
+        self::assertIsArray($inventory['equipment']['ACCESSORY']);
+        self::assertSame('ALL_PURPOSE_FLASK', $inventory['equipment']['ACCESSORY']['key']);
     }
 
     /**
@@ -100,9 +112,9 @@ final class BattleEquipmentTest extends ApiTestCase
         $items->grant($account->id, $key, Uuid::v7(), new DateTimeImmutable());
     }
 
-    private function equip(Account $account, string $key): void
+    private function equip(Account $account, string $key, string $slot = 'HEAD'): void
     {
-        $response = $this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => $key], $account->headers);
+        $response = $this->send('PUT', '/api/inventory/equipment/'.$slot, ['itemKey' => $key], $account->headers);
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
     }
 

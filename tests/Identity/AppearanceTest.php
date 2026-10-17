@@ -16,7 +16,7 @@ final class AppearanceTest extends ApiTestCase
     {
         $headers = $this->openAccount()->headers;
         self::assertSame(Appearance::DEFAULT, self::decode($this->get('/api/me', $headers))['appearance']);
-        foreach (['STRENGTH_V1', 'RUNNER_V1', 'CLIMBER_V1', 'SWIMMER_V1'] as $key) {
+        foreach (['STRENGTH_V2', 'RUNNER_V2', 'CLIMBER_V2', 'SWIMMER_V2'] as $key) {
             $response = $this->send('PATCH', '/api/me', ['appearance' => $key], $headers);
             self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
             self::assertSame($key, self::decode($response)['appearance']);
@@ -30,14 +30,14 @@ final class AppearanceTest extends ApiTestCase
         self::assertSame(422, $this->send('PATCH', '/api/me', ['appearance' => 'GOLDEN_KNIGHT'], $headers)->getStatusCode());
         $connection = self::getContainer()->get(Connection::class);
         self::assertInstanceOf(Connection::class, $connection);
-        $connection->executeStatement("UPDATE game_artwork_pack SET active = FALSE WHERE pack_key = 'RUNNER_V1'");
+        $connection->executeStatement("UPDATE game_artwork_pack SET active = FALSE WHERE pack_key = 'RUNNER_V2'");
         try {
-            self::assertSame(422, $this->send('PATCH', '/api/me', ['appearance' => 'RUNNER_V1'], $headers)->getStatusCode());
+            self::assertSame(422, $this->send('PATCH', '/api/me', ['appearance' => 'RUNNER_V2'], $headers)->getStatusCode());
             $catalog = self::decode($this->get('/api/appearances', $headers));
             self::assertIsArray($catalog['appearances']);
-            self::assertContains('RUNNER_V1', array_column($catalog['appearances'], 'key'));
+            self::assertContains('RUNNER_V2', array_column($catalog['appearances'], 'key'));
         } finally {
-            $connection->executeStatement("UPDATE game_artwork_pack SET active = TRUE WHERE pack_key = 'RUNNER_V1'");
+            $connection->executeStatement("UPDATE game_artwork_pack SET active = TRUE WHERE pack_key = 'RUNNER_V2'");
         }
     }
 
@@ -48,14 +48,17 @@ final class AppearanceTest extends ApiTestCase
         $catalog = self::decode($response);
         self::assertIsArray($catalog['appearances']);
         self::assertIsArray($catalog['equipment']);
-        self::assertCount(4, $catalog['appearances']);
-        self::assertCount(8, $catalog['equipment']);
+        self::assertCount(4, array_filter($catalog['appearances'], static fn ($entry): bool => \is_array($entry) && true === $entry['selectable']));
+        self::assertCount(6, array_filter($catalog['equipment'], static fn ($entry): bool => \is_array($entry) && true === $entry['selectable']));
         $models = [];
         foreach ($catalog['appearances'] as $model) {
             self::assertIsArray($model);
             self::assertIsString($model['key']);
             $models[$model['key']] = $model;
             foreach (['imageUrls' => 512, 'thumbnailUrls' => 256, 'foregroundUrls' => 256] as $field => $size) {
+                if (!isset($model[$field]) && 'foregroundUrls' === $field) {
+                    continue;
+                }
                 self::assertIsArray($model[$field]);
                 foreach (['back', 'front'] as $view) {
                     $urls = $model[$field][$view];
@@ -102,7 +105,7 @@ final class AppearanceTest extends ApiTestCase
     {
         $catalog = self::decode($this->get('/api/appearances', $this->openAccount()->headers));
         self::assertIsArray($catalog['equipment']);
-        $item = array_find($catalog['equipment'], static fn ($entry): bool => \is_array($entry) && 'ACADEMIC_FLIPPERS' === $entry['key']);
+        $item = array_find($catalog['equipment'], static fn ($entry): bool => \is_array($entry) && 'ACADEMIC_FLIPPERS' === $entry['key'] && 'v1' === $entry['version']);
         self::assertIsArray($item);
         self::assertIsArray($item['layers']);
         /** @var array{sourceUrls:array{back:string,front:string},pivot:array{x:float}}|null $rear */
@@ -114,6 +117,49 @@ final class AppearanceTest extends ApiTestCase
         self::assertSame($front['sourceUrls']['front'], $rear['sourceUrls']['back']);
         self::assertSame($front['sourceUrls']['back'], $rear['sourceUrls']['front']);
         self::assertEqualsWithDelta(1 - $front['pivot']['x'], $rear['pivot']['x'], 0.000001);
+    }
+
+    public function testOneAdminGripCalibrationFeedsEveryCombatState(): void
+    {
+        $headers = $this->openAccount()->headers;
+        $connection = self::getContainer()->get(Connection::class);
+        self::assertInstanceOf(Connection::class, $connection);
+        $source = $connection->fetchOne("SELECT manifest_json FROM game_artwork_pack WHERE pack_key = 'STRENGTH_V2'");
+        self::assertIsString($source);
+        /** @var array{stanceMode?:string,imageUrls:array<string,array<string,string>>,thumbnailUrls:array<string,array<string,string>>,attachments:array<string,array<string,array<string,array<string,int|float>>>>} $manifest */
+        $manifest = json_decode($source, true, flags: \JSON_THROW_ON_ERROR);
+        $manifest['stanceMode'] = 'guard';
+        foreach (['imageUrls', 'thumbnailUrls'] as $field) {
+            foreach ($manifest[$field] as &$series) {
+                $series = ['idle' => $series['idle']];
+            }
+            unset($series);
+        }
+        foreach ($manifest['attachments'] as &$anchors) {
+            foreach ($anchors as &$series) {
+                $series = ['idle' => $series['idle']];
+            }
+            unset($series);
+        }
+        unset($anchors);
+        $manifest['attachments']['back']['hand']['idle']['x'] = 0.77;
+        try {
+            $connection->executeStatement("UPDATE game_artwork_pack SET manifest_json = ? WHERE pack_key = 'STRENGTH_V2'", [json_encode($manifest, \JSON_THROW_ON_ERROR)]);
+            $catalog = self::decode($this->get('/api/appearances', $headers));
+            self::assertIsArray($catalog['appearances']);
+            $avatar = array_find($catalog['appearances'], static fn ($row): bool => \is_array($row) && 'STRENGTH_V2' === $row['key']);
+            self::assertIsArray($avatar);
+            self::assertArrayNotHasKey('stanceMode', $avatar);
+            self::assertIsArray($avatar['attachments']);
+            self::assertIsArray($avatar['attachments']['back']);
+            self::assertIsArray($avatar['attachments']['back']['hand']);
+            foreach (GameArtworkPack::POSES as $pose) {
+                self::assertIsArray($avatar['attachments']['back']['hand'][$pose]);
+                self::assertSame(0.77, $avatar['attachments']['back']['hand'][$pose]['x']);
+            }
+        } finally {
+            $connection->executeStatement("UPDATE game_artwork_pack SET manifest_json = ? WHERE pack_key = 'STRENGTH_V2'", [$source]);
+        }
     }
 
     private static function fileFor(string $url): string

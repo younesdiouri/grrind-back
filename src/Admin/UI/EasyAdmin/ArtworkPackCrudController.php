@@ -47,6 +47,6 @@ final class ArtworkPackCrudController extends AbstractCrudController
         yield IntegerField::new('sortOrder', 'Ordre');
         yield TextareaField::new('manifestJson', 'Images, ancrages et compatibilités (JSON)')
             ->setNumOfRows(28)->hideOnIndex()
-            ->setHelp('7 poses × 2 vues. Les chemins /artwork/ sont publics. Les transformations sont normalisées sur le canevas. Créer une nouvelle clé/version pour remplacer un pack utilisé.');
+            ->setHelp('stanceMode: guard = une seule image et position idle par vue, partagée entre les 7 états. Sans ce mode, fournir 7 poses × 2 vues. Chemins /artwork/ publics, transformations normalisées. Nouvelle DA incompatible = nouvelle version.');
     }
 }

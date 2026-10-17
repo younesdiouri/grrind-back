@@ -1,0 +1,740 @@
+[
+  {
+    "kind": "AVATAR",
+    "key": "STRENGTH_V2",
+    "version": "v2",
+    "name": "Muscu",
+    "active": true,
+    "sortOrder": 0,
+    "manifest": {
+      "pixelArt": true,
+      "imageUrls": {
+        "back": {
+          "idle": "/artwork/avatars/strength/v2/back/idle.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/strength/v2/front/idle.png"
+        }
+      },
+      "thumbnailUrls": {
+        "back": {
+          "idle": "/artwork/avatars/strength/v2/thumb/back/idle.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/strength/v2/thumb/front/idle.png"
+        }
+      },
+      "attachments": {
+        "back": {
+          "eyes": {
+            "idle": {
+              "x": 0.535156,
+              "y": 0.167969,
+              "span": 0.140625,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.519531,
+              "y": 0.132812,
+              "span": 0.164062,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.808594,
+              "y": 0.417969,
+              "span": 0.085938,
+              "rotate": 0
+            }
+          },
+          "shoulder": {
+            "idle": {
+              "x": 0.441406,
+              "y": 0.238281,
+              "span": 0.4375,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.65625,
+              "y": 0.84375,
+              "span": 0.347656,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.289062,
+              "y": 0.839844,
+              "span": 0.175781,
+              "rotate": 0
+            }
+          }
+        },
+        "front": {
+          "eyes": {
+            "idle": {
+              "x": 0.464844,
+              "y": 0.167969,
+              "span": 0.140625,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.480469,
+              "y": 0.132812,
+              "span": 0.164062,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.191406,
+              "y": 0.417969,
+              "span": 0.085938,
+              "rotate": 0
+            }
+          },
+          "shoulder": {
+            "idle": {
+              "x": 0.558594,
+              "y": 0.238281,
+              "span": 0.4375,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.34375,
+              "y": 0.84375,
+              "span": 0.347656,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.710938,
+              "y": 0.839844,
+              "span": 0.175781,
+              "rotate": 0
+            }
+          }
+        }
+      },
+      "stanceMode": "guard"
+    }
+  },
+  {
+    "kind": "AVATAR",
+    "key": "RUNNER_V2",
+    "version": "v2",
+    "name": "Course",
+    "active": true,
+    "sortOrder": 1,
+    "manifest": {
+      "pixelArt": true,
+      "imageUrls": {
+        "back": {
+          "idle": "/artwork/avatars/runner/v2/back/idle.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/runner/v2/front/idle.png"
+        }
+      },
+      "thumbnailUrls": {
+        "back": {
+          "idle": "/artwork/avatars/runner/v2/thumb/back/idle.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/runner/v2/thumb/front/idle.png"
+        }
+      },
+      "attachments": {
+        "back": {
+          "eyes": {
+            "idle": {
+              "x": 0.535156,
+              "y": 0.183594,
+              "span": 0.125,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.515625,
+              "y": 0.140625,
+              "span": 0.15625,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.777344,
+              "y": 0.433594,
+              "span": 0.074219,
+              "rotate": 0
+            }
+          },
+          "shoulder": {
+            "idle": {
+              "x": 0.449219,
+              "y": 0.253906,
+              "span": 0.398438,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.664062,
+              "y": 0.84375,
+              "span": 0.332031,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.3125,
+              "y": 0.839844,
+              "span": 0.167969,
+              "rotate": 0
+            }
+          }
+        },
+        "front": {
+          "eyes": {
+            "idle": {
+              "x": 0.464844,
+              "y": 0.183594,
+              "span": 0.125,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.484375,
+              "y": 0.140625,
+              "span": 0.15625,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.222656,
+              "y": 0.433594,
+              "span": 0.074219,
+              "rotate": 0
+            }
+          },
+          "shoulder": {
+            "idle": {
+              "x": 0.550781,
+              "y": 0.253906,
+              "span": 0.398438,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.335938,
+              "y": 0.84375,
+              "span": 0.332031,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.6875,
+              "y": 0.839844,
+              "span": 0.167969,
+              "rotate": 0
+            }
+          }
+        }
+      },
+      "stanceMode": "guard"
+    }
+  },
+  {
+    "kind": "AVATAR",
+    "key": "CLIMBER_V2",
+    "version": "v2",
+    "name": "Escalade",
+    "active": true,
+    "sortOrder": 2,
+    "manifest": {
+      "pixelArt": true,
+      "imageUrls": {
+        "back": {
+          "idle": "/artwork/avatars/climber/v2/back/idle.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/climber/v2/front/idle.png"
+        }
+      },
+      "thumbnailUrls": {
+        "back": {
+          "idle": "/artwork/avatars/climber/v2/thumb/back/idle.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/climber/v2/thumb/front/idle.png"
+        }
+      },
+      "attachments": {
+        "back": {
+          "eyes": {
+            "idle": {
+              "x": 0.546875,
+              "y": 0.171875,
+              "span": 0.132812,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.535156,
+              "y": 0.132812,
+              "span": 0.160156,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.789062,
+              "y": 0.433594,
+              "span": 0.078125,
+              "rotate": 0
+            }
+          },
+          "shoulder": {
+            "idle": {
+              "x": 0.445312,
+              "y": 0.246094,
+              "span": 0.421875,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.660156,
+              "y": 0.84375,
+              "span": 0.339844,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.285156,
+              "y": 0.839844,
+              "span": 0.175781,
+              "rotate": 0
+            }
+          }
+        },
+        "front": {
+          "eyes": {
+            "idle": {
+              "x": 0.453125,
+              "y": 0.171875,
+              "span": 0.132812,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.464844,
+              "y": 0.132812,
+              "span": 0.160156,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.210938,
+              "y": 0.433594,
+              "span": 0.078125,
+              "rotate": 0
+            }
+          },
+          "shoulder": {
+            "idle": {
+              "x": 0.554688,
+              "y": 0.246094,
+              "span": 0.421875,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.339844,
+              "y": 0.84375,
+              "span": 0.339844,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.714844,
+              "y": 0.839844,
+              "span": 0.175781,
+              "rotate": 0
+            }
+          }
+        }
+      },
+      "stanceMode": "guard"
+    }
+  },
+  {
+    "kind": "AVATAR",
+    "key": "SWIMMER_V2",
+    "version": "v2",
+    "name": "Natation",
+    "active": true,
+    "sortOrder": 3,
+    "manifest": {
+      "pixelArt": true,
+      "imageUrls": {
+        "back": {
+          "idle": "/artwork/avatars/swimmer/v2/back/idle.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/swimmer/v2/front/idle.png"
+        }
+      },
+      "thumbnailUrls": {
+        "back": {
+          "idle": "/artwork/avatars/swimmer/v2/thumb/back/idle.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/swimmer/v2/thumb/front/idle.png"
+        }
+      },
+      "attachments": {
+        "back": {
+          "eyes": {
+            "idle": {
+              "x": 0.539062,
+              "y": 0.183594,
+              "span": 0.132812,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.519531,
+              "y": 0.140625,
+              "span": 0.160156,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.789062,
+              "y": 0.433594,
+              "span": 0.078125,
+              "rotate": 0
+            }
+          },
+          "shoulder": {
+            "idle": {
+              "x": 0.449219,
+              "y": 0.253906,
+              "span": 0.421875,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.65625,
+              "y": 0.84375,
+              "span": 0.339844,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.296875,
+              "y": 0.839844,
+              "span": 0.175781,
+              "rotate": 0
+            }
+          }
+        },
+        "front": {
+          "eyes": {
+            "idle": {
+              "x": 0.460938,
+              "y": 0.183594,
+              "span": 0.132812,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.480469,
+              "y": 0.140625,
+              "span": 0.160156,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.210938,
+              "y": 0.433594,
+              "span": 0.078125,
+              "rotate": 0
+            }
+          },
+          "shoulder": {
+            "idle": {
+              "x": 0.550781,
+              "y": 0.253906,
+              "span": 0.421875,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.34375,
+              "y": 0.84375,
+              "span": 0.339844,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.703125,
+              "y": 0.839844,
+              "span": 0.175781,
+              "rotate": 0
+            }
+          }
+        }
+      },
+      "stanceMode": "guard"
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "PURSUIT_GOGGLES",
+    "version": "v2",
+    "name": "Lunettes de course-poursuite",
+    "active": true,
+    "sortOrder": 101,
+    "manifest": {
+      "slot": "HEAD",
+      "iconUrl": "/artwork/items/goggles/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V2",
+        "RUNNER_V2",
+        "CLIMBER_V2",
+        "SWIMMER_V2"
+      ],
+      "layers": [
+        {
+          "attachment": "eyes",
+          "plane": "front",
+          "aspectRatio": 2.327272727272727,
+          "scale": 1.3,
+          "pivot": {
+            "x": 0.55,
+            "y": 0.5
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/goggles/v1/back.png",
+            "front": "/artwork/items/goggles/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "HEADACHE_CAP",
+    "version": "v2",
+    "name": "Prise de tête",
+    "active": true,
+    "sortOrder": 104,
+    "manifest": {
+      "slot": "HEAD",
+      "iconUrl": "/artwork/items/climbing-cap/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V2",
+        "RUNNER_V2",
+        "CLIMBER_V2",
+        "SWIMMER_V2"
+      ],
+      "layers": [
+        {
+          "attachment": "head",
+          "plane": "front",
+          "aspectRatio": 1.4545454545454546,
+          "scale": 1.2,
+          "pivot": {
+            "x": 0.55,
+            "y": 0.88
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/climbing-cap/v1/back.png",
+            "front": "/artwork/items/climbing-cap/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "MIDNIGHT_SWIM_CAP",
+    "version": "v2",
+    "name": "Bonnet de bain de minuit",
+    "active": true,
+    "sortOrder": 106,
+    "manifest": {
+      "slot": "HEAD",
+      "iconUrl": "/artwork/items/swim-cap/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V2",
+        "RUNNER_V2",
+        "CLIMBER_V2",
+        "SWIMMER_V2"
+      ],
+      "layers": [
+        {
+          "attachment": "head",
+          "plane": "front",
+          "aspectRatio": 0.921875,
+          "scale": 1.1,
+          "pivot": {
+            "x": 0.55,
+            "y": 0.8
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/swim-cap/v1/back.png",
+            "front": "/artwork/items/swim-cap/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "HALTER_EGO",
+    "version": "v2",
+    "name": "Haltère ego",
+    "active": true,
+    "sortOrder": 100,
+    "manifest": {
+      "slot": "WEAPON",
+      "iconUrl": "/artwork/items/dumbbell/v2/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V2",
+        "RUNNER_V2",
+        "CLIMBER_V2",
+        "SWIMMER_V2"
+      ],
+      "layers": [
+        {
+          "attachment": "hand",
+          "plane": "behind",
+          "aspectRatio": 0.375,
+          "scale": 1,
+          "pivot": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/dumbbell/v2/back.png",
+            "front": "/artwork/items/dumbbell/v2/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "ACADEMIC_FLIPPERS",
+    "version": "v2",
+    "name": "Palmes académiques",
+    "active": true,
+    "sortOrder": 107,
+    "manifest": {
+      "slot": "FEET",
+      "iconUrl": "/artwork/items/flipper-side/v2/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V2",
+        "RUNNER_V2",
+        "CLIMBER_V2",
+        "SWIMMER_V2"
+      ],
+      "layers": [
+        {
+          "attachment": "footRear",
+          "plane": "front",
+          "aspectRatio": 1.3195876288659794,
+          "scale": 1,
+          "pivot": {
+            "x": 0.5,
+            "y": 0.19
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/flipper-facing/v2/back.png",
+            "front": "/artwork/items/flipper-facing/v2/front.png"
+          }
+        },
+        {
+          "attachment": "footFront",
+          "plane": "front",
+          "aspectRatio": 2.6122448979591835,
+          "scale": 1,
+          "pivot": {
+            "x": 0.13,
+            "y": 0.22
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/flipper-side/v2/back.png",
+            "front": "/artwork/items/flipper-side/v2/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "TRAVELERS_CLOAK",
+    "version": "v2",
+    "name": "Cape du voyageur",
+    "active": true,
+    "sortOrder": 108,
+    "manifest": {
+      "slot": "CHEST",
+      "iconUrl": "/artwork/items/cape/v2/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V2",
+        "RUNNER_V2",
+        "CLIMBER_V2",
+        "SWIMMER_V2"
+      ],
+      "layers": [
+        {
+          "attachment": "shoulder",
+          "plane": "behind",
+          "aspectRatio": 0.953125,
+          "scale": 1,
+          "pivot": {
+            "x": 0.72,
+            "y": 0.08
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/cape/v2/back.png",
+            "front": "/artwork/items/cape/v2/front.png"
+          }
+        }
+      ]
+    }
+  }
+]

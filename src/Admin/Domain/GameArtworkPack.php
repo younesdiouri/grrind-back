@@ -20,7 +20,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\UniqueConstraint(name: 'uniq_artwork_pack', columns: ['kind', 'pack_key', 'version'])]
 class GameArtworkPack
 {
-    public const array POSES = ['idle', 'attack', 'hit', 'critical', 'dodge', 'combo', 'replay'];
+    public const array POSES = \App\Shared\Domain\Appearance::POSES;
 
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME)]
@@ -169,6 +169,11 @@ class GameArtworkPack
     private function manifestError(array $data): ?string
     {
         if ('AVATAR' === $this->kind) {
+            if (isset($data['stanceMode']) && 'guard' !== $data['stanceMode']) {
+                return 'Le mode de garde partagé est guard ; omettre stanceMode pour des poses indépendantes.';
+            }
+            $sharedGuard = 'guard' === ($data['stanceMode'] ?? null);
+            $requiredPoses = $sharedGuard ? ['idle'] : self::POSES;
             if (!str_ends_with($this->key, '_'.strtoupper($this->version))) {
                 return 'La clé d’avatar doit terminer par sa version (par exemple RUNNER_V1).';
             }
@@ -180,7 +185,10 @@ class GameArtworkPack
                     if (!\is_array($data[$field][$view] ?? null)) {
                         return "Orientation manquante : {$field}.{$view}.";
                     }
-                    foreach (self::POSES as $pose) {
+                    if ($sharedGuard && ['idle'] !== array_keys($data[$field][$view])) {
+                        return 'Une garde partagée possède une seule image idle par orientation.';
+                    }
+                    foreach ($requiredPoses as $pose) {
                         if (!self::path($data[$field][$view][$pose] ?? null)) {
                             return "Image manquante ou invalide : {$field}.{$view}.{$pose}.";
                         }
@@ -199,7 +207,10 @@ class GameArtworkPack
                     if (!\is_string($anchor) || !preg_match('/^[a-zA-Z][a-zA-Z0-9]{0,31}$/', $anchor) || !\is_array($poses)) {
                         return 'Nom ou série d’ancrages invalide.';
                     }
-                    foreach (self::POSES as $pose) {
+                    if ($sharedGuard && ['idle'] !== array_keys($poses)) {
+                        return 'Un ancrage de garde partagé possède une seule position idle par orientation.';
+                    }
+                    foreach ($requiredPoses as $pose) {
                         $point = $poses[$pose] ?? null;
                         if (!\is_array($point) || !self::number($point['x'] ?? null, -0.25, 1.25)
                             || !self::number($point['y'] ?? null, -0.25, 1.25)
