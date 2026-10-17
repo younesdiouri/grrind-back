@@ -1,0 +1,34 @@
+{
+  "kind": "EQUIPMENT",
+  "key": "PURSUIT_GOGGLES",
+  "version": "v4",
+  "name": "Lunettes de course-poursuite",
+  "active": true,
+  "sortOrder": 101,
+  "manifest": {
+    "slot": "HEAD",
+    "iconUrl": "/artwork/items/goggles/v4/icon.png",
+    "compatibleAppearances": [
+      "STRENGTH_V3",
+      "RUNNER_V3",
+      "CLIMBER_V3",
+      "SWIMMER_V3"
+    ],
+    "layers": [
+      {
+        "attachment": "eyes",
+        "plane": "front",
+        "aspectRatio": 2.2857142857142856,
+        "scale": 1.3,
+        "pivot": {
+          "x": 0.55,
+          "y": 0.5
+        },
+        "sourceUrls": {
+          "back": "/artwork/items/goggles/v4/back.png",
+          "front": "/artwork/items/goggles/v4/front.png"
+        }
+      }
+    ]
+  }
+}

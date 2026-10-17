@@ -27,7 +27,7 @@ rotate → -rotate, pivot.x → 1-pivot.x. Les palmes utilisent réellement deux
 foregroundUrls et stanceMode: guard sont conservés pour les archives ; la production V3
 omet ce mode et renseigne les sept états. Un calibrage d’attaque ne modifie pas la garde.
 
-make console c=app:artwork:import recharge les dix packs V3 ; il peut écraser un réglage
+make console c=app:artwork:import recharge les dix packs courants (avatars V3, lunettes V4, autres objets V3) ; il peut écraser un réglage
 admin, à exporter avant réimport. La copie migrations/data/retro-v3.json est figée.
 Une nouvelle DA incompatible reçoit de nouveaux chemins et versions. Les combats figent
 appearance et key+artworkVersion ; sans pack actif, artworkVersion reste null.
@@ -37,3 +37,7 @@ le bonnet ouvert. Ces versions ne sont pas des références positives de portabi
 La revue actuelle et ses preuves sont dans ../grrind-app/docs/design/retro-v3-review.md :
 vues entières, contacts agrandis, objets seuls, tenues cumulées, puis contrôle du rendu mobile.
 Une coordonnée valide et un test vert ne prouvent pas la qualité visuelle.
+
+Les lunettes V4 omettent l’arceau arrière et la branche éloignée masqués par le crâne.
+Seule la branche proche est dessinée : ne pas réintroduire une boucle complète devant le front.
+La migration dédiée ne modifie ni les profils ni les autres calibrages ; goggles-v4.json est figé.
