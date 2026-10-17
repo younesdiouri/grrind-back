@@ -337,11 +337,25 @@ class InventoryItemRepository extends ServiceEntityRepository
      */
     public function equippedByPlayer(Uuid $userId): array
     {
+        return $this->equippedByPlayers([$userId]);
+    }
+
+    /**
+     * @param list<Uuid> $userIds
+     *
+     * @return list<InventoryItem>
+     */
+    public function equippedByPlayers(array $userIds): array
+    {
+        if ([] === $userIds) {
+            return [];
+        }
         /** @var list<InventoryItem> $items */
         $items = $this->createQueryBuilder('i')
-            ->andWhere('i.userId = :userId')
+            ->andWhere('i.userId IN (:userIds)')
             ->andWhere('i.slot IS NOT NULL')
-            ->setParameter('userId', $userId, UuidType::NAME)
+            ->andWhere('i.quantity > 0')
+            ->setParameter('userIds', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $userIds))
             ->getQuery()
             ->getResult();
 

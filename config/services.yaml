@@ -36,6 +36,7 @@ services:
     App\Shared\Application\GameRulesets: '@App\Shared\Infrastructure\Config\DatabaseGameRulesets'
     App\Shared\Application\PlayerStatistics: '@App\Combat\Infrastructure\ResolvedPlayerStatistics'
     App\Shared\Application\PublicInventories: '@App\Rewards\Infrastructure\PublicPlayerInventories'
+    App\Shared\Application\PlayerEquipment: '@App\Rewards\Infrastructure\EquippedPlayerItems'
     App\Shared\Application\ItemImageUrlResolver: '@App\Rewards\Infrastructure\Translation\ItemTranslator'
 
     App\Shared\Infrastructure\Config\DatabaseGameRulesets:

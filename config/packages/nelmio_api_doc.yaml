@@ -1744,6 +1744,16 @@ when@dev:
                             attack: { type: string, format: uri }
                             hit: { type: string, format: uri }
 
+                    BattleEquipment:
+                        type: object
+                        description: "Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Le premier pack TEMPERED_HEADBAND v1 utilise la base et les ancrages Murīd v2."
+                        additionalProperties:
+                            type: object
+                            required: [key, artworkVersion]
+                            properties:
+                                key: { type: string, example: TEMPERED_HEADBAND }
+                                artworkVersion: { type: string, nullable: true, example: v1 }
+
                     BattleEnemy:
                         type: object
                         description: |
@@ -1791,6 +1801,7 @@ when@dev:
                                 description: "Le héros du défié au moment du combat (#289), `null` face à un ennemi du catalogue. Ses poses **de face** sont dans `GET /api/appearances` ; `imageUrls` reste `null` pour un joueur."
                                 nullable: true
                                 allOf: [{ $ref: '#/components/schemas/Appearance' }]
+                            equipment: { $ref: '#/components/schemas/BattleEquipment' }
                             imageUrls: { $ref: '#/components/schemas/EnemyImageUrls' }
                             introduction:
                                 type: string
@@ -1906,6 +1917,7 @@ when@dev:
                                       required: [appearance]
                                       properties:
                                           appearance: { $ref: '#/components/schemas/Appearance' }
+                                          equipment: { $ref: '#/components/schemas/BattleEquipment' }
                             enemy: { $ref: '#/components/schemas/BattleEnemy' }
                             events:
                                 type: array

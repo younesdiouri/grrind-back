@@ -10,6 +10,7 @@ use App\Combat\Domain\Exception\CannotChallengeYourself;
 use App\Combat\Domain\Exception\OpponentNotFound;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
 use App\Shared\Application\GameRulesets;
+use App\Shared\Application\PlayerEquipment;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Application\Teammates;
@@ -87,6 +88,7 @@ final readonly class ChallengePlayerHandler
         private BattleRepository $battles,
         private string|GameRulesets $rulesetVersion,
         private ClockInterface $clock,
+        private PlayerEquipment $equipment,
     ) {
     }
 
@@ -125,6 +127,7 @@ final readonly class ChallengePlayerHandler
         $outcome = $this->simulator->fight($challengerFighter, $opponentFighter, new Randomizer(new Xoshiro256StarStar($seed)));
 
         $challenger = $progressions[$command->challengerId->toRfc4122()];
+        $equipment = $this->equipment->of([$command->challengerId, $command->opponentId]);
 
         $battle = Battle::duel(
             Uuid::v7(),
@@ -141,6 +144,8 @@ final readonly class ChallengePlayerHandler
             $now,
             $profiles[$command->challengerId->toRfc4122()]->appearance ?? Appearance::default(),
             $opponent->appearance,
+            $equipment[$command->challengerId->toRfc4122()] ?? [],
+            $equipment[$command->opponentId->toRfc4122()] ?? [],
         );
 
         $this->battles->add($battle);

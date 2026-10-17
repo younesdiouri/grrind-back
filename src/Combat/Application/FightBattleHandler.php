@@ -17,6 +17,7 @@ use App\Shared\Application\BattleDrop;
 use App\Shared\Application\BattleDrops;
 use App\Shared\Application\DroppedItem;
 use App\Shared\Application\GameRulesets;
+use App\Shared\Application\PlayerEquipment;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Domain\Appearance;
@@ -109,6 +110,7 @@ final readonly class FightBattleHandler
         private string|GameRulesets $rulesetVersion,
         private ClockInterface $clock,
         private PlayerProfiles $profiles,
+        private PlayerEquipment $equipment,
     ) {
     }
 
@@ -124,6 +126,7 @@ final readonly class FightBattleHandler
 
         $player = $this->fighters->forPlayer($progression, $command->playerId, $now);
         $appearance = $this->profiles->of([$command->playerId])[$command->playerId->toRfc4122()]->appearance ?? Appearance::default();
+        $equipment = $this->equipment->of([$command->playerId])[$command->playerId->toRfc4122()] ?? [];
 
         // Aucune ligne n'est encore écrite à ce stade : un refus ici — clé inconnue,
         // niveau insuffisant — ne laisse aucune trace, voir le docblock de la classe.
@@ -157,6 +160,7 @@ final readonly class FightBattleHandler
             $seed,
             $now,
             $appearance,
+            $equipment,
         ): Battle {
             $drop = $this->drops->rollFor($command->playerId, $enemy->key, $victory, $id, $now);
 
@@ -174,6 +178,7 @@ final readonly class FightBattleHandler
                 $this->version(),
                 $now,
                 $appearance,
+                $equipment,
             );
 
             $this->battles->add($battle);

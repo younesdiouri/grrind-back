@@ -149,7 +149,7 @@ class Battle
      * Les quatre caractéristiques, la Vitality, et le `Fighter` qui en a été dérivé — voir
      * {@see playerSnapshotOf()}.
      *
-     * @var array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @var array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     #[ORM\Column(type: Types::JSONB)]
     private array $playerSnapshot;
@@ -158,7 +158,7 @@ class Battle
      * La clé de l'ennemi du catalogue, et son `Fighter` au moment du combat — voir
      * {@see enemySnapshotOf()}.
      *
-     * @var array{key: string|null, name?: string, appearance?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @var array{key: string|null, name?: string, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     #[ORM\Column(type: Types::JSONB)]
     private array $enemySnapshot;
@@ -211,9 +211,9 @@ class Battle
     private DateTimeImmutable $foughtAt;
 
     /**
-     * @param array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}} $playerSnapshot
-     * @param array{key: string|null, name?: string, appearance?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}                                                                $enemySnapshot
-     * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}                                                                                                                                                                                                                                                                                                           $reward
+     * @param array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}} $playerSnapshot
+     * @param array{key: string|null, name?: string, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}                                                                $enemySnapshot
+     * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}}                                                                                                                                                                                                                                                                                                                                                                                   $reward
      */
     private function __construct(
         Uuid $id,
@@ -262,6 +262,7 @@ class Battle
      * persisté sur la ligne » dans le docblock de la classe.
      *
      * @param array{loot: list<array<string, mixed>>, coins: array{gained: int, before: int, after: int}} $reward
+     * @param array<string, array{key: string, artworkVersion: ?string}>                                  $equipment
      */
     public static function conclude(
         Uuid $id,
@@ -277,11 +278,12 @@ class Battle
         string $rulesetVersion,
         DateTimeImmutable $foughtAt,
         Appearance $playerAppearance,
+        array $equipment = [],
     ): self {
         return new self(
             $id,
             $playerId,
-            self::playerSnapshotOf($playerAttributes, $playerVitality, $playerFighter, $playerAppearance),
+            self::playerSnapshotOf($playerAttributes, $playerVitality, $playerFighter, $playerAppearance, $equipment),
             self::enemySnapshotOf($enemy, $enemyFighter),
             $outcome,
             $reward,
@@ -308,6 +310,9 @@ class Battle
      * `$reward` n'est pas un paramètre : un défi ne rapporte rien en v1 — voir le docblock de
      * {@see \App\Combat\Application\ChallengePlayerHandler} pour pourquoi ce n'est pas un
      * oubli. La forme vide est écrite ici, jamais une clé absente.
+     *
+     * @param array<string, array{key: string, artworkVersion: ?string}> $challengerEquipment
+     * @param array<string, array{key: string, artworkVersion: ?string}> $opponentEquipment
      */
     public static function duel(
         Uuid $id,
@@ -324,12 +329,14 @@ class Battle
         DateTimeImmutable $foughtAt,
         Appearance $challengerAppearance,
         Appearance $opponentAppearance,
+        array $challengerEquipment = [],
+        array $opponentEquipment = [],
     ): self {
         return new self(
             $id,
             $challengerId,
-            self::playerSnapshotOf($challengerAttributes, $challengerVitality, $challenger, $challengerAppearance),
-            ['key' => null, 'name' => $opponentName, 'appearance' => $opponentAppearance->value, 'fighter' => CombatSnapshot::fighter($opponent)],
+            self::playerSnapshotOf($challengerAttributes, $challengerVitality, $challenger, $challengerAppearance, $challengerEquipment),
+            ['key' => null, 'name' => $opponentName, 'appearance' => $opponentAppearance->value, 'equipment' => $opponentEquipment, 'fighter' => CombatSnapshot::fighter($opponent)],
             $outcome,
             ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
             $seed,
@@ -356,7 +363,7 @@ class Battle
     }
 
     /**
-     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     public function playerSnapshot(): array
     {
@@ -364,7 +371,7 @@ class Battle
     }
 
     /**
-     * @return array{key: string|null, name?: string, appearance?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @return array{key: string|null, name?: string, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     public function enemySnapshot(): array
     {
@@ -437,21 +444,25 @@ class Battle
     }
 
     /**
-     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @param array<string, array{key: string, artworkVersion: ?string}> $equipment
+     *
+     * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
-    private static function playerSnapshotOf(AttributeGains $attributes, int $vitality, Fighter $fighter, Appearance $appearance): array
+    private static function playerSnapshotOf(AttributeGains $attributes, int $vitality, Fighter $fighter, Appearance $appearance, array $equipment): array
     {
         return [
             'attributes' => $attributes->toArray(),
             'vitality' => $vitality,
             // Figée comme le pseudo du défié (#289) : le rejeu montre le héros de ce jour-là.
             'appearance' => $appearance->value,
+            // Les objets et versions sont des faits du combat, jamais relus depuis le sac (#296).
+            'equipment' => $equipment,
             'fighter' => CombatSnapshot::fighter($fighter),
         ];
     }
 
     /**
-     * @return array{key: string|null, name?: string, appearance?: string, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
+     * @return array{key: string|null, name?: string, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
     private static function enemySnapshotOf(Enemy $enemy, Fighter $fighter): array
     {

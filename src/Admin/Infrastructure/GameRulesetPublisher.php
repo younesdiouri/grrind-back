@@ -80,6 +80,36 @@ final readonly class GameRulesetPublisher
         $manager->flush();
     }
 
+    /** La démo ne publie que ses images/noms : un draft de balance en attente doit rester en attente. */
+    public function publishCombatArt(EntityManagerInterface $manager, GameEnemy $enemy, GameItem $item): void
+    {
+        $ruleset = $manager->find(GameRuleset::class, 1, LockMode::PESSIMISTIC_WRITE);
+        \assert($ruleset instanceof GameRuleset);
+        $manager->refresh($ruleset, LockMode::PESSIMISTIC_WRITE);
+        /** @var array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>} $snapshot */
+        $snapshot = $ruleset->snapshot();
+        \assert(\is_array($snapshot['combat']) && \is_array($snapshot['combat']['enemies']) && \is_array($snapshot['items']));
+        foreach ($snapshot['combat']['enemies'] as &$entry) {
+            \assert(\is_array($entry));
+            if ($entry['key'] === $enemy->getKey()) {
+                $entry['translations'] = $enemy->getTranslations();
+                $entry['image_paths'] = ['idle' => $enemy->getIdleImagePath(), 'attack' => $enemy->getAttackImagePath(), 'hit' => $enemy->getHitImagePath()];
+            }
+        }
+        unset($entry);
+        foreach ($snapshot['items'] as &$entry) {
+            \assert(\is_array($entry));
+            if ($entry['key'] === $item->getKey()) {
+                $entry['image_path'] = $item->getImagePath();
+            }
+        }
+        unset($entry);
+        self::validate($snapshot);
+        $ruleset->publish($snapshot, $ruleset->version());
+        $manager->persist(new GamePublication($ruleset->revision(), 'combat-art-demo', $ruleset->version(), $snapshot));
+        $manager->flush();
+    }
+
     /**
      * La simulation valide exactement les mêmes règles sans modifier le publié ni les
      * marqueurs historiques du catalogue. Le caller fige ce tableau pour toute l'opération.
