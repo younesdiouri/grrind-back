@@ -5,6 +5,10 @@
 <style>
  .artwork{background:#050816;color:#EAF6FF;padding:24px}.artwork-controls{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}.artwork select{padding:10px;background:#16213D;color:#EAF6FF;border:1px solid #35E4FF}.artwork-items{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}.artwork-item{display:flex;align-items:center;gap:8px;border:1px solid #16213D;padding:8px}.artwork-item img{width:48px;height:48px;object-fit:contain;image-rendering:pixelated}.artwork-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}.artwork-card{background:#0B1124;border:1px solid #16213D;padding:12px}.artwork-card h3{font-size:16px;color:#35E4FF}.sprite{position:relative;aspect-ratio:1;isolation:isolate}.sprite img{position:absolute;width:100%;height:100%;object-fit:contain;image-rendering:pixelated}.artwork p{color:#8290AE}
 </style>
+<style>
+ .artwork-card button,.artwork-inspector button{background:#16213D;color:#EAF6FF;border:1px solid #35E4FF;padding:8px;cursor:pointer}.artwork-inspector{background:#050816;color:#EAF6FF;border:1px solid #35E4FF;max-width:95vw;max-height:92vh}.artwork-inspector::backdrop{background:#000b}.inspection-body{display:flex;gap:24px;flex-wrap:wrap;align-items:center;padding:24px}.inspection-overview{width:320px;flex-shrink:0}.inspection-details{display:flex;gap:12px;flex-wrap:wrap;max-width:640px}.inspection-details figure{margin:0}.inspection-details figcaption{padding:8px;color:#35E4FF}.inspection-crop{width:180px;height:180px;overflow:hidden;position:relative;background:#0B1124}.inspection-crop .sprite{position:absolute;width:512px;height:512px}
+</style>
+<dialog id="art-inspector" class="artwork-inspector"><form method="dialog"><button>Fermer</button></form><h2 id="art-inspector-title"></h2><div id="art-inspector-body" class="inspection-body"></div></dialog>
 <div class="artwork">
  <form id="art-upload" action="{{ path('admin_artwork_upload') }}" method="post" enctype="multipart/form-data">
   <input type="hidden" name="_token" value="{{ csrf_token('artwork_upload') }}">
@@ -12,7 +16,7 @@
   <button type="submit">Importer un PNG</button>
   <output id="art-upload-result"></output>
  </form>
- <p>Quatre sportifs pieds nus, une garde par identité, deux orientations. Les sept états partagent cette garde : le combat anime le corps et les objets ensemble, avec une prise d’arme fixe.</p>
+ <p>Quatre sportifs pieds nus, sept stances distinctes et deux orientations. Inspecter chaque composition entière puis les raccords agrandis : tête, prise d’arme, pieds et épaule.</p>
  <p>V1 visible : coiffe ou lunettes, arme, chaussures et cape. Ceintures, gourdes et sacs de taille sont retirés du rendu. Les anciennes versions restent archivées pour les replays.</p>
  <div class="artwork-controls"><label>Avatar <select id="art-avatar"></select></label><label>Orientation <select id="art-view"><option value="back">Joueur · vers la droite</option><option value="front">Adversaire · vers la gauche</option></select></label></div>
  <div id="art-items" class="artwork-items"></div>
@@ -33,6 +37,18 @@
  const labels={idle:'Garde',attack:'Attaque',hit:'Coup reçu',critical:'Critique',dodge:'Esquive',combo:'Combo',replay:'Relance'};
  for(const avatar of catalog.appearances.filter(a=>a.selectable)){const option=document.createElement('option');option.value=avatar.key;option.textContent=avatar.name;avatarSelect.append(option);}
  function image(src){const element=document.createElement('img');element.src=src;element.alt='';return element;}
+ function inspect(canvas,avatar,view,pose){
+  const dialog=document.getElementById('art-inspector'),content=document.getElementById('art-inspector-body');
+  document.getElementById('art-inspector-title').textContent=avatar.name+' · '+labels[pose]+' · '+(view==='back'?'vers la droite':'vers la gauche');
+  const overview=document.createElement('div');overview.className='inspection-overview';overview.append(canvas.cloneNode(true));
+  const details=document.createElement('div');details.className='inspection-details';
+  for(const [attachment,label] of [['head','Coiffe et front'],['hand','Poing et poignée'],['footRear','Pied arrière'],['footFront','Pied avant'],['shoulder','Cape et épaule']]){
+   const point=avatar.attachments[view]?.[attachment]?.[pose];if(!point)continue;
+   const figure=document.createElement('figure'),caption=document.createElement('figcaption'),crop=document.createElement('div'),copy=canvas.cloneNode(true);
+   caption.textContent=label;crop.className='inspection-crop';copy.style.left=(90-point.x*512)+'px';copy.style.top=(90-point.y*512)+'px';crop.append(copy);figure.append(caption,crop);details.append(figure);
+  }
+  content.replaceChildren(overview,details);dialog.showModal();
+ }
  function render(){
   const avatar=catalog.appearances.find(a=>a.key===avatarSelect.value),view=viewSelect.value;
   if(!avatar)return;
@@ -57,7 +73,8 @@
     }
    }
    if(avatar.foregroundUrls?.[view]?.[pose]){const hands=image(avatar.foregroundUrls[view][pose]);hands.style.zIndex='3';canvas.append(hands);}
-   card.append(title,canvas);grid.append(card);
+   const inspectButton=document.createElement('button');inspectButton.type='button';inspectButton.textContent='Inspecter les raccords';inspectButton.addEventListener('click',()=>inspect(canvas,avatar,view,pose));
+   card.append(title,canvas,inspectButton);grid.append(card);
   }
  }
  avatarSelect.addEventListener('change',render);viewSelect.addEventListener('change',render);render();

@@ -27,6 +27,8 @@ final class ArtworkAdminTest extends ApiTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('#art-catalog');
         self::assertSelectorExists('form#art-upload');
+        self::assertSelectorExists('dialog#art-inspector');
+        self::assertSelectorExists('#art-inspector-body');
         $this->client->request('POST', '/admin/artwork/upload', ['_token' => 'forged']);
         self::assertResponseStatusCodeSame(403);
         $token = $crawler->filter('input[name="_token"]')->attr('value');

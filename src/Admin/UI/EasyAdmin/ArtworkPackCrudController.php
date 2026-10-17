@@ -38,7 +38,7 @@ final class ArtworkPackCrudController extends AbstractCrudController
     {
         $existing = Crud::PAGE_EDIT === $pageName;
         yield TextField::new('key', 'Clé stable')->setFormTypeOption('disabled', $existing)
-            ->setHelp('Avatar : inclure la version, par exemple RUNNER_V1. Objet : clé du catalogue des items.');
+            ->setHelp('Avatar : inclure la version, par exemple RUNNER_V3. Objet : clé du catalogue des items.');
         yield ChoiceField::new('kind', 'Type')->setChoices(['Avatar' => 'AVATAR', 'Équipement' => 'EQUIPMENT'])->setFormTypeOption('disabled', $existing);
         yield TextField::new('version')->setFormTypeOption('disabled', $existing);
         yield TextField::new('name', 'Nom affiché');
@@ -47,6 +47,6 @@ final class ArtworkPackCrudController extends AbstractCrudController
         yield IntegerField::new('sortOrder', 'Ordre');
         yield TextareaField::new('manifestJson', 'Images, ancrages et compatibilités (JSON)')
             ->setNumOfRows(28)->hideOnIndex()
-            ->setHelp('stanceMode: guard = une seule image et position idle par vue, partagée entre les 7 états. Sans ce mode, fournir 7 poses × 2 vues. Chemins /artwork/ publics, transformations normalisées. Nouvelle DA incompatible = nouvelle version.');
+            ->setHelp('Production courante : 7 poses distinctes × 2 vues, chacune avec ses ancrages. stanceMode: guard reste réservé aux gardes partagées archivées. Chemins /artwork/ publics, transformations normalisées. Nouvelle DA incompatible = nouvelle version.');
     }
 }
