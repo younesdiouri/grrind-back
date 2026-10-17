@@ -773,7 +773,7 @@ paths:
       operationId: get_identity_appearances
       responses:
         '200':
-          description: 'Les modèles de héros disponibles et leurs poses.'
+          description: 'Avatars, poses, ancrages et équipements graphiques.'
           content:
             application/json:
               schema:
@@ -2112,6 +2112,7 @@ components:
         - id
         - displayName
         - registeredAt
+        - appearance
         - level
         - xpIntoLevel
         - xpToNextLevel
@@ -2128,6 +2129,8 @@ components:
         registeredAt:
           type: string
           format: date-time
+        appearance:
+          $ref: '#/components/schemas/Appearance'
         level:
           type: integer
           example: 12
@@ -3730,12 +3733,21 @@ components:
           description: 'Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
           type: integer
       type: object
+    Appearance:
+      description: 'Clé stable d’un avatar du catalogue graphique administrable.'
+      type: string
+      pattern: '^[A-Z][A-Z0-9_]{0,63}$'
+      example: RUNNER_V1
+      maxLength: 64
     AppearancePoses:
-      description: 'Trois PNG RGBA carrés, même cadrage et même ligne de sol. `hit` est le coup reçu ; une esquive utilise `idle`.'
       required:
         - idle
         - attack
         - hit
+        - critical
+        - dodge
+        - combo
+        - replay
       properties:
         idle:
           type: string
@@ -3746,10 +3758,22 @@ components:
         hit:
           type: string
           format: uri
+        critical:
+          type: string
+          format: uri
+        dodge:
+          type: string
+          format: uri
+        combo:
+          type: string
+          format: uri
+        replay:
+          type: string
+          format: uri
       type: object
       additionalProperties: false
     AppearanceViews:
-      description: "**De dos** pour le joueur lui-même, **de face** pour qui l'affronte."
+      description: 'back regarde à droite ; front regarde à gauche.'
       required:
         - back
         - front
@@ -3759,29 +3783,164 @@ components:
         front:
           $ref: '#/components/schemas/AppearancePoses'
       type: object
+    FighterAttachment:
+      required:
+        - x
+        - 'y'
+        - span
+        - rotate
+      properties:
+        x:
+          type: number
+        'y':
+          type: number
+        span:
+          type: number
+          minimum: 0.001
+        rotate:
+          type: number
+      type: object
+    FighterAttachments:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/FighterAttachment'
+    AppearanceAttachments:
+      required:
+        - back
+        - front
+      properties:
+        back:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/FighterAttachments'
+        front:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/FighterAttachments'
+      type: object
     AppearanceModel:
-      description: 'Un modèle de héros complet, purement cosmétique. `imageUrls` en 1024 px, `thumbnailUrls` en 256 px pour afficher une guilde entière.'
+      description: 'Base rétro sans équipement, sept poses par orientation et ancrages des objets.'
       required:
         - key
+        - version
+        - name
+        - selectable
+        - pixelArt
         - imageUrls
         - thumbnailUrls
+        - attachments
       properties:
         key:
           $ref: '#/components/schemas/Appearance'
+        version:
+          type: string
+        name:
+          type: string
+        selectable:
+          type: boolean
+        pixelArt:
+          type: boolean
         imageUrls:
           $ref: '#/components/schemas/AppearanceViews'
         thumbnailUrls:
           $ref: '#/components/schemas/AppearanceViews'
+        foregroundUrls:
+          $ref: '#/components/schemas/AppearanceViews'
+        attachments:
+          $ref: '#/components/schemas/AppearanceAttachments'
+      type: object
+    EquipmentArtworkLayer:
+      required:
+        - attachment
+        - plane
+        - aspectRatio
+        - scale
+        - pivot
+        - sourceUrls
+      properties:
+        attachment:
+          type: string
+        plane:
+          type: string
+          enum:
+            - front
+            - behind
+        aspectRatio:
+          type: number
+          minimum: 0.01
+        scale:
+          type: number
+          minimum: 0.01
+        pivot:
+          required:
+            - x
+            - 'y'
+          properties:
+            x:
+              type: number
+            'y':
+              type: number
+          type: object
+        sourceUrls:
+          required:
+            - back
+            - front
+          properties:
+            back:
+              type: string
+              format: uri
+            front:
+              type: string
+              format: uri
+          type: object
+      type: object
+    EquipmentArtworkModel:
+      required:
+        - key
+        - version
+        - name
+        - selectable
+        - slot
+        - iconUrl
+        - compatibleAppearances
+        - layers
+      properties:
+        key:
+          type: string
+        version:
+          type: string
+        name:
+          type: string
+        selectable:
+          type: boolean
+        slot:
+          type: string
+        iconUrl:
+          type: string
+          format: uri
+        compatibleAppearances:
+          type: array
+          items:
+            $ref: '#/components/schemas/Appearance'
+        layers:
+          type: array
+          items:
+            $ref: '#/components/schemas/EquipmentArtworkLayer'
       type: object
     AppearanceCatalog:
-      description: 'Tous les modèles que `PATCH /api/me` accepte. Le profil, les combats et Ālam ne portent que la clé.'
+      description: 'Packs graphiques administrables ; les versions non sélectionnables restent lisibles.'
       required:
         - appearances
+        - equipment
       properties:
         appearances:
           type: array
           items:
             $ref: '#/components/schemas/AppearanceModel'
+        equipment:
+          type: array
+          items:
+            $ref: '#/components/schemas/EquipmentArtworkModel'
       type: object
     EnemyImageUrls:
       description: 'Pack publié complet ou null. URLs absolues publiques, HTTPS en production. hit est la pose de coup reçu ; une esquive utilise idle. La présentation courante est aussi utilisée au rejeu.'
@@ -3803,7 +3962,7 @@ components:
       nullable: true
       additionalProperties: false
     BattleEquipment:
-      description: 'Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Le premier pack TEMPERED_HEADBAND v1 utilise la base et les ancrages Murīd v2.'
+      description: 'Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Les images et compatibilités de chaque version viennent du catalogue graphique.'
       type: object
       additionalProperties:
         required:
@@ -4424,10 +4583,6 @@ components:
           nullable: true
           default: null
       type: object
-    Appearance:
-      type: string
-      enum:
-        - MURID
     UpdateProfileRequest:
       properties:
         displayName:
@@ -4452,10 +4607,9 @@ components:
             $ref: '#/components/schemas/NotificationPreferenceRequest'
           default: []
         appearance:
+          type: string
+          pattern: '[A-Z][A-Z0-9_]{0,63}'
           nullable: true
-          oneOf:
-            -
-              $ref: '#/components/schemas/Appearance'
           default: null
       type: object
     RegisterRequest:

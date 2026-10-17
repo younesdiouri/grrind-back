@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GRRIND · Avatars sportifs</title></head><body>
+<nav><a href="{{ path('admin') }}">Retour à l’administration</a></nav>
+<h1>Avatars sportifs · vue d’ensemble</h1>
+<style>
+ .artwork{background:#050816;color:#EAF6FF;padding:24px}.artwork-controls{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}.artwork select{padding:10px;background:#16213D;color:#EAF6FF;border:1px solid #35E4FF}.artwork-items{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}.artwork-item{display:flex;align-items:center;gap:8px;border:1px solid #16213D;padding:8px}.artwork-item img{width:48px;height:48px;object-fit:contain;image-rendering:pixelated}.artwork-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}.artwork-card{background:#0B1124;border:1px solid #16213D;padding:12px}.artwork-card h3{font-size:16px;color:#35E4FF}.sprite{position:relative;aspect-ratio:1;isolation:isolate}.sprite img{position:absolute;width:100%;height:100%;object-fit:contain;image-rendering:pixelated}.artwork p{color:#8290AE}
+</style>
+<div class="artwork">
+ <form id="art-upload" action="{{ path('admin_artwork_upload') }}" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="_token" value="{{ csrf_token('artwork_upload') }}">
+  <label>Nouveau PNG <input type="file" name="image" accept="image/png" required></label>
+  <button type="submit">Importer un PNG</button>
+  <output id="art-upload-result"></output>
+ </form>
+ <p>Quatre sportifs, sept poses, deux orientations. Choisir des objets pour inspecter leur superposition réelle.</p>
+ <div class="artwork-controls"><label>Avatar <select id="art-avatar"></select></label><label>Orientation <select id="art-view"><option value="back">Joueur · vers la droite</option><option value="front">Adversaire · vers la gauche</option></select></label></div>
+ <div id="art-items" class="artwork-items"></div>
+ <div id="art-grid" class="artwork-grid"></div>
+</div>
+<script type="application/json" id="art-catalog">{{ catalogJson|raw }}</script>
+<script>
+(() => {
+ const upload=document.getElementById('art-upload'),receipt=document.getElementById('art-upload-result');
+ upload.addEventListener('submit',async event=>{
+  event.preventDefault();receipt.textContent='Import…';
+  try{const response=await fetch(upload.action,{method:'POST',body:new FormData(upload)});const result=await response.json();receipt.textContent=response.ok?result.path:result.error;}
+  catch{receipt.textContent='Import indisponible. Réessayer.';}
+ });
+ const catalog=JSON.parse(document.getElementById('art-catalog').textContent);
+ const avatarSelect=document.getElementById('art-avatar'),viewSelect=document.getElementById('art-view');
+ const chosen=new Map(),poses=['idle','attack','hit','critical','dodge','combo','replay'];
+ const labels={idle:'Garde',attack:'Attaque',hit:'Coup reçu',critical:'Critique',dodge:'Esquive',combo:'Combo',replay:'Relance'};
+ for(const avatar of catalog.appearances){const option=document.createElement('option');option.value=avatar.key;option.textContent=avatar.name;avatarSelect.append(option);}
+ function image(src){const element=document.createElement('img');element.src=src;element.alt='';return element;}
+ function render(){
+  const avatar=catalog.appearances.find(a=>a.key===avatarSelect.value),view=viewSelect.value;
+  if(!avatar)return;
+  const items=catalog.equipment.filter(item=>item.selectable&&item.compatibleAppearances.includes(avatar.key));
+  const controls=document.getElementById('art-items');controls.replaceChildren();
+  for(const item of items){
+   const label=document.createElement('label');label.className='artwork-item';
+   const input=document.createElement('input');input.type='checkbox';input.checked=chosen.get(item.slot)===item.key;
+   input.addEventListener('change',()=>{if(input.checked)chosen.set(item.slot,item.key);else chosen.delete(item.slot);render();});
+   label.append(input,image(item.iconUrl),document.createTextNode(item.name));controls.append(label);
+  }
+  const grid=document.getElementById('art-grid');grid.replaceChildren();
+  for(const pose of poses){
+   const card=document.createElement('div');card.className='artwork-card';const title=document.createElement('h3');title.textContent=labels[pose];
+   const canvas=document.createElement('div');canvas.className='sprite';const body=image(avatar.imageUrls[view][pose]);body.style.zIndex='1';canvas.append(body);
+   for(const item of items.filter(item=>chosen.get(item.slot)===item.key)){
+    for(const layer of item.layers){
+     const anchor=avatar.attachments[view]?.[layer.attachment]?.[pose];if(!anchor)continue;
+     const width=anchor.span*layer.scale,height=width/layer.aspectRatio,part=image(layer.sourceUrls[view]),pivotX=view==='front'?1-layer.pivot.x:layer.pivot.x;
+     Object.assign(part.style,{left:100*(anchor.x-width*pivotX)+'%',top:100*(anchor.y-height*layer.pivot.y)+'%',width:100*width+'%',height:100*height+'%',zIndex:layer.plane==='behind'?'0':'2',transformOrigin:100*pivotX+'% '+100*layer.pivot.y+'%',transform:'rotate('+anchor.rotate+'deg)'});
+     canvas.append(part);
+    }
+   }
+   if(avatar.foregroundUrls?.[view]?.[pose]){const hands=image(avatar.foregroundUrls[view][pose]);hands.style.zIndex='3';canvas.append(hands);}
+   card.append(title,canvas);grid.append(card);
+  }
+ }
+ avatarSelect.addEventListener('change',render);viewSelect.addEventListener('change',render);render();
+})();
+</script>
+</body></html>

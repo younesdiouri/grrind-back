@@ -255,7 +255,7 @@ final class BattlesTest extends ApiTestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable(),
-            Appearance::Murid,
+            Appearance::DEFAULT,
         );
 
         $repository->add($battle);

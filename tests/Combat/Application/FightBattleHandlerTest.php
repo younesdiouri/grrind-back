@@ -184,7 +184,7 @@ final class FightBattleHandlerTest extends KernelTestCase
                 $seed,
                 $this->rulesetVersion,
                 $now,
-                Appearance::Murid,
+                Appearance::DEFAULT,
             );
 
             $this->battles->add($battle);

@@ -63,7 +63,7 @@ trait Battles
             random_bytes(32),
             'v1-000000000000',
             $foughtAt,
-            Appearance::Murid,
+            Appearance::DEFAULT,
         );
 
         $repository->add($battle);

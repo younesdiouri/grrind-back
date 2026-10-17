@@ -43,9 +43,10 @@ final class ShopRoutesTest extends ApiTestCase
         $body = $this->shop($bob);
 
         self::assertSame(0, $body['coins']);
-        self::assertCount(9, $body['items'], 'Les EPIC et LEGENDARY ne sont jamais à l\'étal.');
+        self::assertNotEmpty($body['items']);
 
         foreach ($body['items'] as $item) {
+            self::assertNotContains($item['rarity'], ['EPIC', 'LEGENDARY'], 'Ces raretés ne sont jamais à l’étal.');
             self::assertFalse($item['affordable'], (string) $item['key']);
             self::assertFalse($item['owned'], (string) $item['key']);
         }

@@ -7,17 +7,23 @@ namespace App\Identity\Application;
 use App\Identity\Domain\Locale;
 use App\Identity\Domain\User;
 use App\Identity\Infrastructure\Doctrine\UserRepository;
+use App\Shared\Application\ArtworkCatalog;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\Timezone;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 final readonly class UpdateProfileHandler
 {
-    public function __construct(private UserRepository $users)
+    public function __construct(private UserRepository $users, private ArtworkCatalog $artwork)
     {
     }
 
     public function __invoke(User $user, UpdateProfile $command): User
     {
+        if (null !== $command->appearance && !$this->artwork->selectable($command->appearance)) {
+            throw new UnprocessableEntityHttpException('Cette apparence n’est pas disponible.');
+        }
+
         if (null !== $command->displayName) {
             $user->rename($command->displayName);
         }

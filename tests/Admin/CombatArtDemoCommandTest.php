@@ -50,7 +50,7 @@ final class CombatArtDemoCommandTest extends ApiTestCase
         $source = sys_get_temp_dir().'/combat-art-'.Uuid::v7()->toRfc4122();
         $filesystem->mkdir([$source.'/pebble', $source.'/headband']);
         foreach (['pebble/idle', 'pebble/attack', 'pebble/hit', 'headband/icon'] as $file) {
-            $filesystem->copy('/app/public/appearances/murid/v2/back/idle.png', $source.'/'.$file.'.png');
+            $filesystem->copy('/app/public/artwork/avatars/strength/v1/back/idle.png', $source.'/'.$file.'.png');
         }
         // ApiTestCase conserve game_* entre tests : la démo ne doit pas publier son atelier dans les autres fixtures.
         $connection = $manager->getConnection();

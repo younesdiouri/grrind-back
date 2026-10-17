@@ -277,7 +277,7 @@ class Battle
         string $seed,
         string $rulesetVersion,
         DateTimeImmutable $foughtAt,
-        Appearance $playerAppearance,
+        string $playerAppearance,
         array $equipment = [],
     ): self {
         return new self(
@@ -327,8 +327,8 @@ class Battle
         string $seed,
         string $rulesetVersion,
         DateTimeImmutable $foughtAt,
-        Appearance $challengerAppearance,
-        Appearance $opponentAppearance,
+        string $challengerAppearance,
+        string $opponentAppearance,
         array $challengerEquipment = [],
         array $opponentEquipment = [],
     ): self {
@@ -336,7 +336,7 @@ class Battle
             $id,
             $challengerId,
             self::playerSnapshotOf($challengerAttributes, $challengerVitality, $challenger, $challengerAppearance, $challengerEquipment),
-            ['key' => null, 'name' => $opponentName, 'appearance' => $opponentAppearance->value, 'equipment' => $opponentEquipment, 'fighter' => CombatSnapshot::fighter($opponent)],
+            ['key' => null, 'name' => $opponentName, 'appearance' => $opponentAppearance, 'equipment' => $opponentEquipment, 'fighter' => CombatSnapshot::fighter($opponent)],
             $outcome,
             ['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]],
             $seed,
@@ -448,13 +448,13 @@ class Battle
      *
      * @return array{attributes: array{strength: int, endurance: int, mobility: int, dexterity: int}, vitality: int, appearance?: string, equipment?: array<string, array{key: string, artworkVersion: ?string}>, fighter: array{hp: int, damage: int, mitigationPermille: int, comboPermille: int, dodgePermille: int, maintenancePermille: int, criticalChancePermille: int, guardPermille: int, criticalResistancePermille: int, cooldownReductionPermille: int, precisionPermille: int}}
      */
-    private static function playerSnapshotOf(AttributeGains $attributes, int $vitality, Fighter $fighter, Appearance $appearance, array $equipment): array
+    private static function playerSnapshotOf(AttributeGains $attributes, int $vitality, Fighter $fighter, string $appearance, array $equipment): array
     {
         return [
             'attributes' => $attributes->toArray(),
             'vitality' => $vitality,
             // Figée comme le pseudo du défié (#289) : le rejeu montre le héros de ce jour-là.
-            'appearance' => $appearance->value,
+            'appearance' => $appearance,
             // Les objets et versions sont des faits du combat, jamais relus depuis le sac (#296).
             'equipment' => $equipment,
             'fighter' => CombatSnapshot::fighter($fighter),

@@ -4,64 +4,106 @@ declare(strict_types=1);
 
 namespace App\Tests\Identity;
 
+use App\Admin\Domain\GameArtworkPack;
 use App\Shared\Domain\Appearance;
 use App\Tests\Support\ApiTestCase;
+use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Response;
 
-/** L'apparence du joueur et le catalogue des modèles (#289). */
 final class AppearanceTest extends ApiTestCase
 {
-    public function testEveryAccountStartsWithTheDefaultModelAndCanChooseOne(): void
+    public function testEveryAccountCanChooseEachPublishedSportsAvatar(): void
     {
         $headers = $this->openAccount()->headers;
-        self::assertSame(Appearance::default()->value, self::decode($this->get('/api/me', $headers))['appearance']);
-
-        $response = $this->send('PATCH', '/api/me', ['appearance' => Appearance::Murid->value], $headers);
-
-        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-        self::assertSame(Appearance::Murid->value, self::decode($response)['appearance']);
+        self::assertSame(Appearance::DEFAULT, self::decode($this->get('/api/me', $headers))['appearance']);
+        foreach (['STRENGTH_V1', 'RUNNER_V1', 'CLIMBER_V1', 'SWIMMER_V1'] as $key) {
+            $response = $this->send('PATCH', '/api/me', ['appearance' => $key], $headers);
+            self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
+            self::assertSame($key, self::decode($response)['appearance']);
+            self::assertSame($key, self::decode($this->get('/api/me', $headers))['appearance']);
+        }
     }
 
-    public function testRejectsAModelOutsideTheCatalogue(): void
+    public function testUnknownAndUnavailableModelsCannotBeSelected(): void
     {
-        $response = $this->send('PATCH', '/api/me', ['appearance' => 'GOLDEN_KNIGHT'], $this->openAccount()->headers);
-
-        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+        $headers = $this->openAccount()->headers;
+        self::assertSame(422, $this->send('PATCH', '/api/me', ['appearance' => 'GOLDEN_KNIGHT'], $headers)->getStatusCode());
+        $connection = self::getContainer()->get(Connection::class);
+        self::assertInstanceOf(Connection::class, $connection);
+        $connection->executeStatement("UPDATE game_artwork_pack SET active = FALSE WHERE pack_key = 'RUNNER_V1'");
+        try {
+            self::assertSame(422, $this->send('PATCH', '/api/me', ['appearance' => 'RUNNER_V1'], $headers)->getStatusCode());
+            $catalog = self::decode($this->get('/api/appearances', $headers));
+            self::assertIsArray($catalog['appearances']);
+            self::assertContains('RUNNER_V1', array_column($catalog['appearances'], 'key'));
+        } finally {
+            $connection->executeStatement("UPDATE game_artwork_pack SET active = TRUE WHERE pack_key = 'RUNNER_V1'");
+        }
     }
 
-    /**
-     * Chaque URL du catalogue désigne un PNG livré sous `public/` : un modèle ajouté à l'enum
-     * sans ses douze images échoue ici plutôt qu'en 404 sur le téléphone.
-     */
-    public function testTheCatalogueServesBothViewsAndThumbnailsOfEveryModel(): void
+    public function testEveryPoseThumbnailAndWearableHasARealFileAndCompatibleAnchors(): void
     {
         $response = $this->get('/api/appearances', $this->openAccount()->headers);
-
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-        $appearances = self::decode($response)['appearances'];
-        self::assertIsArray($appearances);
-        self::assertSame(array_column(Appearance::cases(), 'value'), array_column($appearances, 'key'));
-        self::assertSame('murid/v2', Appearance::Murid->directory());
-
-        foreach ($appearances as $model) {
+        $catalog = self::decode($response);
+        self::assertIsArray($catalog['appearances']);
+        self::assertIsArray($catalog['equipment']);
+        self::assertCount(4, $catalog['appearances']);
+        self::assertCount(8, $catalog['equipment']);
+        $models = [];
+        foreach ($catalog['appearances'] as $model) {
             self::assertIsArray($model);
-            foreach (['imageUrls' => 1024, 'thumbnailUrls' => 256] as $field => $side) {
+            self::assertIsString($model['key']);
+            $models[$model['key']] = $model;
+            foreach (['imageUrls' => 512, 'thumbnailUrls' => 256, 'foregroundUrls' => 256] as $field => $size) {
                 self::assertIsArray($model[$field]);
-                self::assertSame(['back', 'front'], array_keys($model[$field]));
-                foreach ($model[$field] as $poses) {
-                    self::assertIsArray($poses);
-                    self::assertSame(['idle', 'attack', 'hit'], array_keys($poses));
-                    foreach ($poses as $url) {
+                foreach (['back', 'front'] as $view) {
+                    $urls = $model[$field][$view];
+                    self::assertIsArray($urls);
+                    self::assertSame(GameArtworkPack::POSES, array_keys($urls));
+                    foreach ($urls as $url) {
                         self::assertIsString($url);
-                        self::assertMatchesRegularExpression('#^https?://[^/]+/appearances/#', $url);
-                        $file = \dirname(__DIR__, 2).'/public'.parse_url($url, \PHP_URL_PATH);
-                        self::assertFileExists($file);
+                        $file = self::fileFor($url);
                         $dimensions = getimagesize($file);
                         self::assertNotFalse($dimensions);
-                        self::assertSame([$side, $side], [$dimensions[0], $dimensions[1]], $file);
+                        self::assertSame([$size, $size], [$dimensions[0], $dimensions[1]], $file);
                     }
                 }
             }
         }
+        foreach ($catalog['equipment'] as $item) {
+            self::assertIsArray($item);
+            self::assertIsString($item['iconUrl']);
+            self::fileFor($item['iconUrl']);
+            self::assertIsArray($item['layers']);
+            self::assertIsArray($item['compatibleAppearances']);
+            foreach ($item['layers'] as $layer) {
+                self::assertIsArray($layer);
+                self::assertIsArray($layer['sourceUrls']);
+                foreach (['back', 'front'] as $view) {
+                    self::assertIsString($layer['sourceUrls'][$view]);
+                    self::fileFor($layer['sourceUrls'][$view]);
+                    foreach ($item['compatibleAppearances'] as $key) {
+                        self::assertIsString($key);
+                        $anchors = $models[$key]['attachments'];
+                        self::assertIsArray($anchors);
+                        self::assertIsArray($anchors[$view]);
+                        self::assertIsString($layer['attachment']);
+                        $series = $anchors[$view][$layer['attachment']];
+                        self::assertIsArray($series);
+                        self::assertSame(GameArtworkPack::POSES, array_keys($series));
+                    }
+                }
+            }
+        }
+    }
+
+    private static function fileFor(string $url): string
+    {
+        self::assertMatchesRegularExpression('#^https?://[^/]+/artwork/#', $url);
+        $file = \dirname(__DIR__, 2).'/public'.parse_url($url, \PHP_URL_PATH);
+        self::assertFileExists($file);
+
+        return $file;
     }
 }

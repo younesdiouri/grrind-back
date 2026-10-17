@@ -8,7 +8,6 @@ use App\Progression\Domain\XpBreakdownSource;
 use App\Shared\Application\PushNotification;
 use App\Shared\Application\PushRoute;
 use App\Shared\Domain\Activity\Discipline;
-use App\Shared\Domain\Appearance;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
 use App\Shared\UI\Http\ProblemDetails;
@@ -217,9 +216,10 @@ final class OpenApiContractTest extends KernelTestCase
     }
 
     /** Même garantie que `Discipline` : le schéma sort de l'enum, `UpdateProfileRequest` le type (#289). */
-    public function testTheAppearanceSchemaStillComesFromTheEnum(): void
+    public function testAppearanceKeysAreOpenToBackendConfiguredPacks(): void
     {
-        self::assertSame(array_column(Appearance::cases(), 'value'), $this->schema('Appearance')['enum']);
+        self::assertSame('string', $this->schema('Appearance')['type']);
+        self::assertArrayNotHasKey('enum', $this->schema('Appearance'));
     }
 
     public function testUserProfileDeclaresThePersistedLocale(): void

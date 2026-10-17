@@ -1,0 +1,3060 @@
+[
+  {
+    "kind": "AVATAR",
+    "key": "STRENGTH_V1",
+    "version": "v1",
+    "name": "Muscu",
+    "active": true,
+    "sortOrder": 0,
+    "manifest": {
+      "pixelArt": true,
+      "imageUrls": {
+        "back": {
+          "idle": "/artwork/avatars/strength/v1/back/idle.png",
+          "attack": "/artwork/avatars/strength/v1/back/attack.png",
+          "hit": "/artwork/avatars/strength/v1/back/hit.png",
+          "critical": "/artwork/avatars/strength/v1/back/critical.png",
+          "dodge": "/artwork/avatars/strength/v1/back/dodge.png",
+          "combo": "/artwork/avatars/strength/v1/back/combo.png",
+          "replay": "/artwork/avatars/strength/v1/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/strength/v1/front/idle.png",
+          "attack": "/artwork/avatars/strength/v1/front/attack.png",
+          "hit": "/artwork/avatars/strength/v1/front/hit.png",
+          "critical": "/artwork/avatars/strength/v1/front/critical.png",
+          "dodge": "/artwork/avatars/strength/v1/front/dodge.png",
+          "combo": "/artwork/avatars/strength/v1/front/combo.png",
+          "replay": "/artwork/avatars/strength/v1/front/replay.png"
+        }
+      },
+      "thumbnailUrls": {
+        "back": {
+          "idle": "/artwork/avatars/strength/v1/thumb/back/idle.png",
+          "attack": "/artwork/avatars/strength/v1/thumb/back/attack.png",
+          "hit": "/artwork/avatars/strength/v1/thumb/back/hit.png",
+          "critical": "/artwork/avatars/strength/v1/thumb/back/critical.png",
+          "dodge": "/artwork/avatars/strength/v1/thumb/back/dodge.png",
+          "combo": "/artwork/avatars/strength/v1/thumb/back/combo.png",
+          "replay": "/artwork/avatars/strength/v1/thumb/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/strength/v1/thumb/front/idle.png",
+          "attack": "/artwork/avatars/strength/v1/thumb/front/attack.png",
+          "hit": "/artwork/avatars/strength/v1/thumb/front/hit.png",
+          "critical": "/artwork/avatars/strength/v1/thumb/front/critical.png",
+          "dodge": "/artwork/avatars/strength/v1/thumb/front/dodge.png",
+          "combo": "/artwork/avatars/strength/v1/thumb/front/combo.png",
+          "replay": "/artwork/avatars/strength/v1/thumb/front/replay.png"
+        }
+      },
+      "attachments": {
+        "back": {
+          "eyes": {
+            "idle": {
+              "x": 0.553,
+              "y": 0.165,
+              "span": 0.16,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.574,
+              "y": 0.273,
+              "span": 0.16,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.4,
+              "y": 0.191,
+              "span": 0.16,
+              "rotate": -15
+            },
+            "critical": {
+              "x": 0.654,
+              "y": 0.328,
+              "span": 0.16,
+              "rotate": 12
+            },
+            "dodge": {
+              "x": 0.402,
+              "y": 0.297,
+              "span": 0.16,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.57,
+              "y": 0.227,
+              "span": 0.16,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.6,
+              "y": 0.281,
+              "span": 0.16,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.528,
+              "y": 0.135,
+              "span": 0.192,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.549,
+              "y": 0.243,
+              "span": 0.192,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.375,
+              "y": 0.161,
+              "span": 0.192,
+              "rotate": -15
+            },
+            "critical": {
+              "x": 0.629,
+              "y": 0.298,
+              "span": 0.192,
+              "rotate": 12
+            },
+            "dodge": {
+              "x": 0.377,
+              "y": 0.267,
+              "span": 0.192,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.545,
+              "y": 0.197,
+              "span": 0.192,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.575,
+              "y": 0.251,
+              "span": 0.192,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.75,
+              "y": 0.41,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "attack": {
+              "x": 0.945,
+              "y": 0.359,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "hit": {
+              "x": 0.758,
+              "y": 0.43,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "critical": {
+              "x": 0.77,
+              "y": 0.086,
+              "span": 0.12,
+              "rotate": 65
+            },
+            "dodge": {
+              "x": 0.559,
+              "y": 0.414,
+              "span": 0.16,
+              "rotate": 55
+            },
+            "combo": {
+              "x": 0.875,
+              "y": 0.336,
+              "span": 0.16,
+              "rotate": -45
+            },
+            "replay": {
+              "x": 0.918,
+              "y": 0.426,
+              "span": 0.16,
+              "rotate": -65
+            }
+          },
+          "waist": {
+            "idle": {
+              "x": 0.52,
+              "y": 0.51,
+              "span": 0.24,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.55,
+              "y": 0.51,
+              "span": 0.24,
+              "rotate": 5
+            },
+            "hit": {
+              "x": 0.53,
+              "y": 0.51,
+              "span": 0.24,
+              "rotate": -12
+            },
+            "critical": {
+              "x": 0.57,
+              "y": 0.59,
+              "span": 0.24,
+              "rotate": 15
+            },
+            "dodge": {
+              "x": 0.51,
+              "y": 0.56,
+              "span": 0.24,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.53,
+              "y": 0.52,
+              "span": 0.24,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.54,
+              "y": 0.56,
+              "span": 0.24,
+              "rotate": 8
+            }
+          },
+          "hip": {
+            "idle": {
+              "x": 0.595,
+              "y": 0.525,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.625,
+              "y": 0.525,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.605,
+              "y": 0.525,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.645,
+              "y": 0.605,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.585,
+              "y": 0.575,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.605,
+              "y": 0.535,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.615,
+              "y": 0.575,
+              "span": 0.105,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.66,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.7,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.71,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.77,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.79,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.71,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.72,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.29,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": -10
+            },
+            "attack": {
+              "x": 0.2,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -15
+            },
+            "hit": {
+              "x": 0.32,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.23,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -20
+            },
+            "dodge": {
+              "x": 0.26,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.25,
+              "y": 0.85,
+              "span": 0.175,
+              "rotate": -30
+            },
+            "replay": {
+              "x": 0.16,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -15
+            }
+          }
+        },
+        "front": {
+          "eyes": {
+            "idle": {
+              "x": 0.447,
+              "y": 0.165,
+              "span": 0.16,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.426,
+              "y": 0.273,
+              "span": 0.16,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.6,
+              "y": 0.191,
+              "span": 0.16,
+              "rotate": 15
+            },
+            "critical": {
+              "x": 0.346,
+              "y": 0.328,
+              "span": 0.16,
+              "rotate": -12
+            },
+            "dodge": {
+              "x": 0.598,
+              "y": 0.297,
+              "span": 0.16,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.43,
+              "y": 0.227,
+              "span": 0.16,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.4,
+              "y": 0.281,
+              "span": 0.16,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.472,
+              "y": 0.135,
+              "span": 0.192,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.451,
+              "y": 0.243,
+              "span": 0.192,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.625,
+              "y": 0.161,
+              "span": 0.192,
+              "rotate": 15
+            },
+            "critical": {
+              "x": 0.371,
+              "y": 0.298,
+              "span": 0.192,
+              "rotate": -12
+            },
+            "dodge": {
+              "x": 0.623,
+              "y": 0.267,
+              "span": 0.192,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.455,
+              "y": 0.197,
+              "span": 0.192,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.425,
+              "y": 0.251,
+              "span": 0.192,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.25,
+              "y": 0.41,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "attack": {
+              "x": 0.055,
+              "y": 0.359,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "hit": {
+              "x": 0.242,
+              "y": 0.43,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "critical": {
+              "x": 0.23,
+              "y": 0.086,
+              "span": 0.12,
+              "rotate": -65
+            },
+            "dodge": {
+              "x": 0.441,
+              "y": 0.414,
+              "span": 0.16,
+              "rotate": -55
+            },
+            "combo": {
+              "x": 0.125,
+              "y": 0.336,
+              "span": 0.16,
+              "rotate": 45
+            },
+            "replay": {
+              "x": 0.082,
+              "y": 0.426,
+              "span": 0.16,
+              "rotate": 65
+            }
+          },
+          "waist": {
+            "idle": {
+              "x": 0.48,
+              "y": 0.51,
+              "span": 0.24,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.45,
+              "y": 0.51,
+              "span": 0.24,
+              "rotate": -5
+            },
+            "hit": {
+              "x": 0.47,
+              "y": 0.51,
+              "span": 0.24,
+              "rotate": 12
+            },
+            "critical": {
+              "x": 0.43,
+              "y": 0.59,
+              "span": 0.24,
+              "rotate": -15
+            },
+            "dodge": {
+              "x": 0.49,
+              "y": 0.56,
+              "span": 0.24,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.47,
+              "y": 0.52,
+              "span": 0.24,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.46,
+              "y": 0.56,
+              "span": 0.24,
+              "rotate": -8
+            }
+          },
+          "hip": {
+            "idle": {
+              "x": 0.405,
+              "y": 0.525,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.375,
+              "y": 0.525,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.395,
+              "y": 0.525,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.355,
+              "y": 0.605,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.415,
+              "y": 0.575,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.395,
+              "y": 0.535,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.385,
+              "y": 0.575,
+              "span": 0.105,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.34,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.3,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.29,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.23,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.21,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.29,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.28,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.71,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 10
+            },
+            "attack": {
+              "x": 0.8,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 15
+            },
+            "hit": {
+              "x": 0.68,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.77,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 20
+            },
+            "dodge": {
+              "x": 0.74,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.75,
+              "y": 0.85,
+              "span": 0.175,
+              "rotate": 30
+            },
+            "replay": {
+              "x": 0.84,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 15
+            }
+          }
+        }
+      },
+      "foregroundUrls": {
+        "back": {
+          "idle": "/artwork/avatars/strength/v1/foreground/back/idle.png",
+          "attack": "/artwork/avatars/strength/v1/foreground/back/attack.png",
+          "hit": "/artwork/avatars/strength/v1/foreground/back/hit.png",
+          "critical": "/artwork/avatars/strength/v1/foreground/back/critical.png",
+          "dodge": "/artwork/avatars/strength/v1/foreground/back/dodge.png",
+          "combo": "/artwork/avatars/strength/v1/foreground/back/combo.png",
+          "replay": "/artwork/avatars/strength/v1/foreground/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/strength/v1/foreground/front/idle.png",
+          "attack": "/artwork/avatars/strength/v1/foreground/front/attack.png",
+          "hit": "/artwork/avatars/strength/v1/foreground/front/hit.png",
+          "critical": "/artwork/avatars/strength/v1/foreground/front/critical.png",
+          "dodge": "/artwork/avatars/strength/v1/foreground/front/dodge.png",
+          "combo": "/artwork/avatars/strength/v1/foreground/front/combo.png",
+          "replay": "/artwork/avatars/strength/v1/foreground/front/replay.png"
+        }
+      }
+    }
+  },
+  {
+    "kind": "AVATAR",
+    "key": "RUNNER_V1",
+    "version": "v1",
+    "name": "Course",
+    "active": true,
+    "sortOrder": 1,
+    "manifest": {
+      "pixelArt": true,
+      "imageUrls": {
+        "back": {
+          "idle": "/artwork/avatars/runner/v1/back/idle.png",
+          "attack": "/artwork/avatars/runner/v1/back/attack.png",
+          "hit": "/artwork/avatars/runner/v1/back/hit.png",
+          "critical": "/artwork/avatars/runner/v1/back/critical.png",
+          "dodge": "/artwork/avatars/runner/v1/back/dodge.png",
+          "combo": "/artwork/avatars/runner/v1/back/combo.png",
+          "replay": "/artwork/avatars/runner/v1/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/runner/v1/front/idle.png",
+          "attack": "/artwork/avatars/runner/v1/front/attack.png",
+          "hit": "/artwork/avatars/runner/v1/front/hit.png",
+          "critical": "/artwork/avatars/runner/v1/front/critical.png",
+          "dodge": "/artwork/avatars/runner/v1/front/dodge.png",
+          "combo": "/artwork/avatars/runner/v1/front/combo.png",
+          "replay": "/artwork/avatars/runner/v1/front/replay.png"
+        }
+      },
+      "thumbnailUrls": {
+        "back": {
+          "idle": "/artwork/avatars/runner/v1/thumb/back/idle.png",
+          "attack": "/artwork/avatars/runner/v1/thumb/back/attack.png",
+          "hit": "/artwork/avatars/runner/v1/thumb/back/hit.png",
+          "critical": "/artwork/avatars/runner/v1/thumb/back/critical.png",
+          "dodge": "/artwork/avatars/runner/v1/thumb/back/dodge.png",
+          "combo": "/artwork/avatars/runner/v1/thumb/back/combo.png",
+          "replay": "/artwork/avatars/runner/v1/thumb/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/runner/v1/thumb/front/idle.png",
+          "attack": "/artwork/avatars/runner/v1/thumb/front/attack.png",
+          "hit": "/artwork/avatars/runner/v1/thumb/front/hit.png",
+          "critical": "/artwork/avatars/runner/v1/thumb/front/critical.png",
+          "dodge": "/artwork/avatars/runner/v1/thumb/front/dodge.png",
+          "combo": "/artwork/avatars/runner/v1/thumb/front/combo.png",
+          "replay": "/artwork/avatars/runner/v1/thumb/front/replay.png"
+        }
+      },
+      "attachments": {
+        "back": {
+          "eyes": {
+            "idle": {
+              "x": 0.543,
+              "y": 0.215,
+              "span": 0.13,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.57,
+              "y": 0.246,
+              "span": 0.13,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.449,
+              "y": 0.258,
+              "span": 0.13,
+              "rotate": -15
+            },
+            "critical": {
+              "x": 0.633,
+              "y": 0.355,
+              "span": 0.13,
+              "rotate": 12
+            },
+            "dodge": {
+              "x": 0.473,
+              "y": 0.395,
+              "span": 0.13,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.59,
+              "y": 0.254,
+              "span": 0.13,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.602,
+              "y": 0.305,
+              "span": 0.13,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.518,
+              "y": 0.185,
+              "span": 0.156,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.545,
+              "y": 0.216,
+              "span": 0.156,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.424,
+              "y": 0.228,
+              "span": 0.156,
+              "rotate": -15
+            },
+            "critical": {
+              "x": 0.608,
+              "y": 0.325,
+              "span": 0.156,
+              "rotate": 12
+            },
+            "dodge": {
+              "x": 0.448,
+              "y": 0.365,
+              "span": 0.156,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.565,
+              "y": 0.224,
+              "span": 0.156,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.577,
+              "y": 0.275,
+              "span": 0.156,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.715,
+              "y": 0.406,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "attack": {
+              "x": 0.875,
+              "y": 0.336,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "hit": {
+              "x": 0.754,
+              "y": 0.41,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "critical": {
+              "x": 0.73,
+              "y": 0.156,
+              "span": 0.12,
+              "rotate": 30
+            },
+            "dodge": {
+              "x": 0.566,
+              "y": 0.508,
+              "span": 0.16,
+              "rotate": 50
+            },
+            "combo": {
+              "x": 0.809,
+              "y": 0.367,
+              "span": 0.16,
+              "rotate": -45
+            },
+            "replay": {
+              "x": 0.871,
+              "y": 0.434,
+              "span": 0.16,
+              "rotate": -65
+            }
+          },
+          "waist": {
+            "idle": {
+              "x": 0.535,
+              "y": 0.5,
+              "span": 0.17,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.527,
+              "y": 0.523,
+              "span": 0.17,
+              "rotate": 5
+            },
+            "hit": {
+              "x": 0.496,
+              "y": 0.488,
+              "span": 0.17,
+              "rotate": -12
+            },
+            "critical": {
+              "x": 0.563,
+              "y": 0.594,
+              "span": 0.17,
+              "rotate": 15
+            },
+            "dodge": {
+              "x": 0.543,
+              "y": 0.625,
+              "span": 0.17,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.539,
+              "y": 0.527,
+              "span": 0.17,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.566,
+              "y": 0.566,
+              "span": 0.17,
+              "rotate": 8
+            }
+          },
+          "hip": {
+            "idle": {
+              "x": 0.61,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.602,
+              "y": 0.538,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.571,
+              "y": 0.503,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.638,
+              "y": 0.609,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.618,
+              "y": 0.64,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.614,
+              "y": 0.542,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.641,
+              "y": 0.581,
+              "span": 0.105,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.66,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.67,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.67,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.76,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.74,
+              "y": 0.85,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.68,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.68,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.35,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -10
+            },
+            "attack": {
+              "x": 0.21,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -15
+            },
+            "hit": {
+              "x": 0.37,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.26,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": -20
+            },
+            "dodge": {
+              "x": 0.36,
+              "y": 0.85,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.35,
+              "y": 0.84,
+              "span": 0.175,
+              "rotate": -30
+            },
+            "replay": {
+              "x": 0.21,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": -15
+            }
+          }
+        },
+        "front": {
+          "eyes": {
+            "idle": {
+              "x": 0.457,
+              "y": 0.215,
+              "span": 0.13,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.43,
+              "y": 0.246,
+              "span": 0.13,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.551,
+              "y": 0.258,
+              "span": 0.13,
+              "rotate": 15
+            },
+            "critical": {
+              "x": 0.367,
+              "y": 0.355,
+              "span": 0.13,
+              "rotate": -12
+            },
+            "dodge": {
+              "x": 0.527,
+              "y": 0.395,
+              "span": 0.13,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.41,
+              "y": 0.254,
+              "span": 0.13,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.398,
+              "y": 0.305,
+              "span": 0.13,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.482,
+              "y": 0.185,
+              "span": 0.156,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.455,
+              "y": 0.216,
+              "span": 0.156,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.576,
+              "y": 0.228,
+              "span": 0.156,
+              "rotate": 15
+            },
+            "critical": {
+              "x": 0.392,
+              "y": 0.325,
+              "span": 0.156,
+              "rotate": -12
+            },
+            "dodge": {
+              "x": 0.552,
+              "y": 0.365,
+              "span": 0.156,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.435,
+              "y": 0.224,
+              "span": 0.156,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.423,
+              "y": 0.275,
+              "span": 0.156,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.285,
+              "y": 0.406,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "attack": {
+              "x": 0.125,
+              "y": 0.336,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "hit": {
+              "x": 0.246,
+              "y": 0.41,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "critical": {
+              "x": 0.27,
+              "y": 0.156,
+              "span": 0.12,
+              "rotate": -30
+            },
+            "dodge": {
+              "x": 0.434,
+              "y": 0.508,
+              "span": 0.16,
+              "rotate": -50
+            },
+            "combo": {
+              "x": 0.191,
+              "y": 0.367,
+              "span": 0.16,
+              "rotate": 45
+            },
+            "replay": {
+              "x": 0.129,
+              "y": 0.434,
+              "span": 0.16,
+              "rotate": 65
+            }
+          },
+          "waist": {
+            "idle": {
+              "x": 0.465,
+              "y": 0.5,
+              "span": 0.17,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.473,
+              "y": 0.523,
+              "span": 0.17,
+              "rotate": -5
+            },
+            "hit": {
+              "x": 0.504,
+              "y": 0.488,
+              "span": 0.17,
+              "rotate": 12
+            },
+            "critical": {
+              "x": 0.437,
+              "y": 0.594,
+              "span": 0.17,
+              "rotate": -15
+            },
+            "dodge": {
+              "x": 0.457,
+              "y": 0.625,
+              "span": 0.17,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.461,
+              "y": 0.527,
+              "span": 0.17,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.434,
+              "y": 0.566,
+              "span": 0.17,
+              "rotate": -8
+            }
+          },
+          "hip": {
+            "idle": {
+              "x": 0.39,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.398,
+              "y": 0.538,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.429,
+              "y": 0.503,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.362,
+              "y": 0.609,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.382,
+              "y": 0.64,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.386,
+              "y": 0.542,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.359,
+              "y": 0.581,
+              "span": 0.105,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.34,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.33,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.33,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.24,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.26,
+              "y": 0.85,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.32,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.32,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.65,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 10
+            },
+            "attack": {
+              "x": 0.79,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 15
+            },
+            "hit": {
+              "x": 0.63,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.74,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 20
+            },
+            "dodge": {
+              "x": 0.64,
+              "y": 0.85,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.65,
+              "y": 0.84,
+              "span": 0.175,
+              "rotate": 30
+            },
+            "replay": {
+              "x": 0.79,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 15
+            }
+          }
+        }
+      },
+      "foregroundUrls": {
+        "back": {
+          "idle": "/artwork/avatars/runner/v1/foreground/back/idle.png",
+          "attack": "/artwork/avatars/runner/v1/foreground/back/attack.png",
+          "hit": "/artwork/avatars/runner/v1/foreground/back/hit.png",
+          "critical": "/artwork/avatars/runner/v1/foreground/back/critical.png",
+          "dodge": "/artwork/avatars/runner/v1/foreground/back/dodge.png",
+          "combo": "/artwork/avatars/runner/v1/foreground/back/combo.png",
+          "replay": "/artwork/avatars/runner/v1/foreground/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/runner/v1/foreground/front/idle.png",
+          "attack": "/artwork/avatars/runner/v1/foreground/front/attack.png",
+          "hit": "/artwork/avatars/runner/v1/foreground/front/hit.png",
+          "critical": "/artwork/avatars/runner/v1/foreground/front/critical.png",
+          "dodge": "/artwork/avatars/runner/v1/foreground/front/dodge.png",
+          "combo": "/artwork/avatars/runner/v1/foreground/front/combo.png",
+          "replay": "/artwork/avatars/runner/v1/foreground/front/replay.png"
+        }
+      }
+    }
+  },
+  {
+    "kind": "AVATAR",
+    "key": "CLIMBER_V1",
+    "version": "v1",
+    "name": "Escalade",
+    "active": true,
+    "sortOrder": 2,
+    "manifest": {
+      "pixelArt": true,
+      "imageUrls": {
+        "back": {
+          "idle": "/artwork/avatars/climber/v1/back/idle.png",
+          "attack": "/artwork/avatars/climber/v1/back/attack.png",
+          "hit": "/artwork/avatars/climber/v1/back/hit.png",
+          "critical": "/artwork/avatars/climber/v1/back/critical.png",
+          "dodge": "/artwork/avatars/climber/v1/back/dodge.png",
+          "combo": "/artwork/avatars/climber/v1/back/combo.png",
+          "replay": "/artwork/avatars/climber/v1/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/climber/v1/front/idle.png",
+          "attack": "/artwork/avatars/climber/v1/front/attack.png",
+          "hit": "/artwork/avatars/climber/v1/front/hit.png",
+          "critical": "/artwork/avatars/climber/v1/front/critical.png",
+          "dodge": "/artwork/avatars/climber/v1/front/dodge.png",
+          "combo": "/artwork/avatars/climber/v1/front/combo.png",
+          "replay": "/artwork/avatars/climber/v1/front/replay.png"
+        }
+      },
+      "thumbnailUrls": {
+        "back": {
+          "idle": "/artwork/avatars/climber/v1/thumb/back/idle.png",
+          "attack": "/artwork/avatars/climber/v1/thumb/back/attack.png",
+          "hit": "/artwork/avatars/climber/v1/thumb/back/hit.png",
+          "critical": "/artwork/avatars/climber/v1/thumb/back/critical.png",
+          "dodge": "/artwork/avatars/climber/v1/thumb/back/dodge.png",
+          "combo": "/artwork/avatars/climber/v1/thumb/back/combo.png",
+          "replay": "/artwork/avatars/climber/v1/thumb/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/climber/v1/thumb/front/idle.png",
+          "attack": "/artwork/avatars/climber/v1/thumb/front/attack.png",
+          "hit": "/artwork/avatars/climber/v1/thumb/front/hit.png",
+          "critical": "/artwork/avatars/climber/v1/thumb/front/critical.png",
+          "dodge": "/artwork/avatars/climber/v1/thumb/front/dodge.png",
+          "combo": "/artwork/avatars/climber/v1/thumb/front/combo.png",
+          "replay": "/artwork/avatars/climber/v1/thumb/front/replay.png"
+        }
+      },
+      "attachments": {
+        "back": {
+          "eyes": {
+            "idle": {
+              "x": 0.562,
+              "y": 0.164,
+              "span": 0.14,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.558,
+              "y": 0.219,
+              "span": 0.14,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.402,
+              "y": 0.195,
+              "span": 0.14,
+              "rotate": -15
+            },
+            "critical": {
+              "x": 0.672,
+              "y": 0.273,
+              "span": 0.14,
+              "rotate": 12
+            },
+            "dodge": {
+              "x": 0.703,
+              "y": 0.328,
+              "span": 0.14,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.578,
+              "y": 0.219,
+              "span": 0.14,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.648,
+              "y": 0.262,
+              "span": 0.14,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.537,
+              "y": 0.134,
+              "span": 0.168,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.533,
+              "y": 0.189,
+              "span": 0.168,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.377,
+              "y": 0.165,
+              "span": 0.168,
+              "rotate": -15
+            },
+            "critical": {
+              "x": 0.647,
+              "y": 0.243,
+              "span": 0.168,
+              "rotate": 12
+            },
+            "dodge": {
+              "x": 0.678,
+              "y": 0.298,
+              "span": 0.168,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.553,
+              "y": 0.189,
+              "span": 0.168,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.623,
+              "y": 0.232,
+              "span": 0.168,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.754,
+              "y": 0.41,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "attack": {
+              "x": 0.93,
+              "y": 0.313,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "hit": {
+              "x": 0.793,
+              "y": 0.355,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "critical": {
+              "x": 0.754,
+              "y": 0.09,
+              "span": 0.12,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.664,
+              "y": 0.543,
+              "span": 0.16,
+              "rotate": -10
+            },
+            "combo": {
+              "x": 0.883,
+              "y": 0.352,
+              "span": 0.16,
+              "rotate": -45
+            },
+            "replay": {
+              "x": 0.934,
+              "y": 0.469,
+              "span": 0.16,
+              "rotate": -65
+            }
+          },
+          "waist": {
+            "idle": {
+              "x": 0.53,
+              "y": 0.5,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.51,
+              "y": 0.5,
+              "span": 0.2,
+              "rotate": 5
+            },
+            "hit": {
+              "x": 0.54,
+              "y": 0.5,
+              "span": 0.2,
+              "rotate": -12
+            },
+            "critical": {
+              "x": 0.57,
+              "y": 0.58,
+              "span": 0.2,
+              "rotate": 15
+            },
+            "dodge": {
+              "x": 0.52,
+              "y": 0.58,
+              "span": 0.2,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.51,
+              "y": 0.52,
+              "span": 0.2,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.54,
+              "y": 0.58,
+              "span": 0.2,
+              "rotate": 8
+            }
+          },
+          "hip": {
+            "idle": {
+              "x": 0.605,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.585,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.615,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.645,
+              "y": 0.595,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.595,
+              "y": 0.595,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.585,
+              "y": 0.535,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.615,
+              "y": 0.595,
+              "span": 0.105,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.7,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.76,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.72,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.79,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.71,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.7,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.79,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.3,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -10
+            },
+            "attack": {
+              "x": 0.17,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -15
+            },
+            "hit": {
+              "x": 0.32,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.25,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": -20
+            },
+            "dodge": {
+              "x": 0.23,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.25,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": -30
+            },
+            "replay": {
+              "x": 0.2,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -15
+            }
+          }
+        },
+        "front": {
+          "eyes": {
+            "idle": {
+              "x": 0.438,
+              "y": 0.164,
+              "span": 0.14,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.442,
+              "y": 0.219,
+              "span": 0.14,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.598,
+              "y": 0.195,
+              "span": 0.14,
+              "rotate": 15
+            },
+            "critical": {
+              "x": 0.328,
+              "y": 0.273,
+              "span": 0.14,
+              "rotate": -12
+            },
+            "dodge": {
+              "x": 0.297,
+              "y": 0.328,
+              "span": 0.14,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.422,
+              "y": 0.219,
+              "span": 0.14,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.352,
+              "y": 0.262,
+              "span": 0.14,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.463,
+              "y": 0.134,
+              "span": 0.168,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.467,
+              "y": 0.189,
+              "span": 0.168,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.623,
+              "y": 0.165,
+              "span": 0.168,
+              "rotate": 15
+            },
+            "critical": {
+              "x": 0.353,
+              "y": 0.243,
+              "span": 0.168,
+              "rotate": -12
+            },
+            "dodge": {
+              "x": 0.322,
+              "y": 0.298,
+              "span": 0.168,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.447,
+              "y": 0.189,
+              "span": 0.168,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.377,
+              "y": 0.232,
+              "span": 0.168,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.246,
+              "y": 0.41,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "attack": {
+              "x": 0.07,
+              "y": 0.313,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "hit": {
+              "x": 0.207,
+              "y": 0.355,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "critical": {
+              "x": 0.246,
+              "y": 0.09,
+              "span": 0.12,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.336,
+              "y": 0.543,
+              "span": 0.16,
+              "rotate": 10
+            },
+            "combo": {
+              "x": 0.117,
+              "y": 0.352,
+              "span": 0.16,
+              "rotate": 45
+            },
+            "replay": {
+              "x": 0.066,
+              "y": 0.469,
+              "span": 0.16,
+              "rotate": 65
+            }
+          },
+          "waist": {
+            "idle": {
+              "x": 0.47,
+              "y": 0.5,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.49,
+              "y": 0.5,
+              "span": 0.2,
+              "rotate": -5
+            },
+            "hit": {
+              "x": 0.46,
+              "y": 0.5,
+              "span": 0.2,
+              "rotate": 12
+            },
+            "critical": {
+              "x": 0.43,
+              "y": 0.58,
+              "span": 0.2,
+              "rotate": -15
+            },
+            "dodge": {
+              "x": 0.48,
+              "y": 0.58,
+              "span": 0.2,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.49,
+              "y": 0.52,
+              "span": 0.2,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.46,
+              "y": 0.58,
+              "span": 0.2,
+              "rotate": -8
+            }
+          },
+          "hip": {
+            "idle": {
+              "x": 0.395,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.415,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.385,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.355,
+              "y": 0.595,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.405,
+              "y": 0.595,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.415,
+              "y": 0.535,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.385,
+              "y": 0.595,
+              "span": 0.105,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.3,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.24,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.28,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.21,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.29,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.3,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.21,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.7,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 10
+            },
+            "attack": {
+              "x": 0.83,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 15
+            },
+            "hit": {
+              "x": 0.68,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.75,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 20
+            },
+            "dodge": {
+              "x": 0.77,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.75,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 30
+            },
+            "replay": {
+              "x": 0.8,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 15
+            }
+          }
+        }
+      },
+      "foregroundUrls": {
+        "back": {
+          "idle": "/artwork/avatars/climber/v1/foreground/back/idle.png",
+          "attack": "/artwork/avatars/climber/v1/foreground/back/attack.png",
+          "hit": "/artwork/avatars/climber/v1/foreground/back/hit.png",
+          "critical": "/artwork/avatars/climber/v1/foreground/back/critical.png",
+          "dodge": "/artwork/avatars/climber/v1/foreground/back/dodge.png",
+          "combo": "/artwork/avatars/climber/v1/foreground/back/combo.png",
+          "replay": "/artwork/avatars/climber/v1/foreground/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/climber/v1/foreground/front/idle.png",
+          "attack": "/artwork/avatars/climber/v1/foreground/front/attack.png",
+          "hit": "/artwork/avatars/climber/v1/foreground/front/hit.png",
+          "critical": "/artwork/avatars/climber/v1/foreground/front/critical.png",
+          "dodge": "/artwork/avatars/climber/v1/foreground/front/dodge.png",
+          "combo": "/artwork/avatars/climber/v1/foreground/front/combo.png",
+          "replay": "/artwork/avatars/climber/v1/foreground/front/replay.png"
+        }
+      }
+    }
+  },
+  {
+    "kind": "AVATAR",
+    "key": "SWIMMER_V1",
+    "version": "v1",
+    "name": "Natation",
+    "active": true,
+    "sortOrder": 3,
+    "manifest": {
+      "pixelArt": true,
+      "imageUrls": {
+        "back": {
+          "idle": "/artwork/avatars/swimmer/v1/back/idle.png",
+          "attack": "/artwork/avatars/swimmer/v1/back/attack.png",
+          "hit": "/artwork/avatars/swimmer/v1/back/hit.png",
+          "critical": "/artwork/avatars/swimmer/v1/back/critical.png",
+          "dodge": "/artwork/avatars/swimmer/v1/back/dodge.png",
+          "combo": "/artwork/avatars/swimmer/v1/back/combo.png",
+          "replay": "/artwork/avatars/swimmer/v1/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/swimmer/v1/front/idle.png",
+          "attack": "/artwork/avatars/swimmer/v1/front/attack.png",
+          "hit": "/artwork/avatars/swimmer/v1/front/hit.png",
+          "critical": "/artwork/avatars/swimmer/v1/front/critical.png",
+          "dodge": "/artwork/avatars/swimmer/v1/front/dodge.png",
+          "combo": "/artwork/avatars/swimmer/v1/front/combo.png",
+          "replay": "/artwork/avatars/swimmer/v1/front/replay.png"
+        }
+      },
+      "thumbnailUrls": {
+        "back": {
+          "idle": "/artwork/avatars/swimmer/v1/thumb/back/idle.png",
+          "attack": "/artwork/avatars/swimmer/v1/thumb/back/attack.png",
+          "hit": "/artwork/avatars/swimmer/v1/thumb/back/hit.png",
+          "critical": "/artwork/avatars/swimmer/v1/thumb/back/critical.png",
+          "dodge": "/artwork/avatars/swimmer/v1/thumb/back/dodge.png",
+          "combo": "/artwork/avatars/swimmer/v1/thumb/back/combo.png",
+          "replay": "/artwork/avatars/swimmer/v1/thumb/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/swimmer/v1/thumb/front/idle.png",
+          "attack": "/artwork/avatars/swimmer/v1/thumb/front/attack.png",
+          "hit": "/artwork/avatars/swimmer/v1/thumb/front/hit.png",
+          "critical": "/artwork/avatars/swimmer/v1/thumb/front/critical.png",
+          "dodge": "/artwork/avatars/swimmer/v1/thumb/front/dodge.png",
+          "combo": "/artwork/avatars/swimmer/v1/thumb/front/combo.png",
+          "replay": "/artwork/avatars/swimmer/v1/thumb/front/replay.png"
+        }
+      },
+      "attachments": {
+        "back": {
+          "eyes": {
+            "idle": {
+              "x": 0.578,
+              "y": 0.191,
+              "span": 0.14,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.578,
+              "y": 0.242,
+              "span": 0.14,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.434,
+              "y": 0.211,
+              "span": 0.14,
+              "rotate": -15
+            },
+            "critical": {
+              "x": 0.613,
+              "y": 0.289,
+              "span": 0.14,
+              "rotate": 12
+            },
+            "dodge": {
+              "x": 0.668,
+              "y": 0.344,
+              "span": 0.14,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.574,
+              "y": 0.215,
+              "span": 0.14,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.625,
+              "y": 0.254,
+              "span": 0.14,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.553,
+              "y": 0.161,
+              "span": 0.168,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.553,
+              "y": 0.212,
+              "span": 0.168,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.409,
+              "y": 0.181,
+              "span": 0.168,
+              "rotate": -15
+            },
+            "critical": {
+              "x": 0.588,
+              "y": 0.259,
+              "span": 0.168,
+              "rotate": 12
+            },
+            "dodge": {
+              "x": 0.643,
+              "y": 0.314,
+              "span": 0.168,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.549,
+              "y": 0.185,
+              "span": 0.168,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.6,
+              "y": 0.224,
+              "span": 0.168,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.723,
+              "y": 0.418,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "attack": {
+              "x": 0.934,
+              "y": 0.316,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "hit": {
+              "x": 0.754,
+              "y": 0.371,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "critical": {
+              "x": 0.777,
+              "y": 0.09,
+              "span": 0.12,
+              "rotate": 70
+            },
+            "dodge": {
+              "x": 0.703,
+              "y": 0.52,
+              "span": 0.16,
+              "rotate": -65
+            },
+            "combo": {
+              "x": 0.902,
+              "y": 0.32,
+              "span": 0.16,
+              "rotate": -45
+            },
+            "replay": {
+              "x": 0.926,
+              "y": 0.43,
+              "span": 0.16,
+              "rotate": -65
+            }
+          },
+          "waist": {
+            "idle": {
+              "x": 0.53,
+              "y": 0.5,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.53,
+              "y": 0.51,
+              "span": 0.2,
+              "rotate": 5
+            },
+            "hit": {
+              "x": 0.51,
+              "y": 0.49,
+              "span": 0.2,
+              "rotate": -12
+            },
+            "critical": {
+              "x": 0.56,
+              "y": 0.55,
+              "span": 0.2,
+              "rotate": 15
+            },
+            "dodge": {
+              "x": 0.54,
+              "y": 0.58,
+              "span": 0.2,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.52,
+              "y": 0.53,
+              "span": 0.2,
+              "rotate": 8
+            },
+            "replay": {
+              "x": 0.55,
+              "y": 0.57,
+              "span": 0.2,
+              "rotate": 8
+            }
+          },
+          "hip": {
+            "idle": {
+              "x": 0.605,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.605,
+              "y": 0.525,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.585,
+              "y": 0.505,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.635,
+              "y": 0.565,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.615,
+              "y": 0.595,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.595,
+              "y": 0.545,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.625,
+              "y": 0.585,
+              "span": 0.105,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.71,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.77,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.72,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.76,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.74,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.69,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.79,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.32,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -10
+            },
+            "attack": {
+              "x": 0.19,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -15
+            },
+            "hit": {
+              "x": 0.34,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.23,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -20
+            },
+            "dodge": {
+              "x": 0.32,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.25,
+              "y": 0.84,
+              "span": 0.175,
+              "rotate": -30
+            },
+            "replay": {
+              "x": 0.23,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": -15
+            }
+          }
+        },
+        "front": {
+          "eyes": {
+            "idle": {
+              "x": 0.422,
+              "y": 0.191,
+              "span": 0.14,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.422,
+              "y": 0.242,
+              "span": 0.14,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.566,
+              "y": 0.211,
+              "span": 0.14,
+              "rotate": 15
+            },
+            "critical": {
+              "x": 0.387,
+              "y": 0.289,
+              "span": 0.14,
+              "rotate": -12
+            },
+            "dodge": {
+              "x": 0.332,
+              "y": 0.344,
+              "span": 0.14,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.426,
+              "y": 0.215,
+              "span": 0.14,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.375,
+              "y": 0.254,
+              "span": 0.14,
+              "rotate": 0
+            }
+          },
+          "head": {
+            "idle": {
+              "x": 0.447,
+              "y": 0.161,
+              "span": 0.168,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.447,
+              "y": 0.212,
+              "span": 0.168,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.591,
+              "y": 0.181,
+              "span": 0.168,
+              "rotate": 15
+            },
+            "critical": {
+              "x": 0.412,
+              "y": 0.259,
+              "span": 0.168,
+              "rotate": -12
+            },
+            "dodge": {
+              "x": 0.357,
+              "y": 0.314,
+              "span": 0.168,
+              "rotate": -8
+            },
+            "combo": {
+              "x": 0.451,
+              "y": 0.185,
+              "span": 0.168,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.4,
+              "y": 0.224,
+              "span": 0.168,
+              "rotate": 0
+            }
+          },
+          "hand": {
+            "idle": {
+              "x": 0.277,
+              "y": 0.418,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "attack": {
+              "x": 0.066,
+              "y": 0.316,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "hit": {
+              "x": 0.246,
+              "y": 0.371,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "critical": {
+              "x": 0.223,
+              "y": 0.09,
+              "span": 0.12,
+              "rotate": -70
+            },
+            "dodge": {
+              "x": 0.297,
+              "y": 0.52,
+              "span": 0.16,
+              "rotate": 65
+            },
+            "combo": {
+              "x": 0.098,
+              "y": 0.32,
+              "span": 0.16,
+              "rotate": 45
+            },
+            "replay": {
+              "x": 0.074,
+              "y": 0.43,
+              "span": 0.16,
+              "rotate": 65
+            }
+          },
+          "waist": {
+            "idle": {
+              "x": 0.47,
+              "y": 0.5,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.47,
+              "y": 0.51,
+              "span": 0.2,
+              "rotate": -5
+            },
+            "hit": {
+              "x": 0.49,
+              "y": 0.49,
+              "span": 0.2,
+              "rotate": 12
+            },
+            "critical": {
+              "x": 0.44,
+              "y": 0.55,
+              "span": 0.2,
+              "rotate": -15
+            },
+            "dodge": {
+              "x": 0.46,
+              "y": 0.58,
+              "span": 0.2,
+              "rotate": 8
+            },
+            "combo": {
+              "x": 0.48,
+              "y": 0.53,
+              "span": 0.2,
+              "rotate": -8
+            },
+            "replay": {
+              "x": 0.45,
+              "y": 0.57,
+              "span": 0.2,
+              "rotate": -8
+            }
+          },
+          "hip": {
+            "idle": {
+              "x": 0.395,
+              "y": 0.515,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.395,
+              "y": 0.525,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.415,
+              "y": 0.505,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.365,
+              "y": 0.565,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.385,
+              "y": 0.595,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.405,
+              "y": 0.545,
+              "span": 0.105,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.375,
+              "y": 0.585,
+              "span": 0.105,
+              "rotate": 0
+            }
+          },
+          "footFront": {
+            "idle": {
+              "x": 0.29,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "attack": {
+              "x": 0.23,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "hit": {
+              "x": 0.28,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.24,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "dodge": {
+              "x": 0.26,
+              "y": 0.86,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.31,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            },
+            "replay": {
+              "x": 0.21,
+              "y": 0.87,
+              "span": 0.2,
+              "rotate": 0
+            }
+          },
+          "footRear": {
+            "idle": {
+              "x": 0.68,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 10
+            },
+            "attack": {
+              "x": 0.81,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 15
+            },
+            "hit": {
+              "x": 0.66,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "critical": {
+              "x": 0.77,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 20
+            },
+            "dodge": {
+              "x": 0.68,
+              "y": 0.86,
+              "span": 0.175,
+              "rotate": 0
+            },
+            "combo": {
+              "x": 0.75,
+              "y": 0.84,
+              "span": 0.175,
+              "rotate": 30
+            },
+            "replay": {
+              "x": 0.77,
+              "y": 0.87,
+              "span": 0.175,
+              "rotate": 15
+            }
+          }
+        }
+      },
+      "foregroundUrls": {
+        "back": {
+          "idle": "/artwork/avatars/swimmer/v1/foreground/back/idle.png",
+          "attack": "/artwork/avatars/swimmer/v1/foreground/back/attack.png",
+          "hit": "/artwork/avatars/swimmer/v1/foreground/back/hit.png",
+          "critical": "/artwork/avatars/swimmer/v1/foreground/back/critical.png",
+          "dodge": "/artwork/avatars/swimmer/v1/foreground/back/dodge.png",
+          "combo": "/artwork/avatars/swimmer/v1/foreground/back/combo.png",
+          "replay": "/artwork/avatars/swimmer/v1/foreground/back/replay.png"
+        },
+        "front": {
+          "idle": "/artwork/avatars/swimmer/v1/foreground/front/idle.png",
+          "attack": "/artwork/avatars/swimmer/v1/foreground/front/attack.png",
+          "hit": "/artwork/avatars/swimmer/v1/foreground/front/hit.png",
+          "critical": "/artwork/avatars/swimmer/v1/foreground/front/critical.png",
+          "dodge": "/artwork/avatars/swimmer/v1/foreground/front/dodge.png",
+          "combo": "/artwork/avatars/swimmer/v1/foreground/front/combo.png",
+          "replay": "/artwork/avatars/swimmer/v1/foreground/front/replay.png"
+        }
+      }
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "HALTER_EGO",
+    "version": "v1",
+    "name": "Haltère ego",
+    "active": true,
+    "sortOrder": 100,
+    "manifest": {
+      "slot": "WEAPON",
+      "iconUrl": "/artwork/items/dumbbell/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V1",
+        "RUNNER_V1",
+        "CLIMBER_V1",
+        "SWIMMER_V1"
+      ],
+      "layers": [
+        {
+          "attachment": "hand",
+          "plane": "front",
+          "aspectRatio": 1.5609756097560976,
+          "scale": 1.5,
+          "pivot": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/dumbbell/v1/back.png",
+            "front": "/artwork/items/dumbbell/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "PURSUIT_GOGGLES",
+    "version": "v1",
+    "name": "Lunettes de course-poursuite",
+    "active": true,
+    "sortOrder": 101,
+    "manifest": {
+      "slot": "HEAD",
+      "iconUrl": "/artwork/items/goggles/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V1",
+        "RUNNER_V1",
+        "CLIMBER_V1",
+        "SWIMMER_V1"
+      ],
+      "layers": [
+        {
+          "attachment": "eyes",
+          "plane": "front",
+          "aspectRatio": 2.327272727272727,
+          "scale": 1.3,
+          "pivot": {
+            "x": 0.55,
+            "y": 0.5
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/goggles/v1/back.png",
+            "front": "/artwork/items/goggles/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "QUIET_STRENGTH_BELT",
+    "version": "v1",
+    "name": "Ceinture de force tranquille",
+    "active": true,
+    "sortOrder": 102,
+    "manifest": {
+      "slot": "ACCESSORY",
+      "iconUrl": "/artwork/items/lifting-belt/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V1",
+        "RUNNER_V1",
+        "CLIMBER_V1",
+        "SWIMMER_V1"
+      ],
+      "layers": [
+        {
+          "attachment": "waist",
+          "plane": "front",
+          "aspectRatio": 1.7297297297297298,
+          "scale": 1.12,
+          "pivot": {
+            "x": 0.5,
+            "y": 0.55
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/lifting-belt/v1/back.png",
+            "front": "/artwork/items/lifting-belt/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "ALL_PURPOSE_FLASK",
+    "version": "v1",
+    "name": "Gourde à tout",
+    "active": true,
+    "sortOrder": 103,
+    "manifest": {
+      "slot": "ACCESSORY",
+      "iconUrl": "/artwork/items/flask/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V1",
+        "RUNNER_V1",
+        "CLIMBER_V1",
+        "SWIMMER_V1"
+      ],
+      "layers": [
+        {
+          "attachment": "hip",
+          "plane": "front",
+          "aspectRatio": 0.921875,
+          "scale": 1.0,
+          "pivot": {
+            "x": 0.5,
+            "y": 0.12
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/flask/v1/back.png",
+            "front": "/artwork/items/flask/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "HEADACHE_CAP",
+    "version": "v1",
+    "name": "Prise de tête",
+    "active": true,
+    "sortOrder": 104,
+    "manifest": {
+      "slot": "HEAD",
+      "iconUrl": "/artwork/items/climbing-cap/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V1",
+        "RUNNER_V1",
+        "CLIMBER_V1",
+        "SWIMMER_V1"
+      ],
+      "layers": [
+        {
+          "attachment": "head",
+          "plane": "front",
+          "aspectRatio": 1.4545454545454546,
+          "scale": 1.2,
+          "pivot": {
+            "x": 0.55,
+            "y": 0.88
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/climbing-cap/v1/back.png",
+            "front": "/artwork/items/climbing-cap/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "GENIE_CHALK_BAG",
+    "version": "v1",
+    "name": "Sac à pof de génie",
+    "active": true,
+    "sortOrder": 105,
+    "manifest": {
+      "slot": "ACCESSORY",
+      "iconUrl": "/artwork/items/chalk-bag/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V1",
+        "RUNNER_V1",
+        "CLIMBER_V1",
+        "SWIMMER_V1"
+      ],
+      "layers": [
+        {
+          "attachment": "hip",
+          "plane": "front",
+          "aspectRatio": 0.84375,
+          "scale": 1.05,
+          "pivot": {
+            "x": 0.5,
+            "y": 0.1
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/chalk-bag/v1/back.png",
+            "front": "/artwork/items/chalk-bag/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "MIDNIGHT_SWIM_CAP",
+    "version": "v1",
+    "name": "Bonnet de bain de minuit",
+    "active": true,
+    "sortOrder": 106,
+    "manifest": {
+      "slot": "HEAD",
+      "iconUrl": "/artwork/items/swim-cap/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V1",
+        "RUNNER_V1",
+        "CLIMBER_V1",
+        "SWIMMER_V1"
+      ],
+      "layers": [
+        {
+          "attachment": "head",
+          "plane": "front",
+          "aspectRatio": 0.921875,
+          "scale": 1.1,
+          "pivot": {
+            "x": 0.55,
+            "y": 0.8
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/swim-cap/v1/back.png",
+            "front": "/artwork/items/swim-cap/v1/front.png"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "EQUIPMENT",
+    "key": "ACADEMIC_FLIPPERS",
+    "version": "v1",
+    "name": "Palmes académiques",
+    "active": true,
+    "sortOrder": 107,
+    "manifest": {
+      "slot": "FEET",
+      "iconUrl": "/artwork/items/flipper/v1/icon.png",
+      "compatibleAppearances": [
+        "STRENGTH_V1",
+        "RUNNER_V1",
+        "CLIMBER_V1",
+        "SWIMMER_V1"
+      ],
+      "layers": [
+        {
+          "attachment": "footRear",
+          "plane": "front",
+          "aspectRatio": 1.9393939393939394,
+          "scale": 1.0,
+          "pivot": {
+            "x": 0.18,
+            "y": 0.38
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/flipper/v1/back.png",
+            "front": "/artwork/items/flipper/v1/front.png"
+          }
+        },
+        {
+          "attachment": "footFront",
+          "plane": "front",
+          "aspectRatio": 1.9393939393939394,
+          "scale": 1.0,
+          "pivot": {
+            "x": 0.18,
+            "y": 0.38
+          },
+          "sourceUrls": {
+            "back": "/artwork/items/flipper/v1/back.png",
+            "front": "/artwork/items/flipper/v1/front.png"
+          }
+        }
+      ]
+    }
+  }
+]

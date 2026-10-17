@@ -21,7 +21,7 @@ final readonly class PlayerProfile
     public function __construct(
         public string $displayName,
         public DateTimeImmutable $registeredAt,
-        public Appearance $appearance = Appearance::Murid,
+        public string $appearance = Appearance::DEFAULT,
     ) {
     }
 }

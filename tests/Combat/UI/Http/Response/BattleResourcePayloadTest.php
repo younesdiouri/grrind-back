@@ -48,7 +48,7 @@ final class BattleResourcePayloadTest extends TestCase
         $player = $payload['player'];
         self::assertIsArray($player);
         self::assertSame(['hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'appearance', 'equipment'], array_keys($player));
-        self::assertSame('MURID', $player['appearance']);
+        self::assertSame(Appearance::DEFAULT, $player['appearance']);
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
@@ -158,8 +158,8 @@ final class BattleResourcePayloadTest extends TestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
-            Appearance::Murid,
-            Appearance::Murid,
+            Appearance::DEFAULT,
+            Appearance::DEFAULT,
         );
 
         $payload = BattleResource::from($duel, new EnemyTranslator(self::stubTranslator(), self::rulesets()))->toArray();
@@ -174,7 +174,7 @@ final class BattleResourcePayloadTest extends TestCase
         self::assertNull($enemy['imageUrls']);
         self::assertNull($enemy['introduction']);
         // Le héros du défié, figé au combat (#289) : ses poses de face sont au catalogue.
-        self::assertSame('MURID', $enemy['appearance']);
+        self::assertSame(Appearance::DEFAULT, $enemy['appearance']);
 
         // Un défi ne rapporte rien en v1 — la forme reste complète.
         self::assertSame(['loot' => [], 'coins' => ['gained' => 0, 'before' => 0, 'after' => 0]], $payload['rewards']);
@@ -213,7 +213,7 @@ final class BattleResourcePayloadTest extends TestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
-            Appearance::Murid,
+            Appearance::DEFAULT,
         );
     }
 

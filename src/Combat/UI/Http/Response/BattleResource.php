@@ -90,7 +90,7 @@ final readonly class BattleResource
             // figée au combat. Un combat antérieur à #289 n'en porte pas et montre le défaut.
             'player' => [
                 ...FighterResource::from($this->battle->playerSnapshot()['fighter'])->toArray(),
-                'appearance' => Appearance::fromSnapshot($this->battle->playerSnapshot()['appearance'] ?? null)->value,
+                'appearance' => Appearance::fromSnapshot($this->battle->playerSnapshot()['appearance'] ?? null),
                 'equipment' => (object) ($this->battle->playerSnapshot()['equipment'] ?? []),
             ],
             // `key` et `name` d'abord, puis les mêmes quatre champs que `player` — voir le
@@ -104,7 +104,7 @@ final readonly class BattleResource
                 ['imageUrls' => $this->imageUrls, 'introduction' => $this->introduction],
                 // Le héros du défié pour un duel, `null` face au catalogue — même règle que
                 // `key` / `playerId`.
-                ['appearance' => null === $enemySnapshot['key'] ? Appearance::fromSnapshot($enemySnapshot['appearance'] ?? null)->value : null],
+                ['appearance' => null === $enemySnapshot['key'] ? Appearance::fromSnapshot($enemySnapshot['appearance'] ?? null) : null],
                 ['equipment' => (object) ($enemySnapshot['equipment'] ?? [])],
             ),
             'events' => BattleEventResource::listOf($this->battle->timeline()),

@@ -238,7 +238,7 @@ final readonly class AlamRuns
             foreach ($contribution['attributes'] as $key => $value) {
                 $totals[$key] = ($totals[$key] ?? 0) + $value;
             }
-            $participants[] = ['playerId' => $id, 'displayName' => $profiles[$id]->displayName ?? 'Aventurier', 'avatarUrl' => null, 'appearance' => $profiles[$id]->appearance->value ?? Appearance::default()->value, 'contribution' => $contribution['total'], 'activitySummary' => $contribution['sports'], 'gauges' => AlamResolution::gauges($contribution['attributes'], $this->rulesOf($run)->targets(1))];
+            $participants[] = ['playerId' => $id, 'displayName' => $profiles[$id]->displayName ?? 'Aventurier', 'avatarUrl' => null, 'appearance' => $profiles[$id]->appearance ?? Appearance::default(), 'contribution' => $contribution['total'], 'activitySummary' => $contribution['sports'], 'gauges' => AlamResolution::gauges($contribution['attributes'], $this->rulesOf($run)->targets(1))];
         }
 
         return [$participants, $totals];

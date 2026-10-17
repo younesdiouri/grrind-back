@@ -13,11 +13,12 @@ use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
-#[AdminDashboard(routePath: '/admin', routeName: 'admin', allowedControllers: [RecipeCrudController::class, ItemCrudController::class, TitleCrudController::class, EnemyCrudController::class, LootTableCrudController::class, DisciplineCrudController::class, LevelCrudController::class, ActivityTypeCrudController::class, SettingsCrudController::class, UserCrudController::class, BattleCrudController::class, InventoryCrudController::class, XpTransactionCrudController::class, CoinTransactionCrudController::class])]
+#[AdminDashboard(routePath: '/admin', routeName: 'admin', allowedControllers: [ArtworkPackCrudController::class, RecipeCrudController::class, ItemCrudController::class, TitleCrudController::class, EnemyCrudController::class, LootTableCrudController::class, DisciplineCrudController::class, LevelCrudController::class, ActivityTypeCrudController::class, SettingsCrudController::class, UserCrudController::class, BattleCrudController::class, InventoryCrudController::class, XpTransactionCrudController::class, CoinTransactionCrudController::class])]
 final class DashboardController extends AbstractDashboardController
 {
     /** @var array<class-string, array{label: string, icon: string}> */
     private const array CONFIGURATION_CRUDS = [
+        ArtworkPackCrudController::class => ['label' => 'Avatars et calques', 'icon' => 'fa fa-person-running'],
         RecipeCrudController::class => ['label' => 'Recettes', 'icon' => 'fa fa-hammer'],
         ItemCrudController::class => ['label' => 'Items', 'icon' => 'fa fa-cube'],
         TitleCrudController::class => ['label' => 'Titres', 'icon' => 'fa fa-trophy'],
@@ -61,6 +62,7 @@ final class DashboardController extends AbstractDashboardController
 
     public function configureMenuItems(): iterable
     {
+        yield MenuItem::linkToRoute('Vue d’ensemble des avatars', 'fa fa-images', 'admin_artwork_overview');
         yield MenuItem::linkToRoute('ʿĀlam al-Nafs', 'fa fa-users', 'admin_alam');
         yield MenuItem::linkToRoute('Campagnes d’équilibrage', 'fa fa-chart-column', 'admin_game_design_campaigns');
         yield MenuItem::linkToRoute('Game design', 'fa fa-flask', 'admin_game_design');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rewards\Infrastructure\Translation;
 
+use App\Shared\Application\ArtworkCatalog;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Application\ItemImageUrlResolver;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -35,6 +36,7 @@ final class ItemTranslator implements ItemImageUrlResolver, ResetInterface
         private readonly TranslatorInterface $translator,
         private readonly GameRulesets $rulesets,
         private readonly UrlGeneratorInterface $urls,
+        private readonly ?ArtworkCatalog $artwork = null,
     ) {
     }
 
@@ -52,6 +54,11 @@ final class ItemTranslator implements ItemImageUrlResolver, ResetInterface
 
     public function imageUrlOf(string $key): string
     {
+        foreach ($this->artwork?->all()['equipment'] ?? [] as $item) {
+            if ($item['key'] === $key && true === $item['selectable'] && \is_string($item['iconUrl'])) {
+                return $item['iconUrl'];
+            }
+        }
         $path = $this->item($key)['image_path'] ?? 'placeholder.png';
         \assert(\is_string($path));
 

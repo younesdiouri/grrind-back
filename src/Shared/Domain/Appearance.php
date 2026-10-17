@@ -4,47 +4,19 @@ declare(strict_types=1);
 
 namespace App\Shared\Domain;
 
-/**
- * Le modèle de héros qu'un joueur a choisi — purement cosmétique, aucun calcul ne le lit (#289).
- *
- * **Des modèles complets, pas des calques.** Chaque cas est une illustration finie, servie en
- * trois poses (`idle`, `attack`, `hit`), `back` pour le joueur et `front` pour son adversaire,
- * en pleine taille et en miniature de 256 px.
- *
- * **Un enum et des fichiers statiques, pas une entrée du snapshot publié.** L'apparence ne
- * touche aucune valeur de jeu : elle n'a rien à faire dans le `rulesetVersion`, et le back-office
- * n'aurait qu'un formulaire de douze images à offrir pour un catalogue qui bouge à chaque
- * livraison d'illustrations. Les PNG vivent sous `public/appearances/`, Caddy les sert sans PHP.
- *
- * Le combat et Ālam figent **la clé**, pas les URL : un combat rejoué montre le modèle porté ce
- * jour-là, dans la version d'illustration courante. Une clé disparue du catalogue retombe sur
- * {@see self::default()} plutôt que de casser la lecture d'un vieux combat.
- */
-enum Appearance: string
+/** Identifiants de présentation ouverts : ajouter un avatar ne demande pas de nouvelle enum. */
+final class Appearance
 {
-    case Murid = 'MURID';
+    public const string DEFAULT = 'STRENGTH_V1';
 
-    public static function default(): self
+    public static function default(): string
     {
-        return self::Murid;
+        return self::DEFAULT;
     }
 
-    public static function fromSnapshot(mixed $value): self
+    public static function fromSnapshot(mixed $value): string
     {
-        return \is_string($value) ? self::tryFrom($value) ?? self::default() : self::default();
-    }
-
-    /**
-     * Le dossier sous `public/appearances/`. Il porte la version de l'illustration : remplacer
-     * les PNG change l'URL, sinon les clients garderaient l'ancienne image en cache.
-     *
-     * `murid/v2` : illustrations peintes latérales, `back` regarde à droite, `front` à gauche.
-     * Les silhouettes `murid/v1` restent accessibles pour les URL déjà chargées.
-     */
-    public function directory(): string
-    {
-        return match ($this) {
-            self::Murid => 'murid/v2',
-        };
+        // Phase de dev : la DA Murīd retirée est remplacée visuellement, sans toucher aux faits.
+        return \is_string($value) && 'MURID' !== $value && 1 === preg_match('/^[A-Z][A-Z0-9_]{0,63}$/', $value) ? $value : self::DEFAULT;
     }
 }

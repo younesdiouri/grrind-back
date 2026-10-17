@@ -47,7 +47,7 @@ final readonly class UserResource
             $user->registeredAt()->format(DateTimeInterface::ATOM),
             $titles,
             self::preferencesOf($user),
-            $user->appearance()->value,
+            $user->appearance(),
         );
     }
 
