@@ -76,8 +76,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private DateTimeImmutable $registeredAt;
 
     /** Cosmétique, sans effet de jeu — voir {@see Appearance}. */
-    #[ORM\Column(length: 32, enumType: Appearance::class, options: ['default' => 'MURID'])]
-    private Appearance $appearance = Appearance::Murid;
+    #[ORM\Column(length: 64, options: ['default' => 'STRENGTH_V1'])]
+    private string $appearance = Appearance::DEFAULT;
 
     /**
      * Les catégories de notification que le joueur a coupées — présence, pas absence :
@@ -206,12 +206,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->locale;
     }
 
-    public function appearance(): Appearance
+    public function appearance(): string
     {
         return $this->appearance;
     }
 
-    public function changeAppearance(Appearance $appearance): void
+    public function changeAppearance(string $appearance): void
     {
         $this->appearance = $appearance;
     }

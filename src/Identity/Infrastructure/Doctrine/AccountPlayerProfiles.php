@@ -45,7 +45,7 @@ final readonly class AccountPlayerProfiles implements PlayerProfiles
             return [];
         }
 
-        /** @var list<array{id: Uuid, displayName: string, registeredAt: DateTimeImmutable, appearance: Appearance}> $rows */
+        /** @var list<array{id: Uuid, displayName: string, registeredAt: DateTimeImmutable, appearance: string}> $rows */
         $rows = $this->entityManager->createQueryBuilder()
             ->select('u.id', 'u.displayName', 'u.registeredAt', 'u.appearance')
             ->from(User::class, 'u')

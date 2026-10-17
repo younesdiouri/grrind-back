@@ -21,11 +21,11 @@ final class BattleEquipmentTest extends ApiTestCase
         self::assertSame([], self::equipmentOf($bare, 'player'));
         self::assertSame([], self::equipmentOf($bare, 'enemy'));
 
-        $this->grant($player, 'TEMPERED_HEADBAND');
+        $this->grant($player, 'PURSUIT_GOGGLES');
         $this->grant($player, 'CROWN_OF_THE_TIRELESS');
-        $this->equip($player, 'TEMPERED_HEADBAND');
+        $this->equip($player, 'PURSUIT_GOGGLES');
         $dressed = $this->fight($player);
-        self::assertSame(['HEAD' => ['key' => 'TEMPERED_HEADBAND', 'artworkVersion' => 'v1']], self::equipmentOf($dressed, 'player'));
+        self::assertSame(['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v1']], self::equipmentOf($dressed, 'player'));
 
         $dressedId = $dressed['id'];
         self::assertIsString($dressedId);
@@ -54,8 +54,8 @@ final class BattleEquipmentTest extends ApiTestCase
         $invite = self::decode($this->post('/api/guilds/'.$guildId.'/invite-code', [], $player->headers));
         self::assertSame(Response::HTTP_OK, $this->post('/api/guilds/join', ['code' => $invite['code']], $opponent->headers)->getStatusCode());
         foreach ([$player, $opponent] as $account) {
-            $this->grant($account, 'TEMPERED_HEADBAND');
-            $this->equip($account, 'TEMPERED_HEADBAND');
+            $this->grant($account, 'PURSUIT_GOGGLES');
+            $this->equip($account, 'PURSUIT_GOGGLES');
         }
         $path = '/api/players/'.$opponent->id->toRfc4122().'/battles';
         $headers = $player->headers + ['Idempotency-Key' => 'duel-equipe'];
@@ -64,7 +64,7 @@ final class BattleEquipmentTest extends ApiTestCase
         $fought = self::decode($response);
         $foughtId = $fought['id'];
         self::assertIsString($foughtId);
-        $head = ['HEAD' => ['key' => 'TEMPERED_HEADBAND', 'artworkVersion' => 'v1']];
+        $head = ['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v1']];
         self::assertSame($head, self::equipmentOf($fought, 'player'));
         self::assertSame($head, self::equipmentOf($fought, 'enemy'));
 

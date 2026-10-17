@@ -124,7 +124,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
-            Appearance::Murid,
+            Appearance::DEFAULT,
         );
     }
 
@@ -149,7 +149,7 @@ final class BattleSummaryResourcePayloadTest extends TestCase
             random_bytes(32),
             'v1-000000000000',
             new DateTimeImmutable('2026-08-29T09:00:00+00:00'),
-            Appearance::Murid,
+            Appearance::DEFAULT,
         );
     }
 

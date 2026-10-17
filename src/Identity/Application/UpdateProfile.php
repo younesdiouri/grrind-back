@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
-use App\Shared\Domain\Appearance;
-
 /**
  * `null` signifie « ne touche pas à ce champ » — un PATCH ne remet pas à zéro ce
  * qu'il n'envoie pas. Même règle pour `notificationPreferences`, à la clé près : une
@@ -22,7 +20,7 @@ final readonly class UpdateProfile
         public ?string $timezone = null,
         public ?string $locale = null,
         public array $notificationPreferences = [],
-        public ?Appearance $appearance = null,
+        public ?string $appearance = null,
     ) {
     }
 }
