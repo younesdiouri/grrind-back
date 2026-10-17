@@ -119,6 +119,21 @@ final class AppearanceTest extends ApiTestCase
         self::assertEqualsWithDelta(1 - $front['pivot']['x'], $rear['pivot']['x'], 0.000001);
     }
 
+    public function testCorrectedGogglesAndHistoricalReplayVersionAreBothServed(): void
+    {
+        $catalog = self::decode($this->get('/api/appearances', $this->openAccount()->headers));
+        self::assertIsArray($catalog['equipment']);
+        $goggles = array_filter($catalog['equipment'], static fn ($entry): bool => \is_array($entry) && 'PURSUIT_GOGGLES' === $entry['key']);
+        $active = array_values(array_filter($goggles, static fn ($entry): bool => \is_array($entry) && true === $entry['selectable']));
+        self::assertCount(1, $active);
+        self::assertIsArray($active[0]);
+        self::assertSame('v4', $active[0]['version']);
+        $historical = array_find($goggles, static fn ($entry): bool => \is_array($entry) && 'v3' === $entry['version']);
+        self::assertIsArray($historical);
+        self::assertFalse($historical['selectable']);
+        self::assertNotSame($historical['layers'], $active[0]['layers']);
+    }
+
     public function testOneAdminGripCalibrationFeedsEveryCombatState(): void
     {
         $headers = $this->openAccount()->headers;

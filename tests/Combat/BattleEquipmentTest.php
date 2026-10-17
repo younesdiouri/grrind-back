@@ -25,7 +25,7 @@ final class BattleEquipmentTest extends ApiTestCase
         $this->grant($player, 'CROWN_OF_THE_TIRELESS');
         $this->equip($player, 'PURSUIT_GOGGLES');
         $dressed = $this->fight($player);
-        self::assertSame(['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v3']], self::equipmentOf($dressed, 'player'));
+        self::assertSame(['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v4']], self::equipmentOf($dressed, 'player'));
 
         $dressedId = $dressed['id'];
         self::assertIsString($dressedId);
@@ -64,7 +64,7 @@ final class BattleEquipmentTest extends ApiTestCase
         $fought = self::decode($response);
         $foughtId = $fought['id'];
         self::assertIsString($foughtId);
-        $head = ['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v3']];
+        $head = ['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v4']];
         self::assertSame($head, self::equipmentOf($fought, 'player'));
         self::assertSame($head, self::equipmentOf($fought, 'enemy'));
 
