@@ -47,12 +47,12 @@ final class BattleResourcePayloadTest extends TestCase
 
         $player = $payload['player'];
         self::assertIsArray($player);
-        self::assertSame(['hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'appearance'], array_keys($player));
+        self::assertSame(['hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'appearance', 'equipment'], array_keys($player));
         self::assertSame('MURID', $player['appearance']);
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction', 'appearance'], array_keys($enemy));
+        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction', 'appearance', 'equipment'], array_keys($enemy));
 
         self::assertNull($enemy['imageUrls']);
         self::assertNull($enemy['introduction']);
@@ -166,7 +166,7 @@ final class BattleResourcePayloadTest extends TestCase
 
         $enemy = $payload['enemy'];
         self::assertIsArray($enemy);
-        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction', 'appearance'], array_keys($enemy));
+        self::assertSame(['key', 'playerId', 'name', 'hp', 'damage', 'mitigationPercent', 'comboPercent', 'dodgePercent', 'maintenancePercent', 'criticalChancePercent', 'guardPercent', 'criticalResistancePercent', 'cooldownReductionPercent', 'precisionPercent', 'imageUrls', 'introduction', 'appearance', 'equipment'], array_keys($enemy));
         self::assertNull($enemy['key']);
         self::assertSame($opponentId->toRfc4122(), $enemy['playerId']);
         // Le pseudo snapshoté, jamais une clé passée au traducteur.

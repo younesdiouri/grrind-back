@@ -91,6 +91,7 @@ final readonly class BattleResource
             'player' => [
                 ...FighterResource::from($this->battle->playerSnapshot()['fighter'])->toArray(),
                 'appearance' => Appearance::fromSnapshot($this->battle->playerSnapshot()['appearance'] ?? null)->value,
+                'equipment' => (object) ($this->battle->playerSnapshot()['equipment'] ?? []),
             ],
             // `key` et `name` d'abord, puis les mêmes quatre champs que `player` — voir le
             // docblock de la classe pour pourquoi le nom est résolu ici plutôt que rendu tel
@@ -104,6 +105,7 @@ final readonly class BattleResource
                 // Le héros du défié pour un duel, `null` face au catalogue — même règle que
                 // `key` / `playerId`.
                 ['appearance' => null === $enemySnapshot['key'] ? Appearance::fromSnapshot($enemySnapshot['appearance'] ?? null)->value : null],
+                ['equipment' => (object) ($enemySnapshot['equipment'] ?? [])],
             ),
             'events' => BattleEventResource::listOf($this->battle->timeline()),
             'rewards' => $this->rewards(),

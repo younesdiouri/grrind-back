@@ -3802,6 +3802,22 @@ components:
       type: object
       nullable: true
       additionalProperties: false
+    BattleEquipment:
+      description: 'Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Le premier pack TEMPERED_HEADBAND v1 utilise la base et les ancrages Murīd v2.'
+      type: object
+      additionalProperties:
+        required:
+          - key
+          - artworkVersion
+        properties:
+          key:
+            type: string
+            example: TEMPERED_HEADBAND
+          artworkVersion:
+            type: string
+            example: v1
+            nullable: true
+        type: object
     BattleEnemy:
       description: "L'adversaire : les mêmes champs qu'un `BattleFighter`, plus son identité.\n\n**Le nom arrive traduit**, comme les titres : le client n'a pas de table de\ncorrespondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du\ncatalogue DB publié, pas une donnée d'affichage.\n\n**`key` et `playerId` sont exclusifs, et l'un des deux est toujours nul.**\nUn combat PvE porte `key`, un défi PvP porte `playerId` et un `name` qui est le\n**pseudo du défié au moment du combat** — jamais relu depuis son compte : un\ncombat déjà joué est un fait écrit, et son rejeu ne dépend ni d'un renommage\npostérieur ni de la présence de ce compte. Un joueur n'a ni `imageUrls` ni\n`introduction` : les deux valent `null`, comme pour un ennemi sans présentation\npubliée, et l'animation est la même.\n"
       required:
@@ -3874,6 +3890,8 @@ components:
           allOf:
             -
               $ref: '#/components/schemas/Appearance'
+        equipment:
+          $ref: '#/components/schemas/BattleEquipment'
         imageUrls:
           $ref: '#/components/schemas/EnemyImageUrls'
         introduction:
@@ -4056,6 +4074,8 @@ components:
               properties:
                 appearance:
                   $ref: '#/components/schemas/Appearance'
+                equipment:
+                  $ref: '#/components/schemas/BattleEquipment'
               type: object
         enemy:
           $ref: '#/components/schemas/BattleEnemy'

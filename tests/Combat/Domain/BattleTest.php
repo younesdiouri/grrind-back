@@ -39,6 +39,7 @@ final class BattleTest extends TestCase
                 'attributes' => ['strength' => 10, 'endurance' => 20, 'mobility' => 30, 'dexterity' => 40],
                 'vitality' => 500,
                 'appearance' => 'MURID',
+                'equipment' => [],
                 'fighter' => ['hp' => 150, 'damage' => 12, 'mitigationPermille' => 100, 'comboPermille' => 50, 'dodgePermille' => 25, 'maintenancePermille' => 0, 'criticalChancePermille' => 0, 'guardPermille' => 0, 'criticalResistancePermille' => 0, 'cooldownReductionPermille' => 0, 'precisionPermille' => 0],
             ],
             $battle->playerSnapshot(),
