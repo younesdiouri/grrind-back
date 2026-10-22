@@ -11,7 +11,10 @@
 
     # Le hub partage la machine web, mais l'outbox le joint par HTTP depuis le worker.
     # Aucun abonné anonyme ; un JWT ne permet que les topics qui lui ont été accordés.
+    # FrankenPHP 1.13 refuse publisher_jwt/subscriber_jwt hors compatibilité (#309) : cet opt-in
+    # garde la validation des jetons d'avant, sans iss ni aud. Le mode moderne est le #310.
     mercure {
+        protocol_version_compatibility 8
         publisher_jwt {$MERCURE_JWT_SECRET}
         subscriber_jwt {$MERCURE_JWT_SECRET}
     }
