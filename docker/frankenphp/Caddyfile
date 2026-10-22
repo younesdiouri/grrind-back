@@ -11,12 +11,19 @@
 
     # Le hub partage la machine web, mais l'outbox le joint par HTTP depuis le worker.
     # Aucun abonné anonyme ; un JWT ne permet que les topics qui lui ont été accordés.
-    # FrankenPHP 1.13 refuse publisher_jwt/subscriber_jwt hors compatibilité (#309) : cet opt-in
-    # garde la validation des jetons d'avant, sans iss ni aud. Le mode moderne est le #310.
+    # Mode moderne (#310) : l'issuer doit valoir le `iss` de config/packages/mercure.yaml.
+    # resource_identifier épingle l'audience : l'outbox publie par une URL interne qui n'est pas
+    # celle de l'abonné, et le hub déduirait sinon une audience différente pour chacun.
     mercure {
-        protocol_version_compatibility 8
-        publisher_jwt {$MERCURE_JWT_SECRET}
-        subscriber_jwt {$MERCURE_JWT_SECRET}
+        issuer grrind-back {
+            publisher {
+                jwt {$MERCURE_JWT_SECRET} HS256
+            }
+            subscriber {
+                jwt {$MERCURE_JWT_SECRET} HS256
+            }
+        }
+        resource_identifier {$MERCURE_PUBLIC_URL}
     }
 
     # Le plafond applicatif d'image est inférieur ; borne aussi le corps avant PHP.
