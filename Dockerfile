@@ -6,7 +6,9 @@
 # Version figée (#291) : le tag flottant `1-php8.4` a ramené au build un module Mercure qui refuse
 # les directives `publisher_jwt` / `subscriber_jwt` du Caddyfile, et la prod n'a plus démarré.
 # Une montée se fait exprès, en même temps que la config Mercure qu'elle exige.
-FROM dunglas/frankenphp:1.12.7-php8.4 AS base
+# PHP est figé au patch (#309) : 1.12.7 n'a jamais reçu 8.4.27 (CVE-2026-109618/109619, RCE en
+# mode worker), et un tag `php8.4` ne dit pas quel correctif de sécurité tourne en prod.
+FROM dunglas/frankenphp:1.13.2-php8.4.27 AS base
 
 WORKDIR /app
 
