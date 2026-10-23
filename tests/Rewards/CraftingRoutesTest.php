@@ -147,7 +147,7 @@ final class CraftingRoutesTest extends ApiTestCase
         $bob = $this->openAccount();
         self::getContainer()->get(InventoryItemRepository::class)->grantQuantity($bob->id, 'NAFS_ESSENCE', 3, new DateTimeImmutable());
         self::assertSame(422, $this->post('/api/inventory/sales', ['itemKey' => 'NAFS_ESSENCE', 'expectedSellPriceCoins' => 0], $bob->headers + ['Idempotency-Key' => 'resource-sale'])->getStatusCode());
-        self::assertSame(422, $this->send('PUT', '/api/inventory/equipment/HANDS', ['itemKey' => 'NAFS_ESSENCE'], $bob->headers)->getStatusCode());
+        self::assertSame(422, $this->send('PUT', '/api/inventory/equipment/WEAPON', ['itemKey' => 'NAFS_ESSENCE'], $bob->headers)->getStatusCode());
         self::assertSame(3, self::getContainer()->get(InventoryItemRepository::class)->ofPlayerAndItem($bob->id, 'NAFS_ESSENCE')?->quantity());
     }
 }

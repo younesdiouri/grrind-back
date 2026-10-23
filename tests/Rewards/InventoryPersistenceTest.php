@@ -101,11 +101,11 @@ final class InventoryPersistenceTest extends ApiTestCase
 
         $repository->grant($userId, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
 
-        $equipped = $repository->equip($userId, self::gauntlets(), EquipmentSlot::Hands);
+        $equipped = $repository->equip($userId, self::gauntlets(), EquipmentSlot::Weapon);
         $entityManager->clear();
 
-        self::assertSame(EquipmentSlot::Hands, $equipped->slot());
-        $reloaded = $repository->equippedIn($userId, EquipmentSlot::Hands);
+        self::assertSame(EquipmentSlot::Weapon, $equipped->slot());
+        $reloaded = $repository->equippedIn($userId, EquipmentSlot::Weapon);
         self::assertInstanceOf(InventoryItem::class, $reloaded);
         self::assertSame('IRON_GAUNTLETS', $reloaded->itemKey());
     }
@@ -116,7 +116,7 @@ final class InventoryPersistenceTest extends ApiTestCase
 
         $this->expectException(ItemNotOwned::class);
 
-        $repository->equip(Uuid::v7(), self::gauntlets(), EquipmentSlot::Hands);
+        $repository->equip(Uuid::v7(), self::gauntlets(), EquipmentSlot::Weapon);
     }
 
     /**
@@ -134,12 +134,12 @@ final class InventoryPersistenceTest extends ApiTestCase
         $userId = Uuid::v7();
 
         $repository->grant($userId, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
-        $repository->equip($userId, self::gauntlets(), EquipmentSlot::Hands);
+        $repository->equip($userId, self::gauntlets(), EquipmentSlot::Weapon);
 
         $repository->grant($userId, 'OTHER_HAND_ITEM', Uuid::v7(), new DateTimeImmutable());
-        $repository->equip($userId, self::otherHandItem(), EquipmentSlot::Hands);
+        $repository->equip($userId, self::otherHandItem(), EquipmentSlot::Weapon);
 
-        $newOccupant = $repository->equippedIn($userId, EquipmentSlot::Hands);
+        $newOccupant = $repository->equippedIn($userId, EquipmentSlot::Weapon);
         self::assertInstanceOf(InventoryItem::class, $newOccupant);
         self::assertSame('OTHER_HAND_ITEM', $newOccupant->itemKey());
 
@@ -156,11 +156,11 @@ final class InventoryPersistenceTest extends ApiTestCase
         $userId = Uuid::v7();
 
         $repository->grant($userId, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
-        $repository->equip($userId, self::gauntlets(), EquipmentSlot::Hands);
+        $repository->equip($userId, self::gauntlets(), EquipmentSlot::Weapon);
 
-        $equipped = $repository->equip($userId, self::gauntlets(), EquipmentSlot::Hands);
+        $equipped = $repository->equip($userId, self::gauntlets(), EquipmentSlot::Weapon);
 
-        self::assertSame(EquipmentSlot::Hands, $equipped->slot());
+        self::assertSame(EquipmentSlot::Weapon, $equipped->slot());
     }
 
     public function testUnequippingClearsTheSlot(): void
@@ -169,11 +169,11 @@ final class InventoryPersistenceTest extends ApiTestCase
         $userId = Uuid::v7();
 
         $repository->grant($userId, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
-        $repository->equip($userId, self::gauntlets(), EquipmentSlot::Hands);
+        $repository->equip($userId, self::gauntlets(), EquipmentSlot::Weapon);
 
-        $repository->unequip($userId, EquipmentSlot::Hands);
+        $repository->unequip($userId, EquipmentSlot::Weapon);
 
-        self::assertNull($repository->equippedIn($userId, EquipmentSlot::Hands));
+        self::assertNull($repository->equippedIn($userId, EquipmentSlot::Weapon));
     }
 
     /** Idempotent, comme un `DELETE` sur une ressource déjà absente. */
@@ -181,9 +181,9 @@ final class InventoryPersistenceTest extends ApiTestCase
     {
         $repository = self::repository();
 
-        $repository->unequip(Uuid::v7(), EquipmentSlot::Hands);
+        $repository->unequip(Uuid::v7(), EquipmentSlot::Weapon);
 
-        self::assertNull($repository->equippedIn(Uuid::v7(), EquipmentSlot::Hands));
+        self::assertNull($repository->equippedIn(Uuid::v7(), EquipmentSlot::Weapon));
     }
 
     public function testEquippedByPlayerOnlyReturnsWornItems(): void
@@ -193,7 +193,7 @@ final class InventoryPersistenceTest extends ApiTestCase
 
         $repository->grant($userId, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
         $repository->grant($userId, 'WORN_RUNNING_SHOES', Uuid::v7(), new DateTimeImmutable());
-        $repository->equip($userId, self::gauntlets(), EquipmentSlot::Hands);
+        $repository->equip($userId, self::gauntlets(), EquipmentSlot::Weapon);
 
         $worn = $repository->equippedByPlayer($userId);
 
@@ -265,14 +265,14 @@ final class InventoryPersistenceTest extends ApiTestCase
 
     private static function gauntlets(): Item
     {
-        return new Item('IRON_GAUNTLETS', Rarity::Common, EquipmentSlot::Hands, 30, [
+        return new Item('IRON_GAUNTLETS', Rarity::Common, EquipmentSlot::Weapon, 30, [
             new ItemModifier(ModifierType::StrengthBonus, 350),
         ]);
     }
 
     private static function otherHandItem(): Item
     {
-        return new Item('OTHER_HAND_ITEM', Rarity::Common, EquipmentSlot::Hands, 30, []);
+        return new Item('OTHER_HAND_ITEM', Rarity::Common, EquipmentSlot::Weapon, 30, []);
     }
 
     private static function entityManager(): EntityManagerInterface

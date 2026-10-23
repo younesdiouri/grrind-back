@@ -534,7 +534,7 @@ final class DatabaseRuntimeCatalogTest extends TestCase
 
     private function balanceRulesets(): MutableRulesets
     {
-        return new MutableRulesets(GameRulesetSeed::data());
+        return new MutableRulesets(\App\Tests\Support\EquipmentCatalogFixture::snapshot(GameRulesetSeed::data()));
     }
 }
 

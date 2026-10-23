@@ -85,6 +85,7 @@ final class CombatV2MigrationTest extends KernelTestCase
             // Le validateur courant exige également les sources ajoutées après cette migration.
             \assert(\is_array($published['combat']));
             $published['combat']['formulas'] = \App\Tests\Combat\StatFormulaFixture::data();
+            $published = \App\Tests\Support\EquipmentCatalogFixture::snapshot($published);
             new ReflectionMethod(GameRulesetPublisher::class, 'validate')->invoke(null, $published);
         } finally {
             $db->rollBack();

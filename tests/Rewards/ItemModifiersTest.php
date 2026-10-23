@@ -68,7 +68,7 @@ final class ItemModifiersTest extends ApiTestCase
     {
         $userId = Uuid::v7();
         self::equip($userId, 'WORN_RUNNING_SHOES', EquipmentSlot::Feet);
-        self::equip($userId, 'IRON_GAUNTLETS', EquipmentSlot::Hands);
+        self::equip($userId, 'IRON_GAUNTLETS', EquipmentSlot::Weapon);
 
         $modifiers = self::itemModifiers()->modifiersOf($userId, new DateTimeImmutable());
 

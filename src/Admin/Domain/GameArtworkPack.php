@@ -224,7 +224,7 @@ class GameArtworkPack
 
             return null;
         }
-        if (!\in_array($data['slot'] ?? null, ['HEAD', 'CHEST', 'HANDS', 'LEGS', 'FEET', 'ACCESSORY', 'WEAPON'], true)
+        if (!\in_array($data['slot'] ?? null, ['HEAD', 'CHEST', 'LEGS', 'FEET', 'ACCESSORY', 'WEAPON'], true)
             || !self::path($data['iconUrl'] ?? null)
             || !\is_array($data['compatibleAppearances'] ?? null) || [] === $data['compatibleAppearances']
             || !\is_array($data['layers'] ?? null) || [] === $data['layers'] || \count($data['layers']) > 8) {

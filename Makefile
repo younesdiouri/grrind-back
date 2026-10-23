@@ -95,6 +95,7 @@ db-reset: ## Recrée la base et rejoue toutes les migrations
 	$(RUN_DB) bin/console doctrine:database:drop --if-exists --force
 	$(RUN_DB) bin/console doctrine:database:create
 	$(RUN_DB) bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+	$(RUN_DB) bin/console app:equipment:retire-legacy --apply
 	$(RUN_DB) bin/console cache:pool:clear game.ruleset
 
 test-db-reset: ## Recrée la base de test et rejoue toutes les migrations
@@ -157,15 +158,15 @@ chat-cleanup: ## Nettoie les pièces jointes sans référence sur le volume loca
 test: game-images ## Suite de tests (base de test créée/migrée au passage)
 	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \
 		&& bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration \
-		&& vendor/bin/phpunit $(c)"
+		&& php tests/fixtures.php && vendor/bin/phpunit $(c)"
 
 test-existing: ## Suite de tests sur le schéma de test existant, sans migration
-	$(RUN_TEST) vendor/bin/phpunit $(c)
+	$(RUN_TEST) sh -c "php tests/fixtures.php && vendor/bin/phpunit $(c)"
 
 perf-ruleset: ## Mesure froide/chaude des quatre endpoints de règles (#260)
 	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \
 		&& bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration \
-		&& GRRIND_PERF_HOT_SAMPLES=$(or $(PERF_SAMPLES),10) vendor/bin/phpunit --group performance"
+		&& php tests/fixtures.php && GRRIND_PERF_HOT_SAMPLES=$(or $(PERF_SAMPLES),10) vendor/bin/phpunit --group performance"
 
 audit: ## Vérifie les dépendances verrouillées contre les avis Composer
 	$(RUN) composer audit --locked

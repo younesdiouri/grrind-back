@@ -21,6 +21,8 @@ final class ItemAdminFormTest extends ApiTestCase
         self::assertCount(1, $upload);
         self::assertSame('required', $upload->attr('required'));
         self::assertSame('image/jpeg,image/png,image/webp', $upload->attr('accept'));
+        $slots = $crawler->filter('select[name$="[slot]"] option')->extract(['value']);
+        self::assertSame(['', 'HEAD', 'CHEST', 'LEGS', 'FEET', 'ACCESSORY', 'WEAPON'], $slots);
     }
 
     public function testEveryStructuredConfigurationFormRendersItsNestedFields(): void

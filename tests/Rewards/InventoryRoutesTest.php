@@ -26,6 +26,15 @@ use Symfony\Component\Uid\Uuid;
  */
 final class InventoryRoutesTest extends ApiTestCase
 {
+    public function testHandsIsNoLongerAnActiveEquipmentSlot(): void
+    {
+        $player = $this->openAccount();
+        $this->grant($player->id, 'GOLDEN_BOXING_GLOVES');
+        $response = $this->send('PUT', '/api/inventory/equipment/HANDS', ['itemKey' => 'GOLDEN_BOXING_GLOVES'], $player->headers);
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame('https://grrind.app/problems/equipment-slot-unknown', self::decode($response)['type']);
+    }
+
     public function testANewAccountHasAnEmptySackAndAnEmptyPurse(): void
     {
         $bob = $this->openAccount();
@@ -35,9 +44,9 @@ final class InventoryRoutesTest extends ApiTestCase
         self::assertSame(0, $body['coins']);
         self::assertSame([], $body['items']);
         self::assertSame(
-            ['HEAD' => null, 'CHEST' => null, 'HANDS' => null, 'LEGS' => null, 'FEET' => null, 'ACCESSORY' => null, 'WEAPON' => null],
+            ['HEAD' => null, 'CHEST' => null, 'LEGS' => null, 'FEET' => null, 'ACCESSORY' => null, 'WEAPON' => null],
             $body['equipment'],
-            'Les sept emplacements sont toujours présents, vides ou non.',
+            'Les six emplacements sont toujours présents, vides ou non.',
         );
     }
 
@@ -46,7 +55,7 @@ final class InventoryRoutesTest extends ApiTestCase
         $bob = $this->openAccount();
         $this->grant($bob->id, 'IRON_GAUNTLETS');
         $before = self::decode($this->get('/api/inventory', $bob->headers));
-        $equipped = self::decode($this->send('PUT', '/api/inventory/equipment/HANDS', ['itemKey' => 'IRON_GAUNTLETS'], $bob->headers));
+        $equipped = self::decode($this->send('PUT', '/api/inventory/equipment/WEAPON', ['itemKey' => 'IRON_GAUNTLETS'], $bob->headers));
         $enemies = self::decode($this->get('/api/enemies', $bob->headers));
         self::assertIsArray($equipped['statistics']);
         self::assertIsArray($equipped['statistics']['attributes']);
@@ -56,7 +65,7 @@ final class InventoryRoutesTest extends ApiTestCase
         self::assertSame($enemies['player'], $equipped['statistics']['fighter']);
         self::assertSame(['base' => 0, 'equipmentBonus' => 350, 'effective' => 350], $equipped['statistics']['attributes']['strength']);
         self::assertGreaterThan($before['statistics']['fighter']['damage'], $equipped['statistics']['fighter']['damage']);
-        $unequipped = self::decode($this->send('DELETE', '/api/inventory/equipment/HANDS', null, $bob->headers));
+        $unequipped = self::decode($this->send('DELETE', '/api/inventory/equipment/WEAPON', null, $bob->headers));
         self::assertSame($before['statistics'], $unequipped['statistics']);
     }
 
@@ -147,9 +156,9 @@ final class InventoryRoutesTest extends ApiTestCase
         $bob = $this->openAccount();
         $this->grant($bob->id, 'IRON_GAUNTLETS');
 
-        $body = $this->equip($bob, 'HANDS', 'IRON_GAUNTLETS');
+        $body = $this->equip($bob, 'WEAPON', 'IRON_GAUNTLETS');
 
-        $hands = $body['equipment']['HANDS'];
+        $hands = $body['equipment']['WEAPON'];
         self::assertNotNull($hands);
         self::assertSame('IRON_GAUNTLETS', $hands['key']);
         self::assertNull($body['equipment']['HEAD']);
@@ -161,10 +170,10 @@ final class InventoryRoutesTest extends ApiTestCase
         $bob = $this->openAccount();
         $this->grant($bob->id, 'IRON_GAUNTLETS');
 
-        $this->equip($bob, 'HANDS', 'IRON_GAUNTLETS');
-        $second = $this->equip($bob, 'HANDS', 'IRON_GAUNTLETS');
+        $this->equip($bob, 'WEAPON', 'IRON_GAUNTLETS');
+        $second = $this->equip($bob, 'WEAPON', 'IRON_GAUNTLETS');
 
-        $hands = $second['equipment']['HANDS'];
+        $hands = $second['equipment']['WEAPON'];
         self::assertNotNull($hands);
         self::assertSame('IRON_GAUNTLETS', $hands['key']);
     }
@@ -207,7 +216,7 @@ final class InventoryRoutesTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
-        $response = $this->send('PUT', '/api/inventory/equipment/HANDS', ['itemKey' => 'IRON_GAUNTLETS'], $bob->headers);
+        $response = $this->send('PUT', '/api/inventory/equipment/WEAPON', ['itemKey' => 'IRON_GAUNTLETS'], $bob->headers);
 
         self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
         self::assertSame('https://grrind.app/problems/item-not-owned', self::decode($response)['type']);
@@ -228,11 +237,11 @@ final class InventoryRoutesTest extends ApiTestCase
     {
         $bob = $this->openAccount();
         $this->grant($bob->id, 'IRON_GAUNTLETS');
-        $this->equip($bob, 'HANDS', 'IRON_GAUNTLETS');
+        $this->equip($bob, 'WEAPON', 'IRON_GAUNTLETS');
 
-        $body = $this->unequip($bob, 'HANDS');
+        $body = $this->unequip($bob, 'WEAPON');
 
-        self::assertNull($body['equipment']['HANDS']);
+        self::assertNull($body['equipment']['WEAPON']);
         self::assertSame(1, self::itemNamed($body['items'], 'IRON_GAUNTLETS')['quantity']);
     }
 
@@ -241,7 +250,7 @@ final class InventoryRoutesTest extends ApiTestCase
     {
         $bob = $this->openAccount();
 
-        self::assertNull($this->unequip($bob, 'HANDS')['equipment']['HANDS']);
+        self::assertNull($this->unequip($bob, 'WEAPON')['equipment']['WEAPON']);
     }
 
     public function testUnequippingAnUnknownSlotIsRefused(): void
@@ -268,9 +277,9 @@ final class InventoryRoutesTest extends ApiTestCase
         self::assertSame(Response::HTTP_UNAUTHORIZED, $this->get('/api/inventory')->getStatusCode());
         self::assertSame(
             Response::HTTP_UNAUTHORIZED,
-            $this->send('PUT', '/api/inventory/equipment/HANDS', ['itemKey' => 'IRON_GAUNTLETS'])->getStatusCode(),
+            $this->send('PUT', '/api/inventory/equipment/WEAPON', ['itemKey' => 'IRON_GAUNTLETS'])->getStatusCode(),
         );
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->send('DELETE', '/api/inventory/equipment/HANDS')->getStatusCode());
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->send('DELETE', '/api/inventory/equipment/WEAPON')->getStatusCode());
     }
 
     /**

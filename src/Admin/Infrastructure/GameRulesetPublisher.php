@@ -46,6 +46,8 @@ use Throwable;
  * Le seul point de publication : il reconstruit les objets métier historiques dans la
  * transaction qui modifie EasyAdmin. Ainsi les validateurs restent sources uniques et
  * aucune ligne administrable à moitié cohérente ne fuit au runtime.
+ *
+ * @phpstan-type Snapshot array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes?: list<array<string, mixed>>, alam?: array<string, mixed>, streak?: array<string, mixed>}
  */
 final readonly class GameRulesetPublisher
 {
@@ -159,86 +161,8 @@ final readonly class GameRulesetPublisher
         }
     }
 
-    /** @param array<string, mixed> $streak */
-    private static function validateStreak(array $streak, ItemCatalog $catalog): void
-    {
-        if (!\is_int($streak['minimum_daily_seconds'] ?? null) || $streak['minimum_daily_seconds'] < 1) {
-            throw new LogicException('La durée qui fait un jour sportif doit être un nombre de secondes positif.');
-        }
-        $chests = $streak['chests'] ?? null;
-        foreach (['COMMON', 'RARE', 'EPIC', 'LEGENDARY'] as $rarity) {
-            $key = \is_array($chests) ? ($chests[$rarity] ?? null) : null;
-            $chest = \is_string($key) ? $catalog->findAvailable($key) : null;
-            if (null === $chest || \App\Rewards\Domain\ItemKind::Chest !== $chest->kind) {
-                throw new LogicException(\sprintf('Le coffre de streak %s doit être un coffre actif du catalogue.', $rarity));
-            }
-        }
-    }
-
-    /**
-     * @param list<GameItem>         $items
-     * @param list<GameTitle>        $titles
-     * @param list<GameEnemy>        $enemies
-     * @param list<GameLootTable>    $tables
-     * @param list<GameDiscipline>   $disciplines
-     * @param list<GameLevel>        $levels
-     * @param list<GameRecipe>       $recipes
-     * @param list<GameActivityType> $activityTypes
-     *
-     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>}
-     */
-    private static function snapshot(array $items, array $titles, array $enemies, array $tables, array $disciplines, array $levels, array $activityTypes, GameSettings $settings, array $recipes): array
-    {
-        $itemRows = array_map(static fn (GameItem $item): array => [
-            'key' => $item->getKey(), 'active' => $item->isActive(), 'rarity' => $item->getRarity(), 'kind' => $item->getKind(), 'slot' => $item->getSlot(),
-            'price_coins' => $item->getPriceCoins(), 'sell_price_coins' => $item->getSellPriceCoins(), 'modifiers' => $item->getModifiers(),
-            'shop' => ['available' => $item->isShopAvailable(), 'minimum_level' => $item->getShopMinimumLevel()],
-            'image_path' => $item->getImagePath(), 'translations' => $item->getTranslations(),
-        ], $items);
-        $titleRows = array_map(static fn (GameTitle $title): array => [
-            'id' => $title->getKey(), 'active' => $title->isActive(), 'condition' => ['type' => $title->getConditionType(), 'threshold' => $title->getThreshold(), 'discipline' => $title->getDiscipline()], 'translations' => $title->getTranslations(),
-        ], $titles);
-        $enemyRows = ['enemies' => [], 'bosses' => []];
-        foreach ($enemies as $enemy) {
-            $row = ['key' => $enemy->getKey(), 'active' => $enemy->isActive(), 'hp' => $enemy->getHp(), 'damage' => $enemy->getDamage(), 'mitigation_permille' => $enemy->getMitigationPermille(), 'combo_permille' => $enemy->getComboPermille(), 'dodge_permille' => $enemy->getDodgePermille(), 'maintenance_permille' => $enemy->getMaintenancePermille(), 'critical_chance_permille' => $enemy->getCriticalChancePermille(), 'guard_permille' => $enemy->getGuardPermille(), 'critical_resistance_permille' => $enemy->getCriticalResistancePermille(), 'cooldown_reduction_permille' => $enemy->getCooldownReductionPermille(), 'precision_permille' => $enemy->getPrecisionPermille(), 'translations' => $enemy->getTranslations(), 'image_paths' => null === $enemy->getIdleImagePath() && null === $enemy->getAttackImagePath() && null === $enemy->getHitImagePath() ? null : ['idle' => $enemy->getIdleImagePath(), 'attack' => $enemy->getAttackImagePath(), 'hit' => $enemy->getHitImagePath()]];
-            if ($enemy->isBoss()) {
-                $row['minimum_level'] = $enemy->getMinimumLevel();
-                $enemyRows['bosses'][] = $row;
-            } else {
-                $row['level'] = $enemy->getMinimumLevel();
-                $enemyRows['enemies'][] = $row;
-            }
-        }
-        $lootRows = ['workout' => [], 'adversary' => [], 'chest' => []];
-        foreach ($tables as $table) {
-            $row = ['key' => $table->getKey(), 'active' => $table->isActive(), 'coins' => ['minimum' => $table->getCoinsMinimum(), 'maximum' => $table->getCoinsMaximum()], 'entries' => $table->getEntries()];
-            if ('workout' === $table->getKind()) {
-                $row['eligibility'] = $table->getEligibility();
-            }
-            $lootRows[$table->getKind()][] = $row;
-        }
-
-        $disciplineRows = array_map(static fn (GameDiscipline $discipline): array => [
-            'discipline' => $discipline->getDiscipline()->value, 'active' => $discipline->isActive(), 'sort_order' => $discipline->getSortOrder(), 'credits_xp' => $discipline->creditsXp(),
-            'daily_cap_xp' => $discipline->getDailyCapXp(), 'xp_per_km' => $discipline->getXpPerKm(), 'xp_per_100m_elevation' => $discipline->getXpPer100mElevation(),
-            'split' => $discipline->getSplit(), 'translations' => $discipline->getTranslations(),
-        ], $disciplines);
-        $levelRows = array_map(static fn (GameLevel $level): array => ['level' => $level->getLevel(), 'total_xp' => $level->getTotalXp(), 'skill_points' => $level->getSkillPoints()], $levels);
-        $activityRows = array_map(static fn (GameActivityType $activityType): array => ['source' => $activityType->getSource()->value, 'provider_type' => $activityType->getProviderType(), 'discipline' => $activityType->getDiscipline()->value, 'active' => $activityType->isActive()], $activityTypes);
-        usort($activityRows, static fn (array $left, array $right): int => [$left['source'], $left['provider_type']] <=> [$right['source'], $right['provider_type']]);
-
-        return [
-            'recipes' => array_map(static fn (GameRecipe $recipe): array => ['key' => $recipe->getKey(), 'active' => $recipe->isActive(), 'result_item' => $recipe->getResultItem(), 'quantity' => $recipe->getQuantity(), 'costs' => $recipe->publishedCosts()], $recipes),
-            'alam' => $settings->getAlam(),
-            'streak' => $settings->getStreak(),
-            'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['formulas' => $settings->getFormulas(), 'fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
-            'training' => $settings->getTraining(), 'xp' => $settings->getXp(), 'attributes' => $settings->getAttributes(), 'disciplines' => $disciplineRows, 'levels' => $levelRows,
-            'activity_types' => $activityRows, 'community' => $settings->getCommunity(), 'notifications' => $settings->getNotifications(),
-        ];
-    }
-
-    /** @param array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes?: list<array<string, mixed>>, alam?: array<string, mixed>, streak?: array<string, mixed>} $snapshot */
-    private static function validate(array $snapshot): void
+    /** @param Snapshot $snapshot */
+    public static function validate(array $snapshot): void
     {
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */ $items = $snapshot['items'];
         /** @var list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */ $titles = $snapshot['titles'];
@@ -383,6 +307,84 @@ final readonly class GameRulesetPublisher
         if ($notifications['quiet_hours_start_hour'] < 0 || $notifications['quiet_hours_start_hour'] > 23 || $notifications['quiet_hours_end_hour'] < 0 || $notifications['quiet_hours_end_hour'] > 23) {
             throw new LogicException('Les heures calmes se bornent entre 0 et 23.');
         }
+    }
+
+    /** @param array<string, mixed> $streak */
+    private static function validateStreak(array $streak, ItemCatalog $catalog): void
+    {
+        if (!\is_int($streak['minimum_daily_seconds'] ?? null) || $streak['minimum_daily_seconds'] < 1) {
+            throw new LogicException('La durée qui fait un jour sportif doit être un nombre de secondes positif.');
+        }
+        $chests = $streak['chests'] ?? null;
+        foreach (['COMMON', 'RARE', 'EPIC', 'LEGENDARY'] as $rarity) {
+            $key = \is_array($chests) ? ($chests[$rarity] ?? null) : null;
+            $chest = \is_string($key) ? $catalog->findAvailable($key) : null;
+            if (null === $chest || \App\Rewards\Domain\ItemKind::Chest !== $chest->kind) {
+                throw new LogicException(\sprintf('Le coffre de streak %s doit être un coffre actif du catalogue.', $rarity));
+            }
+        }
+    }
+
+    /**
+     * @param list<GameItem>         $items
+     * @param list<GameTitle>        $titles
+     * @param list<GameEnemy>        $enemies
+     * @param list<GameLootTable>    $tables
+     * @param list<GameDiscipline>   $disciplines
+     * @param list<GameLevel>        $levels
+     * @param list<GameRecipe>       $recipes
+     * @param list<GameActivityType> $activityTypes
+     *
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>}
+     */
+    private static function snapshot(array $items, array $titles, array $enemies, array $tables, array $disciplines, array $levels, array $activityTypes, GameSettings $settings, array $recipes): array
+    {
+        $itemRows = array_map(static fn (GameItem $item): array => [
+            'key' => $item->getKey(), 'active' => $item->isActive(), 'rarity' => $item->getRarity(), 'kind' => $item->getKind(), 'slot' => $item->getSlot(),
+            'price_coins' => $item->getPriceCoins(), 'sell_price_coins' => $item->getSellPriceCoins(), 'modifiers' => $item->getModifiers(),
+            'shop' => ['available' => $item->isShopAvailable(), 'minimum_level' => $item->getShopMinimumLevel()],
+            'image_path' => $item->getImagePath(), 'translations' => $item->getTranslations(),
+        ], $items);
+        $titleRows = array_map(static fn (GameTitle $title): array => [
+            'id' => $title->getKey(), 'active' => $title->isActive(), 'condition' => ['type' => $title->getConditionType(), 'threshold' => $title->getThreshold(), 'discipline' => $title->getDiscipline()], 'translations' => $title->getTranslations(),
+        ], $titles);
+        $enemyRows = ['enemies' => [], 'bosses' => []];
+        foreach ($enemies as $enemy) {
+            $row = ['key' => $enemy->getKey(), 'active' => $enemy->isActive(), 'hp' => $enemy->getHp(), 'damage' => $enemy->getDamage(), 'mitigation_permille' => $enemy->getMitigationPermille(), 'combo_permille' => $enemy->getComboPermille(), 'dodge_permille' => $enemy->getDodgePermille(), 'maintenance_permille' => $enemy->getMaintenancePermille(), 'critical_chance_permille' => $enemy->getCriticalChancePermille(), 'guard_permille' => $enemy->getGuardPermille(), 'critical_resistance_permille' => $enemy->getCriticalResistancePermille(), 'cooldown_reduction_permille' => $enemy->getCooldownReductionPermille(), 'precision_permille' => $enemy->getPrecisionPermille(), 'translations' => $enemy->getTranslations(), 'image_paths' => null === $enemy->getIdleImagePath() && null === $enemy->getAttackImagePath() && null === $enemy->getHitImagePath() ? null : ['idle' => $enemy->getIdleImagePath(), 'attack' => $enemy->getAttackImagePath(), 'hit' => $enemy->getHitImagePath()]];
+            if ($enemy->isBoss()) {
+                $row['minimum_level'] = $enemy->getMinimumLevel();
+                $enemyRows['bosses'][] = $row;
+            } else {
+                $row['level'] = $enemy->getMinimumLevel();
+                $enemyRows['enemies'][] = $row;
+            }
+        }
+        $lootRows = ['workout' => [], 'adversary' => [], 'chest' => []];
+        foreach ($tables as $table) {
+            $row = ['key' => $table->getKey(), 'active' => $table->isActive(), 'coins' => ['minimum' => $table->getCoinsMinimum(), 'maximum' => $table->getCoinsMaximum()], 'entries' => $table->getEntries()];
+            if ('workout' === $table->getKind()) {
+                $row['eligibility'] = $table->getEligibility();
+            }
+            $lootRows[$table->getKind()][] = $row;
+        }
+
+        $disciplineRows = array_map(static fn (GameDiscipline $discipline): array => [
+            'discipline' => $discipline->getDiscipline()->value, 'active' => $discipline->isActive(), 'sort_order' => $discipline->getSortOrder(), 'credits_xp' => $discipline->creditsXp(),
+            'daily_cap_xp' => $discipline->getDailyCapXp(), 'xp_per_km' => $discipline->getXpPerKm(), 'xp_per_100m_elevation' => $discipline->getXpPer100mElevation(),
+            'split' => $discipline->getSplit(), 'translations' => $discipline->getTranslations(),
+        ], $disciplines);
+        $levelRows = array_map(static fn (GameLevel $level): array => ['level' => $level->getLevel(), 'total_xp' => $level->getTotalXp(), 'skill_points' => $level->getSkillPoints()], $levels);
+        $activityRows = array_map(static fn (GameActivityType $activityType): array => ['source' => $activityType->getSource()->value, 'provider_type' => $activityType->getProviderType(), 'discipline' => $activityType->getDiscipline()->value, 'active' => $activityType->isActive()], $activityTypes);
+        usort($activityRows, static fn (array $left, array $right): int => [$left['source'], $left['provider_type']] <=> [$right['source'], $right['provider_type']]);
+
+        return [
+            'recipes' => array_map(static fn (GameRecipe $recipe): array => ['key' => $recipe->getKey(), 'active' => $recipe->isActive(), 'result_item' => $recipe->getResultItem(), 'quantity' => $recipe->getQuantity(), 'costs' => $recipe->publishedCosts()], $recipes),
+            'alam' => $settings->getAlam(),
+            'streak' => $settings->getStreak(),
+            'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['formulas' => $settings->getFormulas(), 'fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
+            'training' => $settings->getTraining(), 'xp' => $settings->getXp(), 'attributes' => $settings->getAttributes(), 'disciplines' => $disciplineRows, 'levels' => $levelRows,
+            'activity_types' => $activityRows, 'community' => $settings->getCommunity(), 'notifications' => $settings->getNotifications(),
+        ];
     }
 
     /** @param array{maximum_members: int, invite_code_lifetime_hours: int, risala: array{active_weeks: int, reveal_day: int, reveal_hour: int, week_timezone: string, recipient_bonus_percent: int, sender_bonus_percent: int}} $community */
