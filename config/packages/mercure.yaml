@@ -3,6 +3,14 @@ mercure:
         default:
             url: '%env(default::MERCURE_URL)%'
             public_url: '%env(default::MERCURE_PUBLIC_URL)%'
+            # Mode moderne (#310) : jetons RFC 9068. `iss` doit valoir l'issuer du Caddyfile ;
+            # `aud` vaut public_url, que le hub épingle en resource_identifier. `sub` désigne le
+            # back qui signe, pas un joueur : le jeton d'abonnement ne porte toujours aucune identité.
+            protocol_version: '1.0'
             jwt:
                 secret: '%env(MERCURE_JWT_SECRET)%'
                 publish: '*'
+                claims:
+                    iss: 'grrind-back'
+                    sub: 'grrind-back'
+                    client_id: 'grrind-back'

@@ -86,7 +86,9 @@ final class GuildChatTest extends ApiTestCase
         $parts = explode('.', $subscription['token']);
         $claims = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($claims);
-        self::assertSame(['subscribe' => [$subscription['topic']]], $claims['mercure']);
+        self::assertSame([['type' => 'https://mercure.rocks/authorization-detail', 'actions' => ['subscribe'], 'topics' => [['match' => $subscription['topic']]]]], $claims['authorization_details']);
+        self::assertSame('grrind-back', $claims['iss'], 'Le hub ne vérifie un jeton qu\'avec les clés de son issuer.');
+        self::assertSame($subscription['url'], $claims['aud']);
         self::assertIsInt($claims['exp']);
         self::assertEqualsWithDelta(time() + 300, $claims['exp'], 5);
 

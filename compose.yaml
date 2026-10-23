@@ -10,6 +10,8 @@ services:
       APP_ENV: dev
       XDEBUG_MODE: ${XDEBUG_MODE:-off}
       SERVER_NAME: ':80'
+      # Lu par Caddy (resource_identifier du hub), qui ne voit pas le .env de Symfony.
+      MERCURE_PUBLIC_URL: 'http://localhost:8080/.well-known/mercure'
       # FrankenPHP sert en HTTP nu en local : le TLS est du ressort de l'ingress.
       DATABASE_URL: 'postgresql://grrind:grrind@database:5432/grrind?serverVersion=17&charset=utf8'
     volumes:
