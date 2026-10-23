@@ -100,7 +100,7 @@ final class PlayerProfileTest extends ApiTestCase
         self::assertInstanceOf(InventoryItemRepository::class, $repository);
         $repository->grant($member->id, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
         $repository->grant($member->id, 'WORN_RUNNING_SHOES', Uuid::v7(), new DateTimeImmutable());
-        $own = self::decode($this->send('PUT', '/api/inventory/equipment/HANDS', ['itemKey' => 'IRON_GAUNTLETS'], $member->headers));
+        $own = self::decode($this->send('PUT', '/api/inventory/equipment/WEAPON', ['itemKey' => 'IRON_GAUNTLETS'], $member->headers));
         $public = self::decode($this->get('/api/players/'.$member->id->toRfc4122(), $founder->headers));
 
         self::assertSame($own['statistics'], $public['statistics']);
@@ -108,9 +108,9 @@ final class PlayerProfileTest extends ApiTestCase
         self::assertSame(['equipment', 'items'], array_keys($public['inventory']));
         self::assertIsArray($public['inventory']['equipment']);
         self::assertIsArray($own['equipment']);
-        self::assertIsArray($own['equipment']['HANDS']);
-        self::assertIsArray($public['inventory']['equipment']['HANDS']);
-        self::assertSame($own['equipment']['HANDS']['key'], $public['inventory']['equipment']['HANDS']['key']);
+        self::assertIsArray($own['equipment']['WEAPON']);
+        self::assertIsArray($public['inventory']['equipment']['WEAPON']);
+        self::assertSame($own['equipment']['WEAPON']['key'], $public['inventory']['equipment']['WEAPON']['key']);
         self::assertIsArray($public['inventory']['items']);
         self::assertCount(2, $public['inventory']['items']);
         foreach ([...$public['inventory']['items'], ...array_filter($public['inventory']['equipment'])] as $item) {

@@ -61,7 +61,7 @@ final class ItemCatalogTest extends TestCase
     {
         $catalog = new ItemCatalog([
             ['key' => 'FIRST', 'rarity' => 'COMMON', 'slot' => 'FEET', 'price_coins' => 1, 'modifiers' => []],
-            ['key' => 'SECOND', 'rarity' => 'COMMON', 'slot' => 'HANDS', 'price_coins' => 1, 'modifiers' => []],
+            ['key' => 'SECOND', 'rarity' => 'COMMON', 'slot' => 'WEAPON', 'price_coins' => 1, 'modifiers' => []],
         ]);
 
         self::assertSame(['FIRST', 'SECOND'], array_map(static fn ($item) => $item->key, $catalog->all()));
@@ -141,7 +141,7 @@ final class ItemCatalogTest extends TestCase
         $this->expectExceptionMessage('IRON_GAUNTLETS');
 
         new ItemCatalog([
-            ['key' => 'IRON_GAUNTLETS', 'rarity' => 'COMMON', 'slot' => 'HANDS', 'price_coins' => 1, 'modifiers' => [
+            ['key' => 'IRON_GAUNTLETS', 'rarity' => 'COMMON', 'slot' => 'WEAPON', 'price_coins' => 1, 'modifiers' => [
                 ['type' => 'STRENGTH_BONUS', 'value' => 350, 'discipline' => 'RUNNING'],
             ]],
         ]);
@@ -154,7 +154,7 @@ final class ItemCatalogTest extends TestCase
     public function testAccepteUnModificateurDeCombatSansDiscipline(): void
     {
         $catalog = new ItemCatalog([
-            ['key' => 'IRON_GAUNTLETS', 'rarity' => 'COMMON', 'slot' => 'HANDS', 'price_coins' => 1, 'modifiers' => [
+            ['key' => 'IRON_GAUNTLETS', 'rarity' => 'COMMON', 'slot' => 'WEAPON', 'price_coins' => 1, 'modifiers' => [
                 ['type' => 'STRENGTH_BONUS', 'value' => 350],
             ]],
         ]);
@@ -202,7 +202,7 @@ final class ItemCatalogTest extends TestCase
     {
         $catalog = new ItemCatalog([
             ['key' => 'FIRST', 'rarity' => 'COMMON', 'slot' => 'FEET', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true]],
-            ['key' => 'HIDDEN', 'rarity' => 'COMMON', 'slot' => 'HANDS', 'price_coins' => 1, 'modifiers' => []],
+            ['key' => 'HIDDEN', 'rarity' => 'COMMON', 'slot' => 'WEAPON', 'price_coins' => 1, 'modifiers' => []],
             ['key' => 'SECOND', 'rarity' => 'COMMON', 'slot' => 'HEAD', 'price_coins' => 1, 'modifiers' => [], 'shop' => ['available' => true]],
         ]);
 

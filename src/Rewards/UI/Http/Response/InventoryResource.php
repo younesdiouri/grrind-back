@@ -29,7 +29,7 @@ use LogicException;
  * **`equipment` n'est pas une seconde lecture de l'inventaire.** Voir le docblock
  * d'{@see InventoryOverview} : c'est la même ligne, réindexée par emplacement, pour que le
  * client n'ait pas à filtrer `items` sur son propre `slot` pour dessiner la poupée
- * d'équipement. Les sept emplacements sont toujours présents, `null` pour un emplacement
+ * d'équipement. Les six emplacements sont toujours présents, `null` pour un emplacement
  * vide — jamais une clé absente, qui forcerait le client à distinguer « pas encore chargé »
  * de « rien ici ».
  *

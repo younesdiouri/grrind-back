@@ -52,15 +52,15 @@ final class InventoryItemTest extends TestCase
     {
         $item = InventoryItem::firstGrant(Uuid::v7(), 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
 
-        $item->equipInto(EquipmentSlot::Hands);
+        $item->equipInto(EquipmentSlot::Weapon);
 
-        self::assertSame(EquipmentSlot::Hands, $item->slot());
+        self::assertSame(EquipmentSlot::Weapon, $item->slot());
     }
 
     public function testUnequipSendsTheItemBackToTheBag(): void
     {
         $item = InventoryItem::firstGrant(Uuid::v7(), 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
-        $item->equipInto(EquipmentSlot::Hands);
+        $item->equipInto(EquipmentSlot::Weapon);
 
         $item->unequip();
 

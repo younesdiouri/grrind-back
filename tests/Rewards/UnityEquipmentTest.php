@@ -140,7 +140,7 @@ final class UnityEquipmentTest extends ApiTestCase
     private static function equipment(): array
     {
         return [
-            'GOLDEN_BOXING_GLOVES' => ['HANDS', 20, 'CRITICAL_CHANCE_BONUS', 30],
+            'GOLDEN_BOXING_GLOVES' => ['WEAPON', 20, 'CRITICAL_CHANCE_BONUS', 30],
             'LES_GUINZZ_PURPLE' => ['LEGS', 15, 'DODGE_BONUS', 30],
             'LES_GUINZZ_CYAN' => ['LEGS', 15, 'DODGE_BONUS', 30],
             'LES_GUINZZ_CORAL' => ['LEGS', 15, 'DODGE_BONUS', 30],

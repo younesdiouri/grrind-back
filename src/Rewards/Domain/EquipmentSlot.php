@@ -13,7 +13,6 @@ enum EquipmentSlot: string
 {
     case Head = 'HEAD';
     case Chest = 'CHEST';
-    case Hands = 'HANDS';
     case Legs = 'LEGS';
     case Feet = 'FEET';
     case Accessory = 'ACCESSORY';

@@ -8,7 +8,7 @@ les pourcentages résolus ; les `modifiers` conservent les unités du moteur.
 
 | Clé stable | Nom FR / EN | Slot | Achat / revente | Bonus |
 | --- | --- | --- | --- | --- |
-| `GOLDEN_BOXING_GLOVES` | Gants de boxe dorés / Golden Boxing Gloves | HANDS | 20 / 10 | `CRITICAL_CHANCE_BONUS: 30` |
+| `GOLDEN_BOXING_GLOVES` | Gants de boxe dorés / Golden Boxing Gloves | WEAPON | 20 / 10 | `CRITICAL_CHANCE_BONUS: 30` |
 | `LES_GUINZZ_PURPLE` | Les Guinzz — Violet / Purple | LEGS | 15 / 7 | `DODGE_BONUS: 30` |
 | `LES_GUINZZ_CYAN` | Les Guinzz — Cyan | LEGS | 15 / 7 | `DODGE_BONUS: 30` |
 | `LES_GUINZZ_CORAL` | Les Guinzz — Corail / Coral | LEGS | 15 / 7 | `DODGE_BONUS: 30` |
@@ -17,27 +17,25 @@ les pourcentages résolus ; les `modifiers` conservent les unités du moteur.
 | `LE_POIDS_LOURD` | Le Poids Lourd / The Heavyweight | WEAPON | 25 / 12 | `DAMAGE_BONUS: 2` |
 
 Les pièces des séances débutantes sont de l'ordre de 5–15 ; ces prix restent en dessous des
-30 pièces des anciens équipements d'entrée. Les objets existants et leurs bonus restent
-inchangés. Le prix de revente est la moitié entière du prix d'achat initial.
+30 pièces des anciens équipements d'entrée. HALTER_EGO est également conservé : son aperçu Unity bleu utilise le modèle du Poids Lourd. Le prix de revente est la moitié entière du prix d'achat initial.
 
 ## Loot et publication
 
-Chaque objet rejoint `WOODEN_CHEST` avec un poids **5**. La migration conserve les anciennes
-entrées dans leur ordre, les pièces, l'activation et les autres réglages de chaque version.
-Sur une installation neuve, sans chance de loot :
+Chaque nouvel objet rejoint `WOODEN_CHEST` avec un poids **5**. Depuis le nettoyage #315,
+les deux anciens équipements ont été retirés de cette table. Les pièces et les poids des
+entrées conservées ne changent pas. Sur une installation neuve après nettoyage, sans chance
+de loot :
 
 | Résultat | Poids | Probabilité |
 | --- | --- | --- |
-| Aucun objet | 55 | 40,7407 % |
-| Baskets usées | 25 | 18,5185 % |
-| Gantelets de fer | 20 | 14,8148 % |
-| Chacun des sept nouveaux objets | 5 | 3,7037 % |
-| Total | 135 | 100 % |
+| Aucun objet | 55 | 61,1111 % |
+| Chacun des sept nouveaux objets | 5 | 5,5556 % |
+| Total | 90 | 100 % |
 
-Les nouveaux objets représentent ensemble 35/135, soit 25,9259 %. Le coffre garde ses
+Les nouveaux objets représentent ensemble 35/90, soit 38,8889 %. Le coffre garde ses
 10–25 pièces. `LOOT_LUCK` et les réglages administrateur peuvent changer ces probabilités.
 
-La migration ajoute les sept objets séparément dans les tables d'édition et dans le snapshot
+La migration historique #313 ajoute les sept objets séparément dans les tables d'édition et dans le snapshot
 publié, puis les sept entrées au coffre de chacune des deux versions. Elle incrémente la
 version de loot, les révisions et l'historique de publication. Elle ne publie aucun autre
 brouillon, même si celui-ci modifie déjà les prix ou la table du coffre. Les possessions et
@@ -92,7 +90,47 @@ Aucune version de calques 2D n'est inventée pour Unity. Le détail PvE/PvP et l
 ces clés après remplacement/retrait des objets ; l'app doit les raccorder à ses assets 3D.
 Ajouter les objets au catalogue n'active pas leur rendu Unity.
 
-Le Poids Lourd donne ses dégâts côté serveur, mais ses animations ne sont pas validées pour
-le combat. L'atelier rend actuellement gants et haltère exclusifs visuellement ; le serveur
-permet de porter simultanément HANDS et WEAPON. Cette contrainte de l'atelier ne devient
-pas une interdiction métier. Corps, cheveux et personnalisation restent dans #308.
+Le Poids Lourd donne ses dégâts côté serveur, mais ses animations restent limitées à
+l'inspection. Depuis #315, les gants, Le Poids Lourd et HALTER_EGO occupent tous WEAPON :
+un seul de ces objets est équipé à la fois. HANDS ne fait plus partie du domaine actif.
+Corps, cheveux et personnalisation restent dans #308.
+
+## Retrait des équipements sans modèle 3D (#315)
+
+Le nettoyage est une commande Symfony explicite, sans nouvelle migration de données :
+
+```sh
+make console c="app:equipment:retire-legacy"          # simulation, transaction annulée
+make console c="app:equipment:retire-legacy --apply"  # application explicite
+```
+
+Elle supprime les 17 clés historiques nommées dans la commande, leurs piles d'inventaire,
+leurs entrées de loot et les recettes concernées. Elle retire ces clés des profils du
+laboratoire et désactive leurs packs graphiques EQUIPMENT. Les huit équipements Unity,
+les quatre coffres et NAFS_ESSENCE sont conservés. Une future clé ajoutée par l'admin
+n'est pas supprimée par une relance.
+
+Les anciennes possessions sont retirées sans remboursement. Les gants portés en HANDS
+passent en WEAPON si celui-ci est libre après retrait des anciens objets ; sinon ils
+restent possédés dans le sac. Les profils du laboratoire gardent également leur arme
+préexistante ; les gants sortent de la tenue simulée si nécessaire. Les autres références
+HANDS sont retirées de la tenue.
+XP, pièces, tirages audités, combats et publications historiques ne sont pas réécrits.
+
+Publié et brouillon sont nettoyés séparément : un prix ou un poids en attente reste en
+attente. Le nettoyage publié est validé puis tracé dans une nouvelle publication ; version
+de loot, révision et cache sont mis à jour. Une relance sans changement ne crée aucune
+publication. Une table sans entrée restante devient un tirage « rien » de poids 1, avec
+sa bande de pièces conservée.
+
+Pour Fly : déployer depuis main, vérifier la machine app démarrée, puis exécuter la
+simulation et l'application via `flyctl ssh console -a grrind-back --machine <APP_ID>`
+avec `-C "php bin/console app:equipment:retire-legacy [--apply]"`. Vérifier ensuite une
+relance sans changement, les six slots de l'inventaire, les huit équipements en catalogue,
+un achat/équipement/retrait, le refus de HANDS et d'une ancienne clé, et la santé HTTP.
+
+Une installation locale neuve (`make db-reset`, donc `make install`) applique cette même
+commande après les migrations historiques. Les tests du moteur utilisent des fixtures
+explicites conservant leurs scénarios de rareté, de niveau et d'XP ; leurs armes utilisent
+les six slots actuels. Le nettoyage est testé séparément contre ces données complètes,
+sans ajouter de compatibilité HANDS au domaine métier.

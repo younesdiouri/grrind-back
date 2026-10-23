@@ -7,6 +7,7 @@ namespace App\Admin\UI\EasyAdmin;
 use App\Admin\Domain\GameItem;
 use App\Admin\UI\Form\ModifierEntryType;
 use App\Admin\UI\Form\TranslationsType;
+use App\Rewards\Domain\EquipmentSlot;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
@@ -55,7 +56,8 @@ final class ItemCrudController extends GameCrudController
         yield IntegerField::new('sortOrder');
         yield ChoiceField::new('rarity')->setChoices(array_combine(['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY'], ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY']));
         yield ChoiceField::new('kind')->setChoices(['Équipement' => 'EQUIPMENT', 'Coffre' => 'CHEST', 'Ressource' => 'RESOURCE']);
-        yield TextField::new('slot')->hideOnIndex();
+        $slots = array_column(EquipmentSlot::cases(), 'value');
+        yield ChoiceField::new('slot')->setChoices(array_combine($slots, $slots))->setRequired(false)->hideOnIndex();
         yield IntegerField::new('priceCoins');
         yield IntegerField::new('sellPriceCoins', 'Prix de revente (pièces)')
             ->setHelp('Indépendant du prix d’achat. Zéro est autorisé. Les coffres et ressources ne se vendent pas.');

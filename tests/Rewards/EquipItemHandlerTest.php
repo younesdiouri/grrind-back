@@ -41,10 +41,10 @@ final class EquipItemHandlerTest extends ApiTestCase
         $userId = Uuid::v7();
         self::repository()->grant($userId, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
 
-        $equipped = (self::equip())(new EquipItem($userId, 'IRON_GAUNTLETS', 'HANDS'));
+        $equipped = (self::equip())(new EquipItem($userId, 'IRON_GAUNTLETS', 'WEAPON'));
 
         self::assertInstanceOf(InventoryItem::class, $equipped);
-        self::assertSame(EquipmentSlot::Hands, $equipped->slot());
+        self::assertSame(EquipmentSlot::Weapon, $equipped->slot());
     }
 
     public function testEquippingAnUnknownSlotStringIsRefused(): void
@@ -61,18 +61,18 @@ final class EquipItemHandlerTest extends ApiTestCase
     {
         $this->expectException(ItemNotOwned::class);
 
-        (self::equip())(new EquipItem(Uuid::v7(), 'IRON_GAUNTLETS', 'HANDS'));
+        (self::equip())(new EquipItem(Uuid::v7(), 'IRON_GAUNTLETS', 'WEAPON'));
     }
 
     public function testEquippingAnUnknownCatalogKeyIsRefusedAsNotOwned(): void
     {
         $this->expectException(ItemNotOwned::class);
 
-        (self::equip())(new EquipItem(Uuid::v7(), 'DOES_NOT_EXIST', 'HANDS'));
+        (self::equip())(new EquipItem(Uuid::v7(), 'DOES_NOT_EXIST', 'WEAPON'));
     }
 
     /**
-     * `IRON_GAUNTLETS` se porte en `HANDS`, jamais en `HEAD` : le catalogue tranche, pas le
+     * `IRON_GAUNTLETS` se porte en `WEAPON`, jamais en `HEAD` : le catalogue tranche, pas le
      * joueur — voir le docblock d'`EquipItemHandler`.
      */
     public function testEquippingIntoAnIncompatibleSlotIsRefused(): void
@@ -97,18 +97,18 @@ final class EquipItemHandlerTest extends ApiTestCase
 
         $this->expectException(EquipmentSlotIncompatible::class);
 
-        (self::equip())(new EquipItem($userId, 'WOODEN_CHEST', 'HANDS'));
+        (self::equip())(new EquipItem($userId, 'WOODEN_CHEST', 'WEAPON'));
     }
 
     public function testUnequippingClearsTheSlot(): void
     {
         $userId = Uuid::v7();
         self::repository()->grant($userId, 'IRON_GAUNTLETS', Uuid::v7(), new DateTimeImmutable());
-        (self::equip())(new EquipItem($userId, 'IRON_GAUNTLETS', 'HANDS'));
+        (self::equip())(new EquipItem($userId, 'IRON_GAUNTLETS', 'WEAPON'));
 
-        (self::unequip())(new UnequipItem($userId, 'HANDS'));
+        (self::unequip())(new UnequipItem($userId, 'WEAPON'));
 
-        self::assertNull(self::repository()->equippedIn($userId, EquipmentSlot::Hands));
+        self::assertNull(self::repository()->equippedIn($userId, EquipmentSlot::Weapon));
     }
 
     public function testUnequippingAnUnknownSlotStringIsRefused(): void

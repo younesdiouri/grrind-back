@@ -1137,25 +1137,25 @@ when@dev:
                             objet non équipable de plus.
                         required: [key, kind, name, rarity, slot, modifiers, priceCoins, imageUrl]
                         properties:
-                            key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
+                            key: { type: string, example: GOLDEN_BOXING_GLOVES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
                             kind:
                                 type: string
                                 enum: [EQUIPMENT, CHEST, RESOURCE]
                                 description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
-                            name: { type: string, example: "Chaussures de course usées", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
+                            name: { type: string, example: "Gants de boxe dorés", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
                             rarity:
                                 type: string
                                 enum: [COMMON, UNCOMMON, RARE, EPIC, LEGENDARY]
                             slot:
                                 type: string
                                 nullable: true
-                                enum: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                                enum: [HEAD, CHEST, LEGS, FEET, ACCESSORY, WEAPON]
                                 description: "`null` pour un coffre (#230) — il ne se porte pas, il s'ouvre."
                             modifiers:
                                 type: array
                                 description: "Dans l'ordre du catalogue."
                                 items: { $ref: '#/components/schemas/DroppedItemModifier' }
-                            priceCoins: { type: integer, example: 30, description: "En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue." }
+                            priceCoins: { type: integer, example: 20, description: "En pièces — de quoi afficher la valeur de l'objet sans recharger le catalogue." }
                             imageUrl: { type: string, format: uri, example: "https://api.grrind.app/game-images/placeholder.png", description: "URL absolue de l'image livrée par le serveur." }
 
                     InventoryLine:
@@ -1179,19 +1179,19 @@ when@dev:
                         description: "Objet possédé visible sur un profil autorisé, sans données monétaires."
                         required: [key, kind, name, rarity, slot, modifiers, imageUrl, quantity]
                         properties:
-                            key: { type: string, example: WORN_RUNNING_SHOES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
+                            key: { type: string, example: GOLDEN_BOXING_GLOVES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
                             kind:
                                 type: string
                                 enum: [EQUIPMENT, CHEST, RESOURCE]
                                 description: "Ce que l'objet *est* — `EQUIPMENT` se porte, `CHEST` s'ouvre (#230). C'est sur ce champ que l'app décide « Équiper » ou « Ouvrir », jamais sur `slot === null`."
-                            name: { type: string, example: "Chaussures de course usées", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
+                            name: { type: string, example: "Gants de boxe dorés", description: "Déjà traduit dans la langue du joueur — rien à recharger côté client." }
                             rarity:
                                 type: string
                                 enum: [COMMON, UNCOMMON, RARE, EPIC, LEGENDARY]
                             slot:
                                 type: string
                                 nullable: true
-                                enum: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                                enum: [HEAD, CHEST, LEGS, FEET, ACCESSORY, WEAPON]
                                 description: "`null` pour un coffre (#230) — il ne se porte pas, il s'ouvre."
                             modifiers:
                                 type: array
@@ -1206,11 +1206,10 @@ when@dev:
                         properties:
                             equipment:
                                 type: object
-                                required: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                                required: [HEAD, CHEST, LEGS, FEET, ACCESSORY, WEAPON]
                                 properties:
                                     HEAD: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
                                     CHEST: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
-                                    HANDS: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
                                     LEGS: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
                                     FEET: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
                                     ACCESSORY: { nullable: true, allOf: [{ $ref: '#/components/schemas/PublicInventoryLine' }] }
@@ -1270,11 +1269,10 @@ when@dev:
                             statistics: { $ref: '#/components/schemas/PlayerStatistics' }
                             equipment:
                                 type: object
-                                required: [HEAD, CHEST, HANDS, LEGS, FEET, ACCESSORY, WEAPON]
+                                required: [HEAD, CHEST, LEGS, FEET, ACCESSORY, WEAPON]
                                 properties:
                                     HEAD: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
                                     CHEST: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
-                                    HANDS: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
                                     LEGS: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
                                     FEET: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
                                     ACCESSORY: { nullable: true, allOf: [{ $ref: '#/components/schemas/InventoryLine' }] }
