@@ -78,6 +78,58 @@ final class BattleEquipmentTest extends ApiTestCase
         self::assertSame(['HEAD' => ['key' => 'CROWN_OF_THE_TIRELESS', 'artworkVersion' => null]], self::equipmentOf($next, 'enemy'));
     }
 
+    public function testUnityEquipmentKeysStayFrozenForPveAndBothPvpPlayers(): void
+    {
+        $player = $this->openAccount();
+        $opponent = $this->openAccount('unity-opponent@grrind.app', 'Carla');
+        $outfits = [
+            ['HANDS' => 'GOLDEN_BOXING_GLOVES', 'WEAPON' => 'LE_POIDS_LOURD', 'LEGS' => 'LES_GUINZZ_PURPLE', 'CHEST' => 'SPORT_TSHIRT_SLATE'],
+            ['LEGS' => 'LES_GUINZZ_CYAN', 'CHEST' => 'SPORT_TSHIRT_CORAL'],
+        ];
+        foreach ([$player, $opponent] as $index => $account) {
+            foreach ($outfits[$index] as $slot => $key) {
+                $this->grant($account, $key);
+                $this->equip($account, $key, $slot);
+            }
+        }
+        $references = [];
+        foreach ($outfits as $outfit) {
+            $references[] = array_map(static fn (string $key): array => ['key' => $key, 'artworkVersion' => null], $outfit);
+        }
+        $pve = $this->fight($player);
+        self::assertEquals($references[0], self::equipmentOf($pve, 'player'));
+        $guild = self::decode($this->post('/api/guilds', ['name' => 'Unity'], $player->headers));
+        self::assertIsString($guild['id']);
+        $invite = self::decode($this->post('/api/guilds/'.$guild['id'].'/invite-code', [], $player->headers));
+        self::assertSame(200, $this->post('/api/guilds/join', ['code' => $invite['code']], $opponent->headers)->getStatusCode());
+        $profile = $this->get('/api/players/'.$opponent->id->toRfc4122(), $player->headers);
+        self::assertSame(200, $profile->getStatusCode());
+        $public = self::decode($profile);
+        self::assertIsArray($public['inventory']);
+        self::assertIsArray($public['inventory']['equipment']);
+        self::assertIsArray($public['inventory']['equipment']['LEGS']);
+        self::assertSame('LES_GUINZZ_CYAN', $public['inventory']['equipment']['LEGS']['key']);
+        $path = '/api/players/'.$opponent->id->toRfc4122().'/battles';
+        $headers = $player->headers + ['Idempotency-Key' => 'unity-duel'];
+        $duelResponse = $this->post($path, [], $headers);
+        self::assertSame(201, $duelResponse->getStatusCode(), (string) $duelResponse->getContent());
+        $duel = self::decode($duelResponse);
+        self::assertEquals($references[0], self::equipmentOf($duel, 'player'));
+        self::assertEquals($references[1], self::equipmentOf($duel, 'enemy'));
+        foreach (array_keys($outfits[0]) as $slot) {
+            self::assertSame(200, $this->send('DELETE', '/api/inventory/equipment/'.$slot, null, $player->headers)->getStatusCode());
+        }
+        $this->grant($opponent, 'LES_GUINZZ_CORAL');
+        $this->equip($opponent, 'LES_GUINZZ_CORAL', 'LEGS');
+        foreach ([$pve, $duel] as $battle) {
+            self::assertIsString($battle['id']);
+            self::assertEquals($battle, self::decode($this->get('/api/battles/'.$battle['id'], $player->headers)));
+        }
+        self::assertSame($duelResponse->getContent(), $this->post($path, [], $headers)->getContent());
+        $stranger = $this->openAccount('unity-stranger@grrind.app');
+        self::assertSame(404, $this->get('/api/players/'.$opponent->id->toRfc4122(), $stranger->headers)->getStatusCode());
+    }
+
     public function testRetiredWaistArtworkDoesNotRemoveTheEquippedInventoryItem(): void
     {
         $player = $this->openAccount();

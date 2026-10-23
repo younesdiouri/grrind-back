@@ -49,7 +49,12 @@ install: build ## Installation initiale : images, dépendances, secrets, clés, 
 	$(MAKE) mercure-secrets
 	$(MAKE) jwt-keys
 	$(MAKE) up
+	$(MAKE) game-images
 	$(MAKE) db-reset
+
+.PHONY: game-images
+game-images: ## Provisionne les icônes livrées dans le stockage d'images existant, sans écraser les uploads
+	$(RUN) sh -c 'mkdir -p "$${GAME_IMAGES_DIR:-var/game-images}" && cp -n resources/game-images/unity-equipment/*.png "$${GAME_IMAGES_DIR:-var/game-images}/"'
 
 ## —— PHP ——————————————————————————————————————————————————————————————————
 composer: ## Composer (c="require foo/bar")
@@ -149,7 +154,7 @@ chat-cleanup: ## Nettoie les pièces jointes sans référence sur le volume loca
 	$(RUN_DB) bin/console app:chat:cleanup
 
 ## —— Qualité ——————————————————————————————————————————————————————————————
-test: ## Suite de tests (base de test créée/migrée au passage)
+test: game-images ## Suite de tests (base de test créée/migrée au passage)
 	$(RUN_TEST) sh -c "bin/console doctrine:database:create --if-not-exists \
 		&& bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration \
 		&& vendor/bin/phpunit $(c)"
