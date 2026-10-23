@@ -1,0 +1,149 @@
+[
+  {
+    "key": "GOLDEN_BOXING_GLOVES",
+    "slot": "HANDS",
+    "price_coins": 20,
+    "sell_price_coins": 10,
+    "modifiers": [
+      {
+        "type": "CRITICAL_CHANCE_BONUS",
+        "value": 30
+      }
+    ],
+    "image_path": "cb45546edb8570fb2dc09c17271ec9973bfa624a.png",
+    "translations": {
+      "fr": {
+        "name": "Gants de boxe dorés"
+      },
+      "en": {
+        "name": "Golden Boxing Gloves"
+      }
+    }
+  },
+  {
+    "key": "LES_GUINZZ_PURPLE",
+    "slot": "LEGS",
+    "price_coins": 15,
+    "sell_price_coins": 7,
+    "modifiers": [
+      {
+        "type": "DODGE_BONUS",
+        "value": 30
+      }
+    ],
+    "image_path": "3d12064c9aa99dd8c11878ef1a431c8cf5137e6f.png",
+    "translations": {
+      "fr": {
+        "name": "Les Guinzz — Violet"
+      },
+      "en": {
+        "name": "Les Guinzz — Purple"
+      }
+    }
+  },
+  {
+    "key": "LES_GUINZZ_CYAN",
+    "slot": "LEGS",
+    "price_coins": 15,
+    "sell_price_coins": 7,
+    "modifiers": [
+      {
+        "type": "DODGE_BONUS",
+        "value": 30
+      }
+    ],
+    "image_path": "6ecab769db6b16c81511e3023057d4b993207ac6.png",
+    "translations": {
+      "fr": {
+        "name": "Les Guinzz — Cyan"
+      },
+      "en": {
+        "name": "Les Guinzz — Cyan"
+      }
+    }
+  },
+  {
+    "key": "LES_GUINZZ_CORAL",
+    "slot": "LEGS",
+    "price_coins": 15,
+    "sell_price_coins": 7,
+    "modifiers": [
+      {
+        "type": "DODGE_BONUS",
+        "value": 30
+      }
+    ],
+    "image_path": "0e10fd6f2cb4a2bbd9b4855a40d06f2a0c2e7dd5.png",
+    "translations": {
+      "fr": {
+        "name": "Les Guinzz — Corail"
+      },
+      "en": {
+        "name": "Les Guinzz — Coral"
+      }
+    }
+  },
+  {
+    "key": "SPORT_TSHIRT_SLATE",
+    "slot": "CHEST",
+    "price_coins": 10,
+    "sell_price_coins": 5,
+    "modifiers": [
+      {
+        "type": "GUARD_BONUS",
+        "value": 30
+      }
+    ],
+    "image_path": "75825706ebccaa0622464b89e125d03274ae4800.png",
+    "translations": {
+      "fr": {
+        "name": "T-shirt sportif — Ardoise"
+      },
+      "en": {
+        "name": "Sport T-shirt — Slate"
+      }
+    }
+  },
+  {
+    "key": "SPORT_TSHIRT_CORAL",
+    "slot": "CHEST",
+    "price_coins": 10,
+    "sell_price_coins": 5,
+    "modifiers": [
+      {
+        "type": "GUARD_BONUS",
+        "value": 30
+      }
+    ],
+    "image_path": "c34699f4aece0ffe7bf7752947a8533e44b76af5.png",
+    "translations": {
+      "fr": {
+        "name": "T-shirt sportif — Corail"
+      },
+      "en": {
+        "name": "Sport T-shirt — Coral"
+      }
+    }
+  },
+  {
+    "key": "LE_POIDS_LOURD",
+    "slot": "WEAPON",
+    "price_coins": 25,
+    "sell_price_coins": 12,
+    "modifiers": [
+      {
+        "type": "DAMAGE_BONUS",
+        "value": 2
+      }
+    ],
+    "image_path": "ecb08e27a7cf1d45c9adca0724b2741c56767299.png",
+    "translations": {
+      "fr": {
+        "name": "Le Poids Lourd"
+      },
+      "en": {
+        "name": "The Heavyweight"
+      }
+    }
+  }
+]
