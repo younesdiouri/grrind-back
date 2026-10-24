@@ -13,7 +13,8 @@ namespace App\Identity\Application;
 final readonly class UpdateProfile
 {
     /**
-     * @param array<string, bool> $notificationPreferences clé = {@see \App\Shared\Domain\NotificationCategory}::value
+     * @param array<string, bool>       $notificationPreferences clé = {@see \App\Shared\Domain\NotificationCategory}::value
+     * @param array<string, mixed>|null $avatar
      */
     public function __construct(
         public ?string $displayName = null,
@@ -21,6 +22,7 @@ final readonly class UpdateProfile
         public ?string $locale = null,
         public array $notificationPreferences = [],
         public ?string $appearance = null,
+        public ?array $avatar = null,
     ) {
     }
 }

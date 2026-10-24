@@ -6,6 +6,7 @@ namespace App\Identity\Domain;
 
 use App\Identity\Infrastructure\Doctrine\UserRepository;
 use App\Shared\Domain\Appearance;
+use App\Shared\Domain\Avatar;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\Timezone;
 use DateTimeImmutable;
@@ -78,6 +79,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /** Cosmétique, sans effet de jeu — voir {@see Appearance}. */
     #[ORM\Column(length: 64, options: ['default' => 'STRENGTH_V3'])]
     private string $appearance = Appearance::DEFAULT;
+
+    /** @var array<string, mixed>|null null = compte antérieur à la personnalisation Unity. */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $avatar = null;
 
     /**
      * Les catégories de notification que le joueur a coupées — présence, pas absence :
@@ -214,6 +219,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function changeAppearance(string $appearance): void
     {
         $this->appearance = $appearance;
+    }
+
+    /** @return array<string, int|string> */
+    public function avatar(): array
+    {
+        return Avatar::resolve($this->avatar);
+    }
+
+    /** @param array<string, mixed> $avatar validé à la frontière HTTP */
+    public function changeAvatar(array $avatar): void
+    {
+        $this->avatar = $avatar;
     }
 
     public function rename(string $displayName): void

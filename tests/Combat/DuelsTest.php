@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Combat;
 
+use App\Shared\Domain\Avatar;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
@@ -22,6 +23,26 @@ use Symfony\Component\Uid\Uuid;
  */
 final class DuelsTest extends ApiTestCase
 {
+    public function testBothAvatarsAreFrozenEvenAfterBothProfilesChange(): void
+    {
+        [$bob, $carla] = $this->guildOfTwo();
+        $challenger = array_replace(Avatar::DEFAULT, ['noseStyle' => 'original', 'skinTone' => 'light']);
+        $opponent = array_replace(Avatar::DEFAULT, ['body' => 'female', 'faceStyle' => 'original', 'noseStyle' => 'original', 'hairStyle' => 'buns', 'skinTone' => 'deep']);
+        self::assertSame(200, $this->send('PATCH', '/api/me', ['avatar' => $challenger], $bob->headers)->getStatusCode());
+        self::assertSame(200, $this->send('PATCH', '/api/me', ['avatar' => $opponent], $carla->headers)->getStatusCode());
+        $public = self::decode($this->get('/api/players/'.$carla->id, $bob->headers));
+        self::assertSame($opponent, $public['avatar']);
+        $fought = self::decode($this->challenge($bob, $carla->id->toRfc4122()));
+        self::assertIsArray($fought['player']);
+        self::assertIsArray($fought['enemy']);
+        self::assertSame($challenger, $fought['player']['avatar']);
+        self::assertSame($opponent, $fought['enemy']['avatar']);
+        $this->send('PATCH', '/api/me', ['avatar' => Avatar::DEFAULT], $bob->headers);
+        $this->send('PATCH', '/api/me', ['avatar' => Avatar::DEFAULT], $carla->headers);
+        self::assertIsString($fought['id']);
+        self::assertEquals($fought, self::decode($this->get('/api/battles/'.$fought['id'], $bob->headers)));
+    }
+
     public function testChallengingATeammateRendersABattleAgainstHim(): void
     {
         [$bob, $carla] = $this->guildOfTwo();

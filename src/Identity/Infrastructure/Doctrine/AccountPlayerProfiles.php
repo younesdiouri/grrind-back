@@ -7,7 +7,7 @@ namespace App\Identity\Infrastructure\Doctrine;
 use App\Identity\Domain\User;
 use App\Shared\Application\PlayerProfile;
 use App\Shared\Application\PlayerProfiles;
-use App\Shared\Domain\Appearance;
+use App\Shared\Domain\Avatar;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
@@ -45,9 +45,9 @@ final readonly class AccountPlayerProfiles implements PlayerProfiles
             return [];
         }
 
-        /** @var list<array{id: Uuid, displayName: string, registeredAt: DateTimeImmutable, appearance: string}> $rows */
+        /** @var list<array{id: Uuid, displayName: string, registeredAt: DateTimeImmutable, appearance: string, avatar: array<string, mixed>|null}> $rows */
         $rows = $this->entityManager->createQueryBuilder()
-            ->select('u.id', 'u.displayName', 'u.registeredAt', 'u.appearance')
+            ->select('u.id', 'u.displayName', 'u.registeredAt', 'u.appearance', 'u.avatar')
             ->from(User::class, 'u')
             ->where('u.id IN (:ids)')
             ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $playerIds))
@@ -57,7 +57,7 @@ final readonly class AccountPlayerProfiles implements PlayerProfiles
         $profiles = [];
 
         foreach ($rows as $row) {
-            $profiles[$row['id']->toRfc4122()] = new PlayerProfile($row['displayName'], $row['registeredAt'], $row['appearance']);
+            $profiles[$row['id']->toRfc4122()] = new PlayerProfile($row['displayName'], $row['registeredAt'], $row['appearance'], Avatar::resolve($row['avatar']));
         }
 
         return $profiles;

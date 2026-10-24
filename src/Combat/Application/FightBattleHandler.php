@@ -21,6 +21,7 @@ use App\Shared\Application\PlayerEquipment;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Domain\Appearance;
+use App\Shared\Domain\Avatar;
 use Psr\Clock\ClockInterface;
 use Random\Engine\Xoshiro256StarStar;
 use Random\Randomizer;
@@ -125,7 +126,9 @@ final readonly class FightBattleHandler
         $progression = $progressions[$command->playerId->toRfc4122()];
 
         $player = $this->fighters->forPlayer($progression, $command->playerId, $now);
-        $appearance = $this->profiles->of([$command->playerId])[$command->playerId->toRfc4122()]->appearance ?? Appearance::default();
+        $profile = $this->profiles->of([$command->playerId])[$command->playerId->toRfc4122()] ?? null;
+        $appearance = $profile->appearance ?? Appearance::default();
+        $avatar = $profile->avatar ?? Avatar::DEFAULT;
         $equipment = $this->equipment->of([$command->playerId])[$command->playerId->toRfc4122()] ?? [];
 
         // Aucune ligne n'est encore écrite à ce stade : un refus ici — clé inconnue,
@@ -161,6 +164,7 @@ final readonly class FightBattleHandler
             $now,
             $appearance,
             $equipment,
+            $avatar,
         ): Battle {
             $drop = $this->drops->rollFor($command->playerId, $enemy->key, $victory, $id, $now);
 
@@ -179,6 +183,7 @@ final readonly class FightBattleHandler
                 $now,
                 $appearance,
                 $equipment,
+                $avatar,
             );
 
             $this->battles->add($battle);

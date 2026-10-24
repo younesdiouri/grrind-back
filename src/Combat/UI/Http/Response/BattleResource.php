@@ -8,6 +8,7 @@ use App\Combat\Domain\Battle;
 use App\Combat\Infrastructure\Translation\EnemyTranslator;
 use App\Shared\Application\ItemImageUrlResolver;
 use App\Shared\Domain\Appearance;
+use App\Shared\Domain\Avatar;
 use DateTimeInterface;
 
 /**
@@ -92,6 +93,7 @@ final readonly class BattleResource
                 ...FighterResource::from($this->battle->playerSnapshot()['fighter'])->toArray(),
                 'appearance' => Appearance::fromSnapshot($this->battle->playerSnapshot()['appearance'] ?? null),
                 'equipment' => (object) ($this->battle->playerSnapshot()['equipment'] ?? []),
+                'avatar' => Avatar::resolve($this->battle->playerSnapshot()['avatar'] ?? null),
             ],
             // `key` et `name` d'abord, puis les mêmes quatre champs que `player` — voir le
             // docblock de la classe pour pourquoi le nom est résolu ici plutôt que rendu tel
@@ -106,6 +108,7 @@ final readonly class BattleResource
                 // `key` / `playerId`.
                 ['appearance' => null === $enemySnapshot['key'] ? Appearance::fromSnapshot($enemySnapshot['appearance'] ?? null) : null],
                 ['equipment' => (object) ($enemySnapshot['equipment'] ?? [])],
+                ['avatar' => null === $enemySnapshot['key'] ? Avatar::resolve($enemySnapshot['avatar'] ?? null) : null],
             ),
             'events' => BattleEventResource::listOf($this->battle->timeline()),
             'rewards' => $this->rewards(),

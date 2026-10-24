@@ -6,6 +6,8 @@ namespace App\Identity\UI\Http\Request;
 
 use App\Identity\Domain\Locale;
 use App\Identity\Domain\User;
+use App\Shared\Domain\Avatar;
+use OpenApi\Attributes as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -18,6 +20,7 @@ final readonly class UpdateProfileRequest
     /**
      * @param list<NotificationPreferenceRequest> $notificationPreferences liste vide =
      *                                                                     aucune préférence touchée ; voir {@see NotificationPreferenceRequest}
+     * @param array<string, mixed>|null           $avatar                  remplacement complet, null = inchangé
      */
     public function __construct(
         #[Assert\NotBlank(normalizer: 'trim', allowNull: true)]
@@ -35,6 +38,21 @@ final readonly class UpdateProfileRequest
         // Le handler vérifie la disponibilité dans le catalogue graphique administrable.
         #[Assert\Regex('/^[A-Z][A-Z0-9_]{0,63}$/')]
         public ?string $appearance = null,
+        #[OA\Property(ref: '#/components/schemas/Avatar', nullable: true, description: 'Remplacement complet ; absent ou null = inchangé. Aucun équipement accepté.')]
+        #[Assert\Sequentially([
+            new Assert\Collection(fields: [
+                'version' => new Assert\IdenticalTo(Avatar::VERSION),
+                'body' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['body'])],
+                'faceStyle' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['faceStyle'])],
+                'noseStyle' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['noseStyle'])],
+                'hairStyle' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['hairStyle'])],
+                'skinTone' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['skinTone'])],
+                'eyeColor' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['eyeColor'])],
+                'hairColor' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['hairColor'])],
+            ]),
+            new Assert\Expression("value == null or value['body'] == 'male' or (value['faceStyle'] == 'original' and value['noseStyle'] == 'original')", message: 'Le visage carré et le nez large sont disponibles uniquement sur le corps masculin.'),
+        ])]
+        public ?array $avatar = null,
     ) {
     }
 }
