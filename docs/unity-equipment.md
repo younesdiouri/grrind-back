@@ -19,6 +19,33 @@ les pourcentages résolus ; les `modifiers` conservent les unités du moteur.
 Les pièces des séances débutantes sont de l'ordre de 5–15 ; ces prix restent en dessous des
 30 pièces des anciens équipements d'entrée. HALTER_EGO est également conservé : son aperçu Unity bleu utilise le modèle du Poids Lourd. Le prix de revente est la moitié entière du prix d'achat initial.
 
+## Apparence persistante (#308)
+
+`GET /api/avatar-catalog` expose la version, le défaut et les options compatibles des
+corps, traits, coiffures et couleurs. `GET /api/me` rend `avatar` ; `PATCH /api/me`
+remplace cet objet en entier (champ absent ou `null` = inchangé). Exemple V1 :
+
+```json
+{"avatar":{"version":1,"body":"male","faceStyle":"square","noseStyle":"wide","hairStyle":"parted","skinTone":"tan","eyeColor":"brown","hairColor":"brown"}}
+```
+
+Le catalogue et les profils sont authentifiés. Une version, un identifiant ou une combinaison
+invalide, un champ manquant ou un champ d'équipement ajouté rend **422** sans sauvegarde
+partielle. `square` et `wide` sont masculins uniquement et indépendants l'un de l'autre.
+Les identifiants sont ceux du bridge Unity ; les DTO sont générés depuis `openapi.yaml`.
+
+Le profil public et les membres de guilde rendent le même `avatar`. Les deux combattants
+PvP, le joueur PvE et les participants d'Ālam à sa résolution le figent ; un replay
+ne relit jamais l'apparence actuelle. Un ancien snapshot ou une version inconnue utilise
+le défaut V1 ci-dessus ; un identifiant retiré utilise le défaut de son champ. Le corps
+féminin conserve ses traits `original`. Aucun fait historique n'est réécrit.
+
+Les vêtements et coiffes restent des équipements serveur. `headwear` décrit le slot `HEAD`
+avec une liste vide : aucune coiffe Unity n'est publiée depuis #315. Le bandeau local
+du prototype n'est pas équipable via l'avatar. La migration ajoute seulement une colonne
+JSON nullable ; les comptes existants reçoivent le défaut à la lecture. Le ruleset de jeu
+et les statistiques restent indépendants de la personnalisation.
+
 ## Loot et publication
 
 Chaque nouvel objet rejoint `WOODEN_CHEST` avec un poids **5**. Depuis le nettoyage #315,

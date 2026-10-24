@@ -8,6 +8,7 @@ use App\Shared\Application\PlayerProfile;
 use App\Shared\Application\PlayerProgression;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\VitalityBreakdown;
+use App\Shared\Domain\Avatar;
 use DateTimeInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -50,6 +51,8 @@ final readonly class PlayerResource
         public AttributeGains $attributes,
         public int $vitality,
         public VitalityBreakdown $vitalityBreakdown,
+        /** @var array<string, int|string> */
+        public array $avatar = Avatar::DEFAULT,
     ) {
     }
 
@@ -67,6 +70,7 @@ final readonly class PlayerResource
             $progression->attributes,
             $progression->vitality,
             $progression->vitalityBreakdown,
+            $profile->avatar,
         );
     }
 
@@ -80,6 +84,7 @@ final readonly class PlayerResource
             'displayName' => $this->displayName,
             'registeredAt' => $this->registeredAt,
             'appearance' => $this->appearance,
+            'avatar' => $this->avatar,
             'level' => $this->level,
             'xpIntoLevel' => $this->xpIntoLevel,
             'xpToNextLevel' => $this->xpToNextLevel,

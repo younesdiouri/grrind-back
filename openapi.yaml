@@ -780,6 +780,20 @@ paths:
                 $ref: '#/components/schemas/AppearanceCatalog'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/avatar-catalog:
+    get:
+      tags:
+        - Profil
+      operationId: get_identity_avatar_catalog
+      responses:
+        '200':
+          description: 'Options Unity compatibles et défaut de la version courante.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarCatalog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/devices:
     post:
       tags:
@@ -1524,6 +1538,7 @@ components:
         - appearance
         - contribution
         - gauges
+        - avatar
       properties:
         playerId:
           type: string
@@ -1559,6 +1574,8 @@ components:
               durationSeconds:
                 type: integer
             type: object
+        avatar:
+          $ref: '#/components/schemas/Avatar'
       type: object
     AlamDrop:
       required:
@@ -2113,6 +2130,7 @@ components:
         - displayName
         - registeredAt
         - appearance
+        - avatar
         - level
         - xpIntoLevel
         - xpToNextLevel
@@ -2131,6 +2149,8 @@ components:
           format: date-time
         appearance:
           $ref: '#/components/schemas/Appearance'
+        avatar:
+          $ref: '#/components/schemas/Avatar'
         level:
           type: integer
           example: 12
@@ -2340,6 +2360,7 @@ components:
         - nextTitle
         - notificationPreferences
         - appearance
+        - avatar
       properties:
         id:
           type: string
@@ -2379,6 +2400,8 @@ components:
           allOf:
             -
               $ref: '#/components/schemas/Appearance'
+        avatar:
+          $ref: '#/components/schemas/Avatar'
         notificationPreferences:
           description: "Toutes les catégories vivantes : le client lit l'état exact de chacune plutôt\nque de connaître le défaut. Clé = valeur de `NotificationCategory`, valeur =\nactivée.\n"
           type: object
@@ -3719,6 +3742,149 @@ components:
           description: 'Réduction relative de la chance d’esquive adverse. Pourcentage entier tronqué depuis les millièmes serveur.'
           type: integer
       type: object
+    Avatar:
+      description: "Apparence Unity/Quaternius complète, indépendante de l'ancien champ appearance.\nIdentifiants stables dans la version 1. Corps et coiffure sont indépendants ;\nsquare et wide sont réservés à male, les deux traits se choisissent séparément.\nAbsence historique/version inconnue : défaut V1 figé. Identifiant retiré :\ndéfaut du champ ; les traits féminins reviennent à original. Aucun profil courant\nn'est consulté pour un replay. Les écritures inconnues/incomplètes sont refusées (422).\nAucun vêtement, coiffe ou objet : utiliser l'équipement serveur.\n"
+      required:
+        - version
+        - body
+        - faceStyle
+        - noseStyle
+        - hairStyle
+        - skinTone
+        - eyeColor
+        - hairColor
+      properties:
+        version:
+          type: integer
+          enum:
+            - 1
+        body:
+          type: string
+          enum:
+            - male
+            - female
+        faceStyle:
+          type: string
+          enum:
+            - original
+            - square
+        noseStyle:
+          type: string
+          enum:
+            - original
+            - wide
+        hairStyle:
+          type: string
+          enum:
+            - parted
+            - buzzed
+            - buns
+            - long
+        skinTone:
+          type: string
+          enum:
+            - light
+            - tan
+            - brown
+            - deep
+        eyeColor:
+          type: string
+          enum:
+            - brown
+            - blue
+            - green
+        hairColor:
+          type: string
+          enum:
+            - brown
+            - black
+            - blond
+      type: object
+      additionalProperties: false
+    AvatarOption:
+      required:
+        - key
+        - compatibleBodies
+      properties:
+        key:
+          type: string
+        compatibleBodies:
+          type: array
+          items:
+            type: string
+            enum:
+              - male
+              - female
+      type: object
+    AvatarCatalog:
+      description: "Catalogue cosmétique versionné. Les coiffes sont des équipements HEAD, séparés des coiffures ; aucune coiffe Unity disponible actuellement. Le bandeau de l'atelier est un prototype, non équipable."
+      required:
+        - version
+        - default
+        - options
+        - headwear
+      properties:
+        version:
+          type: integer
+          enum:
+            - 1
+        default:
+          $ref: '#/components/schemas/Avatar'
+        options:
+          required:
+            - body
+            - faceStyle
+            - noseStyle
+            - hairStyle
+            - skinTone
+            - eyeColor
+            - hairColor
+          properties:
+            body:
+              type: array
+              items:
+                $ref: '#/components/schemas/AvatarOption'
+            faceStyle:
+              type: array
+              items:
+                $ref: '#/components/schemas/AvatarOption'
+            noseStyle:
+              type: array
+              items:
+                $ref: '#/components/schemas/AvatarOption'
+            hairStyle:
+              type: array
+              items:
+                $ref: '#/components/schemas/AvatarOption'
+            skinTone:
+              type: array
+              items:
+                $ref: '#/components/schemas/AvatarOption'
+            eyeColor:
+              type: array
+              items:
+                $ref: '#/components/schemas/AvatarOption'
+            hairColor:
+              type: array
+              items:
+                $ref: '#/components/schemas/AvatarOption'
+          type: object
+        headwear:
+          required:
+            - slot
+            - options
+          properties:
+            slot:
+              type: string
+              enum:
+                - HEAD
+            options:
+              type: array
+              items:
+                type: string
+              maxItems: 0
+          type: object
+      type: object
     Appearance:
       description: 'Clé stable d’un avatar du catalogue graphique administrable.'
       type: string
@@ -3981,6 +4147,7 @@ components:
         - cooldownReductionPercent
         - precisionPercent
         - appearance
+        - avatar
       properties:
         key:
           description: "L'entrée du catalogue, ou `null` pour un défi PvP."
@@ -4037,6 +4204,11 @@ components:
               $ref: '#/components/schemas/Appearance'
         equipment:
           $ref: '#/components/schemas/BattleEquipment'
+        avatar:
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/Avatar'
         imageUrls:
           $ref: '#/components/schemas/EnemyImageUrls'
         introduction:
@@ -4216,11 +4388,14 @@ components:
             -
               required:
                 - appearance
+                - avatar
               properties:
                 appearance:
                   $ref: '#/components/schemas/Appearance'
                 equipment:
                   $ref: '#/components/schemas/BattleEquipment'
+                avatar:
+                  $ref: '#/components/schemas/Avatar'
               type: object
         enemy:
           $ref: '#/components/schemas/BattleEnemy'
@@ -4596,6 +4771,13 @@ components:
           type: string
           pattern: '[A-Z][A-Z0-9_]{0,63}'
           nullable: true
+          default: null
+        avatar:
+          oneOf:
+            -
+              $ref: '#/components/schemas/Avatar'
+          nullable: true
+          description: 'Remplacement complet ; absent ou null = inchangé. Aucun équipement accepté.'
           default: null
       type: object
     RegisterRequest:

@@ -43,6 +43,10 @@ final readonly class UpdateProfileHandler
             $user->changeAppearance($command->appearance);
         }
 
+        if (null !== $command->avatar) {
+            $user->changeAvatar($command->avatar);
+        }
+
         foreach ($command->notificationPreferences as $categoryValue => $enabled) {
             $user->setNotificationPreference(NotificationCategory::from($categoryValue), $enabled);
         }

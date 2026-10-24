@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Application;
 
 use App\Shared\Domain\Appearance;
+use App\Shared\Domain\Avatar;
 use DateTimeImmutable;
 
 /**
@@ -18,10 +19,12 @@ use DateTimeImmutable;
  */
 final readonly class PlayerProfile
 {
+    /** @param array<string, int|string> $avatar */
     public function __construct(
         public string $displayName,
         public DateTimeImmutable $registeredAt,
         public string $appearance = Appearance::DEFAULT,
+        public array $avatar = Avatar::DEFAULT,
     ) {
     }
 }

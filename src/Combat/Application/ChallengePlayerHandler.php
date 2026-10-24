@@ -15,6 +15,7 @@ use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Application\Teammates;
 use App\Shared\Domain\Appearance;
+use App\Shared\Domain\Avatar;
 use Psr\Clock\ClockInterface;
 use Random\Engine\Xoshiro256StarStar;
 use Random\Randomizer;
@@ -146,6 +147,8 @@ final readonly class ChallengePlayerHandler
             $opponent->appearance,
             $equipment[$command->challengerId->toRfc4122()] ?? [],
             $equipment[$command->opponentId->toRfc4122()] ?? [],
+            $profiles[$command->challengerId->toRfc4122()]->avatar ?? Avatar::DEFAULT,
+            $opponent->avatar,
         );
 
         $this->battles->add($battle);

@@ -17,6 +17,7 @@ use App\Combat\Domain\Enemy;
 use App\Combat\Domain\Fighter;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Appearance;
+use App\Shared\Domain\Avatar;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -39,6 +40,7 @@ final class BattleTest extends TestCase
                 'attributes' => ['strength' => 10, 'endurance' => 20, 'mobility' => 30, 'dexterity' => 40],
                 'vitality' => 500,
                 'appearance' => Appearance::DEFAULT,
+                'avatar' => Avatar::DEFAULT,
                 'equipment' => [],
                 'fighter' => ['hp' => 150, 'damage' => 12, 'mitigationPermille' => 100, 'comboPermille' => 50, 'dodgePermille' => 25, 'maintenancePermille' => 0, 'criticalChancePermille' => 0, 'guardPermille' => 0, 'criticalResistancePermille' => 0, 'cooldownReductionPermille' => 0, 'precisionPermille' => 0],
             ],

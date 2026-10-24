@@ -10,6 +10,7 @@ use App\Shared\Application\FrozenGameRulesets;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Alam\AlamCalendar;
 use App\Shared\Domain\Alam\AlamRules;
+use App\Shared\Domain\Avatar;
 use App\Tests\Support\ApiTestCase;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,6 +27,35 @@ final class AlamRoutesTest extends ApiTestCase
     {
         $_ENV['ALAM_MANUAL_ENABLED'] = $_SERVER['ALAM_MANUAL_ENABLED'] = '0';
         parent::tearDown();
+    }
+
+    public function testResolvedAvatarDoesNotFollowProfileChangesAndOldRunsHaveADefault(): void
+    {
+        $bob = $this->openAccount();
+        $this->post('/api/guilds', ['name' => 'La guilde'], $bob->headers);
+        $avatar = array_replace(Avatar::DEFAULT, ['hairStyle' => 'buzzed', 'skinTone' => 'deep']);
+        $this->send('PATCH', '/api/me', ['avatar' => $avatar], $bob->headers);
+        $response = $this->post('/api/guild/alam/runs', [], $bob->headers + ['Idempotency-Key' => 'avatar-alam']);
+        self::assertSame(201, $response->getStatusCode(), (string) $response->getContent());
+        $run = self::decode($response);
+        self::assertIsArray($run['participants']);
+        self::assertIsArray($run['participants'][0]);
+        self::assertSame($avatar, $run['participants'][0]['avatar']);
+        $this->send('PATCH', '/api/me', ['avatar' => Avatar::DEFAULT], $bob->headers);
+        self::assertIsString($run['id']);
+        $replayed = self::decode($this->get('/api/guild/alam/runs/'.$run['id'], $bob->headers));
+        self::assertSame($run['participants'], $replayed['participants']);
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+        $stored = $em->find(AlamRun::class, $run['id']);
+        self::assertInstanceOf(AlamRun::class, $stored);
+        $legacy = $run['participants'][0];
+        unset($legacy['avatar']);
+        $stored->result['participants'] = [$legacy];
+        $em->flush();
+        $old = self::decode($this->get('/api/guild/alam/runs/'.$run['id'], $bob->headers));
+        self::assertIsArray($old['participants']);
+        self::assertIsArray($old['participants'][0]);
+        self::assertSame(Avatar::DEFAULT, $old['participants'][0]['avatar']);
     }
 
     public function testManualReplayAndWeeklyIsolationWithZeroContributors(): void

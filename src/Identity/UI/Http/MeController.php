@@ -74,6 +74,7 @@ final readonly class MeController
             $request->locale,
             self::preferencesOf($request->notificationPreferences),
             $request->appearance,
+            $request->avatar,
         ));
 
         return new JsonResponse(UserResource::from($updated, $this->titles->of($updated->id()))->toArray());

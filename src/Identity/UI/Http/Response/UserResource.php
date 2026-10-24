@@ -21,7 +21,8 @@ use DateTimeInterface;
 final readonly class UserResource
 {
     /**
-     * @param array<string, bool> $notificationPreferences clé = {@see NotificationCategory}::value
+     * @param array<string, bool>       $notificationPreferences clé = {@see NotificationCategory}::value
+     * @param array<string, int|string> $avatar
      */
     public function __construct(
         public string $id,
@@ -33,6 +34,7 @@ final readonly class UserResource
         public PlayerTitleStanding $titles,
         public array $notificationPreferences,
         public string $appearance,
+        public array $avatar,
     ) {
     }
 
@@ -48,6 +50,7 @@ final readonly class UserResource
             $titles,
             self::preferencesOf($user),
             $user->appearance(),
+            $user->avatar(),
         );
     }
 
@@ -70,6 +73,7 @@ final readonly class UserResource
             'notificationPreferences' => $this->notificationPreferences,
             // La clé seule : les images sont dans `GET /api/appearances`, chargé une fois.
             'appearance' => $this->appearance,
+            'avatar' => $this->avatar,
         ];
     }
 

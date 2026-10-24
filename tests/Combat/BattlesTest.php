@@ -14,6 +14,7 @@ use App\Combat\Domain\Fighter;
 use App\Combat\Infrastructure\Doctrine\BattleRepository;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Appearance;
+use App\Shared\Domain\Avatar;
 use App\Shared\UI\Http\IdempotencyListener;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
@@ -32,6 +33,27 @@ use Symfony\Component\Uid\Uuid;
 final class BattlesTest extends ApiTestCase
 {
     use Battles;
+
+    public function testAvatarIsFrozenForPveAndOldSnapshotsUseTheDefault(): void
+    {
+        $bob = $this->openAccount();
+        $avatar = array_replace(Avatar::DEFAULT, ['faceStyle' => 'original', 'eyeColor' => 'blue']);
+        $this->send('PATCH', '/api/me', ['avatar' => $avatar], $bob->headers);
+        $fought = self::decode($this->fight($bob));
+        self::assertIsArray($fought['player']);
+        self::assertIsArray($fought['enemy']);
+        self::assertSame($avatar, $fought['player']['avatar']);
+        self::assertNull($fought['enemy']['avatar']);
+        $this->send('PATCH', '/api/me', ['avatar' => Avatar::DEFAULT], $bob->headers);
+        self::assertIsString($fought['id']);
+        self::assertEquals($fought, self::decode($this->get('/api/battles/'.$fought['id'], $bob->headers)));
+        $db = self::getContainer()->get('doctrine.dbal.default_connection');
+        self::assertInstanceOf(\Doctrine\DBAL\Connection::class, $db);
+        $db->executeStatement("UPDATE combat_battle SET player_snapshot = (player_snapshot::jsonb - 'avatar')::json WHERE id = ?", [$fought['id']]);
+        $old = self::decode($this->get('/api/battles/'.$fought['id'], $bob->headers));
+        self::assertIsArray($old['player']);
+        self::assertSame(Avatar::DEFAULT, $old['player']['avatar']);
+    }
 
     public function testFightingCreatesABattleAndRendersItsTimeline(): void
     {
