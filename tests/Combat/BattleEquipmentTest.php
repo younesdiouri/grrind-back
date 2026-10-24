@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Combat;
 
 use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
+use App\Shared\Infrastructure\Config\GameRulesetVersion;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use DateTimeImmutable;
@@ -25,13 +26,13 @@ final class BattleEquipmentTest extends ApiTestCase
         $this->grant($player, 'CROWN_OF_THE_TIRELESS');
         $this->equip($player, 'PURSUIT_GOGGLES');
         $dressed = $this->fight($player);
-        self::assertSame(['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v4']], self::equipmentOf($dressed, 'player'));
+        self::assertSame(['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v4', 'weaponType' => null]], self::equipmentOf($dressed, 'player'));
 
         $dressedId = $dressed['id'];
         self::assertIsString($dressedId);
         $this->equip($player, 'CROWN_OF_THE_TIRELESS');
         $replaced = $this->fight($player);
-        self::assertSame(['HEAD' => ['key' => 'CROWN_OF_THE_TIRELESS', 'artworkVersion' => null]], self::equipmentOf($replaced, 'player'));
+        self::assertSame(['HEAD' => ['key' => 'CROWN_OF_THE_TIRELESS', 'artworkVersion' => null, 'weaponType' => null]], self::equipmentOf($replaced, 'player'));
         self::assertEquals($dressed, self::decode($this->get('/api/battles/'.$dressedId, $player->headers)));
 
         self::assertSame(Response::HTTP_OK, $this->send('DELETE', '/api/inventory/equipment/HEAD', null, $player->headers)->getStatusCode());
@@ -64,7 +65,7 @@ final class BattleEquipmentTest extends ApiTestCase
         $fought = self::decode($response);
         $foughtId = $fought['id'];
         self::assertIsString($foughtId);
-        $head = ['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v4']];
+        $head = ['HEAD' => ['key' => 'PURSUIT_GOGGLES', 'artworkVersion' => 'v4', 'weaponType' => null]];
         self::assertSame($head, self::equipmentOf($fought, 'player'));
         self::assertSame($head, self::equipmentOf($fought, 'enemy'));
 
@@ -75,7 +76,7 @@ final class BattleEquipmentTest extends ApiTestCase
         self::assertEquals($fought, self::decode($this->post($path, [], $headers)));
         $next = self::decode($this->post($path, [], $player->headers + ['Idempotency-Key' => 'duel-remplace']));
         self::assertSame([], self::equipmentOf($next, 'player'));
-        self::assertSame(['HEAD' => ['key' => 'CROWN_OF_THE_TIRELESS', 'artworkVersion' => null]], self::equipmentOf($next, 'enemy'));
+        self::assertSame(['HEAD' => ['key' => 'CROWN_OF_THE_TIRELESS', 'artworkVersion' => null, 'weaponType' => null]], self::equipmentOf($next, 'enemy'));
     }
 
     public function testUnityEquipmentKeysStayFrozenForPveAndBothPvpPlayers(): void
@@ -94,7 +95,11 @@ final class BattleEquipmentTest extends ApiTestCase
         }
         $references = [];
         foreach ($outfits as $outfit) {
-            $references[] = array_map(static fn (string $key): array => ['key' => $key, 'artworkVersion' => null], $outfit);
+            $reference = [];
+            foreach ($outfit as $slot => $key) {
+                $reference[$slot] = ['key' => $key, 'artworkVersion' => null, 'weaponType' => 'WEAPON' === $slot ? 'FIST' : null];
+            }
+            $references[] = $reference;
         }
         $pve = $this->fight($player);
         self::assertEquals($references[0], self::equipmentOf($pve, 'player'));
@@ -135,11 +140,66 @@ final class BattleEquipmentTest extends ApiTestCase
         $player = $this->openAccount();
         $this->grant($player, 'ALL_PURPOSE_FLASK');
         $this->equip($player, 'ALL_PURPOSE_FLASK', 'ACCESSORY');
-        self::assertSame(['ACCESSORY' => ['key' => 'ALL_PURPOSE_FLASK', 'artworkVersion' => null]], self::equipmentOf($this->fight($player), 'player'));
+        self::assertSame(['ACCESSORY' => ['key' => 'ALL_PURPOSE_FLASK', 'artworkVersion' => null, 'weaponType' => null]], self::equipmentOf($this->fight($player), 'player'));
         $inventory = self::decode($this->get('/api/inventory', $player->headers));
         self::assertIsArray($inventory['equipment']);
         self::assertIsArray($inventory['equipment']['ACCESSORY']);
         self::assertSame('ALL_PURPOSE_FLASK', $inventory['equipment']['ACCESSORY']['key']);
+    }
+
+    public function testSwordTypesAreFrozenForBothPlayersAndLegacyArchivesNeverReadTheCurrentType(): void
+    {
+        $player = $this->openAccount();
+        $opponent = $this->openAccount('tennis@grrind.app', 'Huilesson');
+        foreach ([[$player, 'FER_PLAY'], [$opponent, 'HUILESSON']] as [$account, $key]) {
+            $this->grant($account, $key);
+            $this->equip($account, $key, 'WEAPON');
+        }
+        $pve = $this->fight($player);
+        self::assertSame(['WEAPON' => ['key' => 'FER_PLAY', 'artworkVersion' => null, 'weaponType' => 'SWORD']], self::equipmentOf($pve, 'player'));
+        $guild = self::decode($this->post('/api/guilds', ['name' => 'Les armes longues'], $player->headers));
+        self::assertIsString($guild['id']);
+        $invite = self::decode($this->post('/api/guilds/'.$guild['id'].'/invite-code', [], $player->headers));
+        self::assertSame(200, $this->post('/api/guilds/join', ['code' => $invite['code']], $opponent->headers)->getStatusCode());
+        $path = '/api/players/'.$opponent->id->toRfc4122().'/battles';
+        $headers = $player->headers + ['Idempotency-Key' => 'sports-duel'];
+        $response = $this->post($path, [], $headers);
+        self::assertSame(201, $response->getStatusCode());
+        $duel = self::decode($response);
+        self::assertSame(['WEAPON' => ['key' => 'HUILESSON', 'artworkVersion' => null, 'weaponType' => 'SWORD']], self::equipmentOf($duel, 'enemy'));
+        $db = self::getContainer()->get(Connection::class);
+        $original = $db->fetchAssociative('SELECT snapshot, version FROM game_ruleset WHERE id = 1');
+        self::assertIsArray($original);
+        self::assertIsString($original['snapshot']);
+        /** @var array{items: list<array<string, mixed>>} $snapshot */
+        $snapshot = json_decode($original['snapshot'], true, flags: \JSON_THROW_ON_ERROR);
+        foreach ($snapshot['items'] as &$item) {
+            if ('FER_PLAY' === $item['key']) {
+                $item['weapon_type'] = 'FIST';
+            }
+        }
+        unset($item);
+        self::assertSame($original['version'], GameRulesetVersion::of($snapshot));
+        $statistics = self::decode($this->get('/api/inventory', $player->headers))['statistics'];
+        try {
+            $db->executeStatement('UPDATE game_ruleset SET snapshot = ?, revision = revision + 1 WHERE id = 1', [json_encode($snapshot, \JSON_THROW_ON_ERROR)]);
+            self::assertSame($statistics, self::decode($this->get('/api/inventory', $player->headers))['statistics']);
+            self::assertSame(['WEAPON' => ['key' => 'FER_PLAY', 'artworkVersion' => null, 'weaponType' => 'FIST']], self::equipmentOf($this->fight($player), 'player'));
+            $this->send('DELETE', '/api/inventory/equipment/WEAPON', null, $opponent->headers);
+            foreach ([$pve, $duel] as $battle) {
+                self::assertIsString($battle['id']);
+                self::assertEquals($battle, self::decode($this->get('/api/battles/'.$battle['id'], $player->headers)));
+            }
+            self::assertSame($response->getContent(), $this->post($path, [], $headers)->getContent());
+            self::assertIsString($duel['id']);
+            $db->executeStatement("UPDATE combat_battle SET player_snapshot = player_snapshot #- '{equipment,WEAPON,weaponType}' WHERE id = ?", [$duel['id']]);
+            $this->client->enableProfiler();
+            $legacy = self::equipmentOf(self::decode($this->get('/api/battles/'.$duel['id'], $player->headers)), 'player');
+            self::assertSame(['WEAPON' => ['key' => 'FER_PLAY', 'artworkVersion' => null]], $legacy);
+            $this->assertNoRulesetSql();
+        } finally {
+            $db->executeStatement('UPDATE game_ruleset SET snapshot = ?, revision = revision + 1 WHERE id = 1', [$original['snapshot']]);
+        }
     }
 
     /**

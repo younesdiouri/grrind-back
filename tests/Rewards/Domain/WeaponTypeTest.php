@@ -28,8 +28,10 @@ final class WeaponTypeTest extends TestCase
         $entry = ['key' => 'FER_PLAY', 'rarity' => 'COMMON', 'slot' => 'WEAPON', 'price_coins' => 25, 'modifiers' => [['type' => 'DAMAGE_BONUS', 'value' => 2]]];
         $before = new ItemCatalog([$entry]);
         $after = new ItemCatalog([$entry + ['weapon_type' => 'SWORD']]);
-        self::assertSame(WeaponType::Sword, $after->find('FER_PLAY')?->weaponType);
-        self::assertEquals($before->find('FER_PLAY')?->modifiers, $after->find('FER_PLAY')?->modifiers);
+        $sword = $after->find('FER_PLAY');
+        self::assertNotNull($sword);
+        self::assertSame(WeaponType::Sword, $sword->weaponType);
+        self::assertEquals($before->find('FER_PLAY')?->modifiers, $sword->modifiers);
         self::assertSame(GameRulesetVersion::of(['items' => [$entry]]), GameRulesetVersion::of(['items' => [$entry + ['weapon_type' => 'SWORD']]]));
     }
 

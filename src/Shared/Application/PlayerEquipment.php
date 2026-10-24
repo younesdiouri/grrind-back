@@ -14,7 +14,7 @@ interface PlayerEquipment
      *
      * @param list<Uuid> $playerIds
      *
-     * @return array<string, array<string, array{key: string, artworkVersion: ?string}>> UUID → emplacement → référence
+     * @return array<string, array<string, array{key: string, artworkVersion: ?string, weaponType?: ?string}>> UUID → emplacement → référence
      */
     public function of(array $playerIds): array;
 }

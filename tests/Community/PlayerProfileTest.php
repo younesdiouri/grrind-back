@@ -115,7 +115,7 @@ final class PlayerProfileTest extends ApiTestCase
         self::assertCount(2, $public['inventory']['items']);
         foreach ([...$public['inventory']['items'], ...array_filter($public['inventory']['equipment'])] as $item) {
             self::assertIsArray($item);
-            self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'imageUrl', 'quantity'], array_keys($item));
+            self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'weaponType', 'modifiers', 'imageUrl', 'quantity'], array_keys($item));
             self::assertNotEmpty($item['modifiers']);
         }
         self::assertIsArray($public['attributes']);

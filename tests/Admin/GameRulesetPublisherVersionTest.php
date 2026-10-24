@@ -75,18 +75,20 @@ final class GameRulesetPublisherVersionTest extends ApiTestCase
         $manager = $this->manager();
         $publisher = self::getContainer()->get(GameRulesetPublisher::class);
         self::assertInstanceOf(GameRulesetPublisher::class, $publisher);
-        $item = $manager->getRepository(GameItem::class)->findOneBy([]);
+        $item = $manager->getRepository(GameItem::class)->findOneBy(['key' => 'FER_PLAY']);
         $ruleset = $manager->find(GameRuleset::class, 1);
         $settings = $manager->find(GameSettings::class, 1);
         self::assertInstanceOf(GameItem::class, $item);
         self::assertInstanceOf(GameRuleset::class, $ruleset);
         self::assertInstanceOf(GameSettings::class, $settings);
         $image = $item->getImagePath();
+        $weaponType = $item->getWeaponType();
         $version = $ruleset->version();
         $lootVersion = $settings->lootVersion();
 
         try {
             $item->setImagePath('presentation-only.png');
+            $item->setWeaponType('FIST');
             $this->publish($publisher, $manager);
             $manager->clear();
             $published = $manager->find(GameRuleset::class, 1);
@@ -95,6 +97,10 @@ final class GameRulesetPublisherVersionTest extends ApiTestCase
             self::assertInstanceOf(GameSettings::class, $afterPresentation);
             self::assertSame($version, $published->version());
             self::assertSame($lootVersion, $afterPresentation->lootVersion());
+            /** @var array{items: list<array{key: string, weapon_type: ?string}>} $snapshot */
+            $snapshot = $published->snapshot();
+            $items = array_column($snapshot['items'], null, 'key');
+            self::assertSame('FIST', $items['FER_PLAY']['weapon_type']);
 
             $this->publish($publisher, $manager);
             $manager->clear();
@@ -106,6 +112,7 @@ final class GameRulesetPublisherVersionTest extends ApiTestCase
             $original = $manager->getRepository(GameItem::class)->find($item->getId());
             if ($original instanceof GameItem) {
                 $original->setImagePath($image);
+                $original->setWeaponType($weaponType);
                 $this->publish($publisher, $manager);
             }
         }

@@ -166,6 +166,7 @@ final readonly class WorkoutSessionDrops implements SessionDrops
             ),
             $item->priceCoins,
             $this->translator->imageUrlOf($item->key),
+            $item->weaponType?->value,
         );
     }
 }

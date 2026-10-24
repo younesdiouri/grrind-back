@@ -86,6 +86,13 @@ final class GameRulesetMigrationSeedTest extends KernelTestCase
         require_once $path;
         $version = new ReflectionMethod('DoctrineMigrations\\Version20260903060248', 'version');
         $snapshot = $this->publishedSnapshot();
+        // Le calcul initial précède aussi la famille d'animation, hors gameplay (#319).
+        \assert(\is_array($snapshot['items']));
+        foreach ($snapshot['items'] as &$item) {
+            \assert(\is_array($item));
+            unset($item['weapon_type']);
+        }
+        unset($item);
         // La migration initiale ne connaissait pas encore les poses ; son algorithme reste figé.
         \assert(\is_array($snapshot['combat']));
         foreach (['enemies', 'bosses'] as $kind) {

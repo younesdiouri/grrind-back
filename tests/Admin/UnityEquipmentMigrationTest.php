@@ -32,6 +32,11 @@ final class UnityEquipmentMigrationTest extends KernelTestCase
             /** @var Snapshot $snapshot */
             $snapshot = self::json($stored);
             $snapshot['items'] = self::withoutNewItems($snapshot['items'], $keys, 'key');
+            // Le scénario restaure la forme publiée avant les familles d'animation (#319).
+            foreach ($snapshot['items'] as &$item) {
+                unset($item['weapon_type']);
+            }
+            unset($item);
             foreach ($snapshot['loot']['chest'] as &$table) {
                 $table['entries'] = self::withoutNewItems($table['entries'], $keys, 'item');
             }

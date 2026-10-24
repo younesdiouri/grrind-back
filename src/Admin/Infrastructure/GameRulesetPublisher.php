@@ -164,7 +164,7 @@ final readonly class GameRulesetPublisher
     /** @param Snapshot $snapshot */
     public static function validate(array $snapshot): void
     {
-        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */ $items = $snapshot['items'];
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, weapon_type?: ?string, price_coins: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */ $items = $snapshot['items'];
         /** @var list<array{id: string, condition: array{type: string, threshold: int, discipline?: string|null}}> $titles */ $titles = $snapshot['titles'];
         /** @var array<string, int> $fighter */ $fighter = $snapshot['combat']['fighter'];
         /** @var list<array{key: string, level: int, hp: int, damage: int, mitigation_permille: int, combo_permille: int, dodge_permille: int}> $enemies */ $enemies = $snapshot['combat']['enemies'];
@@ -344,6 +344,7 @@ final readonly class GameRulesetPublisher
             'price_coins' => $item->getPriceCoins(), 'sell_price_coins' => $item->getSellPriceCoins(), 'modifiers' => $item->getModifiers(),
             'shop' => ['available' => $item->isShopAvailable(), 'minimum_level' => $item->getShopMinimumLevel()],
             'image_path' => $item->getImagePath(), 'translations' => $item->getTranslations(),
+            'weapon_type' => $item->getWeaponType(),
         ], $items);
         $titleRows = array_map(static fn (GameTitle $title): array => [
             'id' => $title->getKey(), 'active' => $title->isActive(), 'condition' => ['type' => $title->getConditionType(), 'threshold' => $title->getThreshold(), 'discipline' => $title->getDiscipline()], 'translations' => $title->getTranslations(),

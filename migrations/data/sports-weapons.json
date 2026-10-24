@@ -1,0 +1,46 @@
+[
+  {
+    "key": "FER_PLAY",
+    "slot": "WEAPON",
+    "weapon_type": "SWORD",
+    "price_coins": 25,
+    "sell_price_coins": 12,
+    "modifiers": [
+      {
+        "type": "DAMAGE_BONUS",
+        "value": 2
+      }
+    ],
+    "image_path": "0f2e36de068cf94c22c7f9eac1b86889f0cf4650.png",
+    "translations": {
+      "fr": {
+        "name": "Fer play"
+      },
+      "en": {
+        "name": "Fer play"
+      }
+    }
+  },
+  {
+    "key": "HUILESSON",
+    "slot": "WEAPON",
+    "weapon_type": "SWORD",
+    "price_coins": 20,
+    "sell_price_coins": 10,
+    "modifiers": [
+      {
+        "type": "CRITICAL_CHANCE_BONUS",
+        "value": 30
+      }
+    ],
+    "image_path": "368c98fbb70e75df13bc3360a7ba67dd976ba048.png",
+    "translations": {
+      "fr": {
+        "name": "Huilesson"
+      },
+      "en": {
+        "name": "Huilesson"
+      }
+    }
+  }
+]

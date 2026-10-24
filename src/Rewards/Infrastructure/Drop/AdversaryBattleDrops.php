@@ -164,6 +164,7 @@ final readonly class AdversaryBattleDrops implements BattleDrops
             ),
             $item->priceCoins,
             $this->translator->imageUrlOf($item->key),
+            $item->weaponType?->value,
         );
     }
 }

@@ -90,7 +90,7 @@ final class ImportLootTest extends ApiTestCase
         if ([] !== $loot) {
             $item = $loot[0];
             self::assertIsArray($item);
-            self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl'], array_keys($item));
+            self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'weaponType', 'modifiers', 'priceCoins', 'imageUrl'], array_keys($item));
             self::assertContains($item['key'], ['WORN_RUNNING_SHOES', 'IRON_GAUNTLETS', 'TRAVELERS_CLOAK']);
             self::assertIsString($item['imageUrl']);
             self::assertMatchesRegularExpression('#^https?://#', $item['imageUrl']);

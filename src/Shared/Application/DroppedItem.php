@@ -50,6 +50,8 @@ final readonly class DroppedItem
         public int $priceCoins,
         /** URL publique absolue, résolue par le serveur depuis le snapshot publié. */
         public string $imageUrl,
+        /** FIST ou SWORD pour une arme ; null sur les autres objets. Présentation uniquement. */
+        public ?string $weaponType = null,
     ) {
     }
 
@@ -64,6 +66,7 @@ final readonly class DroppedItem
             'name' => $this->name,
             'rarity' => $this->rarity,
             'slot' => $this->slot,
+            'weaponType' => $this->weaponType,
             'modifiers' => array_map(
                 static fn (DroppedItemModifier $modifier): array => $modifier->toArray(),
                 $this->modifiers,
