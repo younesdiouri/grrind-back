@@ -82,6 +82,7 @@ final readonly class PurchaseResource
             ),
             $item->priceCoins,
             $translator->imageUrlOf($item->key),
+            $item->weaponType?->value,
         )->toArray();
     }
 }

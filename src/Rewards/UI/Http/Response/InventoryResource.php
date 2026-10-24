@@ -93,7 +93,7 @@ final readonly class InventoryResource
     public static function describePublic(InventoryItem $owned, ItemCatalog $catalog, ItemTranslator $translator): array
     {
         return array_intersect_key(self::describe($owned, $catalog, $translator), array_flip([
-            'key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'imageUrl', 'quantity',
+            'key', 'kind', 'name', 'rarity', 'slot', 'weaponType', 'modifiers', 'imageUrl', 'quantity',
         ]));
     }
 
@@ -126,6 +126,7 @@ final readonly class InventoryResource
             ),
             $item->priceCoins,
             $translator->imageUrlOf($item->key),
+            $item->weaponType?->value,
         );
 
         return [...$dropped->toArray(), 'quantity' => $owned->quantity(), 'sellPriceCoins' => $item->sellPriceCoins];

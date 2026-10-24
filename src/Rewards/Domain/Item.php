@@ -44,6 +44,7 @@ final readonly class Item
          */
         public int $shopMinimumLevel = 1,
         public int $sellPriceCoins = 0,
+        public ?WeaponType $weaponType = null,
     ) {
     }
 }

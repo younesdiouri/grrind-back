@@ -47,6 +47,9 @@ class GameItem
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $slot = null;
 
+    #[ORM\Column(name: 'weapon_type', length: 20, nullable: true)]
+    private ?string $weaponType = null;
+
     #[ORM\Column(name: 'price_coins')]
     private int $priceCoins = 0;
 
@@ -159,6 +162,16 @@ class GameItem
     public function getPriceCoins(): int
     {
         return $this->priceCoins;
+    }
+
+    public function getWeaponType(): ?string
+    {
+        return $this->weaponType;
+    }
+
+    public function setWeaponType(?string $weaponType): void
+    {
+        $this->weaponType = $weaponType;
     }
 
     public function setPriceCoins(int $priceCoins): void

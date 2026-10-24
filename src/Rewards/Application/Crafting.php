@@ -114,6 +114,6 @@ final readonly class Crafting
     {
         $item = $catalog->find($key) ?? throw new LogicException('Objet de recette absent.');
 
-        return new DroppedItem($item->key, $item->kind->value, $this->translator->nameOf($item->key), $item->rarity->value, $item->slot?->value, array_map(static fn (ItemModifier $modifier): DroppedItemModifier => new DroppedItemModifier($modifier->type->value, $modifier->value, $modifier->discipline?->value), $item->modifiers), $item->priceCoins, $this->translator->imageUrlOf($item->key))->toArray();
+        return new DroppedItem($item->key, $item->kind->value, $this->translator->nameOf($item->key), $item->rarity->value, $item->slot?->value, array_map(static fn (ItemModifier $modifier): DroppedItemModifier => new DroppedItemModifier($modifier->type->value, $modifier->value, $modifier->discipline?->value), $item->modifiers), $item->priceCoins, $this->translator->imageUrlOf($item->key), $item->weaponType?->value)->toArray();
     }
 }

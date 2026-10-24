@@ -1122,6 +1122,11 @@ when@dev:
                                 allOf: [{ $ref: '#/components/schemas/Discipline' }]
                                 description: "`null` = l'effet s'applique partout. Une valeur = seulement à cette discipline."
 
+                    WeaponType:
+                        type: string
+                        enum: [FIST, SWORD]
+                        description: "Famille d’animation uniquement : FIST = direct/uppercut critique ; SWORD = taille/estoc critique. Aucun effet sur les dégâts. Mains nues ou archive sans type : FIST."
+
                     DroppedItem:
                         type: object
                         description: |
@@ -1137,7 +1142,7 @@ when@dev:
                             emplacement, mais c'était une déduction à écrire côté client plutôt
                             qu'une donnée du contrat — elle se serait tue en silence au premier
                             objet non équipable de plus.
-                        required: [key, kind, name, rarity, slot, modifiers, priceCoins, imageUrl]
+                        required: [key, kind, name, rarity, slot, weaponType, modifiers, priceCoins, imageUrl]
                         properties:
                             key: { type: string, example: GOLDEN_BOXING_GLOVES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
                             kind:
@@ -1153,6 +1158,7 @@ when@dev:
                                 nullable: true
                                 enum: [HEAD, CHEST, LEGS, FEET, ACCESSORY, WEAPON]
                                 description: "`null` pour un coffre (#230) — il ne se porte pas, il s'ouvre."
+                            weaponType: { nullable: true, allOf: [{ $ref: '#/components/schemas/WeaponType' }], description: 'FIST ou SWORD sur WEAPON ; null pour les autres objets.' }
                             modifiers:
                                 type: array
                                 description: "Dans l'ordre du catalogue."
@@ -1179,7 +1185,7 @@ when@dev:
                     PublicInventoryLine:
                         type: object
                         description: "Objet possédé visible sur un profil autorisé, sans données monétaires."
-                        required: [key, kind, name, rarity, slot, modifiers, imageUrl, quantity]
+                        required: [key, kind, name, rarity, slot, weaponType, modifiers, imageUrl, quantity]
                         properties:
                             key: { type: string, example: GOLDEN_BOXING_GLOVES, description: "La clé du catalogue — stable, ce n'est pas un identifiant d'exemplaire." }
                             kind:
@@ -1195,6 +1201,7 @@ when@dev:
                                 nullable: true
                                 enum: [HEAD, CHEST, LEGS, FEET, ACCESSORY, WEAPON]
                                 description: "`null` pour un coffre (#230) — il ne se porte pas, il s'ouvre."
+                            weaponType: { nullable: true, allOf: [{ $ref: '#/components/schemas/WeaponType' }], description: 'FIST ou SWORD sur WEAPON ; null pour les autres objets.' }
                             modifiers:
                                 type: array
                                 description: "Dans l'ordre du catalogue."
@@ -1880,13 +1887,14 @@ when@dev:
 
                     BattleEquipment:
                         type: object
-                        description: "Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Les images et compatibilités de chaque version viennent du catalogue graphique."
+                        description: "Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. weaponType est figé pour les nouveaux combats (null hors WEAPON) ; un ancien snapshot sans ce champ et les mains nues (WEAPON absent) utilisent FIST sans consulter le catalogue courant. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Les images et compatibilités de chaque version viennent du catalogue graphique."
                         additionalProperties:
                             type: object
                             required: [key, artworkVersion]
                             properties:
                                 key: { type: string, example: TEMPERED_HEADBAND }
                                 artworkVersion: { type: string, nullable: true, example: v1 }
+                                weaponType: { nullable: true, allOf: [{ $ref: '#/components/schemas/WeaponType' }] }
 
                     BattleEnemy:
                         type: object

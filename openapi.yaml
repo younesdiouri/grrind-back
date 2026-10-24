@@ -2854,6 +2854,12 @@ components:
             -
               $ref: '#/components/schemas/Discipline'
       type: object
+    WeaponType:
+      description: 'Famille d’animation uniquement : FIST = direct/uppercut critique ; SWORD = taille/estoc critique. Aucun effet sur les dégâts. Mains nues ou archive sans type : FIST.'
+      type: string
+      enum:
+        - FIST
+        - SWORD
     DroppedItem:
       description: "Un objet tombé d'un tirage (#226), de quoi l'afficher **sans requête\nsupplémentaire** — même geste qu'un titre dans `PlayerTitle`.\n\n`slot` est nullable depuis le #230 : un coffre n'a pas d'emplacement.\nUn objet qui tombe d'un tirage — séance ou combat — en porte en\nrevanche toujours un, un coffre ne tombant jamais d'un tirage.\n\n`kind` distingue un équipement d'un coffre explicitement (#230) :\n`slot === null` suffisait tant que le coffre était le seul objet sans\nemplacement, mais c'était une déduction à écrire côté client plutôt\nqu'une donnée du contrat — elle se serait tue en silence au premier\nobjet non équipable de plus.\n"
       required:
@@ -2862,6 +2868,7 @@ components:
         - name
         - rarity
         - slot
+        - weaponType
         - modifiers
         - priceCoins
         - imageUrl
@@ -2900,6 +2907,12 @@ components:
             - FEET
             - ACCESSORY
             - WEAPON
+        weaponType:
+          description: 'FIST ou SWORD sur WEAPON ; null pour les autres objets.'
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/WeaponType'
         modifiers:
           description: "Dans l'ordre du catalogue."
           type: array
@@ -2943,6 +2956,7 @@ components:
         - name
         - rarity
         - slot
+        - weaponType
         - modifiers
         - imageUrl
         - quantity
@@ -2981,6 +2995,12 @@ components:
             - FEET
             - ACCESSORY
             - WEAPON
+        weaponType:
+          description: 'FIST ou SWORD sur WEAPON ; null pour les autres objets.'
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/WeaponType'
         modifiers:
           description: "Dans l'ordre du catalogue."
           type: array
@@ -4114,7 +4134,7 @@ components:
       nullable: true
       additionalProperties: false
     BattleEquipment:
-      description: 'Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Les images et compatibilités de chaque version viennent du catalogue graphique.'
+      description: 'Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. weaponType est figé pour les nouveaux combats (null hors WEAPON) ; un ancien snapshot sans ce champ et les mains nues (WEAPON absent) utilisent FIST sans consulter le catalogue courant. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Les images et compatibilités de chaque version viennent du catalogue graphique.'
       type: object
       additionalProperties:
         required:
@@ -4128,6 +4148,11 @@ components:
             type: string
             example: v1
             nullable: true
+          weaponType:
+            nullable: true
+            allOf:
+              -
+                $ref: '#/components/schemas/WeaponType'
         type: object
     BattleEnemy:
       description: "L'adversaire : les mêmes champs qu'un `BattleFighter`, plus son identité.\n\n**Le nom arrive traduit**, comme les titres : le client n'a pas de table de\ncorrespondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du\ncatalogue DB publié, pas une donnée d'affichage.\n\n**`key` et `playerId` sont exclusifs, et l'un des deux est toujours nul.**\nUn combat PvE porte `key`, un défi PvP porte `playerId` et un `name` qui est le\n**pseudo du défié au moment du combat** — jamais relu depuis son compte : un\ncombat déjà joué est un fait écrit, et son rejeu ne dépend ni d'un renommage\npostérieur ni de la présence de ce compte. Un joueur n'a ni `imageUrls` ni\n`introduction` : les deux valent `null`, comme pour un ennemi sans présentation\npubliée, et l'animation est la même.\n"

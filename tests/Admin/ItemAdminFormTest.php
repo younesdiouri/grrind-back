@@ -23,6 +23,7 @@ final class ItemAdminFormTest extends ApiTestCase
         self::assertSame('image/jpeg,image/png,image/webp', $upload->attr('accept'));
         $slots = $crawler->filter('select[name$="[slot]"] option')->extract(['value']);
         self::assertSame(['', 'HEAD', 'CHEST', 'LEGS', 'FEET', 'ACCESSORY', 'WEAPON'], $slots);
+        self::assertSame(['', 'FIST', 'SWORD'], $crawler->filter('select[name$="[weaponType]"] option')->extract(['value']));
     }
 
     public function testEveryStructuredConfigurationFormRendersItsNestedFields(): void

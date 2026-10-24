@@ -49,7 +49,7 @@ final class GameRulesetVersion
         \assert(\is_array($items));
         foreach ($items as &$item) {
             \assert(\is_array($item));
-            unset($item['image_path'], $item['translations']);
+            unset($item['image_path'], $item['translations'], $item['weapon_type']);
         }
         unset($item);
         $snapshot['items'] = $items;

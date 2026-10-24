@@ -62,7 +62,7 @@ final class ChestRoutesTest extends ApiTestCase
 
         $shopEntry = self::itemNamed($this->shop($bob)['items'], 'WOODEN_CHEST');
         self::assertSame(
-            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'weaponType', 'modifiers', 'priceCoins', 'imageUrl', 'affordable', 'owned', 'minimumLevel', 'unlocked'],
             array_keys($shopEntry),
         );
         self::assertSame('CHEST', $shopEntry['kind']);
@@ -71,7 +71,7 @@ final class ChestRoutesTest extends ApiTestCase
 
         $inventoryEntry = self::itemNamed($this->inventory($bob)['items'], 'WOODEN_CHEST');
         self::assertSame(
-            ['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl', 'quantity', 'sellPriceCoins'],
+            ['key', 'kind', 'name', 'rarity', 'slot', 'weaponType', 'modifiers', 'priceCoins', 'imageUrl', 'quantity', 'sellPriceCoins'],
             array_keys($inventoryEntry),
         );
         self::assertSame('CHEST', $inventoryEntry['kind']);

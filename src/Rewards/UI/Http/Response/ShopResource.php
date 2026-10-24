@@ -92,6 +92,7 @@ final readonly class ShopResource
             ),
             $item->priceCoins,
             $translator->imageUrlOf($item->key),
+            $item->weaponType?->value,
         );
 
         return [

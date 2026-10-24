@@ -30,6 +30,7 @@ final class UnityEquipmentTest extends ApiTestCase
             $item = $items[$key];
             self::assertIsArray($item);
             self::assertSame($slot, $item['slot']);
+            self::assertSame('WEAPON' === $slot ? (\in_array($key, ['FER_PLAY', 'HUILESSON'], true) ? 'SWORD' : 'FIST') : null, $item['weaponType']);
             self::assertSame('COMMON', $item['rarity']);
             self::assertSame($price, $item['priceCoins']);
             self::assertSame(1, $item['minimumLevel']);
@@ -77,6 +78,8 @@ final class UnityEquipmentTest extends ApiTestCase
             self::assertIsArray($equipped['equipment']);
             self::assertIsArray($equipped['equipment'][$slot]);
             self::assertSame($key, $equipped['equipment'][$slot]['key']);
+            $weaponType = 'WEAPON' === $slot ? (\in_array($key, ['FER_PLAY', 'HUILESSON'], true) ? 'SWORD' : 'FIST') : null;
+            self::assertSame($weaponType, $equipped['equipment'][$slot]['weaponType']);
             self::assertSame(intdiv($price, 2), $equipped['equipment'][$slot]['sellPriceCoins']);
             $profile = self::decode($this->get('/api/players/'.$player->id->toRfc4122(), $player->headers));
             self::assertSame($equipped['statistics'], $profile['statistics']);
@@ -84,6 +87,7 @@ final class UnityEquipmentTest extends ApiTestCase
             self::assertIsArray($profile['inventory']['equipment']);
             self::assertIsArray($profile['inventory']['equipment'][$slot]);
             self::assertSame($key, $profile['inventory']['equipment'][$slot]['key']);
+            self::assertSame($weaponType, $profile['inventory']['equipment'][$slot]['weaponType']);
             $imageUrl = $equipped['equipment'][$slot]['imageUrl'];
             self::assertIsString($imageUrl);
             $imagePath = parse_url($imageUrl, \PHP_URL_PATH);
@@ -110,17 +114,17 @@ final class UnityEquipmentTest extends ApiTestCase
         $roller = self::getContainer()->get(LootRoller::class);
         $table = $tables->forChest('WOODEN_CHEST');
         self::assertNotNull($table);
-        self::assertSame(135, array_sum(array_map(static fn ($entry): int => $entry->weight, $table->entries)));
+        self::assertSame(145, array_sum(array_map(static fn ($entry): int => $entry->weight, $table->entries)));
         self::assertSame(10, $table->coins->minimum);
         self::assertSame(25, $table->coins->maximum);
         $random = new Randomizer(new Xoshiro256StarStar(313));
         $rolls = [];
-        for ($i = 0; $i < 5000 && \count($rolls) < 135; ++$i) {
+        for ($i = 0; $i < 5000 && \count($rolls) < 145; ++$i) {
             $outcome = $roller->rollForChest($tables, 'WOODEN_CHEST', [], $random);
             self::assertNotNull($outcome);
             $rolls[$outcome->itemRoll] = $outcome->items[0] ?? 'NONE';
         }
-        self::assertCount(135, $rolls, 'La graine fixe explore chaque résultat du vrai moteur.');
+        self::assertCount(145, $rolls, 'La graine fixe explore chaque résultat du vrai moteur.');
         $counts = array_count_values($rolls);
         self::assertSame(55, $counts['NONE']);
         self::assertSame(25, $counts['WORN_RUNNING_SHOES']);
@@ -147,6 +151,8 @@ final class UnityEquipmentTest extends ApiTestCase
             'SPORT_TSHIRT_SLATE' => ['CHEST', 10, 'GUARD_BONUS', 30],
             'SPORT_TSHIRT_CORAL' => ['CHEST', 10, 'GUARD_BONUS', 30],
             'LE_POIDS_LOURD' => ['WEAPON', 25, 'DAMAGE_BONUS', 2],
+            'FER_PLAY' => ['WEAPON', 25, 'DAMAGE_BONUS', 2],
+            'HUILESSON' => ['WEAPON', 20, 'CRITICAL_CHANCE_BONUS', 30],
         ];
     }
 }

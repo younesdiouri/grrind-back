@@ -1,0 +1,22 @@
+{
+  "createdOn": "2026-10-24",
+  "items": [
+    "FER_PLAY",
+    "HUILESSON"
+  ],
+  "sourceRepository": "younesdiouri/grrind-app",
+  "sources": [
+    "spikes/art-source/fer-play/review/front.png",
+    "spikes/art-source/huilesson/review/front.png"
+  ],
+  "pipeline": [
+    "ImageGen references",
+    "Meshy 7.1, 35 credits per object",
+    "Blender preparation and render; Huilesson string bed rebuilt"
+  ],
+  "usage": "Meshy subscription terms of the existing account",
+  "triangles": {
+    "FER_PLAY": 1919,
+    "HUILESSON": 1677
+  }
+}

@@ -68,7 +68,7 @@ final class RetireLegacyEquipmentCommandTest extends KernelTestCase
             self::assertSame(0, self::number($db->fetchOne("SELECT COUNT(*) FROM game_artwork_pack WHERE active = true AND pack_key = 'PURSUIT_GOGGLES'")));
             self::assertSame('["HALTER_EGO"]', $db->fetchOne('SELECT equipment FROM game_design_profile WHERE id = ?', [$profileId]));
             self::assertSame($facts, self::state($db, array_keys($facts)));
-            self::assertSame(8, self::number($db->fetchOne("SELECT COUNT(*) FROM game_item WHERE kind = 'EQUIPMENT'")));
+            self::assertSame(10, self::number($db->fetchOne("SELECT COUNT(*) FROM game_item WHERE kind = 'EQUIPMENT'")));
             self::assertSame(4, self::number($db->fetchOne("SELECT COUNT(*) FROM game_item WHERE kind = 'CHEST'")));
             self::assertSame(1, self::number($db->fetchOne("SELECT COUNT(*) FROM game_item WHERE kind = 'RESOURCE'")));
             self::assertSame(777, $db->fetchOne("SELECT price_coins FROM game_item WHERE item_key = 'HALTER_EGO'"));
@@ -86,8 +86,8 @@ final class RetireLegacyEquipmentCommandTest extends KernelTestCase
             self::assertArrayNotHasKey('IRON_GAUNTLETS', $items);
             self::assertSame([], $snapshot['recipes']);
             $chests = array_column($snapshot['loot']['chest'], null, 'key');
-            self::assertSame(90, array_sum(array_column($chests['WOODEN_CHEST']['entries'], 'weight')));
-            self::assertCount(8, $chests['WOODEN_CHEST']['entries']);
+            self::assertSame(100, array_sum(array_column($chests['WOODEN_CHEST']['entries'], 'weight')));
+            self::assertCount(10, $chests['WOODEN_CHEST']['entries']);
             $after = self::state($db, $tables);
             self::assertSame(0, $tester->execute(['--apply' => true]));
             self::assertSame($after, self::state($db, $tables), 'Une relance ne crée pas de nouvelle publication.');

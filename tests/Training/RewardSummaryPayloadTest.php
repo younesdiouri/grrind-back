@@ -52,7 +52,7 @@ final class RewardSummaryPayloadTest extends TestCase
         $loot = $payload['loot'];
         self::assertIsArray($loot);
         self::assertIsArray($loot[0]);
-        self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'modifiers', 'priceCoins', 'imageUrl'], array_keys($loot[0]));
+        self::assertSame(['key', 'kind', 'name', 'rarity', 'slot', 'weaponType', 'modifiers', 'priceCoins', 'imageUrl'], array_keys($loot[0]));
 
         // `attributes` entre `xp` et `level`, jamais ailleurs (#162) : les caractéristiques
         // sont la conséquence directe de l'XP qui vient de tomber, le niveau celle du total
