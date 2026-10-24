@@ -121,7 +121,7 @@ final class ItemCatalog
     private ?int $runtimeRevision = null;
 
     /**
-     * @param list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
+     * @param list<array{key: string, rarity: string, slot?: string, kind?: string, weapon_type?: ?string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items
      *
      * @throws InvalidArgumentException le catalogue ne tient pas debout ; la compilation du conteneur s'arrête là
      */
@@ -169,6 +169,7 @@ final class ItemCatalog
                 $shop['available'],
                 $shop['minimumLevel'],
                 $sellPrice,
+                self::weaponType($slot, $entry['weapon_type'] ?? null),
             );
 
             if (isset($byKey[$item->key])) {
@@ -252,7 +253,7 @@ final class ItemCatalog
         }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
-        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, weapon_type?: ?string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
 
         $this->runtimeRevision = $revision;
@@ -269,7 +270,7 @@ final class ItemCatalog
         }
         $snapshot = $this->rulesets?->snapshot();
         \assert(\is_array($snapshot));
-        /** @var list<array{key: string, active?: bool, rarity: string, slot?: string, kind?: string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
+        /** @var list<array{key: string, active?: bool, rarity: string, slot?: string, kind?: string, weapon_type?: ?string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
 
         return $this->available = new self(array_values(array_filter($items, static fn (array $item): bool => $item['active'] ?? true)));
@@ -302,6 +303,21 @@ final class ItemCatalog
     private static function nature(ItemKind $kind): string
     {
         return ItemKind::Chest === $kind ? 'coffre' : 'ressource';
+    }
+
+    /** Les anciens snapshots d'armes utilisent FIST ; cette métadonnée ne touche jamais le moteur. */
+    private static function weaponType(?EquipmentSlot $slot, ?string $type): ?WeaponType
+    {
+        if (EquipmentSlot::Weapon !== $slot) {
+            if (null !== $type) {
+                throw new InvalidArgumentException('weapon_type ne s’applique qu’à un emplacement WEAPON.');
+            }
+
+            return null;
+        }
+
+        return null === $type ? WeaponType::Fist : (WeaponType::tryFrom($type)
+            ?? throw new InvalidArgumentException(\sprintf('Famille d’animation d’arme inconnue : "%s".', $type)));
     }
 
     /**
