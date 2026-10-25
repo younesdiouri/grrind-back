@@ -58,6 +58,30 @@ final class AlamResolutionTest extends TestCase
         }
     }
 
+    /** #321 : un équipement au slot retiré n'est ni tiré ni annoncé, la ressource reste. */
+    public function testTheDrawIgnoresEquipmentOnARetiredSlot(): void
+    {
+        $rules = AlamOutcomeTest::rules()->values;
+        $rules['equipment_chance_permille'] = 1000;
+        $rules['legendary_chance_permille'] = 0;
+        $snapshot = ['alam' => $rules, 'items' => [['key' => 'NAFS_ESSENCE', 'kind' => 'RESOURCE', 'rarity' => 'COMMON'], ['key' => 'IRON_GAUNTLETS', 'kind' => 'EQUIPMENT', 'slot' => 'HANDS', 'rarity' => 'RARE']]];
+        $now = new DateTimeImmutable('2026-09-14 10:00:00 UTC');
+        $run = new AlamRun(Uuid::v7(), AlamMode::Manual, $now->modify('-1 day'), $now, $now, 1, 'avant-41b2027', $snapshot);
+        $urls = $this->createStub(UrlGeneratorInterface::class);
+        $urls->method('generate')->willReturn('https://example.test/placeholder.png');
+        $resolution = new AlamResolution($this->createStub(AlamRewards::class), $urls);
+        $targets = AlamOutcomeTest::rules()->targets(1);
+        $participants = [['playerId' => Uuid::v7()->toRfc4122(), 'displayName' => 'A', 'avatarUrl' => null, 'contribution' => 400, 'gauges' => AlamResolution::gauges($targets, $targets)]];
+        $result = $resolution->resolve($run, $participants, $targets, $now);
+        self::assertIsArray($result['encounters']);
+        foreach ($result['encounters'] as $encounter) {
+            self::assertIsArray($encounter);
+            self::assertTrue($encounter['won']);
+            self::assertIsArray($encounter['drops']);
+            self::assertSame(['NAFS_ESSENCE'], array_column($encounter['drops'], 'itemKey'));
+        }
+    }
+
     /** Le boss est illustré depuis le catalogue figé de l'édition, jamais depuis le courant (#289). */
     public function testEncountersFreezeTheBossPosesOfTheRunSnapshot(): void
     {

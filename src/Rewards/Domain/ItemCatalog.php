@@ -7,6 +7,7 @@ namespace App\Rewards\Domain;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\ModifierType;
+use App\Shared\Domain\RetiredEquipmentSlots;
 use InvalidArgumentException;
 
 /**
@@ -255,6 +256,7 @@ final class ItemCatalog
         \assert(\is_array($snapshot));
         /** @var list<array{key: string, rarity: string, slot?: string, kind?: string, weapon_type?: ?string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
+        $items = array_values(array_filter($items, static fn (array $item): bool => !RetiredEquipmentSlots::carries($item)));
 
         $this->runtimeRevision = $revision;
         $this->available = null;
@@ -273,7 +275,7 @@ final class ItemCatalog
         /** @var list<array{key: string, active?: bool, rarity: string, slot?: string, kind?: string, weapon_type?: ?string, price_coins: int, sell_price_coins?: int, modifiers: list<array{type: string, value: int, discipline?: string}>, shop?: array{available?: bool, minimum_level?: int}}> $items */
         $items = $snapshot['items'];
 
-        return $this->available = new self(array_values(array_filter($items, static fn (array $item): bool => $item['active'] ?? true)));
+        return $this->available = new self(array_values(array_filter($items, static fn (array $item): bool => ($item['active'] ?? true) && !RetiredEquipmentSlots::carries($item))));
     }
 
     /**
