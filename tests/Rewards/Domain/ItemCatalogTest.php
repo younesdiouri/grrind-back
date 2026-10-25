@@ -7,6 +7,7 @@ namespace App\Tests\Rewards\Domain;
 use App\Rewards\Domain\EquipmentSlot;
 use App\Rewards\Domain\ItemCatalog;
 use App\Rewards\Domain\ItemKind;
+use App\Shared\Application\FrozenGameRulesets;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Modifier\ModifierType;
 use InvalidArgumentException;
@@ -310,5 +311,28 @@ final class ItemCatalogTest extends TestCase
         new ItemCatalog([
             ['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'kind' => 'MYSTERY_BOX', 'price_coins' => 1, 'modifiers' => []],
         ]);
+    }
+
+    /** #321 : une run ouverte avant le retrait du slot mains relit son snapshot sans tomber. */
+    public function testUnSnapshotFigeIgnoreLObjetDUnSlotRetire(): void
+    {
+        $catalog = ItemCatalog::runtime(new FrozenGameRulesets(['items' => [
+            ['key' => 'BOOTS', 'rarity' => 'COMMON', 'slot' => 'FEET', 'price_coins' => 10, 'modifiers' => []],
+            ['key' => 'IRON_GAUNTLETS', 'rarity' => 'RARE', 'slot' => 'HANDS', 'price_coins' => 40, 'modifiers' => []],
+        ]], 'avant-41b2027'));
+
+        self::assertNotNull($catalog->findAvailable('BOOTS'));
+        self::assertNull($catalog->findAvailable('IRON_GAUNTLETS'));
+        self::assertNull($catalog->findHistorical('IRON_GAUNTLETS'));
+    }
+
+    public function testUnSnapshotFigeRefuseToujoursUnSlotInconnuNonRetire(): void
+    {
+        $catalog = ItemCatalog::runtime(new FrozenGameRulesets(['items' => [
+            ['key' => 'GLOVES', 'rarity' => 'COMMON', 'slot' => 'HNADS', 'price_coins' => 10, 'modifiers' => []],
+        ]], 'faute'));
+
+        $this->expectException(InvalidArgumentException::class);
+        $catalog->findAvailable('GLOVES');
     }
 }

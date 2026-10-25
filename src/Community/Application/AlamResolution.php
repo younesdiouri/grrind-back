@@ -12,6 +12,7 @@ use App\Shared\Application\AlamRewards;
 use App\Shared\Application\EnemyImageUrls;
 use App\Shared\Application\FrozenGameRulesets;
 use App\Shared\Domain\Alam\AlamRules;
+use App\Shared\Domain\RetiredEquipmentSlots;
 use DateTimeImmutable;
 use Random\Engine\Xoshiro256StarStar;
 use Random\Randomizer;
@@ -137,11 +138,12 @@ final readonly class AlamResolution
      * @return array<string, array{name: string, kind: string, rarity: string, imagePath: string}> */
     private function catalog(AlamRun $run): array
     {
-        /** @var list<array{key: string, kind?: string, rarity: string, active?: bool, image_path?: string, translations?: array{fr?: array{name?: string}}}> $items */
+        /** @var list<array{key: string, kind?: string, slot?: string, rarity: string, active?: bool, image_path?: string, translations?: array{fr?: array{name?: string}}}> $items */
         $items = $run->rules['items'];
         $catalog = [];
         foreach ($items as $item) {
-            if (false === ($item['active'] ?? true)) {
+            // Un objet à slot retiré n'existe plus : ni annoncé, ni attribué (#321).
+            if (false === ($item['active'] ?? true) || RetiredEquipmentSlots::carries($item)) {
                 continue;
             }
             $catalog[$item['key']] = ['name' => $item['translations']['fr']['name'] ?? $item['key'], 'kind' => $item['kind'] ?? 'EQUIPMENT', 'rarity' => $item['rarity'], 'imagePath' => $item['image_path'] ?? 'placeholder.png'];
