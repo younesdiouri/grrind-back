@@ -26,7 +26,7 @@ final class AvatarTest extends ApiTestCase
     {
         $player = $this->openAccount();
         $other = $this->openAccount('other@grrind.app');
-        $avatar = array_replace(Avatar::DEFAULT, ['body' => 'female', 'faceStyle' => 'original', 'noseStyle' => 'original', 'hairStyle' => 'long', 'skinTone' => 'deep', 'eyeColor' => 'green', 'hairColor' => 'black']);
+        $avatar = array_replace(Avatar::DEFAULT, ['body' => 'female', 'faceStyle' => 'round', 'noseStyle' => 'button', 'hairStyle' => 'ponytail', 'skinTone' => 'deep', 'eyeColor' => 'green', 'hairColor' => 'black']);
         $before = self::decode($this->get('/api/inventory', $player->headers));
         $response = $this->send('PATCH', '/api/me', ['avatar' => $avatar], $player->headers);
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
@@ -64,8 +64,10 @@ final class AvatarTest extends ApiTestCase
         yield 'skin' => [['skinTone' => null]];
         yield 'eye' => [['eyeColor' => ['blue']]];
         yield 'hair color' => [['hairColor' => 'red']];
-        yield 'female square' => [['body' => 'female', 'noseStyle' => 'original']];
-        yield 'female wide' => [['body' => 'female', 'faceStyle' => 'original']];
+        yield 'retired square' => [['faceStyle' => 'square']];
+        yield 'female wide' => [['body' => 'female', 'hairStyle' => 'buns']];
+        yield 'female parted' => [['body' => 'female', 'noseStyle' => 'original']];
+        yield 'male heart' => [['faceStyle' => 'heart']];
         yield 'equipment' => [['headband' => true]];
     }
 

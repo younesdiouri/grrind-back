@@ -3763,7 +3763,7 @@ components:
           type: integer
       type: object
     Avatar:
-      description: "Apparence Unity/Quaternius complète, indépendante de l'ancien champ appearance.\nIdentifiants stables dans la version 1. Corps et coiffure sont indépendants ;\nsquare et wide sont réservés à male, les deux traits se choisissent séparément.\nAbsence historique/version inconnue : défaut V1 figé. Identifiant retiré :\ndéfaut du champ ; les traits féminins reviennent à original. Aucun profil courant\nn'est consulté pour un replay. Les écritures inconnues/incomplètes sont refusées (422).\nAucun vêtement, coiffe ou objet : utiliser l'équipement serveur.\n"
+      description: "Apparence Unity/Quaternius complète, indépendante de l'ancien champ appearance.\nIdentifiants stables dans la version 1. Visages, nez et coiffures sont propres\nà un corps ou communs : voir compatibleBodies du catalogue ; ils se choisissent séparément.\nAbsence historique/version inconnue : défaut V1. Identifiant retiré (square, #323) ou\nincompatible avec le corps : défaut du champ, sinon première option du corps. Aucun profil courant\nn'est consulté pour un replay. Les écritures inconnues/incomplètes sont refusées (422).\nAucun vêtement, coiffe ou objet : utiliser l'équipement serveur.\n"
       required:
         - version
         - body
@@ -3787,19 +3787,30 @@ components:
           type: string
           enum:
             - original
-            - square
+            - angular
+            - oval
+            - heart
+            - round
         noseStyle:
           type: string
           enum:
             - original
             - wide
+            - aquiline
+            - flat
+            - button
+            - straight
         hairStyle:
           type: string
           enum:
             - parted
-            - buzzed
             - buns
+            - buzzed
+            - mohawk
+            - afro
             - long
+            - ponytail
+            - bob
         skinTone:
           type: string
           enum:

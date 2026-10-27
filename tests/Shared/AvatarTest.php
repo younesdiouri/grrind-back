@@ -21,7 +21,18 @@ final class AvatarTest extends TestCase
         self::assertSame('female', $avatar['body']);
         self::assertSame('original', $avatar['faceStyle']);
         self::assertSame('original', $avatar['noseStyle']);
-        self::assertSame('parted', $avatar['hairStyle']);
+        self::assertSame('buns', $avatar['hairStyle']);
         self::assertSame('deep', $avatar['skinTone']);
+    }
+
+    public function testEachBodyKeepsItsOwnChoicesAndFallsBackToItsOwn(): void
+    {
+        $male = Avatar::resolve(array_replace(Avatar::DEFAULT, ['faceStyle' => 'heart', 'noseStyle' => 'button', 'hairStyle' => 'ponytail']));
+        self::assertSame(['original', 'wide', 'parted'], [$male['faceStyle'], $male['noseStyle'], $male['hairStyle']]);
+        $female = array_replace(Avatar::DEFAULT, ['body' => 'female', 'faceStyle' => 'heart', 'noseStyle' => 'button', 'hairStyle' => 'buzzed']);
+        self::assertSame($female, Avatar::resolve($female));
+        self::assertSame(['male'], Avatar::bodies('hairStyle', 'mohawk'));
+        self::assertSame(['female'], Avatar::bodies('hairStyle', 'bob'));
+        self::assertSame(['male', 'female'], Avatar::bodies('hairStyle', 'buzzed'));
     }
 }

@@ -9,6 +9,7 @@ use App\Identity\Domain\User;
 use App\Shared\Domain\Avatar;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
  * Champs absents = inchangés. Ni l'adresse ni le mot de passe ne passent par ici :
@@ -50,9 +51,19 @@ final readonly class UpdateProfileRequest
                 'eyeColor' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['eyeColor'])],
                 'hairColor' => [new Assert\NotNull(), new Assert\Choice(choices: Avatar::OPTIONS['hairColor'])],
             ]),
-            new Assert\Expression("value == null or value['body'] == 'male' or (value['faceStyle'] == 'original' and value['noseStyle'] == 'original')", message: 'Le visage carré et le nez large sont disponibles uniquement sur le corps masculin.'),
+            new Assert\Callback([self::class, 'fitsBody']),
         ])]
         public ?array $avatar = null,
     ) {
+    }
+
+    /** @param array<string, string>|null $avatar déjà validé champ par champ */
+    public static function fitsBody(?array $avatar, ExecutionContextInterface $context): void
+    {
+        foreach (array_keys(Avatar::BODIES) as $field) {
+            if (null !== $avatar && !Avatar::fits($field, $avatar[$field], $avatar['body'])) {
+                $context->buildViolation('Cette option n’est pas disponible pour ce corps.')->atPath($field)->addViolation();
+            }
+        }
     }
 }
