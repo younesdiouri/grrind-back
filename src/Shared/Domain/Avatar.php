@@ -13,16 +13,35 @@ namespace App\Shared\Domain;
 final class Avatar
 {
     public const int VERSION = 1;
-    public const array DEFAULT = ['version' => 1, 'body' => 'male', 'faceStyle' => 'square', 'noseStyle' => 'wide', 'hairStyle' => 'parted', 'skinTone' => 'tan', 'eyeColor' => 'brown', 'hairColor' => 'brown'];
+    // Le visage carré est retiré (#323) : le défaut passe au visage fin, anciens combats compris.
+    public const array DEFAULT = ['version' => 1, 'body' => 'male', 'faceStyle' => 'original', 'noseStyle' => 'wide', 'hairStyle' => 'parted', 'skinTone' => 'tan', 'eyeColor' => 'brown', 'hairColor' => 'brown'];
+    // Dans chaque champ, la première option compatible sert de repli au corps qui ne porte pas le défaut.
     public const array OPTIONS = [
         'body' => ['male', 'female'],
-        'faceStyle' => ['original', 'square'],
-        'noseStyle' => ['original', 'wide'],
-        'hairStyle' => ['parted', 'buzzed', 'buns', 'long'],
+        'faceStyle' => ['original', 'angular', 'oval', 'heart', 'round'],
+        'noseStyle' => ['original', 'wide', 'aquiline', 'flat', 'button', 'straight'],
+        'hairStyle' => ['parted', 'buns', 'buzzed', 'mohawk', 'afro', 'long', 'ponytail', 'bob'],
         'skinTone' => ['light', 'tan', 'brown', 'deep'],
         'eyeColor' => ['brown', 'blue', 'green'],
         'hairColor' => ['brown', 'black', 'blond'],
     ];
+    /** Options propres à un corps ; toute autre option va aux deux. */
+    public const array BODIES = [
+        'faceStyle' => ['angular' => ['male'], 'oval' => ['male'], 'heart' => ['female'], 'round' => ['female']],
+        'noseStyle' => ['wide' => ['male'], 'aquiline' => ['male'], 'flat' => ['male'], 'button' => ['female'], 'straight' => ['female']],
+        'hairStyle' => ['parted' => ['male'], 'mohawk' => ['male'], 'afro' => ['male'], 'buns' => ['female'], 'long' => ['female'], 'ponytail' => ['female'], 'bob' => ['female']],
+    ];
+
+    /** @return list<string> */
+    public static function bodies(string $field, string $key): array
+    {
+        return self::BODIES[$field][$key] ?? self::OPTIONS['body'];
+    }
+
+    public static function fits(string $field, string $key, string $body): bool
+    {
+        return \in_array($body, self::bodies($field, $key), true);
+    }
 
     /**
      * Repli de lecture uniquement : l'API refuse les choix inconnus avant toute écriture.
@@ -41,9 +60,13 @@ final class Avatar
                 $avatar[$field] = $value[$field];
             }
         }
-        if ('female' === $avatar['body']) {
-            $avatar['faceStyle'] = 'original';
-            $avatar['noseStyle'] = 'original';
+        foreach (array_keys(self::BODIES) as $field) {
+            foreach ([(string) $avatar[$field], self::DEFAULT[$field], ...self::OPTIONS[$field]] as $key) {
+                if (self::fits($field, $key, (string) $avatar['body'])) {
+                    $avatar[$field] = $key;
+                    break;
+                }
+            }
         }
 
         return $avatar;
@@ -56,7 +79,7 @@ final class Avatar
         foreach (self::OPTIONS as $field => $keys) {
             $options[$field] = array_map(static fn (string $key): array => [
                 'key' => $key,
-                'compatibleBodies' => \in_array($key, ['square', 'wide'], true) ? ['male'] : self::OPTIONS['body'],
+                'compatibleBodies' => self::bodies($field, $key),
             ], $keys);
         }
 
