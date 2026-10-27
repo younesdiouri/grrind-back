@@ -134,6 +134,29 @@ final class UnityEquipmentTest extends ApiTestCase
         }
     }
 
+    public function testTheLightningHeadbandIsAOneCoinCosmeticForTheHead(): void
+    {
+        $player = $this->openAccount();
+        self::getContainer()->get(CoinLedger::class)->credit($player->id, CoinReason::WorkoutDrop, Uuid::v7(), 1, new DateTimeImmutable());
+        $shop = self::decode($this->get('/api/shop', $player->headers));
+        self::assertIsArray($shop['items']);
+        $items = array_column($shop['items'], null, 'key');
+        self::assertIsArray($items['BANDEAU_ECLAIR'] ?? null);
+        $item = $items['BANDEAU_ECLAIR'];
+        self::assertSame(['HEAD', 1, 1, [], null], [$item['slot'], $item['priceCoins'], $item['minimumLevel'], $item['modifiers'], $item['weaponType']]);
+        self::assertTrue($item['affordable']);
+        $before = $this->inventory($player)['statistics'];
+        $purchased = $this->post('/api/shop/purchases', ['itemKey' => 'BANDEAU_ECLAIR'], $player->headers + ['Idempotency-Key' => 'buy-headband']);
+        self::assertSame(201, $purchased->getStatusCode(), (string) $purchased->getContent());
+        self::assertSame(0, self::decode($purchased)['coinsAfter']);
+        self::assertSame(200, $this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'BANDEAU_ECLAIR'], $player->headers)->getStatusCode());
+        $inventory = $this->inventory($player);
+        self::assertIsArray($inventory['equipment']);
+        self::assertIsArray($inventory['equipment']['HEAD']);
+        self::assertSame('BANDEAU_ECLAIR', $inventory['equipment']['HEAD']['key']);
+        self::assertSame($before, $inventory['statistics'], 'Cosmétique pur : aucune statistique ne bouge.');
+    }
+
     /** @return array<mixed> */
     private function inventory(Account $player): array
     {

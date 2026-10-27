@@ -84,7 +84,7 @@ final class Avatar
         }
 
         return ['version' => self::VERSION, 'default' => self::DEFAULT, 'options' => $options,
-            // Aucun item HEAD Unity publié depuis #315 ; le bandeau reste un prototype local.
-            'headwear' => ['slot' => 'HEAD', 'options' => []]];
+            // Les coiffes Unity portées en HEAD (#325) ; elles s'ajustent à toutes les coiffures.
+            'headwear' => ['slot' => 'HEAD', 'options' => ['BANDEAU_ECLAIR']]];
     }
 }

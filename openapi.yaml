@@ -3848,7 +3848,7 @@ components:
               - female
       type: object
     AvatarCatalog:
-      description: "Catalogue cosmétique versionné. Les coiffes sont des équipements HEAD, séparés des coiffures ; aucune coiffe Unity disponible actuellement. Le bandeau de l'atelier est un prototype, non équipable."
+      description: 'Catalogue cosmétique versionné. Les coiffes sont des équipements HEAD, séparés des coiffures ; headwear liste les clés rendues par Unity sur toutes les coiffures (BANDEAU_ECLAIR, #325).'
       required:
         - version
         - default
@@ -3913,7 +3913,6 @@ components:
               type: array
               items:
                 type: string
-              maxItems: 0
           type: object
       type: object
     Appearance:

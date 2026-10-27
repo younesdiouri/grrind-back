@@ -1,0 +1,19 @@
+{
+  "createdOn": "2026-10-27",
+  "items": [
+    "BANDEAU_ECLAIR"
+  ],
+  "sourceRepository": "younesdiouri/grrind-app",
+  "sources": [
+    "spikes/art-source/bandeau-eclair/source.glb"
+  ],
+  "pipeline": [
+    "ImageGen concept",
+    "Meshy 7.1, 35 credits (task 01a15fb3-a126-77a8-be26-d9c0d4d45624)",
+    "Blender 4.5 Eevee render, 512 x 640 transparent"
+  ],
+  "usage": "Meshy subscription terms of the existing account",
+  "triangles": {
+    "BANDEAU_ECLAIR": 1542
+  }
+}

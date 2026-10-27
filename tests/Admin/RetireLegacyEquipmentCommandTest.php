@@ -68,7 +68,7 @@ final class RetireLegacyEquipmentCommandTest extends KernelTestCase
             self::assertSame(0, self::number($db->fetchOne("SELECT COUNT(*) FROM game_artwork_pack WHERE active = true AND pack_key = 'PURSUIT_GOGGLES'")));
             self::assertSame('["HALTER_EGO"]', $db->fetchOne('SELECT equipment FROM game_design_profile WHERE id = ?', [$profileId]));
             self::assertSame($facts, self::state($db, array_keys($facts)));
-            self::assertSame(10, self::number($db->fetchOne("SELECT COUNT(*) FROM game_item WHERE kind = 'EQUIPMENT'")));
+            self::assertSame(11, self::number($db->fetchOne("SELECT COUNT(*) FROM game_item WHERE kind = 'EQUIPMENT'")), 'Les dix objets Unity et le Bandeau éclair (#325) restent.');
             self::assertSame(4, self::number($db->fetchOne("SELECT COUNT(*) FROM game_item WHERE kind = 'CHEST'")));
             self::assertSame(1, self::number($db->fetchOne("SELECT COUNT(*) FROM game_item WHERE kind = 'RESOURCE'")));
             self::assertSame(777, $db->fetchOne("SELECT price_coins FROM game_item WHERE item_key = 'HALTER_EGO'"));

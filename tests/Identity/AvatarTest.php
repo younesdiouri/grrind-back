@@ -17,7 +17,7 @@ final class AvatarTest extends ApiTestCase
         self::assertSame(1, $catalog['version']);
         self::assertSame(Avatar::DEFAULT, $catalog['default']);
         self::assertSame(Avatar::DEFAULT, self::decode($this->get('/api/me', $player->headers))['avatar']);
-        self::assertSame(['slot' => 'HEAD', 'options' => []], $catalog['headwear']);
+        self::assertSame(['slot' => 'HEAD', 'options' => ['BANDEAU_ECLAIR']], $catalog['headwear']);
         self::assertSame(401, $this->get('/api/avatar-catalog')->getStatusCode());
         self::assertSame(401, $this->send('PATCH', '/api/me', ['avatar' => Avatar::DEFAULT])->getStatusCode());
     }

@@ -1,0 +1,18 @@
+[
+  {
+    "key": "BANDEAU_ECLAIR",
+    "slot": "HEAD",
+    "price_coins": 1,
+    "sell_price_coins": 0,
+    "modifiers": [],
+    "image_path": "c56d7812d5374e960d936fa48758b3e95a01e3fc.png",
+    "translations": {
+      "fr": {
+        "name": "Bandeau éclair"
+      },
+      "en": {
+        "name": "Lightning Headband"
+      }
+    }
+  }
+]

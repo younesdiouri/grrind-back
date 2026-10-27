@@ -161,3 +161,12 @@ commande après les migrations historiques. Les tests du moteur utilisent des fi
 explicites conservant leurs scénarios de rareté, de niveau et d'XP ; leurs armes utilisent
 les six slots actuels. Le nettoyage est testé séparément contre ces données complètes,
 sans ajouter de compatibilité HANDS au domaine métier.
+
+## Bandeau éclair (#325)
+
+`BANDEAU_ECLAIR` occupe HEAD : 1 pièce d’or, revente 0, aucun bonus, hors coffre. Cosmétique
+pur, il ne change aucune statistique. La migration `Version20261027090000` l’ajoute au catalogue
+et au ruleset publié comme #319, sans toucher aux brouillons, au loot ni aux possessions.
+L’icône `c56d7812….png` suit le même provisionnement que les autres : la copier sur le volume
+avant la migration. Le catalogue d’avatar l’annonce dans `headwear.options` ; l’app le rend
+sur toutes les coiffures.

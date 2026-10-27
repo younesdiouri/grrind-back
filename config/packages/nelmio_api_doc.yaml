@@ -1734,7 +1734,7 @@ when@dev:
                             compatibleBodies: { type: array, items: { type: string, enum: [male, female] } }
                     AvatarCatalog:
                         type: object
-                        description: "Catalogue cosmétique versionné. Les coiffes sont des équipements HEAD, séparés des coiffures ; aucune coiffe Unity disponible actuellement. Le bandeau de l'atelier est un prototype, non équipable."
+                        description: "Catalogue cosmétique versionné. Les coiffes sont des équipements HEAD, séparés des coiffures ; headwear liste les clés rendues par Unity sur toutes les coiffures (BANDEAU_ECLAIR, #325)."
                         required: [version, default, options, headwear]
                         properties:
                             version: { type: integer, enum: [1] }
@@ -1755,7 +1755,7 @@ when@dev:
                                 required: [slot, options]
                                 properties:
                                     slot: { type: string, enum: [HEAD] }
-                                    options: { type: array, maxItems: 0, items: { type: string } }
+                                    options: { type: array, items: { type: string } }
 
                     Appearance:
                         type: string
