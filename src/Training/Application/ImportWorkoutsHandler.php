@@ -237,6 +237,7 @@ final readonly class ImportWorkoutsHandler
 
             $fact = $this->factOf($workout);
             $reward = $this->rewards->creditFor($fact);
+            $workout->registerSoloXp($reward->xpAwarded, $this->activityTypes->sportFor($candidate->source->value, $candidate->activityType));
             // Le loot après l'XP et les titres, avant l'outbox — l'ordre de
             // `ARCHITECTURE.md`. `$reward` porte déjà le niveau d'après ce crédit et le
             // verdict « créditée ou non » : voir le docblock de `SessionDrops` pour

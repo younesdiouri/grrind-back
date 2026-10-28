@@ -7,13 +7,14 @@ namespace App\Progression\Domain;
 /**
  * Ce qui a provoqué l'écriture au ledger.
  *
- * Deux valeurs, et pas de « correction manuelle » : aucune route ni commande n'en crédite,
+ * Pas de « correction manuelle » : aucune route ni commande n'en crédite,
  * et une valeur qu'aucun code n'écrit est une porte qu'on finit par pousser. Le jour où un
  * ajustement d'exploitation sera nécessaire, il aura son ticket et sa traçabilité propre.
  */
 enum XpReason: string
 {
     case SessionCompleted = 'SESSION_COMPLETED';
+    case TogetherBonus = 'TOGETHER_BONUS';
 
     /**
      * La contrepartie négative d'un crédit. On ne supprime jamais une transaction : la

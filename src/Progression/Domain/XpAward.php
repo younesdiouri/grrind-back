@@ -25,6 +25,8 @@ final readonly class XpAward
         public XpBreakdown $breakdown,
         public AttributeGains $attributeGains,
         public string $rulesetVersion,
+        /** @var array<string, int> Répartition figée pour les compléments tardifs. */
+        public array $attributePercentages = [],
     ) {
     }
 

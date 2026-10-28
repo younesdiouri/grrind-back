@@ -52,6 +52,9 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\UniqueConstraint(name: 'uniq_xp_transaction_source_reason', columns: ['source_id', 'reason'])]
 class XpTransaction
 {
+    /** @var array<string, int> */
+    #[ORM\Column(type: Types::JSON)]
+    private array $attributePercentages = [];
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $id;
@@ -177,6 +180,17 @@ class XpTransaction
         }
     }
 
+    /** @return array<string, int> */
+    public function attributePercentages(): array
+    {
+        return $this->attributePercentages;
+    }
+
+    public static function togetherFor(self $credit, Uuid $receiptId, XpAward $award): self
+    {
+        return new self($credit->userId, XpReason::TogetherBonus, $receiptId, $credit->discipline, 0, $award->breakdown, $award->attributeGains, $credit->rulesetVersion, $credit->occurredAt);
+    }
+
     /**
      * L'XP accordée pour un workout. Le total peut valoir zéro — une séance entièrement
      * rognée par les rendements décroissants reste une séance, et le breakdown est
@@ -193,7 +207,7 @@ class XpTransaction
         XpAward $award,
         DateTimeImmutable $occurredAt,
     ): self {
-        return new self(
+        $transaction = new self(
             $userId,
             XpReason::SessionCompleted,
             $sessionId,
@@ -204,6 +218,9 @@ class XpTransaction
             $award->rulesetVersion,
             $occurredAt,
         );
+        $transaction->attributePercentages = $award->attributePercentages;
+
+        return $transaction;
     }
 
     /**

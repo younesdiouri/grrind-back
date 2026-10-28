@@ -62,6 +62,8 @@ enum XpBreakdownSource: string
 
     /** Le plafond quotidien par discipline (#15) : négatif au crédit. */
     case DailyCap = 'DAILY_CAP';
+    /** Seul multiplicateur final, après le plafond ; jamais un pourcentage du socle. */
+    case Together = 'TOGETHER';
 
     /**
      * Le vocabulaire du breakdown est un sur-ensemble de celui des modificateurs : le

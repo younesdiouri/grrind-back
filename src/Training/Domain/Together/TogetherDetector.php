@@ -16,10 +16,14 @@ final readonly class TogetherDetector
      * Les candidats sont triés pour rendre le choix stable, sans fusion transitive de groupes.
      *
      * @param list<TogetherTrack> $tracks
+     *
      * @return non-empty-list<TogetherTrack>
      */
     public function groupFor(TogetherTrack $anchor, array $tracks): array
     {
+        if (1 === $this->rules->get('maximum_players')) {
+            return [$anchor];
+        }
         $candidates = array_values(array_filter($tracks, fn (TogetherTrack $other): bool => $other->user !== $anchor->user && $other->sport === $anchor->sport && null !== $this->proof([$anchor, $other])));
         usort($candidates, static fn (TogetherTrack $a, TogetherTrack $b): int => $a->id <=> $b->id);
 
@@ -36,6 +40,9 @@ final readonly class TogetherDetector
         $overlap = $end - $start;
         $minimum = 100;
         foreach ($group as $track) {
+            if (\count($track->points) < 2) {
+                return null;
+            }
             $duration = $track->end - $track->start;
             if ($duration <= 0 || $overlap * 100 < $duration * $this->rules->get('overlap_percent')) {
                 return null;
@@ -74,6 +81,7 @@ final readonly class TogetherDetector
 
     /** @param non-empty-list<TogetherTrack> $group
      * @param list<TogetherTrack> $candidates
+     *
      * @return non-empty-list<TogetherTrack>
      */
     private function extend(array $group, array $candidates): array

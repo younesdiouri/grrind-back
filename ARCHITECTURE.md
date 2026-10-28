@@ -434,6 +434,28 @@ punition.
 
 ---
 
+### Sport ensemble (#329)
+
+```mermaid
+flowchart LR
+    import["Import santé · crédit solo figé"] --> event["WorkoutImported · après COMMIT"]
+    gps["Lots de positions du compte courant"] --> tracker["Training · TogetherTracker"]
+    event --> tracker
+    tracker --> proof["groupe commun · même sport · temps et proximité"]
+    proof --> port["Shared · TogetherRewards"]
+    port --> delta["Progression · delta append-only + reprojection"]
+    delta --> receipt["together_bonus_receipt · flux relisible"]
+    gps --> purge["Scheduler · purge à 30 jours"]
+```
+
+Le plafond s'applique à l'XP solo ; les compléments de groupe en sont exclus. Le total final
+se répartit selon les pourcentages figés du crédit, en ne versant que la différence avec le
+palier déjà accordé. Ni nouvelle durée, ni nouveau loot/streak. Le rapprochement est sérialisé
+par un verrou transactionnel de pilote, jamais pris sous le verrou de l'import. Les preuves
+logiques restent privées sur le workout ; aucun endpoint ne rend de GPS ni d'identité voisine.
+Le compte rendu initial reste inchangé ; le client consomme les reçus par identifiant stable.
+Les seuils publiés sont provisoires en attente des mesures du ticket app #323.
+
 ## 4. Le modèle de données
 
 ```mermaid

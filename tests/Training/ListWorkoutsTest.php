@@ -167,7 +167,7 @@ final class ListWorkoutsTest extends ApiTestCase
         $workout = $this->history($bob)['workouts'][0];
 
         self::assertSame(
-            ['id', 'discipline', 'source', 'trust', 'startedAt', 'endedAt', 'durationSeconds', 'distanceMeters', 'calories', 'elevationGainMeters', 'averageHeartRate', 'externalId'],
+            ['id', 'discipline', 'source', 'trust', 'startedAt', 'endedAt', 'durationSeconds', 'distanceMeters', 'calories', 'elevationGainMeters', 'averageHeartRate', 'externalId', 'together'],
             array_keys($workout),
         );
         self::assertSame(2700, $workout['durationSeconds']);

@@ -39,6 +39,8 @@ final readonly class WorkoutResource
         public ?int $elevationGainMeters,
         public ?int $averageHeartRate,
         public ?string $externalId,
+        /** @var array<string, mixed> */
+        public array $together,
     ) {
     }
 
@@ -57,11 +59,12 @@ final readonly class WorkoutResource
             $workout->elevationGainMeters(),
             $workout->averageHeartRate(),
             $workout->externalId(),
+            $workout->together(),
         );
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     public function toArray(): array
     {
@@ -81,6 +84,7 @@ final readonly class WorkoutResource
             // l'a envoyé : il peut ainsi rapprocher sa liste HealthKit de ce que le serveur
             // connaît déjà, sans deviner.
             'externalId' => $this->externalId,
+            'together' => $this->together,
         ];
     }
 }

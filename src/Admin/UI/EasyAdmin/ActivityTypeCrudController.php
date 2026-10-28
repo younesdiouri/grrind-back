@@ -34,6 +34,7 @@ final class ActivityTypeCrudController extends GameCrudController
     {
         yield ChoiceField::new('source')->setChoices(array_combine(array_map(static fn (WorkoutSource $source): string => $source->value, WorkoutSource::cases()), WorkoutSource::cases()) ?: []);
         yield TextField::new('providerType');
+        yield TextField::new('normalizedSport', 'Sport normalisé')->setHelp('Même clé entre fournisseurs pour le même sport ; vide désactive Sport ensemble pour ce type.');
         yield ChoiceField::new('discipline')->setChoices(array_combine(array_map(static fn (Discipline $discipline): string => $discipline->value, Discipline::cases()), Discipline::cases()) ?: []);
         yield BooleanField::new('active');
     }

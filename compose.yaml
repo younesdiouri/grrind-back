@@ -43,6 +43,7 @@ services:
       - messenger:consume
       - outbox
       - scheduler_alam
+      - scheduler_location_evidence
       - --memory-limit=128M
       - --time-limit=3600
       - -v
