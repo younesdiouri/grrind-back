@@ -94,6 +94,23 @@ final class ActivityTypeMap
         return $this->bySource[$source][$activityType] ?? null;
     }
 
+    public function sportFor(string $source, string $activityType): ?string
+    {
+        if (!$this->isRuntimeRuleset()) {
+            return null !== $this->disciplineFor($source, $activityType) ? $activityType : null;
+        }
+        \assert(null !== $this->rulesets);
+        /** @var list<array{source: string, provider_type: string, normalized_sport?: ?string, active: bool}> $rows */
+        $rows = $this->rulesets->snapshot()['activity_types'];
+        foreach ($rows as $row) {
+            if ($row['source'] === $source && $row['provider_type'] === $activityType && $row['active']) {
+                return $row['normalized_sport'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
     /** @param array<string, mixed> $snapshot */
     private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
     {

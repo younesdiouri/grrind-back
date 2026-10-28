@@ -26,6 +26,9 @@ use App\Shared\Domain\Modifier\ModifierType;
  *
  * ## La règle de composition : additive, sur le socle
  *
+ * Le calcul ci-dessous est le solo. Sport ensemble (#329) multiplie ensuite ce résultat
+ * déjà plafonné, dans un complément distinct utilisant la répartition figée de ce crédit.
+ *
  * Chaque modificateur contribue d'un pourcentage **du socle**, pas du sous-total courant.
  * Un socle de 90 avec +20 % de streak et +15 % d'objets donne `90 + 18 + 13 = 121`, et non
  * `90 × 1,20 × 1,15`. Trois raisons, dans cet ordre :
@@ -174,7 +177,7 @@ final readonly class XpCalculator
         // rendu, et pourquoi elle ne peut pas se déplacer avant l'écrêtage.
         $gains = $this->attributes->distribute($discipline, $breakdown->total());
 
-        return new XpAward($breakdown, $gains, $this->rulesetVersion());
+        return new XpAward($breakdown, $gains, $this->rulesetVersion(), $this->attributes->percentagesFor($discipline));
     }
 
     private function rulesetVersion(): string

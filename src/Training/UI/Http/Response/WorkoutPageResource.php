@@ -32,7 +32,7 @@ final readonly class WorkoutPageResource
     }
 
     /**
-     * @return array{workouts: list<array<string, string|int|null>>, nextCursor: string|null}
+     * @return array{workouts: list<array<string, mixed>>, nextCursor: string|null}
      */
     public function toArray(): array
     {

@@ -211,6 +211,13 @@ l'UUID v7 de la ligne.
 du ruleset *et* le détail du calcul. On peut rééquilibrer sans corrompre l'historique, et le client
 peut afficher « 90 base, +18 streak, +13 bottes ».
 
+**Sport ensemble est le seul multiplicateur final (#329).** Les bonus ordinaires restent
+additifs. Le groupe multiplie l'XP solo **après le plafond quotidien**, puis la répartition en
+caractéristiques se pose sur ce total. Son supplément ne consomme ni plafond ni durée du jour.
+L'import crédite le solo ; le rapprochement des preuves, après COMMIT, ajoute les deltas au
+ledger avec la base et la répartition figées à l'import. Les reçus de ces compléments sont un
+flux distinct : une réponse d'import idempotente ne se réécrit jamais.
+
 **Un seul vocabulaire de modificateurs.** Compétences, objets équipés, streak et ligue produisent
 tous des modificateurs typés (`XP_MULTIPLIER`, `LOOT_LUCK`, `STREAK_SHIELD`, `UNLOCK_SESSION_TYPE`).
 Un unique `ModifierResolver` calcule l'ensemble actif d'un user. C'est ce qui empêche le moteur de

@@ -51,5 +51,6 @@ final class SettingsCrudController extends GameCrudController
         yield StructuredField::new('community')->setFormType(CommunityType::class)->hideOnIndex();
         yield StructuredField::new('notifications')->setFormType(NotificationsType::class)->hideOnIndex();
         yield StructuredField::new('streak', 'Streak')->setFormType(StreakSettingsType::class)->hideOnIndex();
+        yield StructuredField::new('together', 'Sport ensemble — pilote')->setFormType(\App\Admin\UI\Form\TogetherSettingsType::class)->hideOnIndex();
     }
 }

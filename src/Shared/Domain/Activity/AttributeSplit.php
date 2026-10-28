@@ -162,6 +162,12 @@ final class AttributeSplit
         );
     }
 
+    /** @return array<string, int> */
+    public function percentagesFor(Discipline $discipline): array
+    {
+        return $this->isRuntimeRuleset() ? $this->runtimeValue()->percentagesFor($discipline) : $this->percentages[$discipline->value];
+    }
+
     /** @param array<string, mixed> $snapshot */
     private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
     {

@@ -31,6 +31,7 @@ services:
     App\Shared\Application\SportSessions: '@App\Training\Infrastructure\StreakSportSessions'
     App\Shared\Application\StreakChests: '@App\Rewards\Infrastructure\Drop\StreakChestGrants'
     App\Shared\Application\SessionStreaks: '@App\Engagement\Application\StreakTracker'
+    App\Shared\Application\TogetherRewards: '@App\Progression\Infrastructure\TogetherXpRewards'
 
     App\Community\Application\ChatImageStorage: '@App\Community\Infrastructure\Storage\LocalChatImageStorage'
 

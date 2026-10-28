@@ -1113,6 +1113,42 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/workouts/together-bonuses:
+    get:
+      tags:
+        - Progression
+      operationId: get_progression_together_bonuses
+      parameters:
+        -
+          name: after
+          in: query
+          description: 'Dernier identifiant présenté, UUID v7 ; ordre de crédit croissant.'
+          required: false
+          schema:
+            type: string
+            format: uuid
+            nullable: true
+            default: null
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+            minimum: 1
+      responses:
+        '200':
+          description: 'Compléments relisibles du joueur courant ; conserver nextCursor côté appareil après présentation.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TogetherBonusPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/crafting/recipes:
     get:
       tags:
@@ -1491,6 +1527,36 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/workouts/location-evidence:
+    post:
+      tags:
+        - Entraînement
+      operationId: post_training_location_evidence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationEvidenceRequest'
+      responses:
+        '200':
+          description: 'Lot enregistré ou rejoué ; workout nul avant son import.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationEvidenceResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          description: 'Fenêtre de preuve expirée.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /api/workouts/sync-state:
     get:
       tags:
@@ -1527,6 +1593,300 @@ components:
         routeId:
           type: string
           format: uuid
+      type: object
+    TogetherStatus:
+      description: 'Pilote : seuils provisoires. XP solo après plafond ; le supplément est hors budget quotidien. Aucune identité ni position des autres joueurs.'
+      required:
+        - status
+        - playerCount
+        - multiplier
+        - soloXp
+        - bonusXp
+        - totalXp
+        - rulesetVersion
+      properties:
+        status:
+          type: string
+          enum:
+            - PENDING
+            - INSUFFICIENT_EVIDENCE
+            - VERIFIED
+            - UNAVAILABLE
+        playerCount:
+          description: 'Compte plafonné ; afficher 4+ au plafond.'
+          type: integer
+          maximum: 4
+          minimum: 1
+        multiplier:
+          type: integer
+          maximum: 4
+          minimum: 1
+        soloXp:
+          type: integer
+          minimum: 0
+        bonusXp:
+          type: integer
+          minimum: 0
+        totalXp:
+          type: integer
+          minimum: 0
+        rulesetVersion:
+          type: string
+          nullable: true
+      type: object
+    LocationPoint:
+      required:
+        - timestamp
+        - latitude
+        - longitude
+        - horizontalAccuracy
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+          maximum: 90
+          minimum: -90
+        longitude:
+          type: number
+          maximum: 180
+          minimum: -180
+        horizontalAccuracy:
+          type: number
+          maximum: 10000
+          minimum: 0
+      type: object
+    LocationEvidenceRequest:
+      description: 'Lot immuable, UUID stable par compte. Bornes du workout fournisseur (24 h maximum), points dans ces bornes. Avant import accepté ; 50 lots / 20 000 points maximum par séance. Rejeu identique accepté, contenu différent 409. Preuve expirée après 30 jours : 410, sans prolongation. Aucun accès en lecture au GPS brut.'
+      required:
+        - batchId
+        - source
+        - externalId
+        - origin
+        - startedAt
+        - endedAt
+        - points
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        source:
+          type: string
+          enum:
+            - APPLE_HEALTH
+            - HEALTH_CONNECT
+        externalId:
+          type: string
+          maxLength: 128
+          minLength: 1
+        origin:
+          type: string
+          enum:
+            - WORKOUT_ROUTE
+            - PHONE_CAPTURE
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationPoint'
+          maxItems: 2000
+          minItems: 1
+      type: object
+    LocationEvidenceResult:
+      required:
+        - batchId
+        - workoutId
+        - together
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        workoutId:
+          type: string
+          format: uuid
+          nullable: true
+        together:
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/TogetherStatus'
+      type: object
+    TogetherBonus:
+      description: 'Complément seul : bonusXp est le delta nouvellement accordé, totalBonusXp son cumul pour le workout. Ne jamais rejouer le SyncSummary. Valeurs avant/après prises au crédit du complément ; occurredAt reste la date du sport.'
+      required:
+        - id
+        - workoutId
+        - occurredAt
+        - createdAt
+        - previousMultiplier
+        - multiplier
+        - soloXp
+        - bonusXp
+        - totalBonusXp
+        - workoutTotalXp
+        - xp
+        - attributes
+        - level
+        - skillPointsGranted
+        - titlesUnlocked
+        - rulesetVersion
+        - detectionRulesetVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        workoutId:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        previousMultiplier:
+          type: integer
+          minimum: 1
+        multiplier:
+          type: integer
+          minimum: 2
+        soloXp:
+          type: integer
+          minimum: 0
+        bonusXp:
+          type: integer
+          minimum: 0
+        totalBonusXp:
+          type: integer
+          minimum: 0
+        workoutTotalXp:
+          type: integer
+          minimum: 0
+        xp:
+          required:
+            - awarded
+            - breakdown
+          properties:
+            awarded:
+              type: integer
+              minimum: 0
+            breakdown:
+              type: array
+              items:
+                required:
+                  - source
+                  - amount
+                properties:
+                  source: { type: string, enum: [TOGETHER] }
+                  amount: { type: integer, minimum: 0 }
+                type: object
+          type: object
+        attributes:
+          description: "Les cinq caractéristiques du personnage, chacune avec son avant et son\naprès — même raison que le palier de niveau : une jauge qui repartirait de\nzéro mentirait à tout joueur qui n'y était pas.\n\n**Vitality n'a pas de `gained`.** Elle ne reçoit jamais d'XP directement —\nc'est une caractéristique dérivée des quatre autres, qui mesure l'équilibre\nde la pratique. Elle peut donc bouger sans que **cette** séance lui ait\nrien crédité : un joueur qui varie ses sports la voit sauter même le jour\noù la répartition de sa séance n'y touche pas directement.\n"
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+            - vitality
+          properties:
+            strength:
+              $ref: '#/components/schemas/AttributeGauge'
+            endurance:
+              $ref: '#/components/schemas/AttributeGauge'
+            mobility:
+              $ref: '#/components/schemas/AttributeGauge'
+            dexterity:
+              $ref: '#/components/schemas/AttributeGauge'
+            vitality:
+              description: 'Dérivée, jamais créditée : pas de `gained` ici.'
+              required:
+                - before
+                - after
+              properties:
+                before:
+                  type: integer
+                  example: 300
+                after:
+                  type: integer
+                  example: 310
+              type: object
+          type: object
+        level:
+          required:
+            - before
+            - xpIntoLevelBefore
+            - xpToNextLevelBefore
+            - after
+            - reached
+            - totalXp
+            - xpIntoLevel
+            - xpToNextLevel
+          properties:
+            before:
+              type: integer
+              example: 1
+            xpIntoLevelBefore:
+              description: "Où en était la barre avant la séance. Le client l'y place, **puis** la remplit."
+              type: integer
+              example: 30
+            xpToNextLevelBefore:
+              description: "Avec le précédent, la largeur du palier de départ. Elle ne se redéduit pas du reste dès que plusieurs niveaux sont franchis, et sans elle la barre repart de zéro pour un joueur qui n'y était pas. `null` au niveau maximum."
+              type: integer
+              example: 70
+              nullable: true
+            after:
+              type: integer
+              example: 2
+            reached:
+              description: "Les niveaux franchis, dans l'ordre. En gagner plusieurs d'un coup est un cas normal — le client les anime tous. Vide quand rien ne bouge."
+              type: array
+              items:
+                type: integer
+            totalXp:
+              type: integer
+            xpIntoLevel:
+              type: integer
+            xpToNextLevel:
+              description: "Ce qu'il **reste** à gagner. `null` signifie le niveau maximum ; zéro voudrait dire « atteint »."
+              type: integer
+              nullable: true
+          type: object
+        skillPointsGranted:
+          type: integer
+          minimum: 0
+        titlesUnlocked:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerTitle'
+        rulesetVersion:
+          type: string
+        detectionRulesetVersion:
+          type: string
+      type: object
+    TogetherBonusPage:
+      description: 'Ordre de crédit croissant, filtré au compte courant. Relisible ; conserver le curseur après présentation réussie. Retourner nextCursor même à la fin du flux.'
+      required:
+        - bonuses
+        - nextCursor
+        - hasMore
+      properties:
+        bonuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/TogetherBonus'
+        nextCursor:
+          type: string
+          format: uuid
+          nullable: true
+        hasMore:
+          type: boolean
       type: object
     AlamGauge:
       required:
@@ -2571,6 +2931,7 @@ components:
         - elevationGainMeters
         - averageHeartRate
         - externalId
+        - together
       properties:
         id:
           type: string
@@ -2613,6 +2974,8 @@ components:
           description: "L'identifiant chez le fournisseur, rendu parce que c'est le client qui l'a envoyé : il peut ainsi rapprocher sa liste HealthKit de ce que le serveur connaît déjà, sans deviner."
           type: string
           nullable: true
+        together:
+          $ref: '#/components/schemas/TogetherStatus'
       type: object
     WorkoutPage:
       description: "Une page d'historique, **dans l'ordre de la pratique** : `startedAt` décroissant, puis\nl'identifiant pour départager deux séances commencées à la même seconde.\n\n`nextCursor` est une **chaîne opaque** — le client la renvoie telle quelle, il n'a rien à\ny lire. `null` signifie la fin ; il n'y a pas de total, un défilement infini n'en a aucun\nusage.\n"
@@ -2836,6 +3199,7 @@ components:
             - GUILD
             - DIMINISHING
             - DAILY_CAP
+            - TOGETHER
         amount:
           type: integer
           example: -55
@@ -3732,6 +4096,7 @@ components:
           enum:
             - SESSION_COMPLETED
             - SESSION_INVALIDATED
+            - TOGETHER_BONUS
         discipline:
           $ref: '#/components/schemas/Discipline'
         amount:
@@ -5127,6 +5492,76 @@ components:
           default: 20
           maximum: 50
           minimum: 1
+      type: object
+    LocationPointRequest:
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          nullable: true
+          default: null
+        latitude:
+          type: number
+          format: float
+          nullable: true
+          default: null
+          maximum: 90
+          minimum: -90
+        longitude:
+          type: number
+          format: float
+          nullable: true
+          default: null
+          maximum: 180
+          minimum: -180
+        horizontalAccuracy:
+          type: number
+          format: float
+          nullable: true
+          default: null
+          maximum: 10000
+          minimum: 0
+      type: object
+    LocationEvidenceRequest2:
+      properties:
+        batchId:
+          type: string
+          format: uuid
+          nullable: true
+          default: null
+        source:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/WorkoutSource'
+          default: null
+        externalId:
+          type: string
+          default: ''
+          maxLength: 128
+        origin:
+          type: string
+          default: ''
+          enum:
+            - WORKOUT_ROUTE
+            - PHONE_CAPTURE
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          default: null
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+          default: null
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationPointRequest'
+          default: []
+          maxItems: 2000
+          minItems: 1
       type: object
   responses:
     BadRequest:

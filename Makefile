@@ -38,7 +38,7 @@ sh: ## Ouvre un shell dans le conteneur php
 # Le service `worker` de compose consomme déjà l'outbox en fond ; cette cible sert à
 # regarder un message passer, ou à en rejouer un après l'avoir corrigé.
 worker: ## Consomme l'outbox en avant-plan (Ctrl-C pour arrêter)
-	$(RUN_DB) bin/console messenger:consume outbox -vv
+	$(RUN_DB) bin/console messenger:consume outbox scheduler_location_evidence -vv
 
 failures: ## Liste les messages en échec (c="show 42" pour le détail, c="retry" pour rejouer)
 	$(RUN_DB) bin/console messenger:failed:$(or $(c),show)

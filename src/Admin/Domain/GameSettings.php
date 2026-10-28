@@ -12,6 +12,8 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'game_settings')]
 class GameSettings
 {
+    /** @var array<string, mixed> */
+    #[ORM\Column(type: Types::JSON)] private array $together = [];
     #[ORM\Id] #[ORM\Column] private int $id = 1;
     /** @var array<string, array{source: string, combination: string, secondary: ?string}> */
     #[ORM\Column(type: Types::JSON)] private array $formulas = [];
@@ -28,6 +30,18 @@ class GameSettings
     public function __toString(): string
     {
         return 'Réglages globaux';
+    }
+
+    /** @return array<string, mixed> */
+    public function getTogether(): array
+    {
+        return $this->together;
+    }
+
+    /** @param array<string, mixed> $together */
+    public function setTogether(array $together): void
+    {
+        $this->together = $together;
     }
 
     /** @return array<string, array{source: string, combination: string, secondary: ?string}> */

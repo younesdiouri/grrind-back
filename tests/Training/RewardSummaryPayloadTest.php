@@ -147,7 +147,7 @@ final class RewardSummaryPayloadTest extends TestCase
         $workout = $payload['session'];
         self::assertIsArray($workout);
         self::assertSame(
-            ['id', 'discipline', 'source', 'trust', 'startedAt', 'endedAt', 'durationSeconds', 'distanceMeters', 'calories', 'elevationGainMeters', 'averageHeartRate', 'externalId'],
+            ['id', 'discipline', 'source', 'trust', 'startedAt', 'endedAt', 'durationSeconds', 'distanceMeters', 'calories', 'elevationGainMeters', 'averageHeartRate', 'externalId', 'together'],
             array_keys($workout),
         );
     }

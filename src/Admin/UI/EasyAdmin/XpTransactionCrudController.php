@@ -20,7 +20,7 @@ final class XpTransactionCrudController extends ReadOnlyCrudController
     public function configureFields(string $pageName): iterable
     {
         yield IntegerField::new('amount');
-        yield ChoiceField::new('reason')->setChoices(['Séance validée' => XpReason::SessionCompleted, 'Séance annulée' => XpReason::SessionInvalidated]);
+        yield ChoiceField::new('reason')->setChoices(['Séance validée' => XpReason::SessionCompleted, 'Séance annulée' => XpReason::SessionInvalidated, 'Sport ensemble' => XpReason::TogetherBonus]);
         yield TextField::new('rulesetVersion');
     }
 }

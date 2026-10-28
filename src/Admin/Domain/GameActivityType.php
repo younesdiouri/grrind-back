@@ -16,6 +16,7 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\UniqueConstraint(name: 'uniq_game_activity_source_provider', columns: ['source', 'provider_type'])]
 class GameActivityType
 {
+    #[ORM\Column(length: 120, nullable: true)] private ?string $normalizedSport = null;
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $id;
@@ -35,6 +36,16 @@ class GameActivityType
     public function __construct()
     {
         $this->id = Uuid::v7();
+    }
+
+    public function getNormalizedSport(): ?string
+    {
+        return $this->normalizedSport;
+    }
+
+    public function setNormalizedSport(?string $sport): void
+    {
+        $this->normalizedSport = $sport;
     }
 
     public function getId(): Uuid

@@ -47,7 +47,7 @@ use Throwable;
  * transaction qui modifie EasyAdmin. Ainsi les validateurs restent sources uniques et
  * aucune ligne administrable à moitié cohérente ne fuit au runtime.
  *
- * @phpstan-type Snapshot array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes?: list<array<string, mixed>>, alam?: array<string, mixed>, streak?: array<string, mixed>}
+ * @phpstan-type Snapshot array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes?: list<array<string, mixed>>, alam?: array<string, mixed>, streak?: array<string, mixed>, together?: array<string, mixed>}
  */
 final readonly class GameRulesetPublisher
 {
@@ -88,7 +88,7 @@ final readonly class GameRulesetPublisher
         $ruleset = $manager->find(GameRuleset::class, 1, LockMode::PESSIMISTIC_WRITE);
         \assert($ruleset instanceof GameRuleset);
         $manager->refresh($ruleset, LockMode::PESSIMISTIC_WRITE);
-        /** @var array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>} $snapshot */
+        /** @var array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>, together: array<string, mixed>} $snapshot */
         $snapshot = $ruleset->snapshot();
         \assert(\is_array($snapshot['combat']) && \is_array($snapshot['combat']['enemies']) && \is_array($snapshot['items']));
         foreach ($snapshot['combat']['enemies'] as &$entry) {
@@ -116,7 +116,7 @@ final readonly class GameRulesetPublisher
      * La simulation valide exactement les mêmes règles sans modifier le publié ni les
      * marqueurs historiques du catalogue. Le caller fige ce tableau pour toute l'opération.
      *
-     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>}
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>, together: array<string, mixed>}
      */
     public function prepare(EntityManagerInterface $manager): array
     {
@@ -223,6 +223,9 @@ final readonly class GameRulesetPublisher
         self::validateActiveReferences($items, $enemies, $bosses, $workout, $adversary, $chest);
         // Les archives antérieures au streak (#286) n'ont pas de section : seules les
         // publications qui la portent doivent pointer chaque palier sur un coffre actif.
+        if (isset($snapshot['together'])) {
+            new \App\Training\Domain\Together\TogetherRules($snapshot['together']);
+        }
         if (isset($snapshot['streak'])) {
             self::validateStreak($snapshot['streak'], ItemCatalog::runtime(new FrozenGameRulesets($snapshot, 'validation')));
         }
@@ -335,7 +338,7 @@ final readonly class GameRulesetPublisher
      * @param list<GameRecipe>       $recipes
      * @param list<GameActivityType> $activityTypes
      *
-     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>}
+     * @return array{items: list<array<string, mixed>>, titles: list<array<string, mixed>>, combat: array<string, mixed>, loot: array<string, mixed>, training: array<string, mixed>, xp: array<string, mixed>, attributes: array<string, mixed>, disciplines: list<array<string, mixed>>, levels: list<array<string, mixed>>, activity_types: list<array<string, mixed>>, community: array<string, mixed>, notifications: array<string, mixed>, recipes: list<array<string, mixed>>, alam: array<string, mixed>, streak: array<string, mixed>, together: array<string, mixed>}
      */
     private static function snapshot(array $items, array $titles, array $enemies, array $tables, array $disciplines, array $levels, array $activityTypes, GameSettings $settings, array $recipes): array
     {
@@ -375,13 +378,14 @@ final readonly class GameRulesetPublisher
             'split' => $discipline->getSplit(), 'translations' => $discipline->getTranslations(),
         ], $disciplines);
         $levelRows = array_map(static fn (GameLevel $level): array => ['level' => $level->getLevel(), 'total_xp' => $level->getTotalXp(), 'skill_points' => $level->getSkillPoints()], $levels);
-        $activityRows = array_map(static fn (GameActivityType $activityType): array => ['source' => $activityType->getSource()->value, 'provider_type' => $activityType->getProviderType(), 'discipline' => $activityType->getDiscipline()->value, 'active' => $activityType->isActive()], $activityTypes);
+        $activityRows = array_map(static fn (GameActivityType $activityType): array => ['source' => $activityType->getSource()->value, 'provider_type' => $activityType->getProviderType(), 'normalized_sport' => $activityType->getNormalizedSport(), 'discipline' => $activityType->getDiscipline()->value, 'active' => $activityType->isActive()], $activityTypes);
         usort($activityRows, static fn (array $left, array $right): int => [$left['source'], $left['provider_type']] <=> [$right['source'], $right['provider_type']]);
 
         return [
             'recipes' => array_map(static fn (GameRecipe $recipe): array => ['key' => $recipe->getKey(), 'active' => $recipe->isActive(), 'result_item' => $recipe->getResultItem(), 'quantity' => $recipe->getQuantity(), 'costs' => $recipe->publishedCosts()], $recipes),
             'alam' => $settings->getAlam(),
             'streak' => $settings->getStreak(),
+            'together' => $settings->getTogether(),
             'items' => $itemRows, 'titles' => $titleRows, 'combat' => ['formulas' => $settings->getFormulas(), 'fighter' => $settings->getFighter(), ...$enemyRows], 'loot' => ['version' => $settings->lootVersion(), 'loot_luck' => $settings->getLootLuck(), ...$lootRows],
             'training' => $settings->getTraining(), 'xp' => $settings->getXp(), 'attributes' => $settings->getAttributes(), 'disciplines' => $disciplineRows, 'levels' => $levelRows,
             'activity_types' => $activityRows, 'community' => $settings->getCommunity(), 'notifications' => $settings->getNotifications(),

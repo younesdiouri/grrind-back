@@ -35,6 +35,7 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Entity(repositoryClass: WorkoutRepository::class)]
 #[ORM\Table(name: 'workout')]
 #[ORM\Index(name: 'idx_workout_user_started', columns: ['user_id', 'started_at'])]
+#[ORM\Index(name: 'idx_workout_sport_started', columns: ['normalized_sport', 'started_at'])]
 // Le double crédit ne se prévient pas dans le code : entre le SELECT qui cherche
 // l'`externalId` et l'INSERT qui l'écrit, deux synchronisations concurrentes passent
 // toutes les deux. C'est la base qui refuse la seconde.
@@ -49,6 +50,16 @@ use Symfony\Component\Uid\Uuid;
 )]
 class Workout
 {
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $normalizedSport = null;
+
+    /** @var array{status: string, playerCount: int, multiplier: int, soloXp: int, bonusXp: int, totalXp: int, rulesetVersion: ?string} */
+    #[ORM\Column(type: Types::JSON)]
+    private array $together = ['status' => 'PENDING', 'playerCount' => 1, 'multiplier' => 1, 'soloXp' => 0, 'bonusXp' => 0, 'totalXp' => 0, 'rulesetVersion' => null];
+
+    /** @var array<string, mixed> Preuve logique privée, sans position. */
+    #[ORM\Column(type: Types::JSON)]
+    private array $togetherProof = [];
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $id;
@@ -158,6 +169,41 @@ class Workout
         $this->elevationGainMeters = $elevationGainMeters;
         $this->averageHeartRate = $averageHeartRate;
         $this->createdAt = $now;
+    }
+
+    public function normalizedSport(): ?string
+    {
+        return $this->normalizedSport;
+    }
+
+    /** @return array{status: string, playerCount: int, multiplier: int, soloXp: int, bonusXp: int, totalXp: int, rulesetVersion: ?string} */
+    public function together(): array
+    {
+        return $this->together;
+    }
+
+    public function registerSoloXp(int $amount, ?string $sport): void
+    {
+        $this->normalizedSport = $sport;
+        $this->together['soloXp'] = $amount;
+        $this->together['totalXp'] = $amount;
+    }
+
+    /** @param array<string, mixed> $proof */
+    public function markTogether(string $status, int $count, string $version, array $proof = []): void
+    {
+        if ($count < $this->together['playerCount']) {
+            return;
+        }
+        $this->together['status'] = $status;
+        $this->together['playerCount'] = max($this->together['playerCount'], $count);
+        $this->together['multiplier'] = $this->together['playerCount'];
+        $this->together['bonusXp'] = $this->together['soloXp'] * ($this->together['multiplier'] - 1);
+        $this->together['totalXp'] = $this->together['soloXp'] + $this->together['bonusXp'];
+        $this->together['rulesetVersion'] = $version;
+        if ([] !== $proof) {
+            $this->togetherProof = $proof;
+        }
     }
 
     /**
