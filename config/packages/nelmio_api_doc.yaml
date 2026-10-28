@@ -547,6 +547,44 @@ when@dev:
                                   role: { type: string, enum: [FOUNDER, MEMBER] }
                                   joinedAt: { type: string, format: date-time }
 
+                    GuildWeeklyLeaderboard:
+                        type: object
+                        required: [guildId, weekStartsAt, weekEndsAt, timezone, totalWorkouts, activeMemberCount, entries]
+                        description: |
+                            Classement des membres actuels par nombre de séances validées, jamais par XP.
+                            Le crédit enregistré à l'import fait foi : un plafond donnant zéro XP ne retire
+                            pas la séance ; marche, imports hors fenêtre et sources invalidées sont exclus.
+                            Seules les séances terminées depuis l'adhésion actuelle comptent. Aucun gain associé.
+                        properties:
+                            guildId: { type: string, format: uuid }
+                            weekStartsAt:
+                                type: string
+                                format: date-time
+                                description: Lundi 00:00 Europe/Paris, borne incluse sur endedAt.
+                            weekEndsAt:
+                                type: string
+                                format: date-time
+                                description: Lundi suivant 00:00 Europe/Paris, borne exclue sur endedAt. L'offset peut changer en cours de semaine.
+                            timezone: { type: string, enum: [Europe/Paris] }
+                            totalWorkouts: { type: integer, minimum: 0, description: Somme des workoutCount. }
+                            activeMemberCount: { type: integer, minimum: 0, description: Nombre de membres ayant au moins une séance. }
+                            entries:
+                                type: array
+                                description: Nombre de séances décroissant ; entre égaux, adhésion croissante puis UUID joueur. Tous les membres sont présents, sans pagination.
+                                items: { $ref: '#/components/schemas/GuildWeeklyLeaderboardEntry' }
+
+                    GuildWeeklyLeaderboardEntry:
+                        type: object
+                        required: [member, workoutCount, rank]
+                        properties:
+                            member: { $ref: '#/components/schemas/GuildMember' }
+                            workoutCount: { type: integer, minimum: 0 }
+                            rank:
+                                type: integer
+                                minimum: 1
+                                nullable: true
+                                description: Rang de compétition (1, 1, 3). Null à zéro séance ; aucun vainqueur si la semaine est vide.
+
                     GuildDetail:
                         description: |
                             La guilde et ses membres d'un bloc — **c'est l'écran**. L'onglet ne s'ouvre
