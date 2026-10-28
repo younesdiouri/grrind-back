@@ -22,6 +22,8 @@ services:
 
     App\Shared\Application\AlamContributions: '@App\Progression\Infrastructure\AlamWeeklyContributions'
     App\Shared\Application\AlamEfforts: '@App\Training\Infrastructure\AlamWorkoutEfforts'
+    App\Shared\Application\WorkoutCounts: '@App\Training\Infrastructure\CreditedWorkoutCounts'
+    App\Shared\Application\CreditedWorkoutIds: '@App\Progression\Infrastructure\LedgerCreditedWorkoutIds'
     App\Shared\Application\AlamRewards: '@App\Rewards\Infrastructure\Drop\AlamInventoryRewards'
 
     # Le streak (#286) : `Training` fournit les jours sportifs, `Rewards` crédite le coffre,

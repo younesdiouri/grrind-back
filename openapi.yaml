@@ -660,6 +660,26 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  /api/guilds/mine/weekly-leaderboard:
+    get:
+      tags:
+        - Guildes
+      operationId: get_community_guild_weekly_leaderboard
+      responses:
+        '200':
+          description: 'Les membres actuels classés par nombre de séances validées terminées dans la semaine civile Europe/Paris, depuis leur adhésion actuelle. Aucun gain associé.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildWeeklyLeaderboard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "Le joueur n'a pas de guilde (`guild-not-found`)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
   '/api/players/{id}':
     get:
       tags:
@@ -2230,6 +2250,63 @@ components:
               type: string
               format: date-time
           type: object
+    GuildWeeklyLeaderboard:
+      description: "Classement des membres actuels par nombre de séances validées, jamais par XP.\nLe crédit enregistré à l'import fait foi : un plafond donnant zéro XP ne retire\npas la séance ; marche, imports hors fenêtre et sources invalidées sont exclus.\nSeules les séances terminées depuis l'adhésion actuelle comptent. Aucun gain associé.\n"
+      required:
+        - guildId
+        - weekStartsAt
+        - weekEndsAt
+        - timezone
+        - totalWorkouts
+        - activeMemberCount
+        - entries
+      properties:
+        guildId:
+          type: string
+          format: uuid
+        weekStartsAt:
+          description: 'Lundi 00:00 Europe/Paris, borne incluse sur endedAt.'
+          type: string
+          format: date-time
+        weekEndsAt:
+          description: "Lundi suivant 00:00 Europe/Paris, borne exclue sur endedAt. L'offset peut changer en cours de semaine."
+          type: string
+          format: date-time
+        timezone:
+          type: string
+          enum:
+            - Europe/Paris
+        totalWorkouts:
+          description: 'Somme des workoutCount.'
+          type: integer
+          minimum: 0
+        activeMemberCount:
+          description: 'Nombre de membres ayant au moins une séance.'
+          type: integer
+          minimum: 0
+        entries:
+          description: 'Nombre de séances décroissant ; entre égaux, adhésion croissante puis UUID joueur. Tous les membres sont présents, sans pagination.'
+          type: array
+          items:
+            $ref: '#/components/schemas/GuildWeeklyLeaderboardEntry'
+      type: object
+    GuildWeeklyLeaderboardEntry:
+      required:
+        - member
+        - workoutCount
+        - rank
+      properties:
+        member:
+          $ref: '#/components/schemas/GuildMember'
+        workoutCount:
+          type: integer
+          minimum: 0
+        rank:
+          description: 'Rang de compétition (1, 1, 3). Null à zéro séance ; aucun vainqueur si la semaine est vide.'
+          type: integer
+          nullable: true
+          minimum: 1
+      type: object
     GuildDetail:
       description: "La guilde et ses membres d'un bloc — **c'est l'écran**. L'onglet ne s'ouvre\njamais sans les deux, et les séparer coûterait un aller-retour pour un écran\nqui n'a rien à afficher entre-temps.\n"
       allOf:
