@@ -2737,6 +2737,8 @@ components:
           required:
             - role
             - joinedAt
+            - league
+            - headEquipment
           properties:
             role:
               type: string
@@ -2746,6 +2748,14 @@ components:
             joinedAt:
               type: string
               format: date-time
+            league:
+              $ref: '#/components/schemas/LeagueIdentity'
+            headEquipment:
+              description: 'Coiffe réellement portée, jamais le sac ; null si HEAD est vide.'
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/EquipmentReference'
           type: object
     GuildWeeklyLeaderboard:
       description: "Classement des membres actuels par nombre de séances validées, jamais par XP.\nLe crédit enregistré à l'import fait foi : un plafond donnant zéro XP ne retire\npas la séance ; marche, imports hors fenêtre et sources invalidées sont exclus.\nSeules les séances terminées depuis l'adhésion actuelle comptent. Aucun gain associé.\n"
@@ -4862,23 +4872,25 @@ components:
       description: 'Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. weaponType est figé pour les nouveaux combats (null hors WEAPON) ; un ancien snapshot sans ce champ et les mains nues (WEAPON absent) utilisent FIST sans consulter le catalogue courant. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Les images et compatibilités de chaque version viennent du catalogue graphique.'
       type: object
       additionalProperties:
-        required:
-          - key
-          - artworkVersion
-        properties:
-          key:
-            type: string
-            example: TEMPERED_HEADBAND
-          artworkVersion:
-            type: string
-            example: v1
-            nullable: true
-          weaponType:
-            nullable: true
-            allOf:
-              -
-                $ref: '#/components/schemas/WeaponType'
-        type: object
+        $ref: '#/components/schemas/EquipmentReference'
+    EquipmentReference:
+      required:
+        - key
+        - artworkVersion
+      properties:
+        key:
+          type: string
+          example: BANDEAU_ECLAIR
+        artworkVersion:
+          type: string
+          example: v1
+          nullable: true
+        weaponType:
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/WeaponType'
+      type: object
     BattleEnemy:
       description: "L'adversaire : les mêmes champs qu'un `BattleFighter`, plus son identité.\n\n**Le nom arrive traduit**, comme les titres : le client n'a pas de table de\ncorrespondance. `key` reste stable d'une locale à l'autre — c'est l'entrée du\ncatalogue DB publié, pas une donnée d'affichage.\n\n**`key` et `playerId` sont exclusifs, et l'un des deux est toujours nul.**\nUn combat PvE porte `key`, un défi PvP porte `playerId` et un `name` qui est le\n**pseudo du défié au moment du combat** — jamais relu depuis son compte : un\ncombat déjà joué est un fait écrit, et son rejeu ne dépend ni d'un renommage\npostérieur ni de la présence de ce compte. Un joueur n'a ni `imageUrls` ni\n`introduction` : les deux valent `null`, comme pour un ennemi sans présentation\npubliée, et l'animation est la même.\n"
       required:
