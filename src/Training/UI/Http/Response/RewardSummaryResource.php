@@ -46,10 +46,6 @@ use App\Training\Application\SessionCompletion;
  * docblock d'`App\Shared\Domain\Activity\Vitality` pour pourquoi elle peut bouger sans que
  * cette séance lui ait rien crédité.
  *
- * **`loot` se remplit depuis le #226, `coins` l'accompagne, `streak` depuis le #286 ;
- * `unlockableNodes` reste présent et vide** jusqu'aux arbres (Lot 7) : l'ajouter plus tard
- * obligerait le client déjà déployé à traiter un champ qui apparaît.
- *
  * **`streak` vient après `coins`** : le jour sportif, la série avant, la série après, puis
  * le coffre de la semaine s'il tombe — voir {@see SessionStreak}.
  *
@@ -164,7 +160,6 @@ final readonly class RewardSummaryResource
                 'xpIntoLevel' => $this->reward->xpIntoLevel,
                 // `null` signifie le niveau maximum ; zéro voudrait dire « atteint ».
                 'xpToNextLevel' => $this->reward->xpToNextLevel,
-                'skillPointsGranted' => $this->reward->skillPointsGranted,
             ],
             'titlesUnlocked' => array_map(
                 static fn (PlayerTitle $title): array => $title->toArray(),
@@ -177,7 +172,6 @@ final readonly class RewardSummaryResource
             // Entre `loot` et `streak`, jamais ailleurs — voir le docblock de la classe.
             'coins' => self::gauge($this->drop->coinsGained, $this->drop->coinsBefore, $this->drop->coinsAfter),
             'streak' => $this->streak->toArray(),
-            'unlockableNodes' => [],
             // Sous quel équilibrage ces montants ont été accordés. Le client l'affiche dans
             // un rapport de bug ; c'est ce qui rend une capture d'écran exploitable.
             'rulesetVersion' => $this->reward->rulesetVersion,

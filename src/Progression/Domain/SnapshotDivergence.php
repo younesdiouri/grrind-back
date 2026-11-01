@@ -12,9 +12,9 @@ use Symfony\Component\Uid\Uuid;
  * Ce qui sépare un snapshot de ce que le ledger dit qu'il devrait être.
  *
  * **La comparaison porte sur toutes les colonnes, pas seulement sur le total.** Un bug de
- * projection peut très bien laisser `total_xp` juste et `earned_skill_points` faux — c'est
+ * projection peut très bien laisser `total_xp` juste et `level` faux — c'est
  * même le cas le plus vicieux, parce que le joueur voit le bon nombre d'XP et le mauvais
- * nombre de points à dépenser. Ne comparer que le total ferait passer ce bug-là pour une
+ * niveau. Ne comparer que le total ferait passer ce bug-là pour une
  * base saine. Les quatre caractéristiques (#160) rejoignent `$expected`/`$actual` par
  * {@see AttributeGains::toArray()}, qui évite de récrire leurs quatre noms ici : une
  * caractéristique qui recevrait un jour de l'XP au ledger en profiterait de la même façon.
@@ -73,7 +73,6 @@ final readonly class SnapshotDivergence
             'level' => $standing->level,
             'xpIntoLevel' => $standing->xpIntoLevel,
             'xpToNextLevel' => $standing->xpToNextLevel,
-            'earnedSkillPoints' => $standing->earnedSkillPoints,
             ...$ledgerAttributes->toArray(),
             'vitality' => $vitality->of($ledgerAttributes),
         ];
@@ -83,7 +82,6 @@ final readonly class SnapshotDivergence
             'level' => $stored->level(),
             'xpIntoLevel' => $stored->xpIntoLevel(),
             'xpToNextLevel' => $stored->xpToNextLevel(),
-            'earnedSkillPoints' => $stored->earnedSkillPoints(),
             ...$stored->attributes()->toArray(),
             'vitality' => $stored->vitality(),
         ];

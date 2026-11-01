@@ -32,7 +32,6 @@ final class ProgressionSnapshotTest extends TestCase
         self::assertSame(1, $snapshot->level());
         self::assertSame(0, $snapshot->xpIntoLevel());
         self::assertSame(100, $snapshot->xpToNextLevel());
-        self::assertSame(0, $snapshot->earnedSkillPoints());
         self::assertEquals(new AttributeGains(0, 0, 0, 0), $snapshot->attributes());
         // Zéro partout, donc zéro Vitality : c'est l'état normal d'un compte qui vient de
         // s'inscrire, pas le cas que le plancher existe pour protéger (#161).
@@ -62,7 +61,6 @@ final class ProgressionSnapshotTest extends TestCase
         self::assertSame(2, $snapshot->level());
         self::assertSame(120, $snapshot->xpIntoLevel());
         self::assertSame(80, $snapshot->xpToNextLevel());
-        self::assertSame(1, $snapshot->earnedSkillPoints());
         self::assertSame('2026-08-11T12:00:00+00:00', $snapshot->updatedAt()->format(\DATE_ATOM));
     }
 
@@ -119,7 +117,6 @@ final class ProgressionSnapshotTest extends TestCase
         $snapshot = self::untouched();
 
         self::assertSame([2, 3, 4], $snapshot->retotal(600, self::onStrength(600), self::curve(), self::vitality(), self::now()));
-        self::assertSame(4, $snapshot->earnedSkillPoints());
     }
 
     public function testAnnouncesNothingWhenTheLevelDoesNotMove(): void
@@ -141,7 +138,6 @@ final class ProgressionSnapshotTest extends TestCase
         self::assertSame([], $snapshot->retotal(120, self::onStrength(120), self::curve(), self::vitality(), self::now()));
 
         self::assertSame(2, $snapshot->level());
-        self::assertSame(1, $snapshot->earnedSkillPoints());
     }
 
     public function testTheProjectionIsIdempotent(): void
@@ -153,7 +149,6 @@ final class ProgressionSnapshotTest extends TestCase
 
         self::assertSame([], $snapshot->retotal(350, self::onStrength(350), self::curve(), self::vitality(), self::now()));
         self::assertSame(3, $snapshot->level());
-        self::assertSame(2, $snapshot->earnedSkillPoints());
     }
 
     public function testTheTopOfTheCurveHasNoNextLevel(): void

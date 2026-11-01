@@ -39,15 +39,15 @@ final class SnapshotDivergenceTest extends TestCase
     public function testCatchesAColumnThatDriftedWhileTheTotalStayedRight(): void
     {
         // Le cas le plus vicieux, et celui qu'une comparaison du seul total laisserait
-        // passer : le joueur lit la bonne XP et le mauvais nombre de points à dépenser.
+        // passer : le joueur lit la bonne XP et le mauvais niveau.
         $snapshot = self::snapshotAt(400, self::onStrength(400));
-        self::corrupt($snapshot, 'earnedSkillPoints', 99);
+        self::corrupt($snapshot, 'level', 99);
 
         $divergence = self::compare($snapshot, 400, self::onStrength(400));
 
         self::assertNotNull($divergence);
-        self::assertSame(['earnedSkillPoints'], array_keys($divergence->fields));
-        self::assertSame(['stored' => 99, 'expected' => 2], $divergence->fields['earnedSkillPoints']);
+        self::assertSame(['level'], array_keys($divergence->fields));
+        self::assertSame(['stored' => 99, 'expected' => 3], $divergence->fields['level']);
     }
 
     /**
@@ -75,7 +75,7 @@ final class SnapshotDivergenceTest extends TestCase
 
         self::assertNotNull($divergence);
         self::assertSame(
-            ['totalXp', 'level', 'xpIntoLevel', 'earnedSkillPoints', 'strength', 'endurance', 'mobility', 'dexterity', 'vitality'],
+            ['totalXp', 'level', 'xpIntoLevel', 'strength', 'endurance', 'mobility', 'dexterity', 'vitality'],
             array_keys($divergence->fields),
         );
         self::assertSame(['stored' => null, 'expected' => 400], $divergence->fields['totalXp']);
@@ -148,9 +148,9 @@ final class SnapshotDivergenceTest extends TestCase
     private static function curve(): LevelCurve
     {
         return new LevelCurve([
-            ['level' => 1, 'total_xp' => 0, 'skill_points' => 0],
-            ['level' => 2, 'total_xp' => 100, 'skill_points' => 1],
-            ['level' => 3, 'total_xp' => 300, 'skill_points' => 1],
+            ['level' => 1, 'total_xp' => 0],
+            ['level' => 2, 'total_xp' => 100],
+            ['level' => 3, 'total_xp' => 300],
         ]);
     }
 

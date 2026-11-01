@@ -38,7 +38,7 @@ final class RewardSummaryPayloadTest extends TestCase
         $payload = self::summary()->toArray();
 
         self::assertSame(
-            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'streak', 'unlockableNodes', 'rulesetVersion'],
+            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'streak', 'rulesetVersion'],
             array_keys($payload),
             'Un champ déplacé change la mise en scène. Si c\'est voulu, le client doit être prévenu avant.',
         );
@@ -79,7 +79,7 @@ final class RewardSummaryPayloadTest extends TestCase
         // en était, **puis** elle monte. Un client qui lirait `after` en premier ferait
         // repartir de zéro quiconque a franchi plusieurs niveaux d'un coup.
         self::assertSame(
-            ['before', 'xpIntoLevelBefore', 'xpToNextLevelBefore', 'after', 'reached', 'totalXp', 'xpIntoLevel', 'xpToNextLevel', 'skillPointsGranted'],
+            ['before', 'xpIntoLevelBefore', 'xpToNextLevelBefore', 'after', 'reached', 'totalXp', 'xpIntoLevel', 'xpToNextLevel'],
             array_keys($level),
         );
     }
@@ -108,10 +108,14 @@ final class RewardSummaryPayloadTest extends TestCase
         self::assertNotSame($vitality['before'], $vitality['after']);
     }
 
-    /** Les arbres arrivent au Lot 7 : la clé est déjà là, vide, jamais absente. */
-    public function testTheFutureFieldsAreDeclaredEmptyAndNotAbsent(): void
+    /** Aucun arbre de compétences n'est prévu pour la V0 (#334). */
+    public function testTheRewardDoesNotPromiseSkills(): void
     {
-        self::assertSame([], self::summary()->toArray()['unlockableNodes']);
+        $payload = self::summary()->toArray();
+
+        self::assertArrayNotHasKey('unlockableNodes', $payload);
+        self::assertIsArray($payload['level']);
+        self::assertArrayNotHasKey('skillPointsGranted', $payload['level']);
     }
 
     /** Le streak (#286) s'anime dans cet ordre : le jour, la série avant, après, puis le coffre. */
@@ -174,7 +178,6 @@ final class RewardSummaryPayloadTest extends TestCase
             xpIntoLevel: 75,
             xpToNextLevel: 125,
             levelsReached: [2],
-            skillPointsGranted: 1,
             titlesUnlocked: [new PlayerTitle(
                 'premiers-pas',
                 'Premiers pas',

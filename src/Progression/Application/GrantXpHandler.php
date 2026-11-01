@@ -117,7 +117,6 @@ final readonly class GrantXpHandler
                 $attributesBefore,
                 $vitalityBefore,
                 $levelsReached,
-                $snapshot->earnedSkillPoints() - $standingBefore->earnedSkillPoints,
                 // En dernier, et dans la transaction : les conditions se lisent au ledger,
                 // donc la séance qui vient d'être écrite compte pour le titre qu'elle
                 // débloque. Le verrou posé plus haut sérialise l'évaluation avec elle —

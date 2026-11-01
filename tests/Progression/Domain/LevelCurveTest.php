@@ -15,43 +15,41 @@ use PHPUnit\Framework\TestCase;
  * retomber sur ses pieds.
  *
  * La courbe utilisée ici est une fixture à quatre niveaux, délibérément différente de celle
- * qui est livrée : un rééquilibrage doit pouvoir changer `levels.yaml` sans casser une
+ * qui est livrée : un rééquilibrage doit pouvoir changer les seuils sans casser une
  * table de cas qui parle de la mécanique.
  */
 final class LevelCurveTest extends TestCase
 {
     #[DataProvider('totals')]
-    public function testProjectsATotalOntoTheCurve(int $totalXp, int $level, int $into, ?int $toNext, int $skillPoints): void
+    public function testProjectsATotalOntoTheCurve(int $totalXp, int $level, int $into, ?int $toNext): void
     {
         $standing = self::curve()->standingAt($totalXp);
 
         self::assertSame($level, $standing->level);
         self::assertSame($into, $standing->xpIntoLevel);
         self::assertSame($toNext, $standing->xpToNextLevel);
-        self::assertSame($skillPoints, $standing->earnedSkillPoints);
     }
 
     /**
-     * Fixture : 1 → 0 (0 pt), 2 → 100 (1 pt), 3 → 300 (1 pt), 4 → 600 (2 pts).
+     * Fixture : 1 → 0 XP, 2 → 100 XP, 3 → 300 XP, 4 → 600 XP.
      *
-     * @return iterable<string, array{int, int, int, ?int, int}>
+     * @return iterable<string, array{int, int, int, ?int}>
      */
     public static function totals(): iterable
     {
-        yield 'compte neuf' => [0, 1, 0, 100, 0];
-        yield 'en route vers le 2' => [40, 1, 40, 60, 0];
+        yield 'compte neuf' => [0, 1, 0, 100];
+        yield 'en route vers le 2' => [40, 1, 40, 60];
 
         // Le seuil est atteint *à* la valeur, pas au-dessus : 100 XP est le niveau 2, sans
         // quoi le joueur verrait sa barre pleine sans passer de niveau.
-        yield 'pile sur le seuil' => [100, 2, 0, 200, 1];
-        yield 'l\'XP qui manque' => [99, 1, 99, 1, 0];
+        yield 'pile sur le seuil' => [100, 2, 0, 200];
+        yield 'l\'XP qui manque' => [99, 1, 99, 1];
 
-        yield 'au milieu du 2' => [220, 2, 120, 80, 1];
-        yield 'pile sur le 3' => [300, 3, 0, 300, 2];
+        yield 'au milieu du 2' => [220, 2, 120, 80];
+        yield 'pile sur le 3' => [300, 3, 0, 300];
 
-        // Les points sont cumulés jusqu'au niveau atteint, celui-ci inclus.
-        yield 'dernier niveau' => [600, 4, 0, null, 4];
-        yield 'au-delà du dernier' => [10_000, 4, 9400, null, 4];
+        yield 'dernier niveau' => [600, 4, 0, null];
+        yield 'au-delà du dernier' => [10_000, 4, 9400, null];
     }
 
     public function testTheLastLevelHasNoNext(): void
@@ -73,7 +71,6 @@ final class LevelCurveTest extends TestCase
 
         self::assertSame(1, $standing->level);
         self::assertSame(0, $standing->xpIntoLevel);
-        self::assertSame(0, $standing->earnedSkillPoints);
     }
 
     public function testKnowsWhereItStops(): void
@@ -81,8 +78,21 @@ final class LevelCurveTest extends TestCase
         self::assertSame(4, self::curve()->maxLevel());
     }
 
+    public function testHistoricalPublishedLevelsStillProjectTheSameStanding(): void
+    {
+        // Les publications déjà utilisées restent immuables, même après le retrait (#334).
+        $historical = new LevelCurve([
+            ['level' => 1, 'total_xp' => 0, 'skill_points' => 0],
+            ['level' => 2, 'total_xp' => 100, 'skill_points' => 1],
+            ['level' => 3, 'total_xp' => 300, 'skill_points' => 1],
+            ['level' => 4, 'total_xp' => 600, 'skill_points' => 2],
+        ]);
+
+        self::assertEquals(self::curve()->standingAt(400), $historical->standingAt(400));
+    }
+
     /**
-     * @param list<array{level: int, total_xp: int, skill_points: int}> $levels
+     * @param list<array{level: int, total_xp: int}> $levels
      */
     #[DataProvider('unusableCurves')]
     public function testRefusesAnUnusableCurve(array $levels, string $expectedMessage): void
@@ -94,28 +104,28 @@ final class LevelCurveTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{list<array{level: int, total_xp: int, skill_points: int}>, string}>
+     * @return iterable<string, array{list<array{level: int, total_xp: int}>, string}>
      */
     public static function unusableCurves(): iterable
     {
         yield 'courbe vide' => [[], '/sans niveau/'];
 
         yield 'ne commence pas au niveau 1' => [
-            [['level' => 2, 'total_xp' => 0, 'skill_points' => 0]],
+            [['level' => 2, 'total_xp' => 0]],
             '/commencer au niveau 1/',
         ];
 
         // Un socle à 100 XP mettrait tout compte neuf hors de la courbe.
         yield 'le socle coûte de l\'XP' => [
-            [['level' => 1, 'total_xp' => 100, 'skill_points' => 0]],
+            [['level' => 1, 'total_xp' => 100]],
             '/commencer au niveau 1/',
         ];
 
         // Un trou ferait sauter un niveau à tout le monde, en silence.
         yield 'un niveau manquant' => [
             [
-                ['level' => 1, 'total_xp' => 0, 'skill_points' => 0],
-                ['level' => 3, 'total_xp' => 100, 'skill_points' => 1],
+                ['level' => 1, 'total_xp' => 0],
+                ['level' => 3, 'total_xp' => 100],
             ],
             '/sans trou/',
         ];
@@ -124,32 +134,24 @@ final class LevelCurveTest extends TestCase
         // revendiqueraient le même total.
         yield 'un seuil qui redescend' => [
             [
-                ['level' => 1, 'total_xp' => 0, 'skill_points' => 0],
-                ['level' => 2, 'total_xp' => 100, 'skill_points' => 1],
-                ['level' => 3, 'total_xp' => 100, 'skill_points' => 1],
+                ['level' => 1, 'total_xp' => 0],
+                ['level' => 2, 'total_xp' => 100],
+                ['level' => 3, 'total_xp' => 100],
             ],
             '/au-dessus du précédent/',
-        ];
-
-        yield 'un niveau qui retire un point' => [
-            [
-                ['level' => 1, 'total_xp' => 0, 'skill_points' => 0],
-                ['level' => 2, 'total_xp' => 100, 'skill_points' => -1],
-            ],
-            '/retirer de point/',
         ];
     }
 
     /**
-     * @return list<array{level: int, total_xp: int, skill_points: int}>
+     * @return list<array{level: int, total_xp: int}>
      */
     public static function fixture(): array
     {
         return [
-            ['level' => 1, 'total_xp' => 0, 'skill_points' => 0],
-            ['level' => 2, 'total_xp' => 100, 'skill_points' => 1],
-            ['level' => 3, 'total_xp' => 300, 'skill_points' => 1],
-            ['level' => 4, 'total_xp' => 600, 'skill_points' => 2],
+            ['level' => 1, 'total_xp' => 0],
+            ['level' => 2, 'total_xp' => 100],
+            ['level' => 3, 'total_xp' => 300],
+            ['level' => 4, 'total_xp' => 600],
         ];
     }
 

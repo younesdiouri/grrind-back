@@ -17,6 +17,7 @@ namespace App\Shared\Domain\Modifier;
 enum ModifierSource: string
 {
     case Streak = 'STREAK';
+    /** Identifiant historique conservé pour relire les règles ; aucun arbre en V0 (#334). */
     case Skill = 'SKILL';
     case Item = 'ITEM';
     case League = 'LEAGUE';

@@ -19,8 +19,6 @@ final readonly class LevelStanding
         public int $xpIntoLevel,
         /** XP restant à gagner pour le niveau suivant, ou `null` au niveau maximum. */
         public ?int $xpToNextLevel,
-        /** Points de compétence accordés par tous les niveaux atteints, cumulés. */
-        public int $earnedSkillPoints,
     ) {
     }
 

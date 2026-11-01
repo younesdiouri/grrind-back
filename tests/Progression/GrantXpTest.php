@@ -190,7 +190,7 @@ final class GrantXpTest extends ApiTestCase
         self::assertSnapshotMatchesTheCurve($afterReversal->snapshot, $this->ledger->totalOf($player), $this->ledger->attributeTotalsOf($player));
     }
 
-    public function testAnnouncesEveryLevelCrossedAndTheSkillPointsTheyGrant(): void
+    public function testAnnouncesEveryLevelCrossed(): void
     {
         $player = $this->openAccount()->id;
 
@@ -203,7 +203,6 @@ final class GrantXpTest extends ApiTestCase
         // Tous les niveaux, dans l'ordre, du deuxième au dernier — le client les anime un
         // par un, un booléen lui en ferait avaler quarante-huit en silence.
         self::assertSame(range(2, self::curve()->maxLevel()), $granted->levelsReached);
-        self::assertSame($granted->snapshot->earnedSkillPoints(), $granted->skillPointsGranted);
         self::assertNull($granted->snapshot->xpToNextLevel());
     }
 
@@ -318,7 +317,6 @@ final class GrantXpTest extends ApiTestCase
         self::assertSame($standing->level, $snapshot->level());
         self::assertSame($standing->xpIntoLevel, $snapshot->xpIntoLevel());
         self::assertSame($standing->xpToNextLevel, $snapshot->xpToNextLevel());
-        self::assertSame($standing->earnedSkillPoints, $snapshot->earnedSkillPoints());
         // Les quatre caractéristiques (#160) ne sont pas projetées par la courbe : elles se
         // recopient telles quelles du ledger, voir le docblock de `ProgressionSnapshot`.
         self::assertEquals($attributes, $snapshot->attributes());

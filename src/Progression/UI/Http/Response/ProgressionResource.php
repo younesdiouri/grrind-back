@@ -20,12 +20,6 @@ use DateTimeInterface;
  * remplacé par zéro : zéro voudrait dire « atteint », donc une barre pleine sur le point de
  * basculer, ce qui n'arrivera jamais.
  *
- * **Les points de compétence sont deux nombres**, alors qu'ils valent la même chose
- * aujourd'hui. `earned` est un cumul de carrière qui ne redescend pas, `available` est un
- * solde que les arbres (#32) feront baisser. Les fondre en un seul champ maintenant
- * obligerait à le renommer — donc à casser le client — le jour où le premier point se
- * dépense.
- *
  * `rulesetVersion` dit sous quel équilibrage cet état a été projeté. Le client n'en fait
  * rien aujourd'hui ; un rapport de bug, si.
  *
@@ -57,8 +51,6 @@ final readonly class ProgressionResource
         public int $totalXp,
         public int $xpIntoLevel,
         public ?int $xpToNextLevel,
-        public int $earnedSkillPoints,
-        public int $availableSkillPoints,
         public AttributeGains $attributes,
         public int $vitality,
         public VitalityBreakdown $vitalityBreakdown,
@@ -84,8 +76,6 @@ final readonly class ProgressionResource
             $state->totalXp,
             $state->standing->xpIntoLevel,
             $state->standing->xpToNextLevel,
-            $state->standing->earnedSkillPoints,
-            $state->availableSkillPoints,
             $state->attributes,
             $state->vitality,
             $state->vitalityBreakdown,
@@ -109,10 +99,6 @@ final readonly class ProgressionResource
             'totalXp' => $this->totalXp,
             'xpIntoLevel' => $this->xpIntoLevel,
             'xpToNextLevel' => $this->xpToNextLevel,
-            'skillPoints' => [
-                'earned' => $this->earnedSkillPoints,
-                'available' => $this->availableSkillPoints,
-            ],
             // L'état courant des cinq caractéristiques — voir le docblock de la classe pour
             // pourquoi la forme diffère de celle du `RewardSummary` alors que le vocabulaire
             // ne bouge pas.

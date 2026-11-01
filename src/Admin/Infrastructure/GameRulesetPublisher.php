@@ -282,7 +282,7 @@ final readonly class GameRulesetPublisher
             throw new LogicException('La fenêtre de Vitality doit couvrir au moins une journée.');
         }
         new Vitality($attributes['vitality']['floor_permille'], $attributes['vitality']['target_active_kcal'], $attributes['vitality']['bonus_cap_permille']);
-        /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
+        /** @var list<array{level: int, total_xp: int}> $levels */
         $levels = $snapshot['levels'];
         new LevelCurve($levels);
         $activityBySource = ['APPLE_HEALTH' => [], 'HEALTH_CONNECT' => []];
@@ -380,7 +380,7 @@ final readonly class GameRulesetPublisher
             'daily_cap_xp' => $discipline->getDailyCapXp(), 'xp_per_km' => $discipline->getXpPerKm(), 'xp_per_100m_elevation' => $discipline->getXpPer100mElevation(),
             'split' => $discipline->getSplit(), 'translations' => $discipline->getTranslations(),
         ], $disciplines);
-        $levelRows = array_map(static fn (GameLevel $level): array => ['level' => $level->getLevel(), 'total_xp' => $level->getTotalXp(), 'skill_points' => $level->getSkillPoints()], $levels);
+        $levelRows = array_map(static fn (GameLevel $level): array => ['level' => $level->getLevel(), 'total_xp' => $level->getTotalXp()], $levels);
         $activityRows = array_map(static fn (GameActivityType $activityType): array => ['source' => $activityType->getSource()->value, 'provider_type' => $activityType->getProviderType(), 'normalized_sport' => $activityType->getNormalizedSport(), 'discipline' => $activityType->getDiscipline()->value, 'active' => $activityType->isActive()], $activityTypes);
         usort($activityRows, static fn (array $left, array $right): int => [$left['source'], $left['provider_type']] <=> [$right['source'], $right['provider_type']]);
 

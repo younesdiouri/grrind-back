@@ -24,9 +24,6 @@ class GameLevel
     #[ORM\Column(name: 'total_xp')]
     private int $totalXp = 0;
 
-    #[ORM\Column(name: 'skill_points')]
-    private int $skillPoints = 0;
-
     public function __construct()
     {
         $this->id = Uuid::v7();
@@ -55,15 +52,5 @@ class GameLevel
     public function setTotalXp(int $totalXp): void
     {
         $this->totalXp = $totalXp;
-    }
-
-    public function getSkillPoints(): int
-    {
-        return $this->skillPoints;
-    }
-
-    public function setSkillPoints(int $skillPoints): void
-    {
-        $this->skillPoints = $skillPoints;
     }
 }

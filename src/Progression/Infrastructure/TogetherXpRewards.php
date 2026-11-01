@@ -77,7 +77,6 @@ final readonly class TogetherXpRewards implements TogetherRewards
                 'previousMultiplier' => $previous, 'multiplier' => $multiplier, 'soloXp' => $credit->amount(), 'bonusXp' => $amount, 'totalBonusXp' => $credit->amount() * ($multiplier - 1), 'workoutTotalXp' => $credit->amount() * $multiplier,
                 'xp' => ['awarded' => $amount, 'breakdown' => [['source' => 'TOGETHER', 'amount' => $amount]]], 'attributes' => $attributes,
                 'level' => ['before' => $before->level, 'xpIntoLevelBefore' => $before->xpIntoLevel, 'xpToNextLevelBefore' => $before->xpToNextLevel, 'after' => $snapshot->level(), 'reached' => $reached, 'totalXp' => $snapshot->totalXp(), 'xpIntoLevel' => $snapshot->xpIntoLevel(), 'xpToNextLevel' => $snapshot->xpToNextLevel()],
-                'skillPointsGranted' => $snapshot->earnedSkillPoints() - $before->earnedSkillPoints,
                 'titlesUnlocked' => array_map(fn ($title): array => $this->translator->describe(\App\Progression\Domain\TitleProgress::completed($title), $now)->toArray(), $titles),
                 'rulesetVersion' => $credit->rulesetVersion(), 'detectionRulesetVersion' => $detectionVersion,
             ]));

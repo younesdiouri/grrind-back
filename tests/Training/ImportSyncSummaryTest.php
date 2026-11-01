@@ -463,7 +463,7 @@ final class ImportSyncSummaryTest extends ApiTestCase
         self::assertIsArray($level);
         self::assertSame($level['before'], $level['after']);
         self::assertSame([], $level['reached']);
-        self::assertSame(0, $level['skillPointsGranted']);
+        self::assertArrayNotHasKey('skillPointsGranted', $level);
 
         $attributes = $reward['attributes'];
         self::assertIsArray($attributes);

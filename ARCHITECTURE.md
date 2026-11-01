@@ -29,7 +29,7 @@ flowchart TB
         direction TB
         identity["<b>Identity</b><br/>comptes · JWT · refresh tokens<br/>profil · fuseau"]
         training["<b>Training</b><br/>workouts · import santé<br/>arbitrage · historique"]
-        progression["<b>Progression</b><br/>ledger XP · niveaux<br/>titres · arbres"]
+        progression["<b>Progression</b><br/>ledger XP · niveaux<br/>titres"]
         rewards["<b>Rewards</b><br/>loot · inventaire<br/><i>pas encore écrit</i>"]
         engagement["<b>Engagement</b><br/>streak · ligues"]
         community["<b>Community</b><br/>guildes · adhésions<br/>invitations"]
@@ -103,19 +103,19 @@ Ce dernier est le seul **en éventail** — plusieurs implémentations, un seul 
 
 ```mermaid
 flowchart LR
-    p["Progression<br/><i>compétences</i>"] -.->|"implémente<br/>ModifierContributor"| tag{{"tag<br/>app.modifier_contributor"}}
-    r["Rewards<br/><i>objets équipés</i>"] -.-> tag
-    e["Engagement<br/><i>streak · ligue</i>"] -.-> tag
+    r["Rewards<br/><i>objets équipés</i>"] -->|"implémente<br/>ModifierContributor"| tag{{"tag<br/>app.modifier_contributor"}}
+    e["Engagement<br/><i>ligue</i>"] --> tag
+    c["Community<br/><i>guilde</i>"] --> tag
     tag -->|"AutowireIterator"| res["<b>ModifierResolver</b><br/><i>agrège, ordonne, ne compose rien</i>"]
     res --> xp["XpCalculator"]
     res -.-> loot["LootRoller"]
 
     classDef todo stroke-dasharray:4 4,opacity:0.5
-    class p,r,e,loot todo
+    class loot todo
 ```
 
-C'est ce qui tient l'invariant **« un seul vocabulaire de modificateurs »** : compétences,
-objets, streak et ligue ne produisent pas chacun leur bonus maison, ils produisent tous un
+C'est ce qui tient l'invariant **« un seul vocabulaire de modificateurs »** :
+objets, ligue et guilde ne produisent pas chacun leur bonus maison, ils produisent tous un
 `Modifier` typé. Ouvrir une source, c'est une classe qui implémente le port — rien à câbler,
 personne à prévenir, aucune branche de plus dans le calcul d'XP.
 
@@ -127,8 +127,7 @@ services. Un ensemble résolu finit dans un breakdown affiché et dans un tirage
 faire dépendre d'un ordre de compilation, c'est accepter que deux calculs identiques laissent
 deux traces différentes.
 
-**Aucune source ne contribue encore** — le streak arrive au Lot 5, les objets au Lot 6, les
-compétences au Lot 7. Le resolver rend donc un ensemble vide, et c'est le branchement qui est
+Les objets équipés, la ligue et les Risālāt contribuent par ce port. Le branchement est
 éprouvé en test : un tag mal orthographié ne casse rien, il rend un ensemble vide, et le
 joueur serait sous-payé sans que personne le voie.
 
@@ -332,9 +331,8 @@ une synchronisation de dix séances aussi simple à animer qu'une seule. `totals
 timeline — « +847 XP · niveau 10 → 15 » — et n'en est jamais la source : il est dérivé de la
 liste, et vaut `null` quand rien n'a été crédité.
 
-`loot` et `coins` se remplissent depuis le #226, `streak` depuis le #286 ; `unlockableNodes`
-reste présent et vide jusqu'au Lot 7 : une clé qui apparaîtrait plus tard obligerait un client déjà
-déployé à la rendre optionnelle pour toujours. `coins` se place entre `loot` et `streak` — le
+`loot` et `coins` se remplissent depuis le #226, `streak` depuis le #286.
+`coins` se place entre `loot` et `streak` — le
 loot se révèle, puis les pièces tombent dedans — et porte le même geste `{gained, before, after}`
 que les jauges de caractéristiques et le palier de niveau, pour la même raison : une bourse qui
 repartirait du solde final ne s'anime pas.
@@ -358,15 +356,13 @@ niveaux à franchir, ce qui est un cas normal (#79).
                     "reason": null },   // non nul, breakdown vide : une marche (#167)
       "level":    { "before": 1, "xpIntoLevelBefore": 0, "xpToNextLevelBefore": 100,
                     "after": 2, "reached": [2],
-                    "totalXp": 145, "xpIntoLevel": 45, "xpToNextLevel": 115,
-                    "skillPointsGranted": 1 },
+                    "totalXp": 145, "xpIntoLevel": 45, "xpToNextLevel": 115 },
       "titlesUnlocked": [ /* PlayerTitle, déjà traduit — rien à recharger */ ],
       "loot": [ /* DroppedItem : clé, nom traduit, rareté, emplacement, modificateurs, prix — vide si rien n'est tombé */ ],
       "coins": { "gained": 12, "before": 40, "after": 52 },   // avant/après lus sur le solde réel, jamais `before + gained`
       "streak": { "sportDay": "2026-08-12", "dayCounted": true,
                   "before": { /* StreakState */ }, "after": { /* StreakState */ },
                   "chests": [ /* DroppedItem : le coffre de la semaine acquise, vide le plus souvent */ ] },
-      "unlockableNodes": [],
       "rulesetVersion": "…"
     }
     // … un par workout crédité, dans l'ordre chronologique
@@ -504,7 +500,6 @@ erDiagram
         uuid user_id PK "la ligne qu'on verrouille"
         int total_xp
         int level "projeté, jamais saisi"
-        int earned_skill_points
     }
     player_title {
         uuid user_id PK
@@ -640,7 +635,7 @@ L'historique affiche la timeline enregistrée sans simulation.
 `POST /api/players/{id}/battles` oppose deux joueurs sans toucher au moteur : `BattleSimulator`
 reçoit deux `Fighter` et ne sait pas d'où ils viennent, donc le défieur prend la place du joueur
 et le défié celle de l'ennemi. Les deux combattants passent par `FighterFactory::forPlayer()` —
-équipement, compétences, Vitality, modificateurs — et le défié n'a rien à faire : son combattant
+équipement, Vitality, modificateurs — et le défié n'a rien à faire : son combattant
 est dérivé de son état à l'instant du défi. La ligne écrite est un `Battle`, distingué par la
 seule colonne `opponent_id` ; le pseudo du défié est snapshoté dans `enemy_snapshot`, jamais relu.
 L'autorisation « co-équipier » traverse la frontière par le port `Shared\Application\Teammates`,
@@ -749,10 +744,9 @@ défaire. Le raisonnement complet est dans le docblock du fichier concerné.
   passerait au travers — c'est le prix, il est assumé.
 - **Les refresh tokens sont faits main** alors qu'un bundle de référence existe : il stocke le
   jeton en clair, ignore la notion de famille et ne détecte pas le rejeu.
-- **Le snapshot stocke les points de compétence *accordés*, pas *disponibles*.** Un solde
-  rendrait le cache irreconstructible, puisque le ledger ignore les dépenses. L'API sert
-  quand même les **deux** nombres, égaux jusqu'au Lot 7 : les fondre obligerait à renommer,
-  donc à casser le client, le jour où le premier point se dépense.
+- **Aucun arbre ni point de compétences en V0 (#334).** La courbe ne projette que les
+  niveaux et leurs paliers d'XP. Les reçus et publications historiques restent immuables ;
+  leur ancienne métadonnée de compétences n'est plus consommée.
 - **`GET /api/progression` sert les colonnes du snapshot telles quelles**, sans les reprojeter
   de son total. Reprojeter masquerait précisément la divergence que la reconstruction (#20)
   existe pour détecter, et ferait de chaque ouverture d'app une réparation silencieuse.

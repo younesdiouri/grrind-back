@@ -129,11 +129,10 @@ final class RebuildProgressionTest extends ApiTestCase
         $sane = $this->snapshotOf($account->id);
 
         // Un total juste et des colonnes projetées fausses : le cas le plus vicieux, celui
-        // où le joueur lit la bonne XP et le mauvais nombre de points à dépenser. La
+        // où le joueur lit la bonne XP et le mauvais niveau. La
         // caractéristique (#160) est du même acabit : une colonne que rien d'autre ne
         // recoupe.
         $this->corrupt($account->id, 'level', 99);
-        $this->corrupt($account->id, 'earned_skill_points', 99);
         $this->corrupt($account->id, 'strength', 4242);
 
         $rebuild = $this->rebuild();

@@ -143,7 +143,6 @@ final readonly class LedgerSessionRewards implements SessionRewards
             $snapshot->xpIntoLevel(),
             $snapshot->xpToNextLevel(),
             $granted->levelsReached,
-            $granted->skillPointsGranted,
             array_map(
                 // Barre pleine et date de la transaction : un titre qui vient d'être
                 // débloqué l'est à l'instant même que `TitleUnlocker` a écrit en base —
@@ -184,7 +183,7 @@ final readonly class LedgerSessionRewards implements SessionRewards
         $snapshot = $this->snapshots->ofPlayer($workout->userId);
 
         $standing = null !== $snapshot
-            ? new LevelStanding($snapshot->level(), $snapshot->xpIntoLevel(), $snapshot->xpToNextLevel(), $snapshot->earnedSkillPoints())
+            ? new LevelStanding($snapshot->level(), $snapshot->xpIntoLevel(), $snapshot->xpToNextLevel())
             : $this->curve->standingAt(0);
 
         $characteristics = $this->snapshots->characteristicsOf($snapshot);
@@ -204,7 +203,6 @@ final readonly class LedgerSessionRewards implements SessionRewards
             xpIntoLevel: $standing->xpIntoLevel,
             xpToNextLevel: $standing->xpToNextLevel,
             levelsReached: [],
-            skillPointsGranted: 0,
             titlesUnlocked: [],
             attributeGains: new AttributeGains(0, 0, 0, 0),
             attributesBefore: $attributes,

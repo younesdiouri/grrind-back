@@ -1805,7 +1805,6 @@ components:
         - xp
         - attributes
         - level
-        - skillPointsGranted
         - titlesUnlocked
         - rulesetVersion
         - detectionRulesetVersion
@@ -1930,9 +1929,6 @@ components:
               type: integer
               nullable: true
           type: object
-        skillPointsGranted:
-          type: integer
-          minimum: 0
         titlesUnlocked:
           type: array
           items:
@@ -4078,7 +4074,7 @@ components:
           nullable: true
       type: object
     RewardSummary:
-      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq\njauges de caractéristiques montent**, le niveau bascule, le titre tombe, le loot\nse révèle, **puis** les pièces tombent dedans. Un champ déplacé change la mise\nen scène.\n\n`attributes` se place entre `xp` et `level`, et nulle part ailleurs : les\ncaractéristiques sont la conséquence directe de l'XP qui vient de tomber, le\nniveau celui du **total** qu'elles composent — il vient donc après la\nrépartition qui l'alimente.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, les titres déjà\ntraduits, et `loot` qui porte de quoi afficher chaque objet sans recharger le\ncatalogue. `attributes` suit la même règle, Vitality comprise.\n\n**`coins` se place entre `loot` et `streak`, jamais ailleurs** — même geste que\nles jauges de caractéristiques et le palier de niveau, `{gained, before, after}`,\net pour la même raison : une bourse qui repartirait du solde final ne s'anime\npas. `before`/`after` sont lus sur le solde réel du joueur, jamais reconstitués\ndepuis `gained`.\n\n**Une séance sans tirage** — non créditée, ou sans table éligible — porte\n`loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime\nla même séquence dans tous les cas.\n\n**`streak` suit `coins` (#286)** : le jour sportif, la série avant, la série\naprès, puis le coffre de la semaine s'il tombe. `unlockableNodes` reste\n**présent et vide** jusqu'au Lot 7.\n"
+      description: "Ce que le joueur reçoit pour **un** workout crédité. Un `SyncSummary` en contient\nautant qu'il y a eu de séances, dans l'ordre chronologique.\n\n**L'ordre des champs est l'ordre de l'animation** : le client le joue de haut en\nbas — la séance se referme, la barre d'XP se remplit ligne à ligne, **les cinq\njauges de caractéristiques montent**, le niveau bascule, le titre tombe, le loot\nse révèle, **puis** les pièces tombent dedans. Un champ déplacé change la mise\nen scène.\n\n`attributes` se place entre `xp` et `level`, et nulle part ailleurs : les\ncaractéristiques sont la conséquence directe de l'XP qui vient de tomber, le\nniveau celui du **total** qu'elles composent — il vient donc après la\nrépartition qui l'alimente.\n\n**Un seul aller-retour.** Rien ici ne demande de recharger quoi que ce soit avant de\njouer l'animation — d'où le palier donné avant *et* après, les titres déjà\ntraduits, et `loot` qui porte de quoi afficher chaque objet sans recharger le\ncatalogue. `attributes` suit la même règle, Vitality comprise.\n\n**`coins` se place entre `loot` et `streak`, jamais ailleurs** — même geste que\nles jauges de caractéristiques et le palier de niveau, `{gained, before, after}`,\net pour la même raison : une bourse qui repartirait du solde final ne s'anime\npas. `before`/`after` sont lus sur le solde réel du joueur, jamais reconstitués\ndepuis `gained`.\n\n**Une séance sans tirage** — non créditée, ou sans table éligible — porte\n`loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime\nla même séquence dans tous les cas.\n\n**`streak` suit `coins` (#286)** : le jour sportif, la série avant, la série\naprès, puis le coffre de la semaine s'il tombe.\n"
       required:
         - session
         - xp
@@ -4088,7 +4084,6 @@ components:
         - loot
         - coins
         - streak
-        - unlockableNodes
         - rulesetVersion
       properties:
         session:
@@ -4157,7 +4152,6 @@ components:
             - totalXp
             - xpIntoLevel
             - xpToNextLevel
-            - skillPointsGranted
           properties:
             before:
               type: integer
@@ -4187,8 +4181,6 @@ components:
               description: "Ce qu'il **reste** à gagner. `null` signifie le niveau maximum ; zéro voudrait dire « atteint »."
               type: integer
               nullable: true
-            skillPointsGranted:
-              type: integer
           type: object
         titlesUnlocked:
           description: "Vide le plus souvent — un titre est un événement rare, c'est ce qui en fait un."
@@ -4245,11 +4237,6 @@ components:
               items:
                 $ref: '#/components/schemas/DroppedItem'
           type: object
-        unlockableNodes:
-          description: "Lot 7 : toujours vide aujourd'hui."
-          type: array
-          items:
-            type: object
         rulesetVersion:
           description: "L'équilibrage sous lequel ces montants ont été accordés. Le client n'en fait rien ; un rapport de bug, si."
           type: string
@@ -4261,7 +4248,6 @@ components:
         - totalXp
         - xpIntoLevel
         - xpToNextLevel
-        - skillPoints
         - attributes
         - vitalityBreakdown
         - activeTitle
@@ -4279,17 +4265,6 @@ components:
           description: '`null` au niveau maximum.'
           type: integer
           nullable: true
-        skillPoints:
-          description: "Deux nombres, alors qu'ils valent la même chose aujourd'hui. `earned` est un\ncumul de carrière qui ne redescend pas, `available` un solde que les arbres\nferont baisser. Les fondre obligerait à renommer — donc à casser le client —\nau premier point dépensé.\n"
-          required:
-            - earned
-            - available
-          properties:
-            earned:
-              type: integer
-            available:
-              type: integer
-          type: object
         attributes:
           description: "Les cinq caractéristiques du personnage, à l'instant présent — même\nvocabulaire que dans `RewardSummary.attributes`, mais sous une forme\ndifférente : pas de `gained` ni d'avant/après ici, cette route ne rend\nqu'un instant. C'est cet état qui doit rester affiché après une\nsynchronisation, pas seulement le temps de l'animation.\n"
           required:

@@ -53,7 +53,7 @@ final class SyncSummaryPayloadTest extends TestCase
         self::assertIsArray($payload['imported']);
         self::assertIsArray($payload['imported'][0]);
         self::assertSame(
-            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'streak', 'unlockableNodes', 'rulesetVersion'],
+            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'streak', 'rulesetVersion'],
             array_keys($payload['imported'][0]),
         );
     }
@@ -169,7 +169,6 @@ final class SyncSummaryPayloadTest extends TestCase
                 xpIntoLevel: 0,
                 xpToNextLevel: 100,
                 levelsReached: [],
-                skillPointsGranted: 0,
                 titlesUnlocked: [],
                 attributeGains: new AttributeGains($awarded, 0, 0, 0),
                 attributesBefore: new AttributeGains($totalXpBefore, 0, 0, 0),
