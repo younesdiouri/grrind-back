@@ -84,8 +84,8 @@ final class BattleEquipmentTest extends ApiTestCase
         $player = $this->openAccount();
         $opponent = $this->openAccount('unity-opponent@grrind.app', 'Carla');
         $outfits = [
-            ['WEAPON' => 'GOLDEN_BOXING_GLOVES', 'LEGS' => 'LES_GUINZZ_PURPLE', 'CHEST' => 'SPORT_TSHIRT_SLATE'],
-            ['WEAPON' => 'LE_POIDS_LOURD', 'LEGS' => 'LES_GUINZZ_CYAN', 'CHEST' => 'SPORT_TSHIRT_CORAL'],
+            ['WEAPON' => 'GOLDEN_BOXING_GLOVES', 'LEGS' => 'LES_GUINZZ_PURPLE', 'CHEST' => 'SPORT_TSHIRT_SLATE', 'HEAD' => 'MOUMOUTIVATION'],
+            ['WEAPON' => 'LE_POIDS_LOURD', 'LEGS' => 'LES_GUINZZ_CYAN', 'CHEST' => 'SPORT_TSHIRT_CORAL', 'HEAD' => 'MOUMOUTIVATION'],
         ];
         foreach ([$player, $opponent] as $index => $account) {
             foreach ($outfits[$index] as $slot => $key) {
@@ -126,6 +126,8 @@ final class BattleEquipmentTest extends ApiTestCase
         }
         $this->grant($opponent, 'LES_GUINZZ_CORAL');
         $this->equip($opponent, 'LES_GUINZZ_CORAL', 'LEGS');
+        $this->grant($opponent, 'BANDEAU_ECLAIR');
+        $this->equip($opponent, 'BANDEAU_ECLAIR', 'HEAD');
         foreach ([$pve, $duel] as $battle) {
             self::assertIsString($battle['id']);
             self::assertEquals($battle, self::decode($this->get('/api/battles/'.$battle['id'], $player->headers)));

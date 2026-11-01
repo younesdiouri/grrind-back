@@ -157,6 +157,52 @@ final class UnityEquipmentTest extends ApiTestCase
         self::assertSame($before, $inventory['statistics'], 'Cosmétique pur : aucune statistique ne bouge.');
     }
 
+    public function testMoumoutivationCostsTenCoinsAndAddsTwoCriticalChancePointsOnlyWhileWorn(): void
+    {
+        $player = $this->openAccount();
+        self::getContainer()->get(CoinLedger::class)->credit($player->id, CoinReason::WorkoutDrop, Uuid::v7(), 11, new DateTimeImmutable());
+        $shop = self::decode($this->get('/api/shop', $player->headers));
+        self::assertIsArray($shop['items']);
+        $items = array_column($shop['items'], null, 'key');
+        self::assertIsArray($items['MOUMOUTIVATION'] ?? null, json_encode($shop, \JSON_THROW_ON_ERROR));
+        $hat = $items['MOUMOUTIVATION'];
+        self::assertSame(['HEAD', 'COMMON', 10, 1, [['type' => 'CRITICAL_CHANCE_BONUS', 'value' => 20, 'discipline' => null]]], [$hat['slot'], $hat['rarity'], $hat['priceCoins'], $hat['minimumLevel'], $hat['modifiers']]);
+        $before = $this->inventory($player)['statistics'];
+        self::assertIsArray($before);
+        self::assertIsArray($before['fighter']);
+        self::assertIsInt($before['fighter']['criticalChancePercent']);
+        self::assertSame(422, $this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'MOUMOUTIVATION'], $player->headers)->getStatusCode());
+        $headers = $player->headers + ['Idempotency-Key' => 'buy-moumoutivation'];
+        $purchase = $this->post('/api/shop/purchases', ['itemKey' => 'MOUMOUTIVATION'], $headers);
+        self::assertSame(201, $purchase->getStatusCode(), (string) $purchase->getContent());
+        self::assertSame(1, self::decode($purchase)['coinsAfter']);
+        self::assertSame($purchase->getContent(), $this->post('/api/shop/purchases', ['itemKey' => 'MOUMOUTIVATION'], $headers)->getContent());
+        self::assertSame(422, $this->send('PUT', '/api/inventory/equipment/WEAPON', ['itemKey' => 'MOUMOUTIVATION'], $player->headers)->getStatusCode());
+        $worn = self::decode($this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'MOUMOUTIVATION'], $player->headers));
+        self::assertResponseIsSuccessful();
+        $expected = $before;
+        $expected['fighter']['criticalChancePercent'] += 2;
+        self::assertSame($expected, $worn['statistics']);
+        self::assertIsArray($worn['equipment']);
+        self::assertIsArray($worn['equipment']['HEAD']);
+        self::assertSame('MOUMOUTIVATION', $worn['equipment']['HEAD']['key']);
+        self::assertSame(5, $worn['equipment']['HEAD']['sellPriceCoins']);
+        self::assertIsString($worn['equipment']['HEAD']['imageUrl']);
+        $imagePath = parse_url($worn['equipment']['HEAD']['imageUrl'], \PHP_URL_PATH);
+        self::assertIsString($imagePath);
+        $this->get($imagePath);
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'image/png');
+        $profile = self::decode($this->get('/api/players/'.$player->id->toRfc4122(), $player->headers));
+        self::assertSame($expected, $profile['statistics']);
+        self::assertSame(201, $this->post('/api/shop/purchases', ['itemKey' => 'BANDEAU_ECLAIR'], $player->headers + ['Idempotency-Key' => 'replace-hat'])->getStatusCode());
+        $replacement = self::decode($this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'BANDEAU_ECLAIR'], $player->headers));
+        self::assertSame($before, $replacement['statistics']);
+        $this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'MOUMOUTIVATION'], $player->headers);
+        $removed = self::decode($this->send('DELETE', '/api/inventory/equipment/HEAD', null, $player->headers));
+        self::assertSame($before, $removed['statistics']);
+    }
+
     /** @return array<mixed> */
     private function inventory(Account $player): array
     {

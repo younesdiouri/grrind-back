@@ -1,0 +1,21 @@
+{
+  "createdOn": "2026-11-01",
+  "items": [
+    "MOUMOUTIVATION"
+  ],
+  "sourceRepository": "younesdiouri/grrind-app",
+  "sources": [
+    "spikes/art-source/moumoutivation/source.glb",
+    "spikes/art-source/moumoutivation/build/02_catalog_icon.py"
+  ],
+  "pipeline": [
+    "Approved ImageGen concept",
+    "Meshy 7.1, 35 credits (task 01a197d3-445d-77be-84fc-3b9fd1b0243e)",
+    "Blender 4.5.14 Cycles render, 512 x 512 transparent"
+  ],
+  "usage": "Meshy subscription terms of the existing account",
+  "triangles": {
+    "MOUMOUTIVATION": 2094
+  },
+  "icon": "f8234b98578246cd240f51ee5ec41b0c1f775413.png"
+}

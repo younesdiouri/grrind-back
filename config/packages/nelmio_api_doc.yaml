@@ -1839,7 +1839,7 @@ when@dev:
                             compatibleBodies: { type: array, items: { type: string, enum: [male, female] } }
                     AvatarCatalog:
                         type: object
-                        description: "Catalogue cosmétique versionné. Les coiffes sont des équipements HEAD, séparés des coiffures ; headwear liste les clés rendues par Unity sur toutes les coiffures (BANDEAU_ECLAIR, #325)."
+                        description: "Catalogue cosmétique versionné. Les coiffes sont des équipements HEAD, séparés des coiffures ; headwear liste les clés rendues par Unity (BANDEAU_ECLAIR, MOUMOUTIVATION). La Moumoutivation masque les cheveux sans modifier l'avatar sauvegardé."
                         required: [version, default, options, headwear]
                         properties:
                             version: { type: integer, enum: [1] }

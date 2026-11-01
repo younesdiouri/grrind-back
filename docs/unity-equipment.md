@@ -41,8 +41,8 @@ le défaut V1 ci-dessus ; un identifiant retiré utilise le défaut de son champ
 féminin conserve ses traits `original`. Aucun fait historique n'est réécrit.
 
 Les vêtements et coiffes restent des équipements serveur. `headwear` décrit le slot `HEAD`
-avec une liste vide : aucune coiffe Unity n'est publiée depuis #315. Le bandeau local
-du prototype n'est pas équipable via l'avatar. La migration ajoute seulement une colonne
+et annonce `BANDEAU_ECLAIR` et `MOUMOUTIVATION`. Ces objets s'obtiennent via l'inventaire,
+pas via les choix gratuits de l'avatar. La migration d'apparence ajoute seulement une colonne
 JSON nullable ; les comptes existants reçoivent le défaut à la lecture. Le ruleset de jeu
 et les statistiques restent indépendants de la personnalisation.
 
@@ -170,3 +170,17 @@ et au ruleset publié comme #319, sans toucher aux brouillons, au loot ni aux po
 L’icône `c56d7812….png` suit le même provisionnement que les autres : la copier sur le volume
 avant la migration. Le catalogue d’avatar l’annonce dans `headwear.options` ; l’app le rend
 sur toutes les coiffures.
+
+## Moumoutivation (#338)
+
+`MOUMOUTIVATION` : HEAD, COMMON, niveau 1, achat **10 pièces**, revente **5 pièces**,
+`CRITICAL_CHANCE_BONUS: 20` (**+2 points de pourcentage**, avec le plafond du moteur).
+Disponible en boutique, hors coffre. La migration `Version20261101170000` ajoute uniquement
+cet objet au brouillon et au publié, incrémente la révision et conserve l'historique.
+Les autres brouillons et les possessions restent intacts ; une relance n'ajoute rien.
+
+L'icône transparente 512 × 512 `f8234b98….png` vient du même modèle Meshy approuvé que
+l'app (2 094 triangles), rendu avec le script de provenance. La provisionner sur le volume
+Fly avant la migration selon les commandes ci-dessus. L'app relie la clé à la coiffe déjà
+embarquée : cheveux et bandeau masqués tant qu'elle est portée, apparence sauvegardée intacte.
+Profils, portraits de guilde et snapshots de combat utilisent cette même référence HEAD.
