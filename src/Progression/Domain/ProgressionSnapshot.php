@@ -189,6 +189,20 @@ class ProgressionSnapshot
         return $this->vitality;
     }
 
+    /** Le cache expire aussi sans séance ni connexion ; la lecture reste sans écriture. */
+    public function characteristicsSince(DateTimeImmutable $start): PlayerCharacteristics
+    {
+        return $this->updatedAt < $start ? PlayerCharacteristics::untouched() : new PlayerCharacteristics($this->attributes(), $this->vitality);
+    }
+
+    /** Sous verrou, avant de capturer le départ d'un nouveau crédit hebdomadaire. */
+    public function expireCharacteristicsBefore(DateTimeImmutable $start): void
+    {
+        if ($this->updatedAt < $start) {
+            $this->strength = $this->endurance = $this->mobility = $this->dexterity = $this->vitality = 0;
+        }
+    }
+
     public function totalXp(): int
     {
         return $this->totalXp;

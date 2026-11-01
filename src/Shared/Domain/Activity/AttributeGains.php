@@ -29,6 +29,11 @@ final readonly class AttributeGains
         return $this->strength + $this->endurance + $this->mobility + $this->dexterity;
     }
 
+    public function differenceFrom(self $before): self
+    {
+        return new self($this->strength - $before->strength, $this->endurance - $before->endurance, $this->mobility - $before->mobility, $this->dexterity - $before->dexterity);
+    }
+
     /**
      * Les quatre totaux nommés, dans l'ordre de {@see Attribute}. Ce qui s'en sert —
      * {@see \App\Progression\Domain\SnapshotDivergence} au premier chef — évite de récrire

@@ -156,7 +156,7 @@ final readonly class LedgerSessionRewards implements SessionRewards
             ),
             // Le détail de cette séance, déjà porté par `XpAward` (#159) — aucun nouveau
             // calcul, juste le même vecteur réexporté vers `Shared`.
-            $granted->award->attributeGains,
+            $snapshot->attributes()->differenceFrom($granted->attributesBefore),
             // Même geste qu'au palier de niveau : `attributesBefore` vient du handler, lu
             // avant `retotal()` ; l'arrivée se relit directement sur le snapshot reprojeté.
             $granted->attributesBefore,
@@ -187,8 +187,9 @@ final readonly class LedgerSessionRewards implements SessionRewards
             ? new LevelStanding($snapshot->level(), $snapshot->xpIntoLevel(), $snapshot->xpToNextLevel(), $snapshot->earnedSkillPoints())
             : $this->curve->standingAt(0);
 
-        $attributes = $snapshot?->attributes() ?? new AttributeGains(0, 0, 0, 0);
-        $vitality = $snapshot?->vitality() ?? 0;
+        $characteristics = $this->snapshots->characteristicsOf($snapshot);
+        $attributes = $characteristics->attributes;
+        $vitality = $characteristics->vitality;
 
         return new SessionReward(
             xpAwarded: 0,

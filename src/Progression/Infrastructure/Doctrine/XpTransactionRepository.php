@@ -10,11 +10,14 @@ use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\PlayerRecord;
 use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Alam\AlamCalendar;
 use App\Shared\Domain\LocalDay;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Psr\Clock\ClockInterface;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
@@ -26,7 +29,7 @@ use Symfony\Component\Uid\Uuid;
  */
 class XpTransactionRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
+    public function __construct(ManagerRegistry $registry, private readonly ClockInterface $clock, private readonly GameRulesets $rules)
     {
         parent::__construct($registry, XpTransaction::class);
     }
@@ -55,19 +58,21 @@ class XpTransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Le total d'un joueur, par caractéristique — même geste que {@see totalOf()}, sur les
-     * quatre colonnes de répartition (#159) plutôt que sur `amount`. La somme des quatre
-     * vaut `totalOf($userId)` par construction : chaque ligne écrite au ledger porte déjà
-     * cet invariant, une simple addition ne peut pas le rompre.
+     * Les caractéristiques ne portent que la semaine sportive courante (#332), tandis que
+     * totalOf() garde toute l'XP. Annulations et suppléments conservent occurredAt du sport.
      */
     public function attributeTotalsOf(Uuid $userId): AttributeGains
     {
+        $week = AlamCalendar::runtime($this->rules)->week($this->clock->now());
         $row = $this->createQueryBuilder('t')
             ->select('COALESCE(SUM(t.strength), 0) AS strength')
             ->addSelect('COALESCE(SUM(t.endurance), 0) AS endurance')
             ->addSelect('COALESCE(SUM(t.mobility), 0) AS mobility')
             ->addSelect('COALESCE(SUM(t.dexterity), 0) AS dexterity')
             ->where('t.userId = :userId')
+            ->andWhere('t.occurredAt >= :start AND t.occurredAt < :end')
+            ->setParameter('start', $week['start'])
+            ->setParameter('end', $week['reset'])
             ->setParameter('userId', $userId, UuidType::NAME)
             ->getQuery()
             ->getSingleResult();

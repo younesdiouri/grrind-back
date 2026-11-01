@@ -14,7 +14,6 @@ use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\UnlockedTitleRepository;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerTimezones;
-use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\LocalDay;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -59,6 +58,7 @@ final readonly class ProgressionStateProvider
     public function of(Uuid $userId): ProgressionState
     {
         $snapshot = $this->snapshots->ofPlayer($userId);
+        $characteristics = $this->snapshots->characteristicsOf($snapshot);
         $standing = self::standingOf($snapshot, $this->curve);
         $unlockedAt = $this->unlockedTitles->unlockedBy($userId);
 
@@ -68,7 +68,7 @@ final readonly class ProgressionStateProvider
         $today = LocalDay::containing($this->clock->now(), $this->timezones->of($userId));
         $endingOn = new DateTimeImmutable($today->date, new DateTimeZone('UTC'));
 
-        $baseVitality = $snapshot?->vitality() ?? 0;
+        $baseVitality = $characteristics->vitality;
         $bonused = $this->vitalityBonus->of([$userId->toRfc4122() => $baseVitality], [$userId], $endingOn)[$userId->toRfc4122()];
 
         return new ProgressionState(
@@ -77,7 +77,7 @@ final readonly class ProgressionStateProvider
             // Le joueur sans ligne n'a rien gagné sur aucune caractéristique — même raison
             // que pour `standingOf()` : c'est l'état neutre d'un compte qui vient de
             // s'inscrire, pas une base manquante.
-            $snapshot?->attributes() ?? new AttributeGains(0, 0, 0, 0),
+            $characteristics->attributes,
             // Vitality est bonifiée depuis #165 — voir le docblock de `ProgressionState`.
             // Sa base, elle, suit toujours la règle du #163 : lue du snapshot, jamais
             // rederivée des quatre caractéristiques ici.

@@ -68,7 +68,8 @@ final readonly class TogetherXpRewards implements TogetherRewards
             $titles = $this->titles->unlock($credit->userId(), $now);
             $attributes = [];
             foreach ($gains->toArray() as $attribute => $gain) {
-                $attributes[$attribute] = ['gained' => $gain, 'before' => $attributesBefore[$attribute], 'after' => $snapshot->attributes()->toArray()[$attribute]];
+                $after = $snapshot->attributes()->toArray()[$attribute];
+                $attributes[$attribute] = ['gained' => $after - $attributesBefore[$attribute], 'before' => $attributesBefore[$attribute], 'after' => $after];
             }
             $attributes['vitality'] = ['before' => $vitalityBefore, 'after' => $snapshot->vitality()];
             $this->em->persist(new TogetherBonusReceipt($id, $credit->userId(), $workoutId, $multiplier, [
