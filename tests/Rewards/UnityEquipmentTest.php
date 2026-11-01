@@ -203,6 +203,56 @@ final class UnityEquipmentTest extends ApiTestCase
         self::assertSame($before, $removed['statistics']);
     }
 
+    public function testCyclopesCostTenCoinsAndAddTwoPrecisionPointsOnlyWhileWornAlongsideHeadwear(): void
+    {
+        $player = $this->openAccount();
+        self::getContainer()->get(CoinLedger::class)->credit($player->id, CoinReason::WorkoutDrop, Uuid::v7(), 21, new DateTimeImmutable());
+        self::assertSame(201, $this->post('/api/shop/purchases', ['itemKey' => 'MOUMOUTIVATION'], $player->headers + ['Idempotency-Key' => 'cyclopes-headwear'])->getStatusCode());
+        self::assertSame(200, $this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'MOUMOUTIVATION'], $player->headers)->getStatusCode());
+        $shop = self::decode($this->get('/api/shop', $player->headers));
+        self::assertIsArray($shop['items']);
+        $items = array_column($shop['items'], null, 'key');
+        self::assertIsArray($items['LES_CYCLOPES'] ?? null, json_encode($shop, \JSON_THROW_ON_ERROR));
+        $glasses = $items['LES_CYCLOPES'];
+        self::assertSame(['ACCESSORY', 'COMMON', 10, 1, [['type' => 'PRECISION_BONUS', 'value' => 20, 'discipline' => null]]], [$glasses['slot'], $glasses['rarity'], $glasses['priceCoins'], $glasses['minimumLevel'], $glasses['modifiers']]);
+        $before = $this->inventory($player)['statistics'];
+        self::assertIsArray($before);
+        self::assertIsArray($before['fighter']);
+        self::assertIsInt($before['fighter']['precisionPercent']);
+        self::assertSame(422, $this->send('PUT', '/api/inventory/equipment/ACCESSORY', ['itemKey' => 'LES_CYCLOPES'], $player->headers)->getStatusCode());
+        $headers = $player->headers + ['Idempotency-Key' => 'buy-cyclopes'];
+        $purchase = $this->post('/api/shop/purchases', ['itemKey' => 'LES_CYCLOPES'], $headers);
+        self::assertSame(201, $purchase->getStatusCode(), (string) $purchase->getContent());
+        self::assertSame(1, self::decode($purchase)['coinsAfter']);
+        self::assertSame($purchase->getContent(), $this->post('/api/shop/purchases', ['itemKey' => 'LES_CYCLOPES'], $headers)->getContent());
+        self::assertSame($before, $this->inventory($player)['statistics']);
+        self::assertSame(422, $this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'LES_CYCLOPES'], $player->headers)->getStatusCode());
+        $worn = self::decode($this->send('PUT', '/api/inventory/equipment/ACCESSORY', ['itemKey' => 'LES_CYCLOPES'], $player->headers));
+        self::assertResponseIsSuccessful();
+        $expected = $before;
+        $expected['fighter']['precisionPercent'] += 2;
+        self::assertSame($expected, $worn['statistics']);
+        self::assertIsArray($worn['equipment']);
+        self::assertIsArray($worn['equipment']['HEAD']);
+        self::assertIsArray($worn['equipment']['ACCESSORY']);
+        self::assertSame('MOUMOUTIVATION', $worn['equipment']['HEAD']['key']);
+        self::assertSame('LES_CYCLOPES', $worn['equipment']['ACCESSORY']['key']);
+        self::assertSame(5, $worn['equipment']['ACCESSORY']['sellPriceCoins']);
+        self::assertIsString($worn['equipment']['ACCESSORY']['imageUrl']);
+        $imagePath = parse_url($worn['equipment']['ACCESSORY']['imageUrl'], \PHP_URL_PATH);
+        self::assertIsString($imagePath);
+        $this->get($imagePath);
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'image/png');
+        $profile = self::decode($this->get('/api/players/'.$player->id->toRfc4122(), $player->headers));
+        self::assertSame($expected, $profile['statistics']);
+        $removed = self::decode($this->send('DELETE', '/api/inventory/equipment/ACCESSORY', null, $player->headers));
+        self::assertSame($before, $removed['statistics']);
+        self::assertIsArray($removed['equipment']);
+        self::assertIsArray($removed['equipment']['HEAD']);
+        self::assertSame('MOUMOUTIVATION', $removed['equipment']['HEAD']['key']);
+    }
+
     /** @return array<mixed> */
     private function inventory(Account $player): array
     {

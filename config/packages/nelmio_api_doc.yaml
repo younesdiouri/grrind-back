@@ -553,13 +553,17 @@ when@dev:
                         allOf:
                             - $ref: '#/components/schemas/Player'
                             - type: object
-                              required: [role, joinedAt, league, headEquipment]
+                              required: [role, joinedAt, league, headEquipment, accessoryEquipment]
                               properties:
                                   role: { type: string, enum: [FOUNDER, MEMBER] }
                                   joinedAt: { type: string, format: date-time }
                                   league: { $ref: '#/components/schemas/LeagueIdentity' }
                                   headEquipment:
                                       description: Coiffe réellement portée, jamais le sac ; null si HEAD est vide.
+                                      nullable: true
+                                      allOf: [{ $ref: '#/components/schemas/EquipmentReference' }]
+                                  accessoryEquipment:
+                                      description: Accessoire réellement porté pour le portrait, jamais le sac ; null si ACCESSORY est vide.
                                       nullable: true
                                       allOf: [{ $ref: '#/components/schemas/EquipmentReference' }]
 

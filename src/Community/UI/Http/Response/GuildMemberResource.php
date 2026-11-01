@@ -21,6 +21,7 @@ final readonly class GuildMemberResource
     /**
      * @param array{tier: string, tierOrder: int, lootLuckPercent: int}              $league
      * @param array{key: string, artworkVersion: ?string, weaponType?: ?string}|null $headEquipment
+     * @param array{key: string, artworkVersion: ?string, weaponType?: ?string}|null $accessoryEquipment
      */
     public function __construct(
         public PlayerResource $player,
@@ -28,6 +29,7 @@ final readonly class GuildMemberResource
         public string $joinedAt,
         public array $league,
         public ?array $headEquipment,
+        public ?array $accessoryEquipment,
     ) {
     }
 
@@ -39,6 +41,7 @@ final readonly class GuildMemberResource
             $member->joinedAt->format(DateTimeInterface::ATOM),
             $member->league,
             $member->headEquipment,
+            $member->accessoryEquipment,
         );
     }
 
@@ -52,6 +55,7 @@ final readonly class GuildMemberResource
             'joinedAt' => $this->joinedAt,
             'league' => $this->league,
             'headEquipment' => $this->headEquipment,
+            'accessoryEquipment' => $this->accessoryEquipment,
         ];
     }
 }

@@ -121,7 +121,10 @@ final class GuildMembersTest extends ApiTestCase
         $items = self::getContainer()->get(InventoryItemRepository::class);
         $items->grant($member->id, 'BANDEAU_ECLAIR', null, new DateTimeImmutable());
         $items->grant($founder->id, 'BANDEAU_ECLAIR', null, new DateTimeImmutable());
+        $items->grant($member->id, 'LES_CYCLOPES', null, new DateTimeImmutable());
+        $items->grant($founder->id, 'LES_CYCLOPES', null, new DateTimeImmutable());
         self::assertSame(200, $this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'BANDEAU_ECLAIR'], $member->headers)->getStatusCode());
+        self::assertSame(200, $this->send('PUT', '/api/inventory/equipment/ACCESSORY', ['itemKey' => 'LES_CYCLOPES'], $member->headers)->getStatusCode());
 
         // Même niveau, ligues différentes : une identité issue de la dernière semaine close.
         $db = self::getContainer()->get(Connection::class);
@@ -134,7 +137,7 @@ final class GuildMembersTest extends ApiTestCase
             $profile = self::decode($this->get('/api/players/'.$player->id, $founder->headers));
             self::assertIsArray($inventory = $profile['inventory']);
             self::assertIsArray($equipment = $inventory['equipment']);
-            $expected[$player->id->toRfc4122()] = ['avatar' => $profile['avatar'], 'league' => $profile['league'], 'head' => $equipment['HEAD']];
+            $expected[$player->id->toRfc4122()] = ['avatar' => $profile['avatar'], 'league' => $profile['league'], 'head' => $equipment['HEAD'], 'accessory' => $equipment['ACCESSORY']];
         }
 
         foreach (['/api/guilds/mine', '/api/guilds/'.$guildId, '/api/guilds/mine/weekly-leaderboard'] as $path) {
@@ -153,6 +156,14 @@ final class GuildMembersTest extends ApiTestCase
                 self::assertIsString($id = $entry['id']);
                 self::assertSame($expected[$id]['avatar'], $entry['avatar']);
                 self::assertSame($expected[$id]['league'], $entry['league']);
+                if (null === $expected[$id]['accessory']) {
+                    self::assertNull($entry['accessoryEquipment'], 'Des lunettes dans le sac ne se portent pas.');
+                } else {
+                    self::assertIsArray($accessory = $entry['accessoryEquipment']);
+                    self::assertIsArray($publicAccessory = $expected[$id]['accessory']);
+                    self::assertSame($publicAccessory['key'], $accessory['key']);
+                    self::assertSame(['key', 'artworkVersion', 'weaponType'], array_keys($accessory));
+                }
                 if (null === $expected[$id]['head']) {
                     self::assertNull($entry['headEquipment'], 'Un bandeau dans le sac ne se porte pas.');
                 } else {
