@@ -14,9 +14,8 @@ use App\Shared\Application\PlayerProgression;
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
 
-/** Attributs bonifiés avant dérivation ; effets directs ajoutés ensuite et plafonnés en dernier.
- * Les paires utilisent floor(sqrt(a*b)), les taux un rendement décroissant.
- * Le resolver commun somme les équipements ; aucune stat brute ne rejoint le simulateur. */
+/** Les PV et dégâts dérivent des caractéristiques hebdomadaires.
+ * Les taux viennent uniquement des objets équipés, puis sont bornés par les plafonds publiés. */
 final readonly class FighterFactory
 {
     /** @param array<string, array{source: string, combination: string, secondary: ?string}> $formulas */

@@ -26,6 +26,25 @@ use Symfony\Component\Uid\Uuid;
 
 final class WeeklyCharacteristicsTest extends ApiTestCase
 {
+    public function testAnOldImportedWorkoutAwardsXpWithoutRefillingCurrentGauges(): void
+    {
+        $account = $this->openAccount();
+        $start = new DateTimeImmutable('-8 days');
+        $response = $this->post('/api/workouts/import', ['workouts' => [['externalId' => 'previous-week', 'activityType' => 'running', 'source' => 'APPLE_HEALTH', 'startedAt' => $start->format('c'), 'endedAt' => $start->modify('+30 minutes')->format('c')]]], $account->headers + ['Idempotency-Key' => 'previous-week']);
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        /** @var array{imported: list<array{xp: array{awarded: int}, attributes: array<string, array<string, int>>}>} $body */
+        $body = self::decode($response);
+        self::assertCount(1, $body['imported']);
+        self::assertGreaterThan(0, $body['imported'][0]['xp']['awarded']);
+        foreach ($body['imported'][0]['attributes'] as $attribute => $gauge) {
+            self::assertSame(0, $gauge['before']);
+            self::assertSame(0, $gauge['after']);
+            if ('vitality' !== $attribute) {
+                self::assertSame(0, $gauge['gained']);
+            }
+        }
+    }
+
     public function testResetExpiresOfflineSnapshotsAndLateCreditsKeepTheirSportingWeek(): void
     {
         $player = $this->openAccount()->id;

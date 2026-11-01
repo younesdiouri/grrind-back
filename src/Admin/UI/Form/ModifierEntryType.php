@@ -18,7 +18,8 @@ final class ModifierEntryType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $types = array_combine(array_map(static fn (ModifierType $type): string => $type->value, ModifierType::cases()), array_map(static fn (ModifierType $type): string => $type->value, ModifierType::cases()));
+        $allowed = array_values(array_filter(ModifierType::cases(), static fn (ModifierType $type): bool => !$type->isBaseCharacteristic()));
+        $types = array_combine(array_map(static fn (ModifierType $type): string => $type->value, $allowed), array_map(static fn (ModifierType $type): string => $type->value, $allowed));
         $disciplines = array_combine(array_map(static fn (Discipline $discipline): string => $discipline->value, Discipline::cases()), array_map(static fn (Discipline $discipline): string => $discipline->value, Discipline::cases()));
         $builder
             ->add('type', ChoiceType::class, ['choices' => $types])

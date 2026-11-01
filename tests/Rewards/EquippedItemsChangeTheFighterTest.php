@@ -26,20 +26,14 @@ use Symfony\Component\Uid\Uuid;
  */
 final class EquippedItemsChangeTheFighterTest extends ApiTestCase
 {
-    /**
-     * `IRON_GAUNTLETS` porte `{ type: STRENGTH_BONUS, value: 350 }` (catalogue DB publié) : sur un
-     * compte neuf (Strength à zéro), la dérivation vaut
-     * `base_damage + intdiv(350 * damage_per_1000_strength, 1000)` — voir le docblock de
-     * `FighterFactory`. Le calcul exact n'est pas recopié ici : c'est le baseline, tiré du
-     * même endpoint sans l'objet, qui sert de référence.
-     */
-    public function testEquippingAStrengthItemIncreasesTheFightersDamage(): void
+    /** Le bonus direct de dégâts traverse l’inventaire jusqu’au combattant HTTP. */
+    public function testEquippingADirectDamageItemIncreasesTheFightersDamage(): void
     {
         $baseline = $this->openAccount('baseline@grrind.app');
         $withoutGear = self::decode($this->fight($baseline, 'sans-objet'));
 
         $geared = $this->openAccount('geared@grrind.app');
-        self::equip($geared->id, 'IRON_GAUNTLETS');
+        self::equip($geared->id, 'LE_POIDS_LOURD');
         $withGear = self::decode($this->fight($geared, 'avec-objet'));
 
         $damageWithoutGear = $withoutGear['player'];
@@ -50,7 +44,7 @@ final class EquippedItemsChangeTheFighterTest extends ApiTestCase
         self::assertGreaterThan(
             $damageWithoutGear['damage'],
             $damageWithGear['damage'],
-            'Un `STRENGTH_BONUS` équipé doit se voir dans les dégâts du combattant.',
+            'Un bonus direct de dégâts équipé doit se voir dans le combattant.',
         );
     }
 

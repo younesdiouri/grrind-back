@@ -53,12 +53,13 @@ final readonly class RebuildSnapshotsHandler
 
         foreach ($this->playersOf($command) as $userId) {
             ++$checked;
+            $now = $this->clock->now();
 
             $divergence = SnapshotDivergence::between(
                 $userId,
                 $this->snapshots->ofPlayer($userId),
                 $this->ledger->totalOf($userId),
-                $this->ledger->attributeTotalsOf($userId),
+                $this->ledger->attributeTotalsOf($userId, $now),
                 $this->curve,
                 $this->vitality,
             );
@@ -96,13 +97,14 @@ final readonly class RebuildSnapshotsHandler
     private function repair(Uuid $userId): void
     {
         $this->entityManager->wrapInTransaction(function () use ($userId): void {
-            $snapshot = $this->snapshots->lockFor($userId, $this->curve, $this->vitality);
+            $now = $this->clock->now();
+            $snapshot = $this->snapshots->lockFor($userId, $this->curve, $this->vitality, $now);
             $snapshot->retotal(
                 $this->ledger->totalOf($userId),
-                $this->ledger->attributeTotalsOf($userId),
+                $this->ledger->attributeTotalsOf($userId, $now),
                 $this->curve,
                 $this->vitality,
-                $this->clock->now(),
+                $now,
             );
             $this->snapshots->commit();
         });

@@ -14,7 +14,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  * L'XP initiale est la somme des attributs, jamais un niveau contradictoire saisi à part.
  * Les bornes sont des limites de calcul du laboratoire, pas des règles de progression.
  *
- * @phpstan-type ProfileInput array{name: string, strength: int, endurance: int, mobility: int, dexterity: int, vitalityOverride: ?int, equipment: list<string>}
+ * @phpstan-type ProfileInput array{name: string, strength: int, endurance: int, mobility: int, dexterity: int, vitalityOverride: ?int, equipment: list<string>, totalXp?: int}
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'game_design_profile')]

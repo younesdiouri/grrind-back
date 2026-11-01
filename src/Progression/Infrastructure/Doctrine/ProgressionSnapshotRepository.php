@@ -23,6 +23,8 @@ use Psr\Clock\ClockInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
+ * Les caractéristiques expirées se lisent à zéro sans écrire pendant un GET (#332).
+ *
  * @extends ServiceEntityRepository<ProgressionSnapshot>
  */
 class ProgressionSnapshotRepository extends ServiceEntityRepository
@@ -123,7 +125,7 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
      *
      * @throws TransactionRequiredException hors transaction : un verrou qui se relâche aussitôt ne verrouille rien
      */
-    public function lockFor(Uuid $userId, LevelCurve $curve, Vitality $vitality): ProgressionSnapshot
+    public function lockFor(Uuid $userId, LevelCurve $curve, Vitality $vitality, ?DateTimeImmutable $at = null): ProgressionSnapshot
     {
         $this->insertIfMissing($userId, $curve, $vitality);
 
@@ -133,7 +135,7 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
         // L'`INSERT` ci-dessus est passé sous le nez de l'unité de travail : si l'entité
         // avait déjà été chargée dans cette requête, elle porterait un état d'avant.
         $this->getEntityManager()->refresh($snapshot);
-        $snapshot->expireCharacteristicsBefore(AlamCalendar::runtime($this->rules)->week($this->clock->now())['start']);
+        $snapshot->expireCharacteristicsBefore(AlamCalendar::runtime($this->rules)->week($at ?? $this->clock->now())['start']);
 
         return $snapshot;
     }

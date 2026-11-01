@@ -69,7 +69,7 @@ final readonly class GrantXpHandler
         $now = $this->clock->now();
 
         return $this->entityManager->wrapInTransaction(function () use ($command, $now): XpGranted {
-            $snapshot = $this->snapshots->lockFor($command->userId, $this->curve, $this->vitality);
+            $snapshot = $this->snapshots->lockFor($command->userId, $this->curve, $this->vitality, $now);
 
             $award = $this->calculator->calculate(
                 $command->discipline,
@@ -103,7 +103,7 @@ final readonly class GrantXpHandler
             $vitalityBefore = $snapshot->vitality();
             $levelsReached = $snapshot->retotal(
                 $this->ledger->totalOf($command->userId),
-                $this->ledger->attributeTotalsOf($command->userId),
+                $this->ledger->attributeTotalsOf($command->userId, $now),
                 $this->curve,
                 $this->vitality,
                 $now,

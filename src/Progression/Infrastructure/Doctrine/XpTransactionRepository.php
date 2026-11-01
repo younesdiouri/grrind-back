@@ -15,6 +15,7 @@ use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Alam\AlamCalendar;
 use App\Shared\Domain\LocalDay;
+use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Clock\ClockInterface;
@@ -61,9 +62,9 @@ class XpTransactionRepository extends ServiceEntityRepository
      * Les caractéristiques ne portent que la semaine sportive courante (#332), tandis que
      * totalOf() garde toute l'XP. Annulations et suppléments conservent occurredAt du sport.
      */
-    public function attributeTotalsOf(Uuid $userId): AttributeGains
+    public function attributeTotalsOf(Uuid $userId, ?DateTimeImmutable $at = null): AttributeGains
     {
-        $week = AlamCalendar::runtime($this->rules)->week($this->clock->now());
+        $week = AlamCalendar::runtime($this->rules)->week($at ?? $this->clock->now());
         $row = $this->createQueryBuilder('t')
             ->select('COALESCE(SUM(t.strength), 0) AS strength')
             ->addSelect('COALESCE(SUM(t.endurance), 0) AS endurance')

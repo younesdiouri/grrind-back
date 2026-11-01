@@ -22,11 +22,12 @@ final class GameDesignProgressionTest extends TestCase
         $snapshot = GameDesignFixture::snapshot();
         $result = new GameDesignProgression()->compare($snapshot, $snapshot, GameDesignFixture::profile(), $program);
         self::assertSame($result['published'], $result['draft']);
-        /** @var list<array{xp: int, state: array{totalXp: int, averageEnergy: int}} > $sessions */
+        /** @var list<array{xp: int, state: array{totalXp: int, averageEnergy: int, attributes: array<string, int>}} > $sessions */
         $sessions = $result['published']['sessions'];
         self::assertSame([60, 30, 10, 60, 30, 10], array_column($sessions, 'xp'));
         self::assertSame(10100, $sessions[2]['state']['totalXp']);
         self::assertSame(100, $sessions[0]['state']['averageEnergy']);
+        self::assertSame(60, array_sum($sessions[3]['state']['attributes']), 'La seconde semaine repart à zéro, malgré les 10 000 XP de départ.');
         /** @var list<array{state: array{averageEnergy: int, vitality: int, totalXp: int}} > $weeks */
         $weeks = $result['published']['weeks'];
         self::assertSame(700, $weeks[0]['state']['averageEnergy']);

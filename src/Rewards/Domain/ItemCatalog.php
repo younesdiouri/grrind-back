@@ -36,15 +36,9 @@ use InvalidArgumentException;
  *
  * ## Une discipline sur un modificateur de combat se refuse au chargement (#29)
  *
- * `FighterFactory` traite les neuf types de combat ouverts au #224 (`STRENGTH_BONUS`,
- * `ENDURANCE_BONUS`, `MOBILITY_BONUS`, `DEXTERITY_BONUS`, `HP_BONUS`, `DAMAGE_BONUS`,
- * `MITIGATION_BONUS`, `COMBO_BONUS`, `DODGE_BONUS`) comme globaux, sans jamais regarder
- * {@see \App\Shared\Domain\Modifier\Modifier::$discipline} — voir son docblock : « un combat
- * n'a lieu dans aucune discipline ». Écrire `{ type: STRENGTH_BONUS, value: 350, discipline:
- * RUNNING }` dans le snapshot publié produirait donc un objet qui s'applique **partout**, alors que
- * la configuration prétend le contraire de ce que le moteur fait. Une config qui ment se refuse au
- * démarrage plutôt que de se documenter : voir {@see self::COMBAT_MODIFIER_TYPES} et le refus
- * dans {@see modifiers()}.
+ * Les modificateurs de combat sont globaux : un combat ne porte aucune discipline.
+ * Le catalogue refuse une discipline sur ces types et refuse désormais tout bonus de
+ * caractéristique de base (#332). La publication ne peut donc pas réintroduire ces effets.
  *
  * ## La boutique lit `shop:`, et deux mensonges de config s'y refusent (#229)
  *
@@ -93,10 +87,6 @@ final class ItemCatalog
      * @var list<ModifierType>
      */
     private const array COMBAT_MODIFIER_TYPES = [
-        ModifierType::StrengthBonus,
-        ModifierType::EnduranceBonus,
-        ModifierType::MobilityBonus,
-        ModifierType::DexterityBonus,
         ModifierType::HpBonus,
         ModifierType::DamageBonus,
         ModifierType::MitigationBonus,
@@ -340,6 +330,10 @@ final class ItemCatalog
             static function (array $modifier) use ($itemKey): ItemModifier {
                 $type = ModifierType::tryFrom($modifier['type'])
                     ?? throw new InvalidArgumentException(\sprintf('"%s" porte un modificateur de type inconnu : "%s".', $itemKey, $modifier['type']));
+
+                if ($type->isBaseCharacteristic()) {
+                    throw new InvalidArgumentException('Un équipement ne peut pas donner de caractéristique de base : '.$type->value);
+                }
 
                 $discipline = isset($modifier['discipline'])
                     ? Discipline::tryFrom($modifier['discipline'])

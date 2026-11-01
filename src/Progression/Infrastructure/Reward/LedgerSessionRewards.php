@@ -154,8 +154,8 @@ final readonly class LedgerSessionRewards implements SessionRewards
                 ),
                 $granted->titlesUnlocked,
             ),
-            // Le détail de cette séance, déjà porté par `XpAward` (#159) — aucun nouveau
-            // calcul, juste le même vecteur réexporté vers `Shared`.
+            // Une ancienne séance peut accorder de l’XP sans faire monter les jauges
+            // courantes : le gain animé est leur delta réel, pas son gain historique (#332).
             $snapshot->attributes()->differenceFrom($granted->attributesBefore),
             // Même geste qu'au palier de niveau : `attributesBefore` vient du handler, lu
             // avant `retotal()` ; l'arrivée se relit directement sur le snapshot reprojeté.

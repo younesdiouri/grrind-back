@@ -53,9 +53,9 @@ final class InventoryRoutesTest extends ApiTestCase
     public function testStatisticsFollowEquipmentMutationsAndMatchTheCombat(): void
     {
         $bob = $this->openAccount();
-        $this->grant($bob->id, 'IRON_GAUNTLETS');
+        $this->grant($bob->id, 'LE_POIDS_LOURD');
         $before = self::decode($this->get('/api/inventory', $bob->headers));
-        $equipped = self::decode($this->send('PUT', '/api/inventory/equipment/WEAPON', ['itemKey' => 'IRON_GAUNTLETS'], $bob->headers));
+        $equipped = self::decode($this->send('PUT', '/api/inventory/equipment/WEAPON', ['itemKey' => 'LE_POIDS_LOURD'], $bob->headers));
         $enemies = self::decode($this->get('/api/enemies', $bob->headers));
         self::assertIsArray($equipped['statistics']);
         self::assertIsArray($equipped['statistics']['attributes']);
@@ -63,7 +63,7 @@ final class InventoryRoutesTest extends ApiTestCase
         self::assertIsArray($before['statistics']);
         self::assertIsArray($before['statistics']['fighter']);
         self::assertSame($enemies['player'], $equipped['statistics']['fighter']);
-        self::assertSame(['base' => 0, 'equipmentBonus' => 350, 'effective' => 350], $equipped['statistics']['attributes']['strength']);
+        self::assertSame(['base' => 0, 'equipmentBonus' => 0, 'effective' => 0], $equipped['statistics']['attributes']['strength']);
         self::assertGreaterThan($before['statistics']['fighter']['damage'], $equipped['statistics']['fighter']['damage']);
         $unequipped = self::decode($this->send('DELETE', '/api/inventory/equipment/WEAPON', null, $bob->headers));
         self::assertSame($before['statistics'], $unequipped['statistics']);

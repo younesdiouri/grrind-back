@@ -122,7 +122,7 @@ final class PlayerProfileTest extends ApiTestCase
         self::assertIsArray($public['statistics']);
         self::assertIsArray($public['statistics']['attributes']);
         self::assertSame(0, $public['attributes']['strength'], 'Les cercles conservent la progression sans équipement.');
-        self::assertSame(['base' => 0, 'equipmentBonus' => 350, 'effective' => 350], $public['statistics']['attributes']['strength']);
+        self::assertSame(['base' => 0, 'equipmentBonus' => 0, 'effective' => 0], $public['statistics']['attributes']['strength']);
     }
 
     public function testAStrangerIsNotVisible(): void

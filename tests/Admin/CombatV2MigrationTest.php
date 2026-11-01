@@ -86,6 +86,8 @@ final class CombatV2MigrationTest extends KernelTestCase
             \assert(\is_array($published['combat']));
             $published['combat']['formulas'] = \App\Tests\Combat\StatFormulaFixture::data();
             $published = \App\Tests\Support\EquipmentCatalogFixture::snapshot($published);
+            require_once \dirname(__DIR__, 2).'/migrations/WeeklyCharacteristicsUpgrade.php';
+            $published = \DoctrineMigrations\WeeklyCharacteristicsUpgrade::snapshot($published);
             new ReflectionMethod(GameRulesetPublisher::class, 'validate')->invoke(null, $published);
         } finally {
             $db->rollBack();

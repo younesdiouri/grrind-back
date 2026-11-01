@@ -143,7 +143,7 @@ final class ItemCatalogTest extends TestCase
 
         new ItemCatalog([
             ['key' => 'IRON_GAUNTLETS', 'rarity' => 'COMMON', 'slot' => 'WEAPON', 'price_coins' => 1, 'modifiers' => [
-                ['type' => 'STRENGTH_BONUS', 'value' => 350, 'discipline' => 'RUNNING'],
+                ['type' => 'CRITICAL_CHANCE_BONUS', 'value' => 350, 'discipline' => 'RUNNING'],
             ]],
         ]);
     }
@@ -152,11 +152,18 @@ final class ItemCatalogTest extends TestCase
      * Le pendant positif : les neuf types de combat restent parfaitement valides tant
      * qu'aucune discipline ne les accompagne — c'est déjà ce que livre le catalogue DB publié.
      */
+    public function testRefuseLesCaracteristiquesDeBaseSurUnObjet(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('caractéristique de base');
+        new ItemCatalog([['key' => 'CLOAK', 'rarity' => 'COMMON', 'slot' => 'CHEST', 'price_coins' => 1, 'modifiers' => [['type' => 'STRENGTH_BONUS', 'value' => 10]]]]);
+    }
+
     public function testAccepteUnModificateurDeCombatSansDiscipline(): void
     {
         $catalog = new ItemCatalog([
             ['key' => 'IRON_GAUNTLETS', 'rarity' => 'COMMON', 'slot' => 'WEAPON', 'price_coins' => 1, 'modifiers' => [
-                ['type' => 'STRENGTH_BONUS', 'value' => 350],
+                ['type' => 'CRITICAL_CHANCE_BONUS', 'value' => 350],
             ]],
         ]);
 

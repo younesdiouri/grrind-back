@@ -47,7 +47,6 @@ final class ItemModifiersTest extends ApiTestCase
         self::assertEquals(
             [
                 new Modifier(ModifierType::XpMultiplier, 5, ModifierSource::Item, Discipline::Running),
-                new Modifier(ModifierType::MobilityBonus, 1000, ModifierSource::Item),
             ],
             $modifiers,
         );
@@ -72,7 +71,7 @@ final class ItemModifiersTest extends ApiTestCase
 
         $modifiers = self::itemModifiers()->modifiersOf($userId, new DateTimeImmutable());
 
-        self::assertCount(4, $modifiers, 'Deux modificateurs par objet, deux objets équipés.');
+        self::assertCount(2, $modifiers, 'Les bonus de caractéristiques ont été retirés des deux objets.');
     }
 
     /**
@@ -92,7 +91,6 @@ final class ItemModifiersTest extends ApiTestCase
         self::assertEquals(
             [
                 new Modifier(ModifierType::XpMultiplier, 18, ModifierSource::Item, Discipline::Running),
-                new Modifier(ModifierType::MobilityBonus, 4200, ModifierSource::Item),
             ],
             $modifiers,
         );
