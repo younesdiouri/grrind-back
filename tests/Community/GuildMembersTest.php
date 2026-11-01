@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Community;
 
+use App\Engagement\Domain\LeagueWeek;
+use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
+use App\Shared\Domain\Avatar;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
+use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\DataCollector\DoctrineDataCollector;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Response;
@@ -106,6 +110,69 @@ final class GuildMembersTest extends ApiTestCase
         self::assertArrayNotHasKey('password', $member);
     }
 
+    public function testGuildPortraitsMatchEachPublicProfileWithoutLoadingTheirBags(): void
+    {
+        $founder = $this->openAccount();
+        $guildId = $this->foundGuild($founder);
+        $member = $this->openAccount('carla@grrind.app', 'Carla');
+        $this->post('/api/guilds/join', ['code' => $this->issueCode($founder, $guildId)], $member->headers);
+        $avatar = array_replace(Avatar::DEFAULT, ['body' => 'female', 'faceStyle' => 'round', 'noseStyle' => 'button', 'hairStyle' => 'ponytail', 'skinTone' => 'deep']);
+        self::assertSame(200, $this->send('PATCH', '/api/me', ['avatar' => $avatar], $member->headers)->getStatusCode());
+        $items = self::getContainer()->get(InventoryItemRepository::class);
+        $items->grant($member->id, 'BANDEAU_ECLAIR', null, new DateTimeImmutable());
+        $items->grant($founder->id, 'BANDEAU_ECLAIR', null, new DateTimeImmutable());
+        self::assertSame(200, $this->send('PUT', '/api/inventory/equipment/HEAD', ['itemKey' => 'BANDEAU_ECLAIR'], $member->headers)->getStatusCode());
+
+        // Même niveau, ligues différentes : une identité issue de la dernière semaine close.
+        $db = self::getContainer()->get(Connection::class);
+        $week = LeagueWeek::containing(new DateTimeImmutable())->startsAt->modify('-1 week');
+        $db->insert('engagement_league_period', ['starts_at' => $week->format('c'), 'ends_at' => $week->modify('+1 week')->format('c'), 'settled_at' => $week->modify('+1 week')->format('c'), 'ruleset_version' => 'portrait-test']);
+        $db->insert('engagement_league_result', ['player_id' => $member->id->toRfc4122(), 'starts_at' => $week->format('c'), 'tier' => 'BRONZE', 'next_tier' => 'SILVER', 'score' => 100, 'rank' => 1, 'participant_count' => 2]);
+
+        $expected = [];
+        foreach ([$founder, $member] as $player) {
+            $profile = self::decode($this->get('/api/players/'.$player->id, $founder->headers));
+            self::assertIsArray($inventory = $profile['inventory']);
+            self::assertIsArray($equipment = $inventory['equipment']);
+            $expected[$player->id->toRfc4122()] = ['avatar' => $profile['avatar'], 'league' => $profile['league'], 'head' => $equipment['HEAD']];
+        }
+
+        foreach (['/api/guilds/mine', '/api/guilds/'.$guildId, '/api/guilds/mine/weekly-leaderboard'] as $path) {
+            $response = $this->get($path, $founder->headers);
+            self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+            $body = self::decode($response);
+            if (str_ends_with($path, 'weekly-leaderboard')) {
+                self::assertIsArray($entries = $body['entries']);
+                $members = array_column($entries, 'member');
+            } else {
+                $members = self::membersOf($response);
+            }
+            self::assertCount(2, $members);
+            foreach ($members as $entry) {
+                self::assertIsArray($entry);
+                self::assertIsString($id = $entry['id']);
+                self::assertSame($expected[$id]['avatar'], $entry['avatar']);
+                self::assertSame($expected[$id]['league'], $entry['league']);
+                if (null === $expected[$id]['head']) {
+                    self::assertNull($entry['headEquipment'], 'Un bandeau dans le sac ne se porte pas.');
+                } else {
+                    self::assertIsArray($head = $entry['headEquipment']);
+                    self::assertIsArray($publicHead = $expected[$id]['head']);
+                    self::assertSame($publicHead['key'], $head['key']);
+                    self::assertArrayHasKey('artworkVersion', $head);
+                    self::assertSame(['key', 'artworkVersion', 'weaponType'], array_keys($head));
+                }
+                foreach (['email', 'timezone', 'roles', 'password', 'inventory', 'items', 'statistics'] as $private) {
+                    self::assertArrayNotHasKey($private, $entry);
+                }
+            }
+        }
+        self::assertIsArray($founderLeague = $expected[$founder->id->toRfc4122()]['league']);
+        self::assertIsArray($memberLeague = $expected[$member->id->toRfc4122()]['league']);
+        self::assertSame('BRONZE', $founderLeague['tier']);
+        self::assertSame('SILVER', $memberLeague['tier']);
+    }
+
     public function testTheFounderComesFirstThenMembersByJoinDate(): void
     {
         $founder = $this->openAccount();
@@ -191,6 +258,8 @@ final class GuildMembersTest extends ApiTestCase
         $founder = $this->openAccount();
         $guildId = $this->foundGuild($founder);
 
+        $db = self::getContainer()->get(Connection::class);
+        $db->insert('rewards_inventory_item', ['id' => Uuid::v7()->toRfc4122(), 'user_id' => $founder->id->toRfc4122(), 'item_key' => 'BANDEAU_ECLAIR', 'quantity' => 1, 'slot' => 'HEAD', 'obtained_at' => new DateTimeImmutable()->format('c')]);
         $small = $this->countQueriesOfGuildPage($founder);
 
         $this->fillUpTo($guildId, 12);
@@ -278,6 +347,8 @@ final class GuildMembersTest extends ApiTestCase
                 'INSERT INTO identity_user (id, email, roles, display_name, timezone, registered_at, disabled_notification_categories) VALUES (?, ?, ?, ?, ?, NOW(), ?)',
                 [$player->toRfc4122(), 'membre'.$seat.'@grrind.app', '[]', 'Membre '.$seat, 'Europe/Paris', '[]'],
             );
+
+            $connection->insert('rewards_inventory_item', ['id' => Uuid::v7()->toRfc4122(), 'user_id' => $player->toRfc4122(), 'item_key' => 'BANDEAU_ECLAIR', 'quantity' => 1, 'slot' => 'HEAD', 'obtained_at' => new DateTimeImmutable()->format('c')]);
 
             $connection->executeStatement(
                 'INSERT INTO community_guild_membership (id, guild_id, player_id, role, joined_at) VALUES (?, ?, ?, ?, NOW())',

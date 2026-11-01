@@ -20,12 +20,18 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class GuildMemberView
 {
+    /**
+     * @param array{tier: string, tierOrder: int, lootLuckPercent: int}              $league
+     * @param array{key: string, artworkVersion: ?string, weaponType?: ?string}|null $headEquipment
+     */
     public function __construct(
         public Uuid $playerId,
         public PlayerProfile $profile,
         public PlayerProgression $progression,
         public GuildRole $role,
         public DateTimeImmutable $joinedAt,
+        public array $league,
+        public ?array $headEquipment,
     ) {
     }
 }

@@ -553,10 +553,15 @@ when@dev:
                         allOf:
                             - $ref: '#/components/schemas/Player'
                             - type: object
-                              required: [role, joinedAt]
+                              required: [role, joinedAt, league, headEquipment]
                               properties:
                                   role: { type: string, enum: [FOUNDER, MEMBER] }
                                   joinedAt: { type: string, format: date-time }
+                                  league: { $ref: '#/components/schemas/LeagueIdentity' }
+                                  headEquipment:
+                                      description: Coiffe réellement portée, jamais le sac ; null si HEAD est vide.
+                                      nullable: true
+                                      allOf: [{ $ref: '#/components/schemas/EquipmentReference' }]
 
                     GuildWeeklyLeaderboard:
                         type: object
@@ -1988,13 +1993,15 @@ when@dev:
                     BattleEquipment:
                         type: object
                         description: "Objets réellement portés au combat, indexés par emplacement (HEAD, FEET…). Clé et version sont figées dans le snapshot des deux joueurs. Un objet dans le sac est absent ; un ancien combat rend {}. Le client ne consulte jamais l’inventaire courant pour un replay. weaponType est figé pour les nouveaux combats (null hors WEAPON) ; un ancien snapshot sans ce champ et les mains nues (WEAPON absent) utilisent FIST sans consulter le catalogue courant. Une artworkVersion nulle signifie qu’aucun calque n’est livré. Les images et compatibilités de chaque version viennent du catalogue graphique."
-                        additionalProperties:
-                            type: object
-                            required: [key, artworkVersion]
-                            properties:
-                                key: { type: string, example: TEMPERED_HEADBAND }
-                                artworkVersion: { type: string, nullable: true, example: v1 }
-                                weaponType: { nullable: true, allOf: [{ $ref: '#/components/schemas/WeaponType' }] }
+                        additionalProperties: { $ref: '#/components/schemas/EquipmentReference' }
+
+                    EquipmentReference:
+                        type: object
+                        required: [key, artworkVersion]
+                        properties:
+                            key: { type: string, example: BANDEAU_ECLAIR }
+                            artworkVersion: { type: string, nullable: true, example: v1 }
+                            weaponType: { nullable: true, allOf: [{ $ref: '#/components/schemas/WeaponType' }] }
 
                     BattleEnemy:
                         type: object

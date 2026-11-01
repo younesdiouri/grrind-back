@@ -18,10 +18,16 @@ use DateTimeInterface;
  */
 final readonly class GuildMemberResource
 {
+    /**
+     * @param array{tier: string, tierOrder: int, lootLuckPercent: int}              $league
+     * @param array{key: string, artworkVersion: ?string, weaponType?: ?string}|null $headEquipment
+     */
     public function __construct(
         public PlayerResource $player,
         public GuildRole $role,
         public string $joinedAt,
+        public array $league,
+        public ?array $headEquipment,
     ) {
     }
 
@@ -31,6 +37,8 @@ final readonly class GuildMemberResource
             PlayerResource::from($member->playerId, $member->profile, $member->progression),
             $member->role,
             $member->joinedAt->format(DateTimeInterface::ATOM),
+            $member->league,
+            $member->headEquipment,
         );
     }
 
@@ -42,6 +50,8 @@ final readonly class GuildMemberResource
         return $this->player->toArray() + [
             'role' => $this->role->value,
             'joinedAt' => $this->joinedAt,
+            'league' => $this->league,
+            'headEquipment' => $this->headEquipment,
         ];
     }
 }
