@@ -734,6 +734,11 @@ entre les deux ; publier avant annonce un fait encore annulable.
 Une ligne chacune, parce qu'elles sont contre-intuitives et que le réflexe naturel est de les
 défaire. Le raisonnement complet est dans le docblock du fichier concerné.
 
+- **Les ligues figent chaque résultat hebdomadaire (#35).** `scheduler_league` verrouille la
+  période, lit les scores sportifs par `LeagueScores`, écrit les résultats et ouvre la suivante
+  au même COMMIT. Le ledger continue d'accepter les imports tardifs ; les promotions ne se
+  recalculent pas. `PlayerLeagues` expose le statut aux profils, et le contributeur `LEAGUE`
+  relit la ligue de la semaine du sport pour son bonus de chance, jamais un bonus d'XP.
 - **Pas de bus de commandes.** Les contrôleurs appellent les handlers directement. Messenger
   sert l'asynchrone, pas à ajouter une indirection synchrone.
 - **Les objets commande restent** malgré l'absence de bus : ils donnent un domicile aux

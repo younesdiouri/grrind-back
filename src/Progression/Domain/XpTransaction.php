@@ -35,6 +35,8 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: XpTransactionRepository::class)]
 #[ORM\Table(name: 'xp_transaction')]
+// Les ligues lisent la semaine de tous les joueurs, sans filtrer d'abord par user.
+#[ORM\Index(name: 'idx_xp_transaction_occurred', columns: ['occurred_at'])]
 // La journée d'un joueur : c'est l'index des garde-fous quotidiens, lus à chaque workout
 // importé, et celui de la reconstruction du snapshot (#20).
 #[ORM\Index(name: 'idx_xp_transaction_user_occurred', columns: ['user_id', 'occurred_at'])]
