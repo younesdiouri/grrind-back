@@ -16,9 +16,11 @@ use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
 use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\Vitality;
+use App\Shared\Domain\Alam\AlamCalendar;
 use App\Shared\Domain\Modifier\Modifier;
 use App\Shared\Domain\Modifier\ModifierSource;
 use App\Shared\Domain\Modifier\ModifierType;
@@ -142,16 +144,18 @@ final class GrantXpTest extends ApiTestCase
     {
         $player = $this->openAccount()->id;
 
-        // Un crédit connu, daté d'avant-hier pour ne peser ni sur les rendements
-        // décroissants ni sur le plafond du jour — même geste que `seedLedger()`.
+        // Garder le crédit dans la semaine projetée, même juste après la bascule du dimanche.
+        // La première complétion sert ici à reprojeter le snapshot, même si son plafond est atteint.
         $gains = new AttributeGains(700, 200, 100, 0);
+        $week = AlamCalendar::runtime(self::getContainer()->get(GameRulesets::class))->week(new DateTimeImmutable());
+        $creditedAt = max(new DateTimeImmutable('-2 days'), $week['start']);
         $credit = XpTransaction::creditFor(
             $player,
             Uuid::v7(),
             Discipline::Running,
             0,
             new XpAward(new XpBreakdown(new XpBreakdownLine(XpBreakdownSource::Base, 1_000)), $gains, 'v1-000000000000'),
-            new DateTimeImmutable('-2 days'),
+            $creditedAt,
         );
         $this->ledger->add($credit);
         $this->ledger->commit();

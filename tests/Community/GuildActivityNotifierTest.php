@@ -8,6 +8,8 @@ use App\Community\Application\AnnounceGuildActivity;
 use App\Community\Application\AnnounceGuildActivityHandler;
 use App\Community\Domain\PendingGuildActivity;
 use App\Community\Infrastructure\Doctrine\PendingGuildActivityRepository;
+use App\Shared\Application\GameRulesets;
+use App\Shared\Domain\Alam\AlamCalendar;
 use App\Shared\Domain\NotificationCategory;
 use App\Shared\Domain\PushRouteType;
 use App\Shared\Infrastructure\Doctrine\NotificationAttemptRepository;
@@ -64,9 +66,9 @@ final class GuildActivityNotifierTest extends ApiTestCase
         [$author, $recipients] = $this->guildOfFour();
 
         $response = $this->import($author, [
-            self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 110),
-            self::freshCandidate(externalId: 'HK-2', endedMinutesAgo: 70),
-            self::freshCandidate(externalId: 'HK-3', endedMinutesAgo: 30),
+            self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 35, durationSeconds: 600),
+            self::freshCandidate(externalId: 'HK-2', endedMinutesAgo: 20, durationSeconds: 600),
+            self::freshCandidate(externalId: 'HK-3', endedMinutesAgo: 5, durationSeconds: 600),
         ]);
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getContent());
 
@@ -220,7 +222,7 @@ final class GuildActivityNotifierTest extends ApiTestCase
 
         // Décalées pour ne pas se chevaucher — Training écarterait sinon la seconde comme
         // le même effort que la première, et le test ne démontrerait plus rien du #133.
-        $this->import($author, [self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 90)]);
+        $this->import($author, [self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 45)]);
         $this->consumeTheOutbox();
         $this->flushPendingAnnouncement($author);
 
@@ -299,7 +301,7 @@ final class GuildActivityNotifierTest extends ApiTestCase
     {
         [$author, $recipients] = $this->guildOfFour();
 
-        $this->import($author, [self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 90)]);
+        $this->import($author, [self::freshCandidate(externalId: 'HK-1', endedMinutesAgo: 45)]);
         $this->consumeTheOutbox();
 
         $windowId = $this->currentWindowId($author);
@@ -429,6 +431,17 @@ final class GuildActivityNotifierTest extends ApiTestCase
         );
     }
 
+    private static function sportTimeBefore(DateTimeImmutable $at, int $seconds, AlamCalendar $calendar): DateTimeImmutable
+    {
+        while ($seconds > 0) {
+            $before = $at->modify(\sprintf('-%d seconds', min(60, $seconds)));
+            $seconds -= $calendar->retainedSeconds($before, $at);
+            $at = $before;
+        }
+
+        return $at;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -437,8 +450,10 @@ final class GuildActivityNotifierTest extends ApiTestCase
         int $endedMinutesAgo = 5,
         int $durationSeconds = 1800,
     ): array {
-        $endedAt = new DateTimeImmutable(\sprintf('-%d minutes', $endedMinutesAgo));
-        $startedAt = $endedAt->modify(\sprintf('-%d seconds', $durationSeconds));
+        // Garder la durée créditée voulue, même pendant la pause sportive du dimanche.
+        $calendar = AlamCalendar::runtime(self::getContainer()->get(GameRulesets::class));
+        $endedAt = self::sportTimeBefore(new DateTimeImmutable(), $endedMinutesAgo * 60, $calendar);
+        $startedAt = self::sportTimeBefore($endedAt, $durationSeconds, $calendar);
 
         return [
             'externalId' => $externalId,
