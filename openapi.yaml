@@ -164,6 +164,64 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/guild/alam/registration:
+    put:
+      tags:
+        - Alam
+      operationId: put_alam_registration
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlamRegistrationRequest'
+      responses:
+        '200':
+          description: 'Inscription personnelle persistante et état courant.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlamCurrent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /api/guild/alam/difficulty:
+    put:
+      tags:
+        - Alam
+      operationId: put_alam_difficulty
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlamDifficultyRequest'
+      responses:
+        '200':
+          description: 'Difficulté choisie par le chef avant le combat.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlamCurrent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /api/guild/alam/runs:
     get:
       tags:
@@ -2098,6 +2156,8 @@ components:
         - events
         - narrationSource
         - serverNow
+        - difficulty
+        - difficultyOptions
       properties:
         id:
           type: string
@@ -2160,6 +2220,18 @@ components:
         serverNow:
           type: string
           format: date-time
+        difficulty:
+          description: 'Null pour les anciennes éditions à trois rencontres.'
+          type: string
+          nullable: true
+          enum:
+            - EASY
+            - INTERMEDIATE
+            - HARD
+        difficultyOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamDifficultyOption'
       type: object
     AlamCurrent:
       required:
@@ -2167,6 +2239,8 @@ components:
         - canLaunchManual
         - pollAfterSeconds
         - current
+        - registered
+        - canChooseDifficulty
       properties:
         serverNow:
           type: string
@@ -2177,6 +2251,57 @@ components:
           type: integer
         current:
           $ref: '#/components/schemas/AlamRun'
+        registered:
+          type: boolean
+        canChooseDifficulty:
+          type: boolean
+      type: object
+    AlamRegistrationRequest:
+      required:
+        - registered
+      properties:
+        registered:
+          type: boolean
+      type: object
+    AlamDifficultyRequest:
+      required:
+        - difficulty
+      properties:
+        difficulty:
+          type: string
+          enum:
+            - EASY
+            - INTERMEDIATE
+            - HARD
+      type: object
+    AlamDifficultyOption:
+      required:
+        - difficulty
+        - label
+        - thresholdPermille
+        - probabilityMillionths
+        - gauges
+      properties:
+        difficulty:
+          type: string
+          enum:
+            - EASY
+            - INTERMEDIATE
+            - HARD
+        label:
+          type: string
+        thresholdPermille:
+          type: integer
+          maximum: 1000
+          minimum: 1
+        probabilityMillionths:
+          type: integer
+          maximum: 1000000
+          minimum: 0
+        gauges:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlamGauge'
       type: object
     AlamPage:
       required:
@@ -2325,6 +2450,8 @@ components:
             - 'https://grrind.app/problems/validation-failed'
             - 'https://grrind.app/problems/recipe-unavailable'
             - 'https://grrind.app/problems/insufficient-crafting-resources'
+            - 'https://grrind.app/problems/alam-difficulty-closed'
+            - 'https://grrind.app/problems/alam-difficulty-forbidden'
             - 'https://grrind.app/problems/alam-manual-disabled'
             - 'https://grrind.app/problems/alam-run-not-found'
             - 'https://grrind.app/problems/internal-error'
@@ -5247,6 +5374,28 @@ components:
           default: 20
           maximum: 50
           minimum: 1
+      type: object
+    AlamRegistrationRequest2:
+      properties:
+        registered:
+          type: boolean
+          nullable: true
+          default: null
+      type: object
+    AlamDifficulty:
+      type: string
+      enum:
+        - EASY
+        - INTERMEDIATE
+        - HARD
+    AlamDifficultyRequest2:
+      properties:
+        difficulty:
+          nullable: true
+          oneOf:
+            -
+              $ref: '#/components/schemas/AlamDifficulty'
+          default: null
       type: object
     AlamHistoryQuery:
       properties:

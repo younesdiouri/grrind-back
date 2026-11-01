@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Community\Domain;
 
+use App\Shared\Domain\Alam\AlamDifficulty;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -23,6 +24,10 @@ class AlamRun
     /** @var array<string, mixed> */ #[ORM\Column(type: Types::JSON)] public array $result = [];
     #[ORM\Column(length: 64)] public private(set) string $seed;
     #[ORM\Column(length: 64, nullable: true)] public ?string $requestKey = null;
+    /** null distingue les éditions historiques à trois rencontres. */
+    #[ORM\Column(length: 16, enumType: AlamDifficulty::class, nullable: true)]
+    public ?AlamDifficulty $difficulty = AlamDifficulty::Easy;
+
     /** @param array<string, mixed> $rules */
     public function __construct(
         #[ORM\Column(type: UuidType::NAME)]

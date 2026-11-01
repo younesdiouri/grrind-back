@@ -6,13 +6,16 @@ namespace App\Community\UI\Http;
 
 use App\Community\Application\AlamRuns;
 use App\Community\Domain\Exception\AlamRunNotFound;
+use App\Community\UI\Http\Request\AlamDifficultyRequest;
 use App\Community\UI\Http\Request\AlamHistoryQuery;
+use App\Community\UI\Http\Request\AlamRegistrationRequest;
 use App\Shared\UI\Http\Cursor;
 use App\Shared\UI\Http\Idempotent;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
@@ -32,6 +35,42 @@ final readonly class AlamController
     public function current(#[CurrentUser] UserInterface $user): JsonResponse
     {
         return new JsonResponse($this->runs->current(Uuid::fromString($user->getUserIdentifier())));
+    }
+
+    #[Route('/api/guild/alam/registration', name: 'alam_registration', methods: ['PUT'], format: 'json')]
+    #[Idempotent]
+    #[OA\Parameter(ref: '#/components/parameters/IdempotencyKey')]
+    #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/AlamRegistrationRequest'))]
+    #[OA\Response(response: 200, description: 'Inscription personnelle persistante et état courant.', content: new OA\JsonContent(ref: '#/components/schemas/AlamCurrent'))]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
+    public function register(#[CurrentUser] UserInterface $user, #[MapRequestPayload] AlamRegistrationRequest $body): JsonResponse
+    {
+        \assert(null !== $body->registered);
+        $player = Uuid::fromString($user->getUserIdentifier());
+        $this->runs->register($player, $body->registered);
+
+        return new JsonResponse($this->runs->current($player));
+    }
+
+    #[Route('/api/guild/alam/difficulty', name: 'alam_difficulty', methods: ['PUT'], format: 'json')]
+    #[Idempotent]
+    #[OA\Parameter(ref: '#/components/parameters/IdempotencyKey')]
+    #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/AlamDifficultyRequest'))]
+    #[OA\Response(response: 200, description: 'Difficulté choisie par le chef avant le combat.', content: new OA\JsonContent(ref: '#/components/schemas/AlamCurrent'))]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
+    #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
+    public function difficulty(#[CurrentUser] UserInterface $user, #[MapRequestPayload] AlamDifficultyRequest $body): JsonResponse
+    {
+        \assert(null !== $body->difficulty);
+        $player = Uuid::fromString($user->getUserIdentifier());
+        $this->runs->chooseDifficulty($player, $body->difficulty);
+
+        return new JsonResponse($this->runs->current($player));
     }
 
     #[Route('/api/guild/alam/runs', name: 'alam_manual', methods: ['POST'])]

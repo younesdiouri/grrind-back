@@ -436,6 +436,16 @@ when@test:
             arguments: ['2026-08-30 20:00:00', 'Europe/Paris']
             public: true
 
+        test.alam.clock:
+            class: Symfony\Component\Clock\MockClock
+            arguments: ['now']
+            public: true
+
+        App\Community\Application\AlamRuns:
+            public: true
+            arguments:
+                $clock: '@test.alam.clock'
+
         # Public pour que les tests appellent la bascule sans attendre le battement horaire
         # du planificateur — même besoin que `AnnounceGuildActivityHandler` plus haut.
         App\Community\Application\RevealRisalatHandler:
