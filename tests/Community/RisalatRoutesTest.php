@@ -221,7 +221,8 @@ final class RisalatRoutesTest extends ApiTestCase
     {
         $members = $this->guildOfThree();
 
-        $this->clock->modify(new DateTimeImmutable('-2 weeks')->format('Y-m-d H:i:sP'));
+        // modify() conserve le fuseau du MockClock : déplacer par durée évite de relire UTC en heure de Paris.
+        $this->clock->modify(\sprintf('%+d seconds', new DateTimeImmutable('-2 weeks')->getTimestamp() - $this->clock->now()->getTimestamp()));
 
         ($this->reveal)(new RevealRisalat());
         $liveSender = $this->chooseInDomain(Discipline::from(self::CHALLENGED));

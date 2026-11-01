@@ -189,7 +189,8 @@ final class RisalaBonusTest extends ApiTestCase
 
         // Deux semaines avant maintenant : la révélation tombera il y a une semaine, et
         // l'expiration dans une semaine. Une date fixe rendrait ce test faux au bout d'un mois.
-        $this->clock->modify(new DateTimeImmutable('-2 weeks')->format('Y-m-d H:i:sP'));
+        // modify() conserve le fuseau du MockClock : déplacer par durée évite de relire UTC en heure de Paris.
+        $this->clock->modify(\sprintf('%+d seconds', new DateTimeImmutable('-2 weeks')->getTimestamp() - $this->clock->now()->getTimestamp()));
 
         ($this->reveal)(new RevealRisalat());
         $this->choose($discipline);

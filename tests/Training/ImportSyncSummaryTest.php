@@ -7,7 +7,10 @@ namespace App\Tests\Training;
 use App\Progression\Application\GrantXp;
 use App\Progression\Application\GrantXpHandler;
 use App\Progression\Domain\ProgressionSnapshot;
+use App\Progression\Domain\XpReason;
+use App\Progression\Domain\XpTransaction;
 use App\Progression\Infrastructure\Doctrine\ProgressionSnapshotRepository;
+use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
 use App\Shared\Domain\Activity\Discipline;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
@@ -258,7 +261,17 @@ final class ImportSyncSummaryTest extends ApiTestCase
         self::assertIsArray($dexterity);
         self::assertIsInt($dexterity['gained']);
 
-        self::assertGreaterThan($xp['awarded'] / 2, $dexterity['gained']);
+        // La répartition du crédit reste historique ; la jauge hebdomadaire peut déjà avoir été remise à zéro.
+        self::assertGreaterThan(0, $xp['awarded']);
+        $session = $reward['session'];
+        self::assertIsArray($session);
+        self::assertIsString($session['id']);
+        $credit = self::getContainer()->get(XpTransactionRepository::class)->recordedFor(Uuid::fromString($session['id']), XpReason::SessionCompleted);
+        self::assertInstanceOf(XpTransaction::class, $credit);
+        self::assertGreaterThan($xp['awarded'] / 2, $credit->attributeGains()->dexterity);
+        self::assertIsInt($dexterity['before']);
+        self::assertIsInt($dexterity['after']);
+        self::assertSame($dexterity['after'] - $dexterity['before'], $dexterity['gained']);
     }
 
     /**
