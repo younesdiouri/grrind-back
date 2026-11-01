@@ -27,7 +27,7 @@ enum ModifierType: string
     /** Absorbe un jour manqué sans rompre la série (#25). */
     case StreakShield = 'STREAK_SHIELD';
 
-    /** Ouvre un type de séance autrement indisponible (#33). */
+    /** Réservation historique, sans déblocage de séance en V0 (#334). */
     case UnlockSessionType = 'UNLOCK_SESSION_TYPE';
 
     /**

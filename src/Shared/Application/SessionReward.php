@@ -69,8 +69,6 @@ final readonly class SessionReward
         /** `null` au niveau maximum — zéro voudrait dire « atteint », donc une barre pleine. */
         public ?int $xpToNextLevel,
         public array $levelsReached,
-        /** Les points de compétence que ces niveaux ont accordés. */
-        public int $skillPointsGranted,
         public array $titlesUnlocked,
         public AttributeGains $attributeGains,
         public AttributeGains $attributesBefore,

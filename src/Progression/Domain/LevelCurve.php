@@ -9,7 +9,7 @@ use App\Shared\Domain\RuntimeRuleset;
 use InvalidArgumentException;
 
 /**
- * La courbe de niveaux, chargée depuis `config/game/v1/levels.yaml`.
+ * La courbe de niveaux du snapshot de règles publié.
  *
  * **Le niveau est une projection du ledger, jamais une donnée.** Cette classe est la
  * fonction qui projette : un total d'XP entre, un `LevelStanding` sort. Rien d'autre dans
@@ -22,14 +22,11 @@ use InvalidArgumentException;
 final class LevelCurve
 {
     use RuntimeRuleset;
-    /** @var list<array{level: int, total_xp: int, skill_points: int}> par niveau croissant */
+    /** @var list<array{level: int, total_xp: int}> par niveau croissant */
     private array $levels;
 
-    /** @var list<int> points de compétence cumulés jusqu'à l'indice, inclus */
-    private array $cumulativeSkillPoints;
-
     /**
-     * @param list<array{level: int, total_xp: int, skill_points: int}> $levels
+     * @param list<array{level: int, total_xp: int}> $levels
      */
     public function __construct(array $levels, ?GameRulesets $rulesets = null)
     {
@@ -42,9 +39,6 @@ final class LevelCurve
             throw new InvalidArgumentException('La courbe doit commencer au niveau 1, à 0 XP.');
         }
 
-        $cumulative = [];
-        $total = 0;
-
         foreach ($levels as $index => $level) {
             // Consécutifs et croissants : un trou dans la numérotation ferait sauter un
             // niveau à tout le monde, et une inversion rendrait la projection ambiguë.
@@ -55,17 +49,9 @@ final class LevelCurve
             if ($index > 0 && $level['total_xp'] <= $levels[$index - 1]['total_xp']) {
                 throw new InvalidArgumentException(\sprintf('Le seuil du niveau %d (%d) n\'est pas au-dessus du précédent (%d).', $level['level'], $level['total_xp'], $levels[$index - 1]['total_xp']));
             }
-
-            if ($level['skill_points'] < 0) {
-                throw new InvalidArgumentException(\sprintf('Le niveau %d ne peut pas retirer de point de compétence.', $level['level']));
-            }
-
-            $total += $level['skill_points'];
-            $cumulative[] = $total;
         }
 
         $this->levels = $levels;
-        $this->cumulativeSkillPoints = $cumulative;
     }
 
     public static function runtime(GameRulesets $rulesets): self
@@ -106,7 +92,6 @@ final class LevelCurve
             $this->levels[$index]['level'],
             $totalXp - $threshold,
             null === $next ? null : $next['total_xp'] - $totalXp,
-            $this->cumulativeSkillPoints[$index],
         );
     }
 
@@ -122,7 +107,7 @@ final class LevelCurve
     /** @param array<string, mixed> $snapshot */
     private static function fromSnapshot(array $snapshot, ?GameRulesets $rulesets = null): self
     {
-        /** @var list<array{level: int, total_xp: int, skill_points: int}> $levels */
+        /** @var list<array{level: int, total_xp: int}> $levels */
         $levels = $snapshot['levels'];
 
         return new self($levels, $rulesets);

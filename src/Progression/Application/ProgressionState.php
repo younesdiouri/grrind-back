@@ -55,7 +55,6 @@ final readonly class ProgressionState
         public AttributeGains $attributes,
         public int $vitality,
         public VitalityBreakdown $vitalityBreakdown,
-        public int $availableSkillPoints,
         public array $unlockedTitles,
         public array $unlockedAt,
         public ?string $activeTitleId,

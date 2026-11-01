@@ -83,10 +83,6 @@ final readonly class ProgressionStateProvider
             // rederivée des quatre caractéristiques ici.
             $bonused->value,
             $bonused->breakdown,
-            // Accordés moins dépensés — et rien ne se dépense avant les arbres de
-            // compétences (#32). Le calcul vit ici plutôt que dans la réponse pour qu'il
-            // n'y ait qu'un endroit à ouvrir au Lot 7.
-            $standing->earnedSkillPoints,
             $this->acquiredBy($unlockedAt),
             $unlockedAt,
             $this->activeTitles->titleIdOf($userId),
@@ -139,7 +135,6 @@ final readonly class ProgressionStateProvider
             $snapshot->level(),
             $snapshot->xpIntoLevel(),
             $snapshot->xpToNextLevel(),
-            $snapshot->earnedSkillPoints(),
         );
     }
 }

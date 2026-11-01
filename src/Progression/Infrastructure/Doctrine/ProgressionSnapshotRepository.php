@@ -82,9 +82,9 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
         }
 
         $start = AlamCalendar::runtime($this->rules)->week($this->clock->now())['start'];
-        /** @var list<array{userId: Uuid, level: int, xpIntoLevel: int, xpToNextLevel: int|null, earnedSkillPoints: int, strength: int, endurance: int, mobility: int, dexterity: int, vitality: int, updatedAt: DateTimeImmutable}> $rows */
+        /** @var list<array{userId: Uuid, level: int, xpIntoLevel: int, xpToNextLevel: int|null, strength: int, endurance: int, mobility: int, dexterity: int, vitality: int, updatedAt: DateTimeImmutable}> $rows */
         $rows = $this->createQueryBuilder('s')
-            ->select('s.userId', 's.level', 's.xpIntoLevel', 's.xpToNextLevel', 's.earnedSkillPoints', 's.strength', 's.endurance', 's.mobility', 's.dexterity', 's.vitality', 's.updatedAt')
+            ->select('s.userId', 's.level', 's.xpIntoLevel', 's.xpToNextLevel', 's.strength', 's.endurance', 's.mobility', 's.dexterity', 's.vitality', 's.updatedAt')
             ->where('s.userId IN (:ids)')
             ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $userIds))
             ->getQuery()
@@ -98,7 +98,6 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
                     $row['level'],
                     $row['xpIntoLevel'],
                     $row['xpToNextLevel'],
-                    $row['earnedSkillPoints'],
                 ),
                 $row['updatedAt'] < $start ? PlayerCharacteristics::untouched() : new PlayerCharacteristics(
                     new AttributeGains($row['strength'], $row['endurance'], $row['mobility'], $row['dexterity']),
@@ -192,8 +191,8 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
 
         $this->getEntityManager()->getConnection()->executeStatement(
             <<<'SQL'
-                INSERT INTO progression_snapshot (user_id, total_xp, strength, endurance, mobility, dexterity, vitality, level, xp_into_level, xp_to_next_level, earned_skill_points, updated_at)
-                VALUES (:userId, :totalXp, :strength, :endurance, :mobility, :dexterity, :vitality, :level, :xpIntoLevel, :xpToNextLevel, :earnedSkillPoints, :updatedAt)
+                INSERT INTO progression_snapshot (user_id, total_xp, strength, endurance, mobility, dexterity, vitality, level, xp_into_level, xp_to_next_level, updated_at)
+                VALUES (:userId, :totalXp, :strength, :endurance, :mobility, :dexterity, :vitality, :level, :xpIntoLevel, :xpToNextLevel, :updatedAt)
                 ON CONFLICT (user_id) DO NOTHING
                 SQL,
             [
@@ -207,7 +206,6 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
                 'level' => $fresh->level(),
                 'xpIntoLevel' => $fresh->xpIntoLevel(),
                 'xpToNextLevel' => $fresh->xpToNextLevel(),
-                'earnedSkillPoints' => $fresh->earnedSkillPoints(),
                 'updatedAt' => $fresh->updatedAt()->format('Y-m-d H:i:sP'),
             ],
             ['xpToNextLevel' => ParameterType::INTEGER],

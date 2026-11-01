@@ -89,15 +89,6 @@ class ProgressionSnapshot
     #[ORM\Column(nullable: true)]
     private ?int $xpToNextLevel;
 
-    /**
-     * Les points **accordés** par les niveaux atteints, pas ceux qui restent à dépenser.
-     * La distinction comptera au Lot 7 : les points dépensés se déduiront de l'arbre du
-     * joueur (#32), et « disponibles » vaudra accordés − dépensés. Stocker le solde ici
-     * rendrait le snapshot irreconstructible, puisque le ledger ne sait rien des dépenses.
-     */
-    #[ORM\Column]
-    private int $earnedSkillPoints;
-
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $updatedAt;
 
@@ -112,7 +103,6 @@ class ProgressionSnapshot
         $this->level = 0;
         $this->xpIntoLevel = 0;
         $this->xpToNextLevel = null;
-        $this->earnedSkillPoints = 0;
         $this->updatedAt = $now;
 
         $this->project($curve, $vitality);
@@ -164,14 +154,14 @@ class ProgressionSnapshot
     /**
      * Où en est le joueur, **d'un seul geste**.
      *
-     * Les quatre champs se lisent aussi un à un, et c'est ce qu'on faisait. Mais qui veut
-     * le point de départ d'une animation les veut *tous les quatre au même instant* : lus
-     * séparément autour d'un {@see retotal}, deux d'entre eux décriraient le palier de
-     * départ et deux celui d'arrivée, sans qu'aucun type ne s'en aperçoive.
+     * Les trois champs se lisent aussi un à un, et c'est ce qu'on faisait. Mais qui veut
+     * le point de départ d'une animation les veut *tous les trois au même instant* : lus
+     * séparément autour d'un {@see retotal}, ils pourraient mélanger le palier de départ
+     * et celui d'arrivée, sans qu'aucun type ne s'en aperçoive.
      */
     public function standing(): LevelStanding
     {
-        return new LevelStanding($this->level, $this->xpIntoLevel, $this->xpToNextLevel, $this->earnedSkillPoints);
+        return new LevelStanding($this->level, $this->xpIntoLevel, $this->xpToNextLevel);
     }
 
     /**
@@ -223,11 +213,6 @@ class ProgressionSnapshot
         return $this->xpToNextLevel;
     }
 
-    public function earnedSkillPoints(): int
-    {
-        return $this->earnedSkillPoints;
-    }
-
     public function updatedAt(): DateTimeImmutable
     {
         return $this->updatedAt;
@@ -245,7 +230,6 @@ class ProgressionSnapshot
         $this->level = $standing->level;
         $this->xpIntoLevel = $standing->xpIntoLevel;
         $this->xpToNextLevel = $standing->xpToNextLevel;
-        $this->earnedSkillPoints = $standing->earnedSkillPoints;
         $this->vitality = $vitality->of($this->attributes());
     }
 }

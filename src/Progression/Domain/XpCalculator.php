@@ -42,8 +42,8 @@ use App\Shared\Domain\Modifier\ModifierType;
  * 3. **Le rééquilibrage est local.** Changer un bonus ne déplace pas les autres.
  *
  * **Pas de plafond global**, donc, et c'est la réponse à la question ouverte du #18. Le
- * déclencheur qui le ferait entrer est écrit : le jour où les arbres de compétences (#31)
- * ouvrent assez de nœuds pour que le total des bonus dépasse +100 %, on mesure et on
+ * déclencheur qui le ferait entrer est écrit : si le total des bonus actifs
+ * dépasse +100 %, on mesure et on
  * décide. Les garde-fous de #15 bornent déjà la journée, qui est la vraie surface d'abus.
  *
  * ## L'ordre des opérations

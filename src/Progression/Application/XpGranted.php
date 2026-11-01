@@ -44,8 +44,6 @@ final readonly class XpGranted
         public AttributeGains $attributesBefore,
         public int $vitalityBefore,
         public array $levelsReached,
-        /** Les points de compétence que ces niveaux ont accordés. */
-        public int $skillPointsGranted,
         public array $titlesUnlocked = [],
     ) {
     }

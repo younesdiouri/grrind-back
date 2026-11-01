@@ -1,7 +1,7 @@
 # GRRIND — Backend
 
-API du produit GRRIND : une app qui transforme le sport en RPG (XP, niveaux, titres, arbres de
-compétences, loot, streak, ligues). Ce dépôt ne contient **que le back**. Le client est une app
+API du produit GRRIND : une app qui transforme le sport en RPG (XP, niveaux, titres,
+loot, streak, ligues). Ce dépôt ne contient **que le back**. Le client est une app
 **React Native** (dépôt séparé) — voir ci-dessous pourquoi, la question se repose sinon.
 
 ### Le client est en React Native, et ce n'est pas à « corriger »
@@ -160,7 +160,7 @@ src/
   Shared/         # Kernel, Clock, UuidV7, types Doctrine, idempotence, ModifierVocabulary
   Identity/       # User, auth, profil, timezone
   Training/       # Workout : import santé, arbitrage, historique
-  Progression/    # Ledger XP, courbe de niveaux, titres, arbres de compétences
+  Progression/    # Ledger XP, courbe de niveaux, titres
   Rewards/        # Tables de loot, tirages, inventaire, équipement
   Engagement/     # Streak, classements, ligues
   Community/      # Guildes, adhésions, invitations
@@ -218,7 +218,7 @@ L'import crédite le solo ; le rapprochement des preuves, après COMMIT, ajoute 
 ledger avec la base et la répartition figées à l'import. Les reçus de ces compléments sont un
 flux distinct : une réponse d'import idempotente ne se réécrit jamais.
 
-**Un seul vocabulaire de modificateurs.** Compétences, objets équipés, streak et ligue produisent
+**Un seul vocabulaire de modificateurs.** Objets équipés, streak, ligue et guilde produisent
 tous des modificateurs typés (`XP_MULTIPLIER`, `LOOT_LUCK`, `STREAK_SHIELD`, `UNLOCK_SESSION_TYPE`).
 Un unique `ModifierResolver` calcule l'ensemble actif d'un user. C'est ce qui empêche le moteur de
 pourrir.
@@ -260,7 +260,7 @@ BEGIN
       relire la charge du jour — celle de la journée du sport
       calculer l'XP (XpCalculator, pur)
       écrire l'XpTransaction
-      mettre à jour le snapshot, attribuer les points de compétence
+      mettre à jour le snapshot de progression
       tirer le loot (LootRoller, audité)
       mettre à jour le streak
       publier WorkoutImported dans l'outbox
@@ -420,7 +420,7 @@ Le format reste le conventionnel déjà en place — `feat(module):`, `fix(modul
 le *quoi* (le diff le dit déjà).
 
 Identity, Training, Progression et le **premier jouable** (import santé → `SyncSummary`) sont
-faits ; le reste est ouvert sur le tableau, dans l'ordre Streak → Loot → Arbres → Classements →
+faits ; le reste est ouvert sur le tableau, dans l'ordre Streak → Loot → Classements →
 durcissement. Strava arrive après, comme simple source supplémentaire.
 
 [ARCHITECTURE.md](ARCHITECTURE.md) est la vue d'ensemble, **en schémas** : la carte des modules et

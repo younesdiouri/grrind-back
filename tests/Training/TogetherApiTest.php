@@ -50,6 +50,9 @@ final class TogetherApiTest extends ApiTestCase
         /** @var array{bonuses: list<array<string, mixed>>} $rest */
         $rest = self::decode($this->get('/api/workouts/together-bonuses?after='.$feed['nextCursor'], $players[0]->headers));
         self::assertCount(2, $rest['bonuses']);
+        foreach ($rest['bonuses'] as $bonus) {
+            self::assertArrayNotHasKey('skillPointsGranted', $bonus);
+        }
         self::assertSame([], self::decode($this->get('/api/workouts/together-bonuses', $this->openAccount('outsider@grrind.app')->headers))['bonuses']);
         self::assertSame(30, $this->number("SELECT SUM(amount) FROM xp_transaction WHERE user_id = ? AND reason != 'TOGETHER_BONUS'", [$players[0]->id->toRfc4122()]));
     }

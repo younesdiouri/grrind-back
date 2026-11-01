@@ -24,6 +24,5 @@ final class LevelCrudController extends GameCrudController
     {
         yield IntegerField::new('level')->setFormTypeOption('disabled', Crud::PAGE_EDIT === $pageName);
         yield IntegerField::new('totalXp');
-        yield IntegerField::new('skillPoints');
     }
 }
