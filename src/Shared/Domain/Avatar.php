@@ -84,7 +84,7 @@ final class Avatar
         }
 
         return ['version' => self::VERSION, 'default' => self::DEFAULT, 'options' => $options,
-            // Les coiffes Unity portées en HEAD (#325) ; elles s'ajustent à toutes les coiffures.
-            'headwear' => ['slot' => 'HEAD', 'options' => ['BANDEAU_ECLAIR']]];
+            // Les coiffes Unity portées en HEAD ; la Moumoutivation masque les cheveux au rendu.
+            'headwear' => ['slot' => 'HEAD', 'options' => ['BANDEAU_ECLAIR', 'MOUMOUTIVATION']]];
     }
 }

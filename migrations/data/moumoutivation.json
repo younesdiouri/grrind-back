@@ -1,0 +1,23 @@
+[
+  {
+    "key": "MOUMOUTIVATION",
+    "slot": "HEAD",
+    "price_coins": 10,
+    "sell_price_coins": 5,
+    "modifiers": [
+      {
+        "type": "CRITICAL_CHANCE_BONUS",
+        "value": 20
+      }
+    ],
+    "image_path": "f8234b98578246cd240f51ee5ec41b0c1f775413.png",
+    "translations": {
+      "fr": {
+        "name": "La Moumoutivation"
+      },
+      "en": {
+        "name": "Moumoutivation"
+      }
+    }
+  }
+]
