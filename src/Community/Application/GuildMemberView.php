@@ -23,6 +23,7 @@ final readonly class GuildMemberView
     /**
      * @param array{tier: string, tierOrder: int, lootLuckPercent: int}              $league
      * @param array{key: string, artworkVersion: ?string, weaponType?: ?string}|null $headEquipment
+     * @param array{key: string, artworkVersion: ?string, weaponType?: ?string}|null $accessoryEquipment
      */
     public function __construct(
         public Uuid $playerId,
@@ -32,6 +33,7 @@ final readonly class GuildMemberView
         public DateTimeImmutable $joinedAt,
         public array $league,
         public ?array $headEquipment,
+        public ?array $accessoryEquipment,
     ) {
     }
 }

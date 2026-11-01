@@ -84,8 +84,8 @@ final class BattleEquipmentTest extends ApiTestCase
         $player = $this->openAccount();
         $opponent = $this->openAccount('unity-opponent@grrind.app', 'Carla');
         $outfits = [
-            ['WEAPON' => 'GOLDEN_BOXING_GLOVES', 'LEGS' => 'LES_GUINZZ_PURPLE', 'CHEST' => 'SPORT_TSHIRT_SLATE', 'HEAD' => 'MOUMOUTIVATION'],
-            ['WEAPON' => 'LE_POIDS_LOURD', 'LEGS' => 'LES_GUINZZ_CYAN', 'CHEST' => 'SPORT_TSHIRT_CORAL', 'HEAD' => 'MOUMOUTIVATION'],
+            ['WEAPON' => 'GOLDEN_BOXING_GLOVES', 'LEGS' => 'LES_GUINZZ_PURPLE', 'CHEST' => 'SPORT_TSHIRT_SLATE', 'HEAD' => 'MOUMOUTIVATION', 'ACCESSORY' => 'LES_CYCLOPES'],
+            ['WEAPON' => 'LE_POIDS_LOURD', 'LEGS' => 'LES_GUINZZ_CYAN', 'CHEST' => 'SPORT_TSHIRT_CORAL', 'HEAD' => 'MOUMOUTIVATION', 'ACCESSORY' => 'LES_CYCLOPES'],
         ];
         foreach ([$player, $opponent] as $index => $account) {
             foreach ($outfits[$index] as $slot => $key) {

@@ -1,0 +1,23 @@
+[
+  {
+    "key": "LES_CYCLOPES",
+    "slot": "ACCESSORY",
+    "price_coins": 10,
+    "sell_price_coins": 5,
+    "modifiers": [
+      {
+        "type": "PRECISION_BONUS",
+        "value": 20
+      }
+    ],
+    "image_path": "587b60f526a0d6e92ab6a2d7f534ca6b4cd71a3d.png",
+    "translations": {
+      "fr": {
+        "name": "Les Cyclopes"
+      },
+      "en": {
+        "name": "The Cyclopes"
+      }
+    }
+  }
+]

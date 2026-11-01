@@ -68,6 +68,7 @@ final readonly class GuildMembersProvider
                 $membership->joinedAt(),
                 $leagues[$key],
                 $equipment[$key]['HEAD'] ?? null,
+                $equipment[$key]['ACCESSORY'] ?? null,
             );
         }
 
