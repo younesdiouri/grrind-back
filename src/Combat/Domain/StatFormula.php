@@ -44,11 +44,11 @@ final readonly class StatFormula
      */
     public static function scores(array $definitions, array $attributes): array
     {
-        if (\count($definitions) !== \count(DerivedStat::cases())) {
-            throw new InvalidArgumentException('Une formule est requise pour chacune des onze statistiques.');
+        if (2 !== \count($definitions)) {
+            throw new InvalidArgumentException('Seuls les PV et les dégâts dérivent des caractéristiques.');
         }
         $scores = [];
-        foreach (DerivedStat::cases() as $stat) {
+        foreach ([DerivedStat::Hp, DerivedStat::Damage] as $stat) {
             $definition = $definitions[$stat->value] ?? throw new InvalidArgumentException('Formule manquante : '.$stat->value);
             $scores[$stat->value] = self::fromArray($definition)->score($attributes);
         }

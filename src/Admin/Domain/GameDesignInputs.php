@@ -44,7 +44,7 @@ final class GameDesignInputs
                 throw new InvalidArgumentException('Les attributs du profil doivent être positifs ou nuls.');
             }
         }
-        $standing = LevelCurve::runtime($rulesets)->standingAt($attributes->total());
+        $standing = LevelCurve::runtime($rulesets)->standingAt($profile['totalXp'] ?? $attributes->total());
         $vitality = Vitality::runtime($rulesets);
         $value = $allowOverride && null !== $profile['vitalityOverride'] ? $profile['vitalityOverride'] : $vitality->bonused($vitality->of($attributes), $averageEnergy);
 

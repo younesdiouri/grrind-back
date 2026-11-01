@@ -8,6 +8,8 @@ use App\Community\Domain\AlamMode;
 use App\Community\Domain\AlamNarrationSource;
 use App\Community\Domain\AlamRun;
 use App\Community\Domain\AlamStatus;
+use App\Community\Domain\Exception\AlamDifficultyClosed;
+use App\Community\Domain\Exception\AlamDifficultyForbidden;
 use App\Community\Domain\Exception\AlamManualDisabled;
 use App\Community\Domain\Exception\AlamRunNotFound;
 use App\Community\Domain\Exception\GuildNotFound;
@@ -20,6 +22,7 @@ use App\Shared\Application\FrozenGameRulesets;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Domain\Alam\AlamCalendar;
+use App\Shared\Domain\Alam\AlamDifficulty;
 use App\Shared\Domain\Alam\AlamRules;
 use App\Shared\Domain\Appearance;
 use App\Shared\Domain\Avatar;
@@ -61,7 +64,45 @@ final readonly class AlamRuns
         $guild = $this->guildOf($player);
         $run = $this->ensureWeek($guild->id());
 
-        return ['serverNow' => $this->clock->now()->format('c'), 'canLaunchManual' => $this->manualEnabled, 'pollAfterSeconds' => 5, 'current' => $this->resource($run)];
+        $membership = $this->memberships->ofPlayer($player);
+
+        return ['serverNow' => $this->clock->now()->format('c'), 'canLaunchManual' => $this->manualEnabled, 'registered' => $membership?->isAlamRegistered() ?? false, 'canChooseDifficulty' => ($membership?->isFounder() ?? false) && null === $run->resolvedAt && $this->clock->now() < $run->collectionEndsAt, 'pollAfterSeconds' => 5, 'current' => $this->resource($run)];
+    }
+
+    public function register(Uuid $player, bool $registered): void
+    {
+        $guildId = $this->guildOf($player)->id();
+        $this->em->wrapInTransaction(function () use ($guildId, $player, $registered): void {
+            $guild = $this->guilds->lockForUpdate($guildId) ?? throw new GuildNotFound();
+            $membership = $this->memberships->ofPlayer($player);
+            if (null === $membership || !$membership->guild()->id()->equals($guildId)) {
+                throw new GuildNotFound();
+            }
+            // Régler les éditions échues avant de changer les inscrits : une inscription
+            // à 19 h 01 concerne la prochaine édition, même si le worker était en retard.
+            $this->ensureWeekLocked($guild);
+            $membership->registerForAlam($registered);
+        });
+    }
+
+    public function chooseDifficulty(Uuid $player, AlamDifficulty $difficulty): void
+    {
+        $guildId = $this->guildOf($player)->id();
+        $this->em->wrapInTransaction(function () use ($guildId, $player, $difficulty): void {
+            $guild = $this->guilds->lockForUpdate($guildId) ?? throw new GuildNotFound();
+            $membership = $this->memberships->ofPlayer($player);
+            if (null === $membership || !$membership->guild()->id()->equals($guildId)) {
+                throw new GuildNotFound();
+            }
+            if (!$membership->isFounder()) {
+                throw new AlamDifficultyForbidden();
+            }
+            $run = $this->ensureWeekLocked($guild);
+            if (null !== $run->resolvedAt || $this->clock->now() >= $run->collectionEndsAt) {
+                throw new AlamDifficultyClosed();
+            }
+            $run->difficulty = $difficulty;
+        });
     }
 
     public function manual(Uuid $player, string $requestKey): AlamRun
@@ -101,6 +142,7 @@ final readonly class AlamRuns
             $weekly = $this->ensureWeekLocked($guild);
             $now = $this->clock->now();
             $run = new AlamRun($guildId, AlamMode::Manual, $weekly->weekStartsAt, min($now, $weekly->collectionEndsAt), $now, $weekly->frozenTargetCount, $weekly->rulesetVersion, $weekly->rules);
+            $run->difficulty = $weekly->difficulty;
             $run->requestKey = $requestKey;
             $this->em->persist($run);
             $this->resolveLocked($run, $guild, $now);
@@ -156,7 +198,8 @@ final readonly class AlamRuns
         if (null === $run->resolvedAt) {
             $guild = $this->guilds->ofId($run->guildId);
             [$participants, $totals] = null === $guild ? [[], []] : $this->roster($run, $guild);
-            $result = ['participants' => $participants, 'gauges' => AlamResolution::gauges($totals, $this->rulesOf($run)->targets($run->frozenTargetCount)), 'encounters' => [], 'events' => [], 'narrationSource' => AlamNarrationSource::Local->value, 'presentationStartsAt' => null, 'presentationEndsAt' => null];
+            $rules = $this->rulesOf($run);
+            $result = ['participants' => $participants, 'gauges' => AlamResolution::gauges($totals, $rules->targets($run->frozenTargetCount, $rules->threshold($run->difficulty ?? AlamDifficulty::Easy))), 'difficultyOptions' => AlamResolution::options($totals, $rules, $run->frozenTargetCount), 'encounters' => [], 'events' => [], 'narrationSource' => AlamNarrationSource::Local->value, 'presentationStartsAt' => null, 'presentationEndsAt' => null];
         }
 
         if (\is_array($result['participants'] ?? null)) {
@@ -168,31 +211,13 @@ final readonly class AlamRuns
             unset($participant);
         }
 
-        return ['id' => $run->id->toRfc4122(), 'guildId' => $run->guildId->toRfc4122(), 'mode' => $run->mode->value, 'status' => null === $run->resolvedAt ? AlamStatus::Collecting->value : AlamStatus::Resolved->value, 'weekStartsAt' => $run->weekStartsAt->format('c'), 'collectionEndsAt' => $run->collectionEndsAt->format('c'), 'revealedAt' => $run->revealedAt->format('c'), 'frozenTargetCount' => $run->frozenTargetCount, 'rulesetVersion' => $run->rulesetVersion, ...$result, 'serverNow' => $this->clock->now()->format('c')];
+        return ['id' => $run->id->toRfc4122(), 'guildId' => $run->guildId->toRfc4122(), 'mode' => $run->mode->value, 'status' => null === $run->resolvedAt ? AlamStatus::Collecting->value : AlamStatus::Resolved->value, 'weekStartsAt' => $run->weekStartsAt->format('c'), 'collectionEndsAt' => $run->collectionEndsAt->format('c'), 'revealedAt' => $run->revealedAt->format('c'), 'frozenTargetCount' => $run->frozenTargetCount, 'rulesetVersion' => $run->rulesetVersion, ...$result, 'difficulty' => $run->difficulty?->value, 'difficultyOptions' => $result['difficultyOptions'] ?? [], 'serverNow' => $this->clock->now()->format('c')];
     }
 
     public function tick(): void
     {
         foreach ($this->guilds->findAll() as $guild) {
             $this->ensureWeek($guild->id());
-        }
-        /** @var list<AlamRun> $pending */
-        $pending = $this->em->getRepository(AlamRun::class)->findBy(['resolvedAt' => null]);
-        foreach ($pending as $run) {
-            if ($run->collectionEndsAt <= $this->clock->now()) {
-                $this->em->wrapInTransaction(function () use ($run): void {
-                    // Une guilde dissoute pendant sa semaine laisse son édition en l'état :
-                    // la résoudre sur un roster vide figerait un raid sans personne dedans.
-                    $guild = $this->guilds->lockForUpdate($run->guildId);
-                    if (null === $guild) {
-                        return;
-                    }
-                    $this->em->refresh($run, LockMode::PESSIMISTIC_WRITE);
-                    if (null === $run->resolvedAt) {
-                        $this->resolveLocked($run, $guild, $this->clock->now());
-                    }
-                });
-            }
         }
     }
 
@@ -203,6 +228,16 @@ final readonly class AlamRuns
 
     private function ensureWeekLocked(Guild $guild): AlamRun
     {
+        /** @var list<AlamRun> $pending */
+        $pending = $this->em->getRepository(AlamRun::class)->findBy(['guildId' => $guild->id(), 'resolvedAt' => null]);
+        foreach ($pending as $run) {
+            if ($run->collectionEndsAt <= $this->clock->now()) {
+                $this->em->refresh($run, LockMode::PESSIMISTIC_WRITE);
+                if (null === $run->resolvedAt) {
+                    $this->resolveLocked($run, $guild, $this->clock->now());
+                }
+            }
+        }
         /** @var array<string, mixed> $configuration */
         $configuration = $this->rulesets->snapshot()['alam'];
         $calendar = new AlamCalendar(new AlamRules($configuration));
@@ -237,7 +272,7 @@ final readonly class AlamRuns
     /** @return array{list<array{playerId: string, displayName: string, avatarUrl: ?string, appearance: string, avatar: array<string, int|string>, contribution: int, gauges: list<array{attribute: string, current: int, target: int, progressPermille: int}>}>, array<string, int>} */
     private function roster(AlamRun $run, Guild $guild): array
     {
-        $players = array_map(static fn (GuildMembership $member): Uuid => $member->playerId(), $guild->members());
+        $players = array_map(static fn (GuildMembership $member): Uuid => $member->playerId(), array_values(array_filter($guild->members(), static fn (GuildMembership $member): bool => $member->isAlamRegistered())));
         $gains = $this->contributions->between($players, $run->weekStartsAt, min($this->clock->now(), $run->collectionEndsAt), new FrozenGameRulesets($run->rules, $run->rulesetVersion));
         $profiles = $this->profiles->of($players);
         $participants = [];

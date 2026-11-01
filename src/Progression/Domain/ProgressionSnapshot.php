@@ -28,7 +28,7 @@ use Symfony\Component\Uid\Uuid;
  * reconstruisant, sinon on entérine le bug qui l'a produite.
  *
  * **Les quatre caractéristiques (#160) ne sont pas projetées par la courbe, contrairement
- * au palier.** Elles sont la simple somme du ledger —
+ * au palier.** Elles sont la somme du ledger sur la semaine sportive courante (#332) —
  * {@see \App\Progression\Infrastructure\Doctrine\XpTransactionRepository::attributeTotalsOf()}
  * — recopiée telle quelle : rien à en déduire, `AttributeSplit` a déjà fait le calcul à
  * l'écriture.
@@ -55,7 +55,7 @@ class ProgressionSnapshot
     private int $totalXp;
 
     /**
-     * Les quatre caractéristiques (#160), recopiées telles quelles du ledger — voir le
+     * Les quatre caractéristiques hebdomadaires (#332), recopiées du ledger — voir le
      * docblock de la classe. Signées comme `totalXp`, pour la même raison : une annulation
      * les fait redescendre, pas seulement le total.
      */
@@ -187,6 +187,20 @@ class ProgressionSnapshot
     public function vitality(): int
     {
         return $this->vitality;
+    }
+
+    /** Le cache expire aussi sans séance ni connexion ; la lecture reste sans écriture. */
+    public function characteristicsSince(DateTimeImmutable $start): PlayerCharacteristics
+    {
+        return $this->updatedAt < $start ? PlayerCharacteristics::untouched() : new PlayerCharacteristics($this->attributes(), $this->vitality);
+    }
+
+    /** Sous verrou, avant de capturer le départ d'un nouveau crédit hebdomadaire. */
+    public function expireCharacteristicsBefore(DateTimeImmutable $start): void
+    {
+        if ($this->updatedAt < $start) {
+            $this->strength = $this->endurance = $this->mobility = $this->dexterity = $this->vitality = 0;
+        }
     }
 
     public function totalXp(): int

@@ -49,6 +49,9 @@ class GuildMembership
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
     private DateTimeImmutable $joinedAt;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $alamRegistered = false;
+
     /**
      * Interne à l'agrégat : une adhésion ne se crée que par {@see Guild::found()} ou
      * {@see Guild::admit()}, qui sont les seuls à connaître le plafond et le rôle dû.
@@ -92,6 +95,16 @@ class GuildMembership
     public function joinedAt(): DateTimeImmutable
     {
         return $this->joinedAt;
+    }
+
+    public function isAlamRegistered(): bool
+    {
+        return $this->alamRegistered;
+    }
+
+    public function registerForAlam(bool $registered): void
+    {
+        $this->alamRegistered = $registered;
     }
 
     /** @internal la succession se décide dans {@see Guild}, qui voit toutes les adhésions */

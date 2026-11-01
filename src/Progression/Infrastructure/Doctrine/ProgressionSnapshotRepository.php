@@ -9,8 +9,11 @@ use App\Progression\Domain\LevelStanding;
 use App\Progression\Domain\PlayerCharacteristics;
 use App\Progression\Domain\PlayerStanding;
 use App\Progression\Domain\ProgressionSnapshot;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Vitality;
+use App\Shared\Domain\Alam\AlamCalendar;
+use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\DBAL\ParameterType;
@@ -20,11 +23,13 @@ use Psr\Clock\ClockInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
+ * Les caractéristiques expirées se lisent à zéro sans écrire pendant un GET (#332).
+ *
  * @extends ServiceEntityRepository<ProgressionSnapshot>
  */
 class ProgressionSnapshotRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry, private readonly ClockInterface $clock)
+    public function __construct(ManagerRegistry $registry, private readonly ClockInterface $clock, private readonly GameRulesets $rules)
     {
         parent::__construct($registry, ProgressionSnapshot::class);
     }
@@ -32,6 +37,11 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
     public function ofPlayer(Uuid $userId): ?ProgressionSnapshot
     {
         return $this->find($userId);
+    }
+
+    public function characteristicsOf(?ProgressionSnapshot $snapshot): PlayerCharacteristics
+    {
+        return $snapshot?->characteristicsSince(AlamCalendar::runtime($this->rules)->week($this->clock->now())['start']) ?? PlayerCharacteristics::untouched();
     }
 
     /**
@@ -71,9 +81,10 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
             return [];
         }
 
-        /** @var list<array{userId: Uuid, level: int, xpIntoLevel: int, xpToNextLevel: int|null, earnedSkillPoints: int, strength: int, endurance: int, mobility: int, dexterity: int, vitality: int}> $rows */
+        $start = AlamCalendar::runtime($this->rules)->week($this->clock->now())['start'];
+        /** @var list<array{userId: Uuid, level: int, xpIntoLevel: int, xpToNextLevel: int|null, earnedSkillPoints: int, strength: int, endurance: int, mobility: int, dexterity: int, vitality: int, updatedAt: DateTimeImmutable}> $rows */
         $rows = $this->createQueryBuilder('s')
-            ->select('s.userId', 's.level', 's.xpIntoLevel', 's.xpToNextLevel', 's.earnedSkillPoints', 's.strength', 's.endurance', 's.mobility', 's.dexterity', 's.vitality')
+            ->select('s.userId', 's.level', 's.xpIntoLevel', 's.xpToNextLevel', 's.earnedSkillPoints', 's.strength', 's.endurance', 's.mobility', 's.dexterity', 's.vitality', 's.updatedAt')
             ->where('s.userId IN (:ids)')
             ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toRfc4122(), $userIds))
             ->getQuery()
@@ -89,7 +100,7 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
                     $row['xpToNextLevel'],
                     $row['earnedSkillPoints'],
                 ),
-                new PlayerCharacteristics(
+                $row['updatedAt'] < $start ? PlayerCharacteristics::untouched() : new PlayerCharacteristics(
                     new AttributeGains($row['strength'], $row['endurance'], $row['mobility'], $row['dexterity']),
                     $row['vitality'],
                 ),
@@ -114,7 +125,7 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
      *
      * @throws TransactionRequiredException hors transaction : un verrou qui se relâche aussitôt ne verrouille rien
      */
-    public function lockFor(Uuid $userId, LevelCurve $curve, Vitality $vitality): ProgressionSnapshot
+    public function lockFor(Uuid $userId, LevelCurve $curve, Vitality $vitality, ?DateTimeImmutable $at = null): ProgressionSnapshot
     {
         $this->insertIfMissing($userId, $curve, $vitality);
 
@@ -124,6 +135,7 @@ class ProgressionSnapshotRepository extends ServiceEntityRepository
         // L'`INSERT` ci-dessus est passé sous le nez de l'unité de travail : si l'entité
         // avait déjà été chargée dans cette requête, elle porterait un état d'avant.
         $this->getEntityManager()->refresh($snapshot);
+        $snapshot->expireCharacteristicsBefore(AlamCalendar::runtime($this->rules)->week($at ?? $this->clock->now())['start']);
 
         return $snapshot;
     }

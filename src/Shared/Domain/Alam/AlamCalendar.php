@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Domain\Alam;
 
+use App\Shared\Application\GameRulesets;
 use DateTimeImmutable;
 use DateTimeZone;
 
@@ -12,6 +13,14 @@ final readonly class AlamCalendar
 {
     public function __construct(private AlamRules $rules)
     {
+    }
+
+    public static function runtime(GameRulesets $rules): self
+    {
+        /** @var array<string, mixed> $alam */
+        $alam = $rules->snapshot()['alam'];
+
+        return new self(new AlamRules($alam));
     }
 
     /** @return array{start: DateTimeImmutable, close: DateTimeImmutable, reset: DateTimeImmutable} */

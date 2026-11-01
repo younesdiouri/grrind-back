@@ -19,20 +19,22 @@ use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
 
-/**
- * La traduction caractéristique → combattant, seule et sans conteneur : voir le docblock de
- * {@see FighterFactory} pour la correspondance et pourquoi le socle + contribution est la
- * forme retenue. Ce que ces tests démontrent est indépendant des valeurs livrées dans
- * snapshot DB publié — {@see \App\Tests\Shared\Config\CombatCoverageTest} vérifie celles-là.
- *
- * **Aucun objet, aucun contributeur réel (#224).** {@see modifiersOf()} force des
- * `Modifier` à la main — le seul moyen d'éprouver l'ordre de la dérivation avant que
- * `Rewards` ne branche l'inventaire sur le port (#29). Les tests qui ne passent aucun
- * modificateur prouvent le branchement : le `ModifierResolver` rend un ensemble vide et le
- * combattant est celui d'avant #224, au bit près.
- */
+/** Les caractéristiques hebdomadaires dérivent les PV/dégâts ; les taux viennent des objets. */
 final class FighterFactoryTest extends TestCase
 {
+    public function testRatesComeOnlyFromEquippedItemsRegardlessOfWeeklyAttributes(): void
+    {
+        $factory = self::factoryOf(modifiers: [
+            self::modifierOf(ModifierType::CriticalChanceBonus, 123),
+            new Modifier(ModifierType::DodgeBonus, 200, ModifierSource::Skill),
+        ]);
+        $fighter = $factory->forPlayer(self::progressionOf(strength: 10000, endurance: 10000, mobility: 10000, dexterity: 10000), self::playerId(), self::occurredAt());
+        self::assertSame(123, $fighter->criticalChancePermille);
+        self::assertSame(0, $fighter->dodgePermille);
+        self::assertSame(0, $fighter->mitigationPermille);
+        self::assertSame(0, $fighter->comboPermille);
+    }
+
     public function testAChangedFormulaChangesTheRealPlayerDerivation(): void
     {
         $formulas = \App\Tests\Combat\StatFormulaFixture::data();
@@ -57,23 +59,29 @@ final class FighterFactoryTest extends TestCase
         $at = self::occurredAt();
         $resolved = $factory->resolvePlayer($progression, $id, $at);
 
-        self::assertSame(['base' => 1000, 'equipmentBonus' => 150, 'effective' => 1150], $resolved['attributes']['strength']);
-        self::assertSame(['base' => 100, 'equipmentBonus' => -200, 'effective' => 0], $resolved['attributes']['dexterity']);
-        self::assertSame(['base' => 0, 'equipmentBonus' => 0, 'effective' => 30], $resolved['attributes']['mobility']);
+        self::assertSame(['base' => 1000, 'equipmentBonus' => 0, 'effective' => 1000], $resolved['attributes']['strength']);
+        self::assertSame(['base' => 100, 'equipmentBonus' => 0, 'effective' => 100], $resolved['attributes']['dexterity']);
+        self::assertSame(['base' => 0, 'equipmentBonus' => 0, 'effective' => 0], $resolved['attributes']['mobility']);
         self::assertSame(['base' => 200, 'equipmentBonus' => 0, 'effective' => 200], $resolved['attributes']['vitality']);
         self::assertEquals($factory->forPlayer($progression, $id, $at), $resolved['fighter']);
     }
 
-    public function testEverySynergyAndDirectBonusUsesTheDeclaredOrder(): void
+    public function testDirectItemRatesAreSummedFlooredAndCapped(): void
     {
         $fighter = self::factoryOf(modifiers: [
-            self::modifierOf(ModifierType::StrengthBonus, 10000),
-            self::modifierOf(ModifierType::MitigationBonus, -50),
+            self::modifierOf(ModifierType::DamageBonus, 60),
+            self::modifierOf(ModifierType::DodgeBonus, 150),
+            self::modifierOf(ModifierType::CriticalChanceBonus, 175),
+            self::modifierOf(ModifierType::GuardBonus, 200),
+            self::modifierOf(ModifierType::CriticalResistanceBonus, 250),
+            self::modifierOf(ModifierType::CooldownReductionBonus, 150),
+            self::modifierOf(ModifierType::ComboBonus, 175),
+            self::modifierOf(ModifierType::MitigationBonus, 300),
             self::modifierOf(ModifierType::MaintenanceBonus, 10000),
             self::modifierOf(ModifierType::PrecisionBonus, -10000),
         ])->forPlayer(self::progressionOf(endurance: 10000, mobility: 10000, dexterity: 10000), self::playerId(), self::occurredAt());
         self::assertSame(70, $fighter->damage);
-        self::assertSame(300, $fighter->mitigationPermille); // paire 10000 → 350, puis −50
+        self::assertSame(300, $fighter->mitigationPermille);
         self::assertSame(950, $fighter->maintenancePermille);
         self::assertSame(150, $fighter->dodgePermille);
         self::assertSame(175, $fighter->criticalChancePermille);
@@ -84,15 +92,15 @@ final class FighterFactoryTest extends TestCase
         self::assertSame(0, $fighter->precisionPermille);
     }
 
-    public function testNegativeAttributeBonusFloorsBeforePairDerivation(): void
+    public function testLegacyAttributeModifiersCannotChangeTheFighter(): void
     {
         $fighter = self::factoryOf(modifiers: [self::modifierOf(ModifierType::StrengthBonus, -20000)])
             ->forPlayer(self::progressionOf(strength: 10000, endurance: 10000, mobility: 10000, dexterity: 10000), self::playerId(), self::occurredAt());
         self::assertSame(0, $fighter->mitigationPermille);
         self::assertSame(0, $fighter->guardPermille);
         self::assertSame(0, $fighter->criticalResistancePermille);
-        self::assertSame(10, $fighter->damage);
-        self::assertSame(633, $fighter->maintenancePermille);
+        self::assertSame(70, $fighter->damage);
+        self::assertSame(0, $fighter->maintenancePermille);
     }
 
     public function testAFreshAccountIsPlayableAtTheFighterSocle(): void
@@ -130,61 +138,54 @@ final class FighterFactoryTest extends TestCase
         self::assertGreaterThan($low->damage, $high->damage);
     }
 
-    public function testMoreEnduranceYieldsMoreMitigationEverythingElseEqual(): void
+    public function testEnduranceDoesNotCreateMitigation(): void
     {
         $factory = self::factoryOf();
 
         $low = $factory->forPlayer(self::progressionOf(strength: 1_000_000, endurance: 1_000), self::playerId(), self::occurredAt());
         $high = $factory->forPlayer(self::progressionOf(strength: 1_000_000, endurance: 5_000), self::playerId(), self::occurredAt());
 
-        self::assertGreaterThan($low->mitigationPermille, $high->mitigationPermille);
+        self::assertSame($low->mitigationPermille, $high->mitigationPermille);
     }
 
-    public function testMoreDexterityYieldsMoreComboChanceEverythingElseEqual(): void
+    public function testDexterityDoesNotCreateCombo(): void
     {
         $factory = self::factoryOf();
 
         $low = $factory->forPlayer(self::progressionOf(endurance: 1_000_000, dexterity: 1_000), self::playerId(), self::occurredAt());
         $high = $factory->forPlayer(self::progressionOf(endurance: 1_000_000, dexterity: 5_000), self::playerId(), self::occurredAt());
 
-        self::assertGreaterThan($low->comboPermille, $high->comboPermille);
+        self::assertSame($low->comboPermille, $high->comboPermille);
     }
 
-    /**
-     * `Mobility` entre en combat au #218 — voir le docblock de {@see FighterFactory}. Ce
-     * test était l'inverse jusque-là (#210) : il prouvait que la caractéristique ne changeait
-     * rien au `Fighter` produit, pour qu'elle ne soit pas branchée par distraction avant
-     * qu'on ait décidé à quoi. La décision est prise ; c'est maintenant l'inverse qui doit
-     * être vrai, et cette classe reste le seul endroit qui en parle.
-     */
-    public function testMobilityChangesTheFighterProduced(): void
+    public function testMobilityDoesNotCreateCombatRates(): void
     {
         $factory = self::factoryOf();
 
         $withoutMobility = $factory->forPlayer(self::progressionOf(strength: 2_000, endurance: 2_000, dexterity: 2_000, mobility: 0), self::playerId(), self::occurredAt());
         $withMobility = $factory->forPlayer(self::progressionOf(strength: 2_000, endurance: 2_000, dexterity: 2_000, mobility: 1_000_000), self::playerId(), self::occurredAt());
 
-        self::assertNotEquals($withoutMobility, $withMobility);
-        self::assertGreaterThan($withoutMobility->dodgePermille, $withMobility->dodgePermille);
+        self::assertEquals($withoutMobility, $withMobility);
+        self::assertSame(0, $withMobility->dodgePermille);
     }
 
-    public function testMoreMobilityYieldsMoreDodgeChanceEverythingElseEqual(): void
+    public function testMobilityDoesNotCreateDodge(): void
     {
         $factory = self::factoryOf();
 
         $low = $factory->forPlayer(self::progressionOf(mobility: 1_000), self::playerId(), self::occurredAt());
         $high = $factory->forPlayer(self::progressionOf(mobility: 5_000), self::playerId(), self::occurredAt());
 
-        self::assertGreaterThan($low->dodgePermille, $high->dodgePermille);
+        self::assertSame($low->dodgePermille, $high->dodgePermille);
     }
 
     public function testDodgeChanceNeverExceedsTheConfiguredCap(): void
     {
-        $factory = self::factoryOf(dodgeCapPermille: 300);
+        $factory = self::factoryOf(dodgeCapPermille: 300, modifiers: [self::modifierOf(ModifierType::DodgeBonus, 10000)]);
 
         $fighter = $factory->forPlayer(self::progressionOf(mobility: 1_000_000), self::playerId(), self::occurredAt());
 
-        self::assertSame(297, $fighter->dodgePermille);
+        self::assertSame(300, $fighter->dodgePermille);
     }
 
     public function testMitigationNeverExceedsTheConfiguredCap(): void
@@ -224,19 +225,13 @@ final class FighterFactoryTest extends TestCase
         self::assertSame(30, $fighter->dodgePermille);
     }
 
-    /**
-     * Un bonus de caractéristique pure s'ajoute au total lu du snapshot **avant** la
-     * dérivation, et non au résultat de la dérivation (#224) : `+1000` Strength avec un
-     * coefficient de 6 pour 1000 vaut `+6` dégâts, exactement comme si le joueur avait
-     * réparti ce total lui-même.
-     */
-    public function testACharacteristicBonusTraversesTheDerivation(): void
+    public function testALegacyCharacteristicBonusCannotCreateDamage(): void
     {
         $factory = self::factoryOf(modifiers: [self::modifierOf(ModifierType::StrengthBonus, 1_000)]);
 
         $fighter = $factory->forPlayer(self::progressionOf(), self::playerId(), self::occurredAt());
 
-        self::assertSame(16, $fighter->damage);
+        self::assertSame(10, $fighter->damage);
     }
 
     /**
@@ -257,16 +252,16 @@ final class FighterFactoryTest extends TestCase
     /**
      * Deux modificateurs du même type se composent par la somme (#224) : le choix est
      * tranché dans le docblock de {@see FighterFactory}. Deux objets « +100 » et « +50 »
-     * Strength valent un seul « +150 », pas un « +100 » qui écraserait l'autre.
+     * de dégâts valent un seul « +150 », pas un « +100 » qui écraserait l'autre.
      */
     public function testTwoModifiersOfTheSameTypeSumUp(): void
     {
         $withBoth = self::factoryOf(modifiers: [
-            self::modifierOf(ModifierType::StrengthBonus, 100),
-            self::modifierOf(ModifierType::StrengthBonus, 50),
+            self::modifierOf(ModifierType::DamageBonus, 100),
+            self::modifierOf(ModifierType::DamageBonus, 50),
         ])->forPlayer(self::progressionOf(), self::playerId(), self::occurredAt());
 
-        $withSum = self::factoryOf(modifiers: [self::modifierOf(ModifierType::StrengthBonus, 150)])
+        $withSum = self::factoryOf(modifiers: [self::modifierOf(ModifierType::DamageBonus, 150)])
             ->forPlayer(self::progressionOf(), self::playerId(), self::occurredAt());
 
         self::assertSame($withSum->damage, $withBoth->damage);

@@ -17,6 +17,7 @@ final class GameDesignFixture
         return [
             'combat' => ['fighter' => CombatRulesFixture::snapshot(), 'formulas' => StatFormulaFixture::data(), 'enemies' => [['key' => 'test', 'level' => 1, 'hp' => 500, 'damage' => 30, 'mitigation_permille' => 0, 'combo_permille' => 0, 'dodge_permille' => 0]], 'bosses' => []],
             'items' => [],
+            'alam' => \App\Tests\Community\Domain\AlamOutcomeTest::rules()->values,
             'training' => ['minimum_duration_seconds' => 60, 'maximum_duration_seconds' => 3600, 'import_window_days' => 7],
             'xp' => ['base_xp_per_hour' => 60, 'diminishing_returns' => [['up_to_minutes' => 60, 'weight_percent' => 100]], 'diminishing_returns_beyond_percent' => 50],
             'disciplines' => array_map(static fn (\App\Shared\Domain\Activity\Discipline $discipline): array => ['discipline' => $discipline->value, 'active' => true, 'credits_xp' => true, 'daily_cap_xp' => 70, 'xp_per_km' => 1, 'xp_per_100m_elevation' => 1, 'split' => ['strength' => 25, 'endurance' => 25, 'mobility' => 25, 'dexterity' => 25]], \App\Shared\Domain\Activity\Discipline::cases()),

@@ -33,6 +33,7 @@ final class AlamRoutesTest extends ApiTestCase
     {
         $bob = $this->openAccount();
         $this->post('/api/guilds', ['name' => 'La guilde'], $bob->headers);
+        $this->send('PUT', '/api/guild/alam/registration', ['registered' => true], $bob->headers + ['Idempotency-Key' => 'register-alam']);
         $avatar = array_replace(Avatar::DEFAULT, ['hairStyle' => 'buzzed', 'skinTone' => 'deep']);
         $this->send('PATCH', '/api/me', ['avatar' => $avatar], $bob->headers);
         $response = $this->post('/api/guild/alam/runs', [], $bob->headers + ['Idempotency-Key' => 'avatar-alam']);
@@ -63,6 +64,7 @@ final class AlamRoutesTest extends ApiTestCase
         $bob = $this->openAccount();
         self::assertSame(404, $this->get('/api/guild/alam', $bob->headers)->getStatusCode());
         $this->post('/api/guilds', ['name' => 'La guilde'], $bob->headers);
+        $this->send('PUT', '/api/guild/alam/registration', ['registered' => true], $bob->headers + ['Idempotency-Key' => 'register-alam']);
         $current = self::decode($this->get('/api/guild/alam', $bob->headers));
         self::assertTrue($current['canLaunchManual']);
         self::assertIsArray($current['current']);
@@ -75,7 +77,7 @@ final class AlamRoutesTest extends ApiTestCase
         self::assertSame('MANUAL', $run['mode']);
         self::assertSame('RESOLVED', $run['status']);
         self::assertIsArray($run['encounters']);
-        self::assertCount(3, $run['encounters']);
+        self::assertCount(1, $run['encounters']);
         foreach ($run['encounters'] as $encounter) {
             self::assertIsArray($encounter);
             self::assertFalse($encounter['won']);
@@ -104,6 +106,7 @@ final class AlamRoutesTest extends ApiTestCase
     {
         $bob = $this->openAccount();
         $this->post('/api/guilds', ['name' => 'La guilde'], $bob->headers);
+        $this->send('PUT', '/api/guild/alam/registration', ['registered' => true], $bob->headers + ['Idempotency-Key' => 'register-alam']);
         $rules = self::getContainer()->get(GameRulesets::class);
         $snapshot = $rules->snapshot();
         self::assertIsArray($snapshot['alam']);
@@ -149,6 +152,7 @@ final class AlamRoutesTest extends ApiTestCase
     {
         $bob = $this->openAccount();
         $this->post('/api/guilds', ['name' => 'La guilde'], $bob->headers);
+        $this->send('PUT', '/api/guild/alam/registration', ['registered' => true], $bob->headers + ['Idempotency-Key' => 'register-alam']);
         $headers = $bob->headers + ['Idempotency-Key' => 'lost-receipt'];
         $run = self::decode($this->post('/api/guild/alam/runs', [], $headers));
         self::assertIsString($run['id']);
@@ -185,6 +189,7 @@ final class AlamRoutesTest extends ApiTestCase
         self::assertSame(401, $this->get('/api/guild/alam')->getStatusCode());
         $bob = $this->openAccount();
         $this->post('/api/guilds', ['name' => 'La guilde'], $bob->headers);
+        $this->send('PUT', '/api/guild/alam/registration', ['registered' => true], $bob->headers + ['Idempotency-Key' => 'register-alam']);
         $_ENV['ALAM_MANUAL_ENABLED'] = $_SERVER['ALAM_MANUAL_ENABLED'] = '0';
         $response = $this->post('/api/guild/alam/runs', [], $bob->headers + ['Idempotency-Key' => 'disabled']);
         self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());

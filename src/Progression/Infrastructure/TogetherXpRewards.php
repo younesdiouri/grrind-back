@@ -39,7 +39,8 @@ final readonly class TogetherXpRewards implements TogetherRewards
             if (null === $credit || null !== $this->ledger->recordedFor($workoutId, XpReason::SessionInvalidated) || 0 === $credit->amount()) {
                 return;
             }
-            $snapshot = $this->snapshots->lockFor($credit->userId(), $this->curve, $this->vitality);
+            $now = $this->clock->now();
+            $snapshot = $this->snapshots->lockFor($credit->userId(), $this->curve, $this->vitality, $now);
             $receipts = $this->em->getRepository(TogetherBonusReceipt::class)->findBy(['workoutId' => $workoutId], ['multiplier' => 'DESC'], 1);
             $previous = $receipts[0]->multiplier ?? 1;
             if ($multiplier <= $previous) {
@@ -63,12 +64,12 @@ final readonly class TogetherXpRewards implements TogetherRewards
             $before = $snapshot->standing();
             $attributesBefore = $snapshot->attributes()->toArray();
             $vitalityBefore = $snapshot->vitality();
-            $now = $this->clock->now();
-            $reached = $snapshot->retotal($this->ledger->totalOf($credit->userId()), $this->ledger->attributeTotalsOf($credit->userId()), $this->curve, $this->vitality, $now);
+            $reached = $snapshot->retotal($this->ledger->totalOf($credit->userId()), $this->ledger->attributeTotalsOf($credit->userId(), $now), $this->curve, $this->vitality, $now);
             $titles = $this->titles->unlock($credit->userId(), $now);
             $attributes = [];
             foreach ($gains->toArray() as $attribute => $gain) {
-                $attributes[$attribute] = ['gained' => $gain, 'before' => $attributesBefore[$attribute], 'after' => $snapshot->attributes()->toArray()[$attribute]];
+                $after = $snapshot->attributes()->toArray()[$attribute];
+                $attributes[$attribute] = ['gained' => $after - $attributesBefore[$attribute], 'before' => $attributesBefore[$attribute], 'after' => $after];
             }
             $attributes['vitality'] = ['before' => $vitalityBefore, 'after' => $snapshot->vitality()];
             $this->em->persist(new TogetherBonusReceipt($id, $credit->userId(), $workoutId, $multiplier, [

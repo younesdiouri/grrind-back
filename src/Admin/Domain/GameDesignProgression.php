@@ -14,6 +14,7 @@ use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\AttributeSplit;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Activity\WorkoutSource;
+use App\Shared\Domain\Alam\AlamCalendar;
 use App\Shared\Domain\LocalDay;
 use App\Shared\Domain\Timezone;
 use App\Shared\Infrastructure\Config\GameRulesetVersion;
@@ -117,6 +118,19 @@ final class GameDesignProgression
         $state = $profile;
         $state['vitalityOverride'] = null;
         $initial = $state['strength'] + $state['endurance'] + $state['mobility'] + $state['dexterity'];
+        $state['totalXp'] = $profile['totalXp'] ?? $initial;
+        $calendar = AlamCalendar::runtime($rulesets);
+        $period = $calendar->week($start)['start'];
+        // La simulation traverse les mêmes resets civils que le personnage réel.
+        $advance = static function (DateTimeImmutable $at) use (&$state, &$period, $calendar): void {
+            $next = $calendar->week($at)['start'];
+            if ($next != $period) {
+                foreach (['strength', 'endurance', 'mobility', 'dexterity'] as $attribute) {
+                    $state[$attribute] = 0;
+                }
+                $period = $next;
+            }
+        };
         $energy = [];
         $sessions = $weeks = [];
         $weekXp = 0;
@@ -129,6 +143,7 @@ final class GameDesignProgression
             $secondsToday = 0;
             $xpToday = [];
             foreach ($byDay[$date->format('Y-m-d')] ?? [] as $candidate) {
+                $advance($candidate->startedAt);
                 $discipline = Discipline::from($candidate->activityType);
                 $reason = $reasons[$candidate->externalId] ?? null;
                 $xp = 0;
@@ -151,8 +166,10 @@ final class GameDesignProgression
                     $xpToday[$discipline->value] = ($xpToday[$discipline->value] ?? 0) + $xp;
                 }
                 $weekXp += $xp;
+                $state['totalXp'] += $xp;
                 $sessions[] = ['id' => $candidate->externalId, 'at' => $candidate->startedAt->format(\DATE_ATOM), 'end' => $candidate->endedAt->format(\DATE_ATOM), 'discipline' => $discipline->value, 'duration' => $candidate->durationSeconds(), 'retained' => $retained, 'xp' => $xp, 'reason' => $reason, 'breakdown' => $breakdown, 'state' => $this->state($state, $rulesets, $average)];
             }
+            $advance($date->modify('+1 day')->modify('-1 second'));
             if (6 === $day % 7) {
                 $weeks[] = ['week' => intdiv($day, 7) + 1, 'date' => $date->format('Y-m-d'), 'xp' => $weekXp, 'state' => $this->state($state, $rulesets, $average)];
                 $weekXp = 0;
@@ -171,6 +188,6 @@ final class GameDesignProgression
         $fighter = GameDesignInputs::fighter($profile, $rulesets, $average, false);
         $profile['vitalityOverride'] = $progression->vitality;
 
-        return ['totalXp' => $progression->attributes->total(), 'level' => $progression->level, 'xpIntoLevel' => $progression->xpIntoLevel, 'xpToNextLevel' => $progression->xpToNextLevel, 'attributes' => $progression->attributes->toArray(), 'vitality' => $progression->vitality, 'averageEnergy' => $average, 'vitalityBonusPermille' => $progression->vitalityBreakdown->bonusPermille, 'fighter' => CombatSnapshot::fighter($fighter['fighter']), 'profile' => $profile];
+        return ['totalXp' => $profile['totalXp'] ?? $progression->attributes->total(), 'level' => $progression->level, 'xpIntoLevel' => $progression->xpIntoLevel, 'xpToNextLevel' => $progression->xpToNextLevel, 'attributes' => $progression->attributes->toArray(), 'vitality' => $progression->vitality, 'averageEnergy' => $average, 'vitalityBonusPermille' => $progression->vitalityBreakdown->bonusPermille, 'fighter' => CombatSnapshot::fighter($fighter['fighter']), 'profile' => $profile];
     }
 }

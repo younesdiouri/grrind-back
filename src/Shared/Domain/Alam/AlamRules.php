@@ -42,7 +42,7 @@ final readonly class AlamRules
         new DateTimeZone($this->text('timezone'));
         $thresholds = $values['encounter_thresholds'] ?? null;
         if (!\is_array($thresholds) || 3 !== \count($thresholds) || !array_is_list($thresholds)) {
-            throw new InvalidArgumentException('Alam exige trois rencontres.');
+            throw new InvalidArgumentException('Alam exige trois difficultés.');
         }
         $previous = 0;
         foreach ($thresholds as $threshold) {
@@ -52,7 +52,21 @@ final readonly class AlamRules
             $previous = $threshold;
         }
         if (1000 !== $previous) {
-            throw new InvalidArgumentException('La dernière rencontre utilise la cible entière.');
+            throw new InvalidArgumentException('La dernière difficulté utilise la cible entière.');
+        }
+        if (isset($values['difficulty_loot'])) {
+            foreach (AlamDifficulty::cases() as $difficulty) {
+                $loot = $values['difficulty_loot'];
+                $loot = \is_array($loot) ? ($loot[$difficulty->value] ?? null) : null;
+                if (!\is_array($loot)) {
+                    throw new InvalidArgumentException('Récompenses Alam manquantes : '.$difficulty->value);
+                }
+                foreach (['resource_base', 'resource_progression', 'equipment_chance_permille', 'legendary_chance_permille'] as $key) {
+                    if (!\is_int($loot[$key] ?? null) || $loot[$key] < ('resource_base' === $key ? 1 : 0) || $loot[$key] > 1000) {
+                        throw new InvalidArgumentException('Récompense Alam hors limites : '.$difficulty->value.'.'.$key);
+                    }
+                }
+            }
         }
     }
 
@@ -77,6 +91,20 @@ final readonly class AlamRules
     {
         /** @var list<int> */
         return $this->values['encounter_thresholds'];
+    }
+
+    public function threshold(AlamDifficulty $difficulty): int
+    {
+        return $this->thresholds()[$difficulty->position()];
+    }
+
+    /** Les anciens snapshots gardent leurs réglages ; aucune réécriture des replays. */
+    public function loot(AlamDifficulty $difficulty, string $key): int
+    {
+        /** @var array<string, array<string, int>> $loot */
+        $loot = $this->values['difficulty_loot'] ?? [];
+
+        return $loot[$difficulty->value][$key] ?? $this->integer($key);
     }
 
     /** @return array<string, int> */
