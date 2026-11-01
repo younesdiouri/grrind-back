@@ -44,6 +44,7 @@ services:
       - outbox
       - scheduler_alam
       - scheduler_location_evidence
+      - scheduler_league
       - --memory-limit=128M
       - --time-limit=3600
       - -v

@@ -225,7 +225,8 @@ final class PlayerProfileTest extends ApiTestCase
         unset($inList['role'], $inList['joinedAt']);
         self::assertArrayNotHasKey('inventory', $inList);
         self::assertArrayNotHasKey('statistics', $inList);
-        unset($alone['inventory'], $alone['statistics']);
+        self::assertArrayNotHasKey('league', $inList);
+        unset($alone['inventory'], $alone['statistics'], $alone['league']);
         self::assertSame($alone, $inList);
     }
 

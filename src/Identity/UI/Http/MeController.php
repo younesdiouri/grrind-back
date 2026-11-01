@@ -10,6 +10,7 @@ use App\Identity\Domain\User;
 use App\Identity\UI\Http\Request\NotificationPreferenceRequest;
 use App\Identity\UI\Http\Request\UpdateProfileRequest;
 use App\Identity\UI\Http\Response\UserResource;
+use App\Shared\Application\PlayerLeagues;
 use App\Shared\Application\PlayerTitles;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -41,6 +42,7 @@ final readonly class MeController
         private UpdateProfileHandler $updateProfile,
         /** Le port : `Identity` ne connaît ni le catalogue des titres ni la table des déblocages. */
         private PlayerTitles $titles,
+        private PlayerLeagues $leagues,
     ) {
     }
 
@@ -49,12 +51,15 @@ final readonly class MeController
     #[OA\Response(
         response: 200,
         description: 'Le profil, titre porté et titre visé compris : l\'état du joueur en une requête à l\'ouverture de l\'app.',
-        content: new OA\JsonContent(ref: '#/components/schemas/UserProfile'),
+        content: new OA\JsonContent(ref: '#/components/schemas/CurrentUserProfile'),
     )]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     public function show(#[CurrentUser] User $user): JsonResponse
     {
-        return new JsonResponse(UserResource::from($user, $this->titles->of($user->id()))->toArray());
+        return new JsonResponse([
+            ...UserResource::from($user, $this->titles->of($user->id()))->toArray(),
+            'league' => $this->leagues->of([$user->id()])[$user->id()->toRfc4122()],
+        ]);
     }
 
     #[Route('/api/me', name: 'identity_me_update', methods: ['PATCH'])]

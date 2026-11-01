@@ -726,6 +726,69 @@ when@dev:
                                     l'a créé s'est exécutée à l'heure — mais c'est une conséquence du calendrier,
                                     pas une garantie du contrat : ne pas s'y fier pour déduire l'un de l'autre.
 
+                    LeagueIdentity:
+                        type: object
+                        required: [tier, tierOrder, lootLuckPercent]
+                        description: "Statut courant ; nouveau compte = Bronze. Palette, cadre et ornements sont dessinés côté client à partir du tier."
+                        properties:
+                            tier: { type: string, enum: [BRONZE, SILVER, GOLD, PLATINUM, DIAMOND] }
+                            tierOrder: { type: integer, minimum: 0, maximum: 4 }
+                            lootLuckPercent: { type: integer, minimum: 0, description: "Bonus LOOT_LUCK en points de pourcentage, et non probabilité finale de drop." }
+
+                    LeagueResult:
+                        type: object
+                        required: [weekStartsAt, weekEndsAt, settledAt, tier, nextTier, movement, score, rank, participantCount, rulesetVersion]
+                        description: "Résultat figé à la clôture. Les imports et annulations ultérieurs ne le réécrivent pas."
+                        properties:
+                            weekStartsAt: { type: string, format: date-time }
+                            weekEndsAt: { type: string, format: date-time }
+                            settledAt: { type: string, format: date-time }
+                            tier: { type: string, enum: [BRONZE, SILVER, GOLD, PLATINUM, DIAMOND] }
+                            nextTier: { type: string, enum: [BRONZE, SILVER, GOLD, PLATINUM, DIAMOND] }
+                            movement: { type: string, enum: [PROMOTED, MAINTAINED, RELEGATED] }
+                            score: { type: integer, minimum: 0 }
+                            rank: { type: integer, nullable: true, minimum: 1 }
+                            participantCount: { type: integer, minimum: 1 }
+                            rulesetVersion: { type: string }
+
+                    LeagueState:
+                        type: object
+                        required: [league, weekStartsAt, weekEndsAt, timezone, isParticipating, score, rank, participantCount, projectedMovement, movementPercent, minimumPlayersForRelegation, lastResult]
+                        description: |
+                            Une division commune par ligue, sans limite d'effectif. Score = XP nette du
+                            ledger datée du sport, bornes [lundi 00:00 Paris, lundi suivant[.
+                            Le niveau de personnage est indépendant. La course reste provisoire jusqu'à
+                            sa clôture par le worker (battement chaque minute, rattrapage après arrêt).
+                            Le top movementPercent %% (arrondi inférieur, au moins un) à score positif
+                            monte d'un palier ; ex æquo = même décision. Score nul = un palier en moins.
+                            Les derniers movementPercent %% descendent si l'effectif atteint le minimum ;
+                            une égalité traversant cette limite reste maintenue. Bornes Bronze/Diamant.
+                            Un nouveau compte n'entre dans les effectifs qu'à sa première semaine d'XP
+                            positive. Aucun profil d'un autre joueur n'est exposé par cet endpoint.
+                        properties:
+                            league: { $ref: '#/components/schemas/LeagueIdentity' }
+                            weekStartsAt: { type: string, format: date-time }
+                            weekEndsAt: { type: string, format: date-time }
+                            timezone: { type: string, enum: [Europe/Paris] }
+                            isParticipating: { type: boolean }
+                            score: { type: integer, minimum: 0 }
+                            rank: { type: integer, nullable: true, minimum: 1, description: "Rang de compétition dans sa ligue (1, 1, 3) ; null si score nul ou pas encore engagé." }
+                            participantCount: { type: integer, minimum: 0 }
+                            projectedMovement: { type: string, enum: [PROMOTED, MAINTAINED, RELEGATED], description: "Projection calculée par le serveur ; ne jamais déduire une promotion du seul rang." }
+                            movementPercent: { type: integer, minimum: 1, maximum: 49 }
+                            minimumPlayersForRelegation: { type: integer, minimum: 2 }
+                            lastResult:
+                                nullable: true
+                                allOf: [{ $ref: '#/components/schemas/LeagueResult' }]
+
+                    CurrentUserProfile:
+                        allOf:
+                            - $ref: '#/components/schemas/UserProfile'
+                            - type: object
+                              required: [league]
+                              properties:
+                                  league: { $ref: '#/components/schemas/LeagueIdentity' }
+
                     UserProfile:
                         type: object
                         required: [id, email, displayName, timezone, locale, registeredAt, title, nextTitle, notificationPreferences, appearance, avatar]
@@ -1300,8 +1363,9 @@ when@dev:
                         allOf:
                             - $ref: '#/components/schemas/Player'
                             - type: object
-                              required: [inventory, statistics]
+                              required: [inventory, statistics, league]
                               properties:
+                                  league: { $ref: '#/components/schemas/LeagueIdentity' }
                                   inventory: { $ref: '#/components/schemas/PublicInventory' }
                                   statistics: { $ref: '#/components/schemas/PlayerStatistics' }
 

@@ -13,6 +13,8 @@ use Doctrine\ORM\Mapping as ORM;
 class GameSettings
 {
     /** @var array<string, mixed> */
+    #[ORM\Column(type: Types::JSON)] private array $league = [];
+    /** @var array<string, mixed> */
     #[ORM\Column(type: Types::JSON)] private array $together = [];
     #[ORM\Id] #[ORM\Column] private int $id = 1;
     /** @var array<string, array{source: string, combination: string, secondary: ?string}> */
@@ -36,6 +38,18 @@ class GameSettings
     public function getTogether(): array
     {
         return $this->together;
+    }
+
+    /** @return array<string, mixed> */
+    public function getLeague(): array
+    {
+        return $this->league;
+    }
+
+    /** @param array<string, mixed> $league */
+    public function setLeague(array $league): void
+    {
+        $this->league = $league;
     }
 
     /** @param array<string, mixed> $together */

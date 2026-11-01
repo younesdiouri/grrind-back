@@ -6,6 +6,7 @@ namespace App\Community\UI\Http;
 
 use App\Community\Domain\Exception\PlayerNotFound;
 use App\Community\UI\Http\Response\PlayerResource;
+use App\Shared\Application\PlayerLeagues;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Application\PlayerStatistics;
@@ -43,6 +44,7 @@ final readonly class PlayerController
         private PlayerProgressions $progressions,
         private PlayerStatistics $statistics,
         private PublicInventories $inventories,
+        private PlayerLeagues $leagues,
     ) {
     }
 
@@ -83,6 +85,7 @@ final readonly class PlayerController
 
         return new JsonResponse([
             ...PlayerResource::from($id, $profile, $progression)->toArray(),
+            'league' => $this->leagues->of([$id])[$id->toRfc4122()],
             'inventory' => $this->inventories->of($id),
             'statistics' => $this->statistics->of($id, $progression),
         ]);

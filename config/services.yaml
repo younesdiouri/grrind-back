@@ -20,6 +20,9 @@ services:
     App\:
         resource: '../src/'
 
+    App\Shared\Application\LeagueScores: '@App\Progression\Infrastructure\LedgerLeagueScores'
+    App\Shared\Application\PlayerLeagues: '@App\Engagement\Application\LeagueStateProvider'
+
     App\Shared\Application\AlamContributions: '@App\Progression\Infrastructure\AlamWeeklyContributions'
     App\Shared\Application\AlamEfforts: '@App\Training\Infrastructure\AlamWorkoutEfforts'
     App\Shared\Application\WorkoutCounts: '@App\Training\Infrastructure\CreditedWorkoutCounts'

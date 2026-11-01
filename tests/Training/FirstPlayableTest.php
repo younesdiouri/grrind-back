@@ -296,7 +296,8 @@ final class FirstPlayableTest extends ApiTestCase
     {
         return [
             self::candidate('HK-1', 9, '07:00:00', 2700, 'running', distanceMeters: 8_000),
-            self::candidate('HK-2', 7, '18:00:00', 3600, 'cycling', distanceMeters: 25_000),
+            // À midi pour rester hors de la fenêtre Ālam même lorsque la suite tourne un dimanche.
+            self::candidate('HK-2', 7, '12:00:00', 3600, 'cycling', distanceMeters: 25_000),
             self::candidate('HK-3', 5, '12:30:00', 2400, 'traditionalStrengthTraining'),
             self::candidate('HK-4', 3, '07:15:00', 1800, 'running', distanceMeters: 5_000),
             self::candidate('HK-5', 1, '09:00:00', 5400, 'hiking', distanceMeters: 8_000, elevationGainMeters: 400),
@@ -309,7 +310,7 @@ final class FirstPlayableTest extends ApiTestCase
             self::candidate('HK-ARCHIVE', 400, '10:00:00', 3600, 'running', distanceMeters: 12_000),
 
             // La même sortie que HK-2, vue par la seconde application du téléphone.
-            self::candidate('HK-CHEVAUCHE', 7, '18:00:31', 3540, 'running'),
+            self::candidate('HK-CHEVAUCHE', 7, '12:00:31', 3540, 'running'),
 
             self::candidate('HK-CURLING', 4, '20:00:00', 3600, 'curling'),
         ];
