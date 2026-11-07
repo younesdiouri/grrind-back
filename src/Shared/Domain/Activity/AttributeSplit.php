@@ -18,8 +18,7 @@ use InvalidArgumentException;
  * **La répartition se pose sur le total final, jamais sur le socle.** `XpCalculator`
  * compose additivement : `(socle + Σbonus) × p == socle×p + Σ(bonus×p)`, donc répartir le
  * montant qu'il rend en dernier donne exactement le même vecteur que répartir chaque
- * ligne du détail avant de les sommer. Les garde-fous — rendements décroissants, plafond
- * quotidien — restent sur ce total et n'ont pas à connaître les caractéristiques.
+ * ligne du détail avant de les sommer. Le plafond quotidien reste sur ce total et n'ont pas à connaître les caractéristiques.
  *
  * ## L'arrondi : plus fort reste, déterministe
  *

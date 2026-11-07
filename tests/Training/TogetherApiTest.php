@@ -141,7 +141,6 @@ final class TogetherApiTest extends ApiTestCase
         self::assertInstanceOf(\App\Progression\Application\DailyLoadProvider::class, $load);
         $day = $load->of($a->id, Discipline::Running, self::daysAgo(3));
         self::assertSame(30, $day->xpSoFarInDiscipline);
-        self::assertSame(1800, $day->secondsSoFar);
     }
 
     public function testWalkingStillGrantsNoXpAndOldProofsAreRejected(): void

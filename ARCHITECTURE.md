@@ -202,8 +202,8 @@ Quatre choses que ce schéma dit et qu'il faut avoir en tête :
   rien — neuf séances valides ne peuvent pas échouer parce que la dixième est une partie de
   curling. Une *panne*, elle, défait tout : un workout écrit sans XP créditée est une perte
   silencieuse.
-- **L'ordre chronologique n'est pas cosmétique.** Les rendements décroissants se calculent sur ce
-  que le joueur a déjà fait ce jour-là, donc la charge du jour se relit à chaque itération. Le
+- **L'ordre chronologique n'est pas cosmétique.** Le plafond quotidien se calcule sur ce que le
+  joueur a déjà gagné ce jour-là, donc la charge du jour se relit à chaque itération. Le
   même lot envoyé dans un autre ordre doit donner le même ledger.
 - **Le verrou est pris une fois** et tenu jusqu'au COMMIT — un verrou de ligne est ré-entrant
   dans une transaction. C'est lui qui sérialise deux appareils du même compte.
@@ -254,7 +254,7 @@ flowchart TB
     lock["🔒 <b>verrou pessimiste</b> sur la ligne<br/>de progression du joueur"]
     lock --> load["lire la charge du jour<br/><i>après le verrou, donc en voyant<br/>ce que la requête concurrente a écrit</i>"]
     load --> mods["résoudre les <b>modificateurs actifs</b><br/><i>après le verrou pour la même raison :<br/>le streak change dans cette transaction-là</i>"]
-    mods --> calc["<b>XpCalculator</b> — fonction pure<br/>socle → rendements décroissants<br/>→ bonus → plafond quotidien"]
+    mods --> calc["<b>XpCalculator</b> — fonction pure<br/>socle → terrain<br/>→ bonus → plafond quotidien"]
     calc --> ledger["écrire l'<b>XpTransaction</b><br/><i>montant + rulesetVersion + détail ligne à ligne</i>"]
     ledger --> snap["reprojeter le <b>snapshot</b><br/><i>sur SUM(ledger), jamais un +=</i>"]
     snap --> titles["évaluer les <b>titres</b><br/><i>après l'écriture : la séance qui vient<br/>d'être créditée compte pour son titre</i>"]
@@ -318,7 +318,7 @@ que Vitality selon le document de game design — s'arrête avant ce schéma en 
 négative, aucun verrou, aucune lecture de charge du jour, aucune `XpTransaction`. La séance est
 quand même écrite par `Training` et animée dans `imported` — c'est un `RewardSummary` à part
 entière, à 0 XP et avec une `reason` — mais sans jamais toucher `GrantXpHandler`. C'est ce qui
-garantit qu'une marche ne consomme ni les rendements décroissants ni le plafond quotidien d'une
+garantit qu'une marche ne consomme pas le plafond quotidien d'une
 autre discipline pratiquée le même jour.
 
 **Ce qui sort du COMMIT : le `SyncSummary`.** C'est le contrat le plus coûteux à casser du
@@ -352,7 +352,7 @@ niveaux à franchir, ce qui est un cas normal (#79).
       "xp":       { "awarded": 145,
                     "breakdown": [ { "source": "BASE",        "amount":  60 },
                                    { "source": "DISTANCE",    "amount": 100 },
-                                   { "source": "DIMINISHING", "amount": -15 } ],
+                                   { "source": "DAILY_CAP",   "amount": -15 } ],
                     "reason": null },   // non nul, breakdown vide : une marche (#167)
       "level":    { "before": 1, "xpIntoLevelBefore": 0, "xpToNextLevelBefore": 100,
                     "after": 2, "reached": [2],
@@ -383,8 +383,8 @@ Pourquoi cet ordre, en trois phrases :
 - **Le verrou d'abord.** Il porte sur *une ligne* — deux joueurs ne s'attendent jamais. Sans
   lui, deux synchronisations simultanées lisent le même total, calculent le même niveau et
   s'écrasent l'une l'autre.
-- **La lecture du jour et des modificateurs après le verrou.** Sinon les rendements
-  décroissants se contourneraient en créditant deux workouts à la même seconde, et un ensemble
+- **La lecture du jour et des modificateurs après le verrou.** Sinon le plafond
+  quotidien se contournerait en créditant deux workouts à la même seconde, et un ensemble
   de bonus lu avant la transaction créditerait un streak déjà périmé. C'est aussi ce qui rend un
   lot correct workout par workout : la charge est relue à chaque itération, donc le deuxième
   workout d'une journée voit le premier même s'ils arrivent ensemble.
@@ -400,10 +400,9 @@ Et le calcul lui-même, qui est une **fonction pure et versionnée** :
 ```mermaid
 flowchart LR
     d["durée retenue"] --> base["socle<br/><i>une minute = un point</i>"]
-    base --> dim["− rendements décroissants<br/><i>selon le temps déjà fait ce jour-là</i>"]
-    dim --> terr["+ distance + dénivelé<br/><i>selon la discipline, non rabotés</i>"]
+    base --> terr["+ distance + dénivelé<br/><i>selon la discipline</i>"]
     m["distance · D+"] --> terr
-    terr --> bonus["+ bonus<br/><i>en % du socle raboté, additifs</i>"]
+    terr --> bonus["+ bonus<br/><i>en % du socle, additifs</i>"]
     mods["modificateurs actifs<br/><i>ModifierResolver</i>"] --> bonus
     bonus --> cap["− dépassement du plafond<br/>quotidien de la discipline"]
     cap --> out["<b>XpAward</b><br/>montant + rulesetVersion<br/>+ le détail de chaque ligne"]
@@ -417,11 +416,11 @@ distingue les disciplines est désormais **mesuré**, ou assumé comme absent : 
 dimension fiable, et une dimension qu'on n'aurait que sur la moitié des appareils créerait deux
 jeux au lieu d'un.
 
-**Le terrain échappe aux rendements décroissants** : dix kilomètres restent dix kilomètres quelle
-que soit l'heure à laquelle on les a courus. Ce sont les *minutes* qui décroissent. C'est le
-plafond quotidien qui borne ce côté-là.
+**Pas de rendements décroissants** (supprimés au #344) : une, deux ou trois séances dans la
+journée valent chacune leur durée pleine. Seul le plafond quotidien de la discipline borne la
+journée.
 
-**Les bonus sont additifs sur le socle raboté**, terrain non compris, et pas multiplicatifs :
+**Les bonus sont additifs sur le socle**, terrain non compris, et pas multiplicatifs :
 `90 + 18 + 13 = 121`, et non `90 × 1,20 × 1,15`. Chaque ligne du détail reste ainsi vraie
 isolément — « +18 grâce à ta série » ne dépend pas de ce qui a été appliqué avant, et un même
 streak ne vaut pas trois fois plus sur un trail que sur une séance de fonte. Et chaque garde-fou

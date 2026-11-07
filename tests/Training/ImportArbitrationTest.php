@@ -255,10 +255,8 @@ final class ImportArbitrationTest extends ApiTestCase
         self::assertSame(1, $this->countWorkouts());
         self::assertSame(12 * 3600, self::asInt($this->connection()->fetchOne('SELECT duration_seconds FROM workout')));
 
-        // Quatre heures retenues, entièrement rabotées par les rendements décroissants
-        // au-delà de la deuxième heure : 60 min pleines, 30 à 60 %, 30 à 30 %, le reste à
-        // rien. Le montant compte moins que le fait qu'il y en ait un.
-        self::assertSame(87, $this->snapshotTotalOf($bob));
+        // Quatre heures retenues, chacune à plein tarif depuis #344.
+        self::assertSame(240, $this->snapshotTotalOf($bob));
     }
 
     /**

@@ -122,13 +122,11 @@ class XpTransactionRepository extends ServiceEntityRepository
     public function dailyLoadOf(Uuid $userId, Discipline $discipline, LocalDay $day): DailyLoad
     {
         $row = $this->createQueryBuilder('t')
-            ->select('COALESCE(SUM(t.durationSeconds), 0) AS seconds')
-            // Le CASE porte la restriction à la discipline plutôt qu'un second appel :
-            // une seule lecture de la journée, un seul parcours d'index.
-            ->addSelect('COALESCE(SUM(CASE WHEN t.discipline = :discipline THEN t.amount ELSE 0 END), 0) AS xp')
+            ->select('COALESCE(SUM(t.amount), 0) AS xp')
             ->where('t.userId = :userId')
             ->andWhere('t.occurredAt >= :startsAt')
             ->andWhere('t.occurredAt < :endsAt')
+            ->andWhere('t.discipline = :discipline')
             ->andWhere('t.reason != :together')
             ->setParameter('together', XpReason::TogetherBonus)
             ->setParameter('userId', $userId, UuidType::NAME)
@@ -138,12 +136,9 @@ class XpTransactionRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleResult();
 
-        \assert(\is_array($row) && is_numeric($row['seconds']) && is_numeric($row['xp']));
+        \assert(\is_array($row) && is_numeric($row['xp']));
 
-        // Un cumul négatif n'a pas de sens pour placer une séance sur la courbe : il
-        // signifierait qu'on a annulé plus que ce qui avait été crédité ce jour-là, ce que
-        // seule une annulation datée d'un autre jour peut produire.
-        return new DailyLoad(max(0, (int) $row['seconds']), (int) $row['xp']);
+        return new DailyLoad((int) $row['xp']);
     }
 
     /**

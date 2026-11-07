@@ -30,9 +30,7 @@ enum XpBreakdownSource: string
      * d'animation de plus, et c'est tout l'intérêt : « 45 de base, +62 pour tes 6,2 km »
      * se lit et se joue, là où un total unique se subit.
      *
-     * Elles s'ajoutent au socle sans être rabotées par les rendements décroissants : dix
-     * kilomètres restent dix kilomètres quelle que soit l'heure à laquelle on les a
-     * courus. C'est le plafond quotidien qui borne ce côté-là.
+     * Elles s'ajoutent au socle ; c'est le plafond quotidien qui borne ce côté-là.
      */
     case Distance = 'DISTANCE';
     case Elevation = 'ELEVATION';
@@ -57,7 +55,10 @@ enum XpBreakdownSource: string
      */
     case Guild = 'GUILD';
 
-    /** Les rendements décroissants de la journée (#15) : négatif au crédit. */
+    /**
+     * Les rendements décroissants de la journée (#15), supprimés au #344. Plus rien ne
+     * produit cette ligne ; la valeur reste parce que le ledger, append-only, la porte encore.
+     */
     case Diminishing = 'DIMINISHING';
 
     /** Le plafond quotidien par discipline (#15) : négatif au crédit. */

@@ -53,19 +53,15 @@ final class DailyLoadTest extends ApiTestCase
         $this->credit($player, Discipline::Running, 60, 2400, '2026-03-01T23:30:00+00:00');
 
         $veille = $this->provider->of($player, Discipline::Running, new DateTimeImmutable('2026-03-01T22:45:00+00:00'));
-        self::assertSame(1800, $veille->secondsSoFar);
         self::assertSame(45, $veille->xpSoFarInDiscipline);
 
         $lendemain = $this->provider->of($player, Discipline::Running, new DateTimeImmutable('2026-03-01T23:45:00+00:00'));
-        self::assertSame(2400, $lendemain->secondsSoFar);
         self::assertSame(60, $lendemain->xpSoFarInDiscipline);
     }
 
-    public function testTheTimeIsCumulativeAcrossDisciplinesButTheXpIsNot(): void
+    public function testTheXpIsCountedPerDiscipline(): void
     {
-        // Les deux garde-fous ne visent pas la même chose : le volume d'entraînement
-        // décroît quoi qu'on pratique, le plafond empêche de tout mettre sur la discipline
-        // la mieux payée.
+        // Le plafond empêche de tout mettre sur la discipline la mieux payée.
         $player = $this->openAccount()->id;
 
         $this->credit($player, Discipline::Running, 90, 3600, '2026-03-02T10:00:00+00:00');
@@ -73,7 +69,6 @@ final class DailyLoadTest extends ApiTestCase
 
         $today = $this->provider->of($player, Discipline::Running, new DateTimeImmutable('2026-03-02T14:00:00+00:00'));
 
-        self::assertSame(5400, $today->secondsSoFar);
         self::assertSame(90, $today->xpSoFarInDiscipline);
     }
 
@@ -85,12 +80,10 @@ final class DailyLoadTest extends ApiTestCase
         $this->ledger->add(XpTransaction::reversalOf($credit));
         $this->ledger->commit();
 
-        // Montant *et* durée s'annulent par simple somme : la séance invalidée cesse de
-        // peser sur les rendements décroissants comme elle cesse de compter en XP, sans que
-        // la requête ait à filtrer sur les raisons.
+        // Le montant s'annule par simple somme, sans que la requête ait à filtrer sur les
+        // raisons.
         $today = $this->provider->of($player, Discipline::Running, new DateTimeImmutable('2026-03-02T14:00:00+00:00'));
 
-        self::assertSame(0, $today->secondsSoFar);
         self::assertSame(0, $today->xpSoFarInDiscipline);
     }
 
@@ -99,7 +92,6 @@ final class DailyLoadTest extends ApiTestCase
         $today = $this->provider->of(Uuid::v7(), Discipline::Running, new DateTimeImmutable('2026-03-02T14:00:00+00:00'));
 
         // Compte inconnu : le port rend UTC plutôt que de lever, et le ledger est vide.
-        self::assertSame(0, $today->secondsSoFar);
         self::assertSame(0, $today->xpSoFarInDiscipline);
     }
 

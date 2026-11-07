@@ -198,10 +198,6 @@ services:
             $luck: '@App\Shared\Application\GameRulesets'
 
 
-    App\Progression\Domain\DiminishingReturns:
-        factory: ['App\Progression\Domain\DiminishingReturns', 'runtime']
-        arguments: ['@App\Shared\Application\GameRulesets']
-
     # La table de répartition de l'XP entre les quatre caractéristiques (#158), tirée de
     # `game/v1/attributes.yaml`. Une liste, comme `disciplines` de `XpRates` juste
     # au-dessus : ouvrir une discipline ou corriger un pourcentage se fait dans le YAML,
