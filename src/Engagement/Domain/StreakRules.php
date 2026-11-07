@@ -4,114 +4,59 @@ declare(strict_types=1);
 
 namespace App\Engagement\Domain;
 
-use App\Shared\Application\StreakState;
 use DateTimeImmutable;
-use DateTimeZone;
 
 /**
- * La régularité du vrai sport (§7.5 du game design, #286) : une fonction pure, des jours
- * sportifs et un jour courant vers un {@see StreakState}.
+ * Le streak de l'assiduité (#346) : ouvrir l'app une fois par jour fait la série, le sport
+ * fait le palier du coffre de la semaine.
  *
- * **Fenêtre glissante stricte.** Une série commence au premier jour sportif et vit tant
- * que toute fenêtre de 7 jours consécutifs depuis ce jour compte au plus un jour manqué :
- * deux jours manqués à moins de 7 jours d'écart la cassent, au second. On repart alors de
- * zéro au jour sportif suivant. « 12 sur 14 », « 18 sur 21 » et « 24 sur 28 » ne sont pas
- * des règles de plus : ils découlent de celle-ci, ce sont les semaines 2, 3 et 4. La
- * lecture « cumul par paliers », plus laxiste, a été écartée avec l'auteur.
+ * Il remplace la régularité sportive du #286 (six jours de 30 minutes sur sept) : trop dure
+ * à tenir, elle cassait presque chaque semaine. Une semaine civile — lundi au dimanche, dans
+ * le fuseau du joueur — pointée sept jours sur sept rapporte un coffre ; le nombre de jours
+ * où le joueur a fait au moins une séance créditée en fixe le palier. Des **jours**, pas des
+ * séances : six séances courtes le dimanche ne valent pas une semaine de sport.
  *
- * **Le jour courant n'est pas encore manqué.** La journée n'est pas finie : sans séance
- * pour l'instant, elle ne casse rien.
- *
- * **Les semaines sont ancrées sur le premier jour de la série**, jamais sur le calendrier :
- * la semaine *k* couvre `[A + 7(k−1), A + 7k − 1]` et rapporte son coffre dès qu'elle
- * compte 6 jours sportifs.
- *
- * Les seuils (6 sur 7, quatre paliers) sont la spec elle-même, pas un réglage : seule la
- * durée qui fait un jour sportif est administrable, dans le réglage publié `streak`.
+ * Les seuils sont la spec, pas un réglage : seul le coffre de chaque palier s'administre,
+ * dans le réglage publié `streak`.
  */
 final class StreakRules
 {
     public const int WEEK = 7;
-    public const int SPORT_DAYS_PER_WEEK = 6;
-
-    private const array RARITIES = [1 => 'COMMON', 2 => 'RARE', 3 => 'EPIC'];
 
     /**
-     * @param array<string, true> $sportDays les jours sportifs, `AAAA-MM-JJ` local ; ceux d'après `$today` sont ignorés
+     * Jours pointés consécutifs jusqu'à aujourd'hui. Aujourd'hui pas encore pointé ne casse
+     * rien — la journée n'est pas finie — on compte alors jusqu'à hier.
+     *
+     * @param array<string, true> $checkIns les jours pointés, `AAAA-MM-JJ` local
      */
-    public static function evaluate(array $sportDays, string $today): StreakState
+    public static function days(array $checkIns, string $today): int
     {
-        $end = self::number($today);
-        $days = [];
-        foreach (array_keys($sportDays) as $day) {
-            $number = self::number($day);
-            if ($number <= $end) {
-                $days[$number] = true;
-            }
+        $day = new DateTimeImmutable($today);
+        if (!isset($checkIns[$today])) {
+            $day = $day->modify('-1 day');
+        }
+        $days = 0;
+        while (isset($checkIns[$day->format('Y-m-d')])) {
+            ++$days;
+            $day = $day->modify('-1 day');
         }
 
-        $anchor = null;
-        $lastMiss = null;
-        if ([] !== $days) {
-            for ($day = min(array_keys($days)); $day <= $end; ++$day) {
-                if (isset($days[$day])) {
-                    $anchor ??= $day;
-                } elseif (null !== $anchor && $day !== $end) {
-                    if (null !== $lastMiss && $day - $lastMiss < self::WEEK) {
-                        $anchor = $lastMiss = null;
-                    } else {
-                        $lastMiss = $day;
-                    }
-                }
-            }
-        }
-
-        $weeks = 0;
-        if (null !== $anchor) {
-            for ($start = $anchor; $start <= $end; $start += self::WEEK) {
-                if (self::countBetween($days, $start, $start + self::WEEK - 1) >= self::SPORT_DAYS_PER_WEEK) {
-                    ++$weeks;
-                }
-            }
-        }
-
-        return new StreakState(
-            null === $anchor ? null : self::date($anchor),
-            null === $anchor ? 0 : $end - $anchor + 1,
-            $weeks,
-            self::countBetween($days, $end - self::WEEK + 1, $end),
-            self::rarityOf($weeks + 1),
-        );
+        return $days;
     }
 
-    /** La rareté du coffre de la semaine `$week` (1 = la première) : Légendaire à partir de la quatrième. */
-    public static function rarityOf(int $week): string
+    /** Le palier du coffre d'une semaine, selon ses jours avec au moins une séance. */
+    public static function rarityFor(int $sportDays): string
     {
-        return self::RARITIES[$week] ?? 'LEGENDARY';
+        return match (true) {
+            $sportDays >= 6 => 'LEGENDARY',
+            $sportDays >= 3 => 'RARE',
+            default => 'COMMON',
+        };
     }
 
-    /** @param array<int, true> $days */
-    private static function countBetween(array $days, int $from, int $until): int
+    /** Le lundi de la semaine qui contient `$day`. */
+    public static function weekStart(string $day): string
     {
-        $count = 0;
-        for ($day = $from; $day <= $until; ++$day) {
-            $count += isset($days[$day]) ? 1 : 0;
-        }
-
-        return $count;
-    }
-
-    /** Un jour civil en entier, pour que les écarts soient des soustractions : en UTC, un jour fait toujours 86 400 secondes. */
-    private static function number(string $date): int
-    {
-        $day = DateTimeImmutable::createFromFormat('!Y-m-d', $date, new DateTimeZone('UTC'));
-        \assert(false !== $day);
-
-        return intdiv($day->getTimestamp(), 86400);
-    }
-
-    private static function date(int $number): string
-    {
-        return new DateTimeImmutable('@'.($number * 86400))->format('Y-m-d');
+        return new DateTimeImmutable($day)->modify('monday this week')->format('Y-m-d');
     }
 }

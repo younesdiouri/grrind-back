@@ -6,18 +6,17 @@ namespace App\Training\Application;
 
 use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
-use App\Shared\Application\SessionStreak;
 use App\Training\Domain\Workout;
 
 /**
  * Un workout crédité et ce qu'il a rapporté.
  *
- * Les trois ensemble parce qu'elles sortent de la **même** transaction. Les séparer
+ * Les deux ensemble parce qu'elles sortent de la **même** transaction. Les séparer
  * obligerait l'appelant à recharger l'une d'elles après coup, donc à lire un état qui a pu
  * bouger entre-temps — et le `RewardSummary` (#22) doit décrire un instant, pas deux.
  *
  * `reward` et `drop` sont peuplées par un module chacune — `Progression` et `Rewards`
- * (#226) — et `streak` par `Engagement` (#286), de la même façon.
+ * (#226). Le streak n'y est plus (#346) : il se gagne en ouvrant l'app, pas en important.
  */
 final readonly class SessionCompletion
 {
@@ -25,7 +24,6 @@ final readonly class SessionCompletion
         public Workout $session,
         public SessionReward $reward,
         public SessionDrop $drop,
-        public SessionStreak $streak,
     ) {
     }
 }

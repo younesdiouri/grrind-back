@@ -11,16 +11,15 @@ use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Le coffre d'une semaine de régularité, une fois pour toutes (#286) : la ligne d'audit
- * et la garantie d'unicité. Une série se reconnaît à son premier jour.
+ * Le coffre d'une semaine pointée sept jours sur sept (#346), une fois pour toutes : la
+ * ligne d'audit et la garantie d'unicité, par `(joueur, lundi)`.
  *
- * ponytail: un import tardif qui comble le trou entre deux séries les fusionne et déplace
- * l'ancre — les semaines de la série fusionnée peuvent alors rapporter un second coffre.
- * Borné par la fenêtre d'antériorité de 30 jours ; clé par jour de clôture si ça compte.
+ * Écrit par `INSERT … ON CONFLICT DO NOTHING` dans {@see \App\Engagement\Application\StreakTracker} ;
+ * l'entité n'existe que pour que le schéma reste décrit par le mapping.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'engagement_streak_chest')]
-#[ORM\UniqueConstraint(name: 'uniq_streak_chest_week', columns: ['user_id', 'run_started_on', 'week'])]
+#[ORM\UniqueConstraint(name: 'uniq_streak_chest_week', columns: ['user_id', 'week_start'])]
 class StreakChest
 {
     #[ORM\Id]
@@ -31,9 +30,9 @@ class StreakChest
         #[ORM\Column(type: UuidType::NAME)]
         private Uuid $userId,
         #[ORM\Column(type: Types::DATE_IMMUTABLE)]
-        private DateTimeImmutable $runStartedOn,
+        private DateTimeImmutable $weekStart,
         #[ORM\Column]
-        private int $week,
+        private int $sportDays,
         #[ORM\Column(length: 20)]
         private string $rarity,
         #[ORM\Column(length: 64)]
@@ -44,10 +43,5 @@ class StreakChest
         private DateTimeImmutable $grantedAt,
     ) {
         $this->id = Uuid::v7();
-    }
-
-    public function week(): int
-    {
-        return $this->week;
     }
 }
