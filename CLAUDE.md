@@ -262,7 +262,6 @@ BEGIN
       écrire l'XpTransaction
       mettre à jour le snapshot de progression
       tirer le loot (LootRoller, audité)
-      mettre à jour le streak
       publier WorkoutImported dans l'outbox
 COMMIT
 → asynchrone : classements, notifications

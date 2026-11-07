@@ -316,11 +316,8 @@ final readonly class GameRulesetPublisher
     /** @param array<string, mixed> $streak */
     private static function validateStreak(array $streak, ItemCatalog $catalog): void
     {
-        if (!\is_int($streak['minimum_daily_seconds'] ?? null) || $streak['minimum_daily_seconds'] < 1) {
-            throw new LogicException('La durée qui fait un jour sportif doit être un nombre de secondes positif.');
-        }
         $chests = $streak['chests'] ?? null;
-        foreach (['COMMON', 'RARE', 'EPIC', 'LEGENDARY'] as $rarity) {
+        foreach (['COMMON', 'RARE', 'LEGENDARY'] as $rarity) {
             $key = \is_array($chests) ? ($chests[$rarity] ?? null) : null;
             $chest = \is_string($key) ? $catalog->findAvailable($key) : null;
             if (null === $chest || \App\Rewards\Domain\ItemKind::Chest !== $chest->kind) {

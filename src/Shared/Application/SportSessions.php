@@ -8,21 +8,18 @@ use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Les séances qui font un jour sportif (#286) : `Training` les possède, `Engagement` en
- * tire la série de régularité sans importer un workout.
+ * Les séances qui montent le palier du coffre de la semaine (#346) : `Training` les
+ * possède, `Engagement` en tire le palier sans importer un workout.
  *
  * Seules les séances **créditées** d'une discipline **créditrice** en sortent — la marche
- * ne compte pas, et un workout conservé hors fenêtre d'antériorité non plus : sans quoi
- * trois ans d'Apple Health importés d'un coup ouvriraient trois ans de coffres, exactement
- * ce que la fenêtre interdit déjà pour l'XP.
+ * ne compte pas, et un workout conservé hors fenêtre d'antériorité non plus.
  */
 interface SportSessions
 {
     /**
-     * Toutes les séances qui comptent du joueur, dans l'ordre chronologique. `seconds` est
-     * la durée retenue, écrêtée au plafond comme pour l'XP.
+     * Le début de chaque séance qui compte, commencée dans `[$from, $until[`.
      *
-     * @return list<array{id: string, startedAt: DateTimeImmutable, seconds: int}>
+     * @return list<DateTimeImmutable>
      */
-    public function of(Uuid $player): array;
+    public function startedBetween(Uuid $player, DateTimeImmutable $from, DateTimeImmutable $until): array;
 }

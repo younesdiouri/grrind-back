@@ -8,7 +8,6 @@ use App\Shared\Application\DroppedItem;
 use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
-use App\Shared\Application\SessionStreak;
 use App\Shared\Application\XpLine;
 use App\Training\Application\SessionCompletion;
 
@@ -46,10 +45,7 @@ use App\Training\Application\SessionCompletion;
  * docblock d'`App\Shared\Domain\Activity\Vitality` pour pourquoi elle peut bouger sans que
  * cette séance lui ait rien crédité.
  *
- * **`streak` vient après `coins`** : le jour sportif, la série avant, la série après, puis
- * le coffre de la semaine s'il tombe — voir {@see SessionStreak}.
- *
- * **`coins` se place entre `loot` et `streak`, jamais ailleurs.** Même geste que les jauges
+ * **`coins` suit `loot`, jamais ailleurs.** Même geste que les jauges
  * de caractéristiques et le palier de niveau — `{gained, before, after}` — et la même
  * raison : une bourse qui repartirait du solde final ne s'anime pas. L'ordre dit la mise en
  * scène : le loot se révèle, **puis** les pièces tombent dedans. `before`/`after` viennent
@@ -79,7 +75,6 @@ final readonly class RewardSummaryResource
         public WorkoutResource $session,
         public SessionReward $reward,
         public SessionDrop $drop,
-        public SessionStreak $streak,
     ) {
     }
 
@@ -89,7 +84,6 @@ final readonly class RewardSummaryResource
             WorkoutResource::from($completion->session),
             $completion->reward,
             $completion->drop,
-            $completion->streak,
         );
     }
 
@@ -169,9 +163,8 @@ final readonly class RewardSummaryResource
                 static fn (DroppedItem $item): array => $item->toArray(),
                 $this->drop->items,
             ),
-            // Entre `loot` et `streak`, jamais ailleurs — voir le docblock de la classe.
+            // Après `loot`, jamais ailleurs — voir le docblock de la classe.
             'coins' => self::gauge($this->drop->coinsGained, $this->drop->coinsBefore, $this->drop->coinsAfter),
-            'streak' => $this->streak->toArray(),
             // Sous quel équilibrage ces montants ont été accordés. Le client l'affiche dans
             // un rapport de bug ; c'est ce qui rend une capture d'écran exploitable.
             'rulesetVersion' => $this->reward->rulesetVersion,

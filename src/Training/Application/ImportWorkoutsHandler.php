@@ -7,7 +7,6 @@ namespace App\Training\Application;
 use App\Shared\Application\GameRulesets;
 use App\Shared\Application\SessionDrops;
 use App\Shared\Application\SessionRewards;
-use App\Shared\Application\SessionStreaks;
 use App\Shared\Domain\Activity\ActivityTypeMap;
 use App\Shared\Domain\Activity\Discipline;
 use App\Shared\Domain\Alam\AlamCalendar;
@@ -75,7 +74,6 @@ final readonly class ImportWorkoutsHandler
         private WorkoutRules $rules,
         private SessionRewards $rewards,
         private SessionDrops $drops,
-        private SessionStreaks $streaks,
         // `event.bus` explicitement (#155) : `WorkoutImported` est un `DomainEvent`, il
         // part sur le bus qui tolère l'absence d'abonné. Sans `#[Target]`, l'autowiring
         // par nom de paramètre est déprécié en 8.1 et retomberait de toute façon sur
@@ -241,10 +239,8 @@ final readonly class ImportWorkoutsHandler
             // `ARCHITECTURE.md`. `$reward` porte déjà le niveau d'après ce crédit et le
             // verdict « créditée ou non » : voir le docblock de `SessionDrops` pour
             // pourquoi cette classe ne repose aucune de ces deux questions.
-            // Le streak en dernier (#286) : il relit les séances déjà écrites, celle-ci
-            // comprise, et son coffre se révèle après le loot dans la mise en scène.
             $drop = $this->drops->rollFor($fact, $reward);
-            $imported[] = new SessionCompletion($workout, $reward, $drop, $this->streaks->recordFor($fact));
+            $imported[] = new SessionCompletion($workout, $reward, $drop);
 
             // Publié dans la transaction : le transport Doctrine écrit dans
             // `messenger_messages` sur la même connexion, donc l'événement partage le COMMIT.

@@ -1214,18 +1214,28 @@ when@dev:
                     StreakState:
                         type: object
                         description: |
-                            Une série de régularité (#286), relue des jours sportifs. Un jour sportif cumule
-                            30 minutes de sport valide (la marche ne compte pas). La série casse dès que
-                            deux jours manqués tombent à moins de 7 jours d'écart ; le jour courant n'est pas
-                            encore manqué. Chaque semaine de la série à 6 jours sportifs rapporte un coffre :
-                            commun, rare, épique, puis légendaire chaque semaine.
-                        required: [startedOn, days, weeksCompleted, sportDaysInLast7, nextChestRarity]
+                            Le streak de l'assiduité (#346) : les jours consécutifs où le joueur a ouvert
+                            l'app. Une semaine civile (lundi → dimanche, fuseau du joueur) pointée 7 jours
+                            sur 7 rapporte un coffre au premier pointage de la semaine suivante ; son palier
+                            dépend des jours avec au moins une séance créditée : 0–2 commun, 3–5 rare,
+                            6–7 légendaire.
+                        required: [days, checkedInToday, sportDaysThisWeek, chestRarity]
                         properties:
-                            startedOn: { type: string, format: date, nullable: true, example: '2026-08-07', description: 'Premier jour de la série en cours ; `null` sans série.' }
-                            days: { type: integer, example: 6, description: "Jours écoulés depuis `startedOn`, aujourd'hui compris." }
-                            weeksCompleted: { type: integer, example: 1 }
-                            sportDaysInLast7: { type: integer, example: 6 }
-                            nextChestRarity: { type: string, enum: [COMMON, RARE, EPIC, LEGENDARY] }
+                            days: { type: integer, example: 12, description: "Jours pointés consécutifs ; aujourd'hui pas encore pointé ne casse rien." }
+                            checkedInToday: { type: boolean }
+                            sportDaysThisWeek: { type: integer, example: 3, description: "Jours de la semaine en cours avec au moins une séance créditée." }
+                            chestRarity: { type: string, enum: [COMMON, RARE, LEGENDARY], description: "Le palier du coffre de cette semaine si elle s'arrêtait là." }
+
+                    StreakCheckIn:
+                        type: object
+                        description: "Le pointage du jour (#346). À appeler à l'ouverture de l'app, **après** la synchronisation santé : le coffre de la semaine passée compte les séances du dimanche."
+                        required: [streak, chest]
+                        properties:
+                            streak: { $ref: '#/components/schemas/StreakState' }
+                            chest:
+                                nullable: true
+                                description: "Le coffre de la semaine passée, s'il vient de tomber — déjà crédité à l'inventaire, il s'ouvre par `POST /api/inventory/chests/{key}/open`."
+                                allOf: [{ $ref: '#/components/schemas/DroppedItem' }]
 
                     DroppedItemModifier:
                         type: object
@@ -1540,7 +1550,7 @@ when@dev:
                             traduits, et `loot` qui porte de quoi afficher chaque objet sans recharger le
                             catalogue. `attributes` suit la même règle, Vitality comprise.
 
-                            **`coins` se place entre `loot` et `streak`, jamais ailleurs** — même geste que
+                            **`coins` suit `loot`, jamais ailleurs** — même geste que
                             les jauges de caractéristiques et le palier de niveau, `{gained, before, after}`,
                             et pour la même raison : une bourse qui repartirait du solde final ne s'anime
                             pas. `before`/`after` sont lus sur le solde réel du joueur, jamais reconstitués
@@ -1549,10 +1559,7 @@ when@dev:
                             **Une séance sans tirage** — non créditée, ou sans table éligible — porte
                             `loot: []` et un `coins` à gain nul, jamais des clés absentes : le client anime
                             la même séquence dans tous les cas.
-
-                            **`streak` suit `coins` (#286)** : le jour sportif, la série avant, la série
-                            après, puis le coffre de la semaine s'il tombe.
-                        required: [session, xp, attributes, level, titlesUnlocked, loot, coins, streak, rulesetVersion]
+                        required: [session, xp, attributes, level, titlesUnlocked, loot, coins, rulesetVersion]
                         properties:
                             session: { $ref: '#/components/schemas/Workout' }
                             xp:
@@ -1642,25 +1649,12 @@ when@dev:
                                 items: { $ref: '#/components/schemas/DroppedItem' }
                             coins:
                                 type: object
-                                description: "Entre `loot` et `streak` : le loot se révèle, puis les pièces tombent dedans (#226)."
+                                description: "Après `loot` : le loot se révèle, puis les pièces tombent dedans (#226)."
                                 required: [gained, before, after]
                                 properties:
                                     gained: { type: integer, example: 12, description: "Peut valoir zéro : aucune table éligible, ou séance non créditée." }
                                     before: { type: integer, example: 40 }
                                     after: { type: integer, example: 52 }
-                            streak:
-                                type: object
-                                description: "Ce que la séance a fait à la série de régularité (#286), dans l'ordre de l'animation. Présent pour chaque séance, marche comprise — qui ne compte simplement pas."
-                                required: [sportDay, dayCounted, before, after, chests]
-                                properties:
-                                    sportDay: { type: string, format: date, example: '2026-08-12', description: 'Le jour local du sport, dans le fuseau du joueur.' }
-                                    dayCounted: { type: boolean, description: "Ce jour atteint 30 minutes de sport valide, cette séance comprise." }
-                                    before: { $ref: '#/components/schemas/StreakState' }
-                                    after: { $ref: '#/components/schemas/StreakState' }
-                                    chests:
-                                        type: array
-                                        description: "Le coffre de la semaine de régularité qui vient d'être acquise — vide le plus souvent. Déjà crédité à l'inventaire, il s'ouvre par `POST /api/inventory/chests/{key}/open`."
-                                        items: { $ref: '#/components/schemas/DroppedItem' }
                             rulesetVersion:
                                 type: string
                                 description: "L'équilibrage sous lequel ces montants ont été accordés. Le client n'en fait rien ; un rapport de bug, si."

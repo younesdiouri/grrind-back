@@ -6,8 +6,6 @@ namespace App\Tests\Training;
 
 use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
-use App\Shared\Application\SessionStreak;
-use App\Shared\Application\StreakState;
 use App\Shared\Application\XpLine;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
@@ -53,7 +51,7 @@ final class SyncSummaryPayloadTest extends TestCase
         self::assertIsArray($payload['imported']);
         self::assertIsArray($payload['imported'][0]);
         self::assertSame(
-            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'streak', 'rulesetVersion'],
+            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'rulesetVersion'],
             array_keys($payload['imported'][0]),
         );
     }
@@ -178,7 +176,6 @@ final class SyncSummaryPayloadTest extends TestCase
                 rulesetVersion: 'v1-abcdef',
             ),
             SessionDrop::none(0),
-            new SessionStreak('2026-08-12', true, new StreakState('2026-08-07', 5, 0, 5, 'COMMON'), new StreakState('2026-08-07', 6, 1, 6, 'RARE'), []),
         );
     }
 }

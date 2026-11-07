@@ -9,8 +9,6 @@ use App\Shared\Application\DroppedItemModifier;
 use App\Shared\Application\PlayerTitle;
 use App\Shared\Application\SessionDrop;
 use App\Shared\Application\SessionReward;
-use App\Shared\Application\SessionStreak;
-use App\Shared\Application\StreakState;
 use App\Shared\Application\XpLine;
 use App\Shared\Domain\Activity\AttributeGains;
 use App\Shared\Domain\Activity\Discipline;
@@ -38,13 +36,13 @@ final class RewardSummaryPayloadTest extends TestCase
         $payload = self::summary()->toArray();
 
         self::assertSame(
-            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'streak', 'rulesetVersion'],
+            ['session', 'xp', 'attributes', 'level', 'titlesUnlocked', 'loot', 'coins', 'rulesetVersion'],
             array_keys($payload),
             'Un champ déplacé change la mise en scène. Si c\'est voulu, le client doit être prévenu avant.',
         );
 
-        // Le loot se révèle, puis les pièces tombent dedans (#226) : `coins` entre `loot`
-        // et `streak`, jamais ailleurs.
+        // Le loot se révèle, puis les pièces tombent dedans (#226) : `coins` juste après
+        // `loot`, jamais ailleurs.
         $coins = $payload['coins'];
         self::assertIsArray($coins);
         self::assertSame(['gained', 'before', 'after'], array_keys($coins));
@@ -116,16 +114,6 @@ final class RewardSummaryPayloadTest extends TestCase
         self::assertArrayNotHasKey('unlockableNodes', $payload);
         self::assertIsArray($payload['level']);
         self::assertArrayNotHasKey('skillPointsGranted', $payload['level']);
-    }
-
-    /** Le streak (#286) s'anime dans cet ordre : le jour, la série avant, après, puis le coffre. */
-    public function testTheStreakBlockFollowsTheAnimationOrder(): void
-    {
-        $streak = self::summary()->toArray()['streak'];
-
-        self::assertIsArray($streak);
-        self::assertSame(['sportDay', 'dayCounted', 'before', 'after', 'chests'], array_keys($streak));
-        self::assertSame(['startedOn' => '2026-08-07', 'days' => 6, 'weeksCompleted' => 1, 'sportDaysInLast7' => 6, 'nextChestRarity' => 'RARE'], $streak['after']);
     }
 
     /**
@@ -214,6 +202,6 @@ final class RewardSummaryPayloadTest extends TestCase
             coinsAfter: 52,
         );
 
-        return RewardSummaryResource::from(new SessionCompletion($workout, $reward, $drop, new SessionStreak('2026-08-12', true, new StreakState('2026-08-07', 5, 0, 5, 'COMMON'), new StreakState('2026-08-07', 6, 1, 6, 'RARE'), [])));
+        return RewardSummaryResource::from(new SessionCompletion($workout, $reward, $drop));
     }
 }
