@@ -9,7 +9,7 @@ namespace App\Progression\Domain;
  *
  * `XpBreakdown` refuse d'être vide — un montant sans explication n'est pas un montant —
  * mais une discipline qui ne crédite pas d'XP (#167, `XpRates::credits()`) n'a justement
- * aucune ligne à produire : ni socle, ni rendements décroissants, ni plafond, puisque
+ * aucune ligne à produire : ni socle, ni plafond, puisque
  * `LedgerSessionRewards` s'arrête avant `XpCalculator`. Un breakdown vide serait alors
  * une séance non expliquée, et une ligne « base : 0 » mentirait sur ce qui a été calculé
  * — rien ne l'a été. `reason` porte l'explication à la place, dans `Shared\Application\

@@ -6,7 +6,6 @@ namespace App\Admin\Domain;
 
 use App\Combat\Domain\CombatSnapshot;
 use App\Progression\Domain\DailyLoad;
-use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\XpCalculator;
 use App\Progression\Domain\XpRates;
 use App\Shared\Application\FrozenGameRulesets;
@@ -63,7 +62,7 @@ final class GameDesignProgression
         $start = new DateTimeImmutable($program['startDate'].' 00:00:00', $timezone->toDateTimeZone());
         $workoutRules = WorkoutRules::runtime($rulesets);
         $rates = XpRates::runtime($rulesets);
-        $calculator = new XpCalculator($rates, DiminishingReturns::runtime($rulesets), AttributeSplit::runtime($rulesets), $rulesets);
+        $calculator = new XpCalculator($rates, AttributeSplit::runtime($rulesets), $rulesets);
         $modifiers = GameDesignInputs::modifiers($profile['equipment'], $rulesets);
         /** @var list<array{discipline: string, active: bool}> $disciplines */
         $disciplines = $snapshot['disciplines'];
@@ -140,7 +139,6 @@ final class GameDesignProgression
             $date = $start->modify('+'.$day.' days');
             $energy[] = $program['energy'][(int) $date->format('N') - 1];
             $average = intdiv(array_sum(\array_slice($energy, -$windowDays)), $windowDays);
-            $secondsToday = 0;
             $xpToday = [];
             foreach ($byDay[$date->format('Y-m-d')] ?? [] as $candidate) {
                 $advance($candidate->startedAt);
@@ -154,7 +152,7 @@ final class GameDesignProgression
                 }
                 if (null === $reason) {
                     $retained = $workoutRules->retainedDuration($candidate->durationSeconds());
-                    $award = $calculator->calculate($discipline, $retained, $modifiers, new DailyLoad($secondsToday, $xpToday[$discipline->value] ?? 0), $candidate->distanceMeters, $candidate->elevationGainMeters);
+                    $award = $calculator->calculate($discipline, $retained, $modifiers, new DailyLoad($xpToday[$discipline->value] ?? 0), $candidate->distanceMeters, $candidate->elevationGainMeters);
                     $xp = $award->amount();
                     foreach ($award->attributeGains->toArray() as $attribute => $gain) {
                         $state[$attribute] += $gain;
@@ -162,7 +160,6 @@ final class GameDesignProgression
                     foreach ($award->breakdown->lines as $line) {
                         $breakdown[] = ['source' => $line->source->value, 'amount' => $line->amount];
                     }
-                    $secondsToday += $retained;
                     $xpToday[$discipline->value] = ($xpToday[$discipline->value] ?? 0) + $xp;
                 }
                 $weekXp += $xp;

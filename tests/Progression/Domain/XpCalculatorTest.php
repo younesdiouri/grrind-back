@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Progression\Domain;
 
 use App\Progression\Domain\DailyLoad;
-use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\XpBreakdownLine;
 use App\Progression\Domain\XpBreakdownSource;
 use App\Progression\Domain\XpCalculator;
@@ -137,7 +136,6 @@ final class XpCalculatorTest extends TestCase
      */
     public static function guardedDays(): iterable
     {
-        // Dans la première tranche, rien n'est rogné : pas de ligne inutile.
         yield 'journée vierge, aucune ligne de garde-fou' => [
             DailyLoad::untouched(),
             2700,
@@ -145,25 +143,17 @@ final class XpCalculatorTest extends TestCase
             67,
         ];
 
-        // 50 min déjà faites, séance de 20 : 10 min à 100 %, 10 min à 60 % = 16 min
-        // retenues. Socle plein 30, socle retenu 24.
-        yield 'à cheval sur deux tranches' => [
-            new DailyLoad(50 * 60, 0),
-            20 * 60,
-            [[XpBreakdownSource::Base, 30], [XpBreakdownSource::Diminishing, -6]],
-            24,
-        ];
-
-        yield 'au-delà des tranches, la séance ne rapporte plus rien' => [
-            new DailyLoad(130 * 60, 0),
-            30 * 60,
-            [[XpBreakdownSource::Base, 45], [XpBreakdownSource::Diminishing, -45]],
-            0,
+        // #344 : deux heures déjà faites dans la journée ne retirent rien à la troisième.
+        yield 'une troisième heure vaut la première' => [
+            DailyLoad::untouched(),
+            3600,
+            [[XpBreakdownSource::Base, 90]],
+            90,
         ];
 
         // 150 déjà gagnés sur un plafond de 180 : il reste 30 à prendre sur les 45 gagnés.
         yield 'le plafond quotidien écrête' => [
-            new DailyLoad(0, 150),
+            new DailyLoad(150),
             30 * 60,
             [[XpBreakdownSource::Base, 45], [XpBreakdownSource::DailyCap, -15]],
             30,
@@ -172,25 +162,10 @@ final class XpCalculatorTest extends TestCase
         // Le plafond écrête, il ne rejette pas — même geste qu'au plafond de durée d'une
         // séance. Le joueur au plafond voit tout partir, et la ligne le dit.
         yield 'déjà au plafond' => [
-            new DailyLoad(0, 180),
+            new DailyLoad(180),
             30 * 60,
             [[XpBreakdownSource::Base, 45], [XpBreakdownSource::DailyCap, -45]],
             0,
-        ];
-
-        // Les deux garde-fous se cumulent, chacun avec sa ligne. 80 min déjà faites, séance
-        // de 20 min : elle traverse deux tranches — 10 min à 60 % puis 10 min à 30 %, soit
-        // 9 min retenues. Socle plein 30, retenu 13. Et il ne reste que 10 XP sous le
-        // plafond, d'où −3 de plus.
-        yield 'les deux garde-fous à la fois' => [
-            new DailyLoad(80 * 60, 170),
-            20 * 60,
-            [
-                [XpBreakdownSource::Base, 30],
-                [XpBreakdownSource::Diminishing, -17],
-                [XpBreakdownSource::DailyCap, -3],
-            ],
-            10,
         ];
     }
 
@@ -248,10 +223,7 @@ final class XpCalculatorTest extends TestCase
 
         self::assertSame(
             [
-                // Deux heures pleines de socle, rognées par les tranches : 60 min à 100 %,
-                // 30 à 60 % et 30 à 30 %, soit 87 min retenues sur 120.
                 [XpBreakdownSource::Base, 180],
-                [XpBreakdownSource::Diminishing, -50],
                 [XpBreakdownSource::Distance, 72],
                 [XpBreakdownSource::Elevation, 128],
             ],
@@ -305,34 +277,7 @@ final class XpCalculatorTest extends TestCase
     }
 
     /**
-     * Le terrain n'est **pas** raboté par les rendements décroissants : dix kilomètres
-     * restent dix kilomètres quelle que soit l'heure à laquelle on les a courus. C'est le
-     * plafond quotidien qui borne ce côté-là, et il le fait plus bas dans la séquence.
-     */
-    public function testTheTerrainEscapesTheDiminishingReturnsButNotTheDailyCap(): void
-    {
-        // 130 min déjà faites : le socle est entièrement rogné. La distance, elle, tient.
-        $award = self::calculator()->calculate(
-            Discipline::Running,
-            30 * 60,
-            [],
-            new DailyLoad(130 * 60, 0),
-            distanceMeters: 5000,
-        );
-
-        self::assertSame(
-            [
-                [XpBreakdownSource::Base, 45],
-                [XpBreakdownSource::Diminishing, -45],
-                [XpBreakdownSource::Distance, 50],
-            ],
-            self::linesOf($award->breakdown->lines),
-        );
-        self::assertSame(50, $award->amount());
-    }
-
-    /**
-     * Les bonus en pourcentage portent sur le socle rogné, **terrain non compris**. Sinon
+     * Les bonus en pourcentage portent sur le socle, **terrain non compris**. Sinon
      * un même streak vaudrait trois fois plus sur un trail que sur une séance de fonte,
      * pour une raison que personne ne pourrait raconter.
      */
@@ -357,29 +302,10 @@ final class XpCalculatorTest extends TestCase
         );
     }
 
-    public function testTheBonusesApplyToTheTrimmedBase(): void
-    {
-        // 50 min déjà faites : socle plein 30, retenu 24. Le streak porte sur 24, pas sur
-        // 30 — sinon un bonus rendrait le rendement décroissant contournable.
-        $award = self::calculator()->calculate(Discipline::Running, 20 * 60, [
-            self::bonus(ModifierSource::Streak, 50),
-        ], new DailyLoad(50 * 60, 0));
-
-        self::assertSame(
-            [
-                [XpBreakdownSource::Base, 30],
-                [XpBreakdownSource::Diminishing, -6],
-                [XpBreakdownSource::Streak, 12],
-            ],
-            self::linesOf($award->breakdown->lines),
-        );
-        self::assertSame(36, $award->amount());
-    }
-
     public function testTheDailyCapCountsWhatWasAlreadyEarnedInThatDisciplineOnly(): void
     {
         // Le plafond est par discipline : avoir saturé la course n'entame pas la natation.
-        $award = self::calculator()->calculate(Discipline::Swimming, 30 * 60, [], new DailyLoad(0, 0));
+        $award = self::calculator()->calculate(Discipline::Swimming, 30 * 60, [], DailyLoad::untouched());
 
         self::assertSame([[XpBreakdownSource::Base, 45]], self::linesOf($award->breakdown->lines));
     }
@@ -462,30 +388,16 @@ final class XpCalculatorTest extends TestCase
      */
     public function testAttributesAreDistributedOnTheAmountAfterTheDailyCapNotBeforeIt(): void
     {
-        $calculator = new XpCalculator(self::rates(), self::diminishing(), self::splitOf(33, 33, 17, 17), 'v1-abcdef012345');
+        $calculator = new XpCalculator(self::rates(), self::splitOf(33, 33, 17, 17), 'v1-abcdef012345');
 
         // 150 déjà gagnés sur un plafond de 180 : la séance de 30 min gagnerait 45, mais il
         // ne reste que 30 sous le plafond — le même cas que « le plafond quotidien écrête »
         // ci-dessus.
-        $award = $calculator->calculate(Discipline::Running, 30 * 60, [], new DailyLoad(0, 150));
+        $award = $calculator->calculate(Discipline::Running, 30 * 60, [], new DailyLoad(150));
 
         self::assertSame(30, $award->amount());
         self::assertSame($award->amount(), $award->attributeGains->total());
         self::assertEquals(new AttributeGains(10, 10, 5, 5), $award->attributeGains);
-    }
-
-    /**
-     * Même preuve à l'autre bout de l'échelle : un socle entièrement rogné par les
-     * rendements décroissants doit distribuer zéro sur les quatre, pas le socle plein.
-     */
-    public function testAttributesAreDistributedOnTheAmountAfterDiminishingReturnsHaveEmptiedIt(): void
-    {
-        $calculator = new XpCalculator(self::rates(), self::diminishing(), self::splitOf(33, 33, 17, 17), 'v1-abcdef012345');
-
-        $award = $calculator->calculate(Discipline::Running, 30 * 60, [], new DailyLoad(130 * 60, 0));
-
-        self::assertSame(0, $award->amount());
-        self::assertEquals(new AttributeGains(0, 0, 0, 0), $award->attributeGains);
     }
 
     private static function splitOf(int $strength, int $endurance, int $mobility, int $dexterity): AttributeSplit
@@ -522,7 +434,7 @@ final class XpCalculatorTest extends TestCase
 
     private static function calculator(): XpCalculator
     {
-        return new XpCalculator(self::rates(), self::diminishing(), self::uniformSplit(), 'v1-abcdef012345');
+        return new XpCalculator(self::rates(), self::uniformSplit(), 'v1-abcdef012345');
     }
 
     private static function rates(): XpRates
@@ -548,15 +460,6 @@ final class XpCalculatorTest extends TestCase
             ['discipline' => 'COURT_SPORTS', 'daily_cap_xp' => 150],
             ['discipline' => 'RACKET_SPORTS', 'daily_cap_xp' => 150],
         ], null, [['from_bpm' => 130, 'bonus_percent' => 10], ['from_bpm' => 150, 'bonus_percent' => 20]]);
-    }
-
-    private static function diminishing(): DiminishingReturns
-    {
-        return new DiminishingReturns([
-            ['up_to_minutes' => 60, 'weight_percent' => 100],
-            ['up_to_minutes' => 90, 'weight_percent' => 60],
-            ['up_to_minutes' => 120, 'weight_percent' => 30],
-        ], 0);
     }
 
     /**

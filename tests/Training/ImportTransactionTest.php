@@ -128,16 +128,32 @@ final class ImportTransactionTest extends ApiTestCase
     }
 
     /**
-     * **Le test qui porte le ticket.** Les rendements décroissants se calculent sur ce que
-     * le joueur a déjà fait ce jour-là, donc la charge du jour doit être relue à chaque
-     * itération — en voyant les workouts crédités plus tôt dans la **même boucle**, pas
-     * seulement ce qui était en base au BEGIN.
+     * **Le test qui porte le ticket.** Le plafond quotidien se calcule sur ce que le joueur
+     * a déjà gagné ce jour-là, donc la charge du jour doit être relue à chaque itération —
+     * en voyant les workouts crédités plus tôt dans la **même boucle**, pas seulement ce
+     * qui était en base au BEGIN.
      *
-     * Deux heures de course le même jour, en trois séances : la première heure pleine, la
-     * demi-heure suivante à 60 %, la dernière à 30 %. Si la boucle relisait la même charge à
-     * chaque fois, les trois vaudraient leur plein et le total serait 120.
+     * Trois courses le même jour, plafond course à 400 : 240, puis les 160 qui restent,
+     * puis rien. Si la boucle relisait la même charge à chaque fois, le total serait 540.
      */
     public function testTheDailyLoadSeesTheWorkoutsCreditedEarlierInTheSameBatch(): void
+    {
+        $bob = $this->openAccount();
+
+        $this->import($bob, [
+            self::candidate(externalId: 'HK-MATIN', startedAt: self::daysAgo(5, '04:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 4 * 3600),
+            self::candidate(externalId: 'HK-MIDI', startedAt: self::daysAgo(5, '10:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 4 * 3600),
+            self::candidate(externalId: 'HK-SOIR', startedAt: self::daysAgo(5, '18:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 3600),
+        ]);
+
+        self::assertSame(400, $this->snapshotTotalOf($bob));
+    }
+
+    /**
+     * #344 : plusieurs séances dans la journée valent chacune leur durée pleine. Une heure,
+     * puis deux demi-heures : 60 + 30 + 30, rien n'est décoté.
+     */
+    public function testSeveralSessionsInADayAreEachWorthTheirFullDuration(): void
     {
         $bob = $this->openAccount();
 
@@ -147,9 +163,7 @@ final class ImportTransactionTest extends ApiTestCase
             self::candidate(externalId: 'HK-SOIR', startedAt: self::daysAgo(5, '18:00:00')->format(DateTimeInterface::ATOM), durationSeconds: 1800),
         ]);
 
-        // 60 sur la première heure, puis 18 et 9 sur les deux demi-heures des tranches
-        // 60-90 et 90-120, pondérées à 60 % et 30 %.
-        self::assertSame(60 + 18 + 9, $this->snapshotTotalOf($bob));
+        self::assertSame(120, $this->snapshotTotalOf($bob));
     }
 
     /**

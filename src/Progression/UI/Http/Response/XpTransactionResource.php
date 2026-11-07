@@ -14,7 +14,7 @@ use DateTimeInterface;
  *
  * C'est tout l'intérêt de l'écran : « d'où vient mon XP » ne se répond pas par un montant.
  * Le breakdown stocké redit ligne par ligne ce que le calcul avait décidé — le socle, ce
- * que les rendements décroissants ont rogné, ce que la série a ajouté — et il le redit
+ * que la série a ajouté, ce que le plafond a écrêté — et il le redit
  * **sous les règles du jour du calcul**, que `rulesetVersion` nomme. Un rééquilibrage ne
  * réécrit donc pas l'histoire.
  *

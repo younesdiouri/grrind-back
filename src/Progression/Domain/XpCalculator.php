@@ -44,39 +44,31 @@ use App\Shared\Domain\Modifier\ModifierType;
  * **Pas de plafond global**, donc, et c'est la réponse à la question ouverte du #18. Le
  * déclencheur qui le ferait entrer est écrit : si le total des bonus actifs
  * dépasse +100 %, on mesure et on
- * décide. Les garde-fous de #15 bornent déjà la journée, qui est la vraie surface d'abus.
+ * décide. Le plafond quotidien de #15 borne déjà la journée, qui est la vraie surface d'abus.
  *
  * ## L'ordre des opérations
  *
- * 1. **le socle**, au prorata de la durée retenue ;
- * 2. **les rendements décroissants**, qui rabotent le socle selon ce que le joueur a déjà
- *    accumulé aujourd'hui ;
- * 3. **la distance et le dénivelé**, qui s'ajoutent au socle **sans être rabotés** : ils
- *    mesurent une quantité de terrain, pas du temps, et dix kilomètres restent dix
- *    kilomètres quelle que soit l'heure à laquelle on les a courus ;
- * 4. **le bonus cardiaque** (#164), en pourcentage du socle rogné, quand la FC moyenne
- *    atteint un palier — c'est encore ce que la séance vaut, pas ce que le personnage ajoute ;
- * 5. **les bonus**, en pourcentage du socle **après** rabotage — et non du sous-total
- *    incluant le terrain, sans quoi un même streak vaudrait trois fois plus sur un trail
- *    que sur une séance de fonte, pour une raison que personne ne pourrait raconter ;
- * 6. **le plafond quotidien** de la discipline, qui écrête le total et borne le seul côté
- *    que les rendements décroissants ne bornent pas ;
- * 7. **la répartition en caractéristiques** (#159), qui se pose en tout dernier, sur le
+ * 1. **le socle**, au prorata de la durée retenue — la même minute vaut la même chose à la
+ *    première séance du jour qu'à la troisième : les rendements décroissants ont été
+ *    supprimés au #344 ;
+ * 2. **la distance et le dénivelé**, qui s'ajoutent au socle : ils mesurent une quantité
+ *    de terrain, pas du temps ;
+ * 3. **le bonus cardiaque** (#164), en pourcentage du socle, quand la FC moyenne atteint
+ *    un palier — c'est encore ce que la séance vaut, pas ce que le personnage ajoute ;
+ * 4. **les bonus**, en pourcentage du socle — et non du sous-total incluant le terrain,
+ *    sans quoi un même streak vaudrait trois fois plus sur un trail que sur une séance de
+ *    fonte, pour une raison que personne ne pourrait raconter ;
+ * 5. **le plafond quotidien** de la discipline, qui écrête le total ;
+ * 6. **la répartition en caractéristiques** (#159), qui se pose en tout dernier, sur le
  *    montant final déjà écrêté.
  *
- * Placer les rendements décroissants avant les bonus plutôt qu'après donne exactement le
- * même montant — les deux opérations sont linéaires — mais une arithmétique entière plus
- * simple, une seule troncature au lieu d'un ratio appliqué à un sous-total, et surtout une
- * narration que le joueur suit : « 90 de base, −40 parce que tu as déjà beaucoup couru
- * aujourd'hui, +10 grâce à ta série ».
- *
- * Le breakdown **montre ce qui a été rogné** au lieu de livrer un total amaigri sans
+ * Le breakdown **montre ce qui a été écrêté** au lieu de livrer un total amaigri sans
  * explication : c'est ce qui fait la différence entre une mécanique et une punition.
  *
  * ## Pourquoi la répartition se pose en dernier, et pourquoi ça ne change rien
  *
  * `AttributeSplit::distribute()` reçoit `$breakdown->total()` — le montant **après**
- * rendements décroissants et plafond quotidien, jamais le socle. C'est un choix de
+ * plafond quotidien, jamais le socle. C'est un choix de
  * position, pas seulement de commodité, et il ne bouge pas malgré la tentation de
  * répartir chaque ligne du détail avant de les sommer :
  *
@@ -101,7 +93,6 @@ final readonly class XpCalculator
 {
     public function __construct(
         private XpRates $rates,
-        private DiminishingReturns $diminishing,
         private AttributeSplit $attributes,
         private string|GameRulesets $rulesetVersion,
     ) {
@@ -124,22 +115,12 @@ final readonly class XpCalculator
         ?int $elevationGainMeters = null,
         ?int $averageHeartRate = null,
     ): XpAward {
-        $fullBase = $this->rates->baseFor($durationSeconds);
-        $base = $this->rates->baseFor($this->diminishing->retain($today->secondsSoFar, $durationSeconds));
-
-        $lines = [new XpBreakdownLine(XpBreakdownSource::Base, $fullBase)];
-
-        if ($base !== $fullBase) {
-            $lines[] = new XpBreakdownLine(XpBreakdownSource::Diminishing, $base - $fullBase);
-        }
+        $base = $this->rates->baseFor($durationSeconds);
+        $lines = [new XpBreakdownLine(XpBreakdownSource::Base, $base)];
 
         // Une métrique absente ne produit pas de ligne, et une métrique nulle non plus :
         // « +0 XP pour tes 0 km » à un joueur qui vient de soulever de la fonte n'explique
         // rien. C'est la même règle que pour un bonus trop petit pour peser.
-        //
-        // Elles sont calculées sur `$distanceMeters` brut, pas sur le socle rogné : dix
-        // kilomètres restent dix kilomètres quelle que soit l'heure à laquelle on les a
-        // courus. C'est le plafond quotidien qui borne ce côté-là.
         if (0 !== $distance = $this->rates->distanceBonusOf($discipline, $distanceMeters)) {
             $lines[] = new XpBreakdownLine(XpBreakdownSource::Distance, $distance);
         }

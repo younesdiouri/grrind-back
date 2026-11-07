@@ -274,8 +274,8 @@ Un workout *écarté* n'annule rien : neuf séances valides ne peuvent pas écho
 dixième est une partie de curling. Une *panne*, elle, défait tout : un workout écrit sans XP
 créditée est une perte silencieuse.
 
-**L'ordre chronologique n'est pas cosmétique.** Les rendements décroissants se calculent sur ce
-que le joueur a déjà fait ce jour-là, donc la charge du jour se relit à chaque itération, en
+**L'ordre chronologique n'est pas cosmétique.** Le plafond quotidien se calcule sur ce que le
+joueur a déjà gagné ce jour-là, donc la charge du jour se relit à chaque itération, en
 voyant ce que la boucle vient d'écrire. Le même lot envoyé dans un autre ordre doit donner le
 même ledger.
 
@@ -292,13 +292,12 @@ il ne doit rien au framework qui la joue.
 ## Garde-fous anti-abus v1
 
 Ce sont **des règles de game design avant d'être de l'anti-triche**, et c'est pour ça qu'elles
-survivent à une donnée certifiée par Apple : ce sont elles qui font qu'une journée de quatre
-heures ne vaut pas quatre fois une journée d'une heure. Elles protègent aussi le jour où une
-source déclarée reviendra.
+survivent à une donnée certifiée par Apple. Elles protègent aussi le jour où une source déclarée
+reviendra.
 
-- rendements décroissants sur la journée (0-60 min ×1, 60-90 ×0.6, 90-120 ×0.3, au-delà ×0),
-  calculés workout par workout dans l'ordre chronologique
-- plafond d'XP quotidien par discipline
+- plafond d'XP quotidien par discipline, calculé workout par workout dans l'ordre chronologique
+  — **pas de rendements décroissants** (supprimés au #344) : deux ou trois séances dans la
+  journée valent chacune leur durée pleine
 - durée plancher (un faux départ sur la montre n'est pas une séance) et plafond (l'enregistrement
   oublié est **écrêté**, jamais rejeté)
 - fenêtre d'antériorité de 30 jours : au-delà, un workout est **conservé sans être crédité**

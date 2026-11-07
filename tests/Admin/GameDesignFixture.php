@@ -19,7 +19,7 @@ final class GameDesignFixture
             'items' => [],
             'alam' => \App\Tests\Community\Domain\AlamOutcomeTest::rules()->values,
             'training' => ['minimum_duration_seconds' => 60, 'maximum_duration_seconds' => 3600, 'import_window_days' => 7],
-            'xp' => ['base_xp_per_hour' => 60, 'diminishing_returns' => [['up_to_minutes' => 60, 'weight_percent' => 100]], 'diminishing_returns_beyond_percent' => 50],
+            'xp' => ['base_xp_per_hour' => 60],
             'disciplines' => array_map(static fn (\App\Shared\Domain\Activity\Discipline $discipline): array => ['discipline' => $discipline->value, 'active' => true, 'credits_xp' => true, 'daily_cap_xp' => 70, 'xp_per_km' => 1, 'xp_per_100m_elevation' => 1, 'split' => ['strength' => 25, 'endurance' => 25, 'mobility' => 25, 'dexterity' => 25]], \App\Shared\Domain\Activity\Discipline::cases()),
             'levels' => [['level' => 1, 'total_xp' => 0], ['level' => 2, 'total_xp' => 100]],
             'attributes' => ['vitality' => ['floor_permille' => 250, 'window_days' => 7, 'target_active_kcal' => 500, 'bonus_cap_permille' => 500]],

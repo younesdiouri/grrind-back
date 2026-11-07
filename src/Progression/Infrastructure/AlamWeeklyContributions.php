@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Progression\Infrastructure;
 
 use App\Progression\Domain\DailyLoad;
-use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\XpCalculator;
 use App\Progression\Domain\XpRates;
@@ -31,14 +30,13 @@ final readonly class AlamWeeklyContributions implements AlamContributions
 
     public function between(array $players, DateTimeImmutable $start, DateTimeImmutable $end, GameRulesets $rules): array
     {
-        $calculator = new XpCalculator(XpRates::runtime($rules), DiminishingReturns::runtime($rules), AttributeSplit::runtime($rules), $rules);
+        $calculator = new XpCalculator(XpRates::runtime($rules), AttributeSplit::runtime($rules), $rules);
         $vitality = Vitality::runtime($rules);
         $result = [];
         foreach ($players as $player) {
             $efforts = $this->efforts->within($player, $start, $end, $rules);
             $credited = $this->credited($player, array_column($efforts, 'sourceId'));
             $totals = ['strength' => 0, 'endurance' => 0, 'mobility' => 0, 'dexterity' => 0];
-            $secondsByDay = [];
             $xpByDay = [];
             $sessions = 0;
             $sports = [];
@@ -49,8 +47,7 @@ final readonly class AlamWeeklyContributions implements AlamContributions
                 }
                 $day = $effort->start->setTimezone($zone)->format('Y-m-d');
                 $discipline = $effort->discipline->value;
-                $award = $calculator->calculate($effort->discipline, $effort->seconds, [], new DailyLoad($secondsByDay[$day] ?? 0, $xpByDay[$day][$discipline] ?? 0), $effort->distance, $effort->elevation);
-                $secondsByDay[$day] = ($secondsByDay[$day] ?? 0) + $effort->seconds;
+                $award = $calculator->calculate($effort->discipline, $effort->seconds, [], new DailyLoad($xpByDay[$day][$discipline] ?? 0), $effort->distance, $effort->elevation);
                 $xpByDay[$day][$discipline] = ($xpByDay[$day][$discipline] ?? 0) + $award->amount();
                 foreach ($award->attributeGains->toArray() as $attribute => $value) {
                     $totals[$attribute] += $value;

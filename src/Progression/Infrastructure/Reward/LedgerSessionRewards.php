@@ -50,7 +50,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * **Une discipline qui ne crédite pas s'arrête avant tout ça (#167).** `credits()` est la
  * première question posée, avant `GrantXpHandler` : pour `WALKING`, aucun verrou, aucune
  * lecture de la charge du jour, aucune `XpTransaction`, aucun `WorkoutCredited`. C'est ce
- * qui garantit qu'une marche ne consomme ni les rendements décroissants ni le plafond
+ * qui garantit qu'une marche ne consomme pas le plafond
  * quotidien d'une autre discipline pratiquée le même jour — la contaminer y punirait la
  * vraie séance, ce qui serait pire que neutre. {@see uncredited()} rend malgré tout un
  * `SessionReward` complet : la séance est créditée pour `Training` au sens où elle entre

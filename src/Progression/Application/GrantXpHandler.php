@@ -77,7 +77,7 @@ final readonly class GrantXpHandler
                 $this->modifiers->of($command->userId, $command->occurredAt),
                 // La journée du **sport**, pas celle de l'appel. Sur un import, les deux
                 // sont à des jours d'écart, et c'est bien la charge de ce jour-là qui place
-                // le workout sur la courbe des rendements décroissants.
+                // le workout sous le plafond quotidien.
                 $this->dailyLoad->of($command->userId, $command->discipline, $command->occurredAt),
                 $command->distanceMeters,
                 $command->elevationGainMeters,

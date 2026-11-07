@@ -9,7 +9,6 @@ use App\Combat\Domain\EnemyCatalog;
 use App\Community\Domain\GuildRules;
 use App\Community\Domain\QuietHours;
 use App\Community\Domain\RisalaRules;
-use App\Progression\Domain\DiminishingReturns;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\TitleCatalog;
 use App\Progression\Domain\XpRates;
@@ -397,7 +396,6 @@ final class DatabaseRuntimeCatalogTest extends TestCase
         self::assertTrue(CreditingDisciplines::runtime($rulesets)->credits(Discipline::Running));
         self::assertSame(100, AttributeSplit::runtime($rulesets)->distribute(Discipline::Running, 100)->total());
         self::assertGreaterThan(0, Vitality::runtime($rulesets)->of(new AttributeGains(100, 100, 100, 100)));
-        self::assertGreaterThan(0, DiminishingReturns::runtime($rulesets)->retain(0, 60));
         self::assertSame(1, LevelCurve::runtime($rulesets)->standingAt(0)->level);
         self::assertGreaterThanOrEqual(2, GuildRules::runtime($rulesets)->maximumMembers());
         self::assertGreaterThan(0, RisalaRules::runtime($rulesets)->recipientBonusPercent());

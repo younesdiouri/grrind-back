@@ -39,8 +39,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *
  * ————— L'ordre chronologique n'est pas cosmétique ——————————————————————————————————————
  *
- * Les rendements décroissants et le plafond quotidien se calculent sur ce que le joueur a
- * **déjà** fait ce jour-là. Créditer le vélo de 18 h avant la course de 7 h donnerait un
+ * Le plafond quotidien se calcule sur ce que le joueur a **déjà** gagné ce jour-là. Créditer le vélo de 18 h avant la course de 7 h donnerait un
  * autre total, et deux imports du même lot dans un ordre différent donneraient deux ledgers
  * différents — pour la même journée de sport.
  *

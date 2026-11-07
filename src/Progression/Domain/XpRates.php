@@ -32,7 +32,7 @@ use InvalidArgumentException;
  * 0 », la punition qu'on cherche justement à éviter. `credits()` est la question que pose
  * `LedgerSessionRewards` **avant** d'appeler quoi que ce soit d'autre sur cette classe :
  * une discipline qui ne crédite pas n'atteint jamais `baseFor()`, `dailyCapOf()` ni les
- * bonus de terrain, et ne consomme donc ni les rendements décroissants ni le plafond
+ * bonus de terrain, et ne consomme donc pas le plafond
  * quotidien d'aucune autre discipline pratiquée le même jour.
  */
 final class XpRates
@@ -115,7 +115,7 @@ final class XpRates
             }
 
             // Un plafond sous ce qu'une seule heure de socle rapporte ferait du garde-fou le
-            // limiteur principal, à la place des rendements décroissants — et le joueur
+            // limiteur de toute séance d'une heure — et le joueur
             // buterait dessus tous les jours sans comprendre pourquoi.
             if ($rate['daily_cap_xp'] < $baseXpPerHour) {
                 throw new InvalidArgumentException(\sprintf('Le plafond quotidien de "%s" (%d) est sous ce qu\'une heure de socle rapporte (%d).', $discipline->value, $rate['daily_cap_xp'], $baseXpPerHour));

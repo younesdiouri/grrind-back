@@ -81,8 +81,7 @@ class XpTransaction
 
     /**
      * La discipline et la durée que cette écriture valorise. Dénormalisées ici plutôt que
-     * relues chez `Training` : ce sont les deux entrées des garde-fous quotidiens
-     * (rendements décroissants sur le temps cumulé, plafond d'XP par discipline), et
+     * relues chez `Training` : le plafond d'XP quotidien est par discipline, et
      * `Progression` doit pouvoir y répondre sans franchir une frontière de module.
      *
      * Elles rendent surtout le ledger auto-suffisant : « à cette date, pour cette
@@ -94,9 +93,8 @@ class XpTransaction
 
     /**
      * **Signée**, comme le montant. L'annulation d'une séance porte une durée négative :
-     * les deux compteurs de la journée se soldent alors par simple somme, sans que la
-     * requête ait à connaître les raisons — une séance invalidée cesse de peser sur les
-     * rendements décroissants exactement comme elle cesse de compter en XP.
+     * la journée se solde alors par simple somme, sans que la requête ait à connaître les
+     * raisons.
      */
     #[ORM\Column]
     private int $durationSeconds;
@@ -136,8 +134,7 @@ class XpTransaction
 
     /**
      * **L'instant du sport, pas celui de l'écriture.** C'est ce qui rattache une écriture à
-     * une journée, et donc ce que lisent les garde-fous quotidiens : rendements décroissants
-     * sur le temps cumulé, plafond d'XP par discipline.
+     * une journée, et donc ce que lit le plafond d'XP quotidien par discipline.
      *
      * La distinction n'existait pas tant que Grrind tenait le chronomètre — on créditait au
      * moment où la séance se fermait. Avec l'import, dix workouts vieux de dix jours
@@ -195,7 +192,7 @@ class XpTransaction
 
     /**
      * L'XP accordée pour un workout. Le total peut valoir zéro — une séance entièrement
-     * rognée par les rendements décroissants reste une séance, et le breakdown est
+     * écrêtée par le plafond quotidien reste une séance, et le breakdown est
      * précisément ce qui le fait comprendre.
      *
      * `$occurredAt` est l'instant du **sport**, pas celui de l'appel : c'est lui qui range
@@ -255,9 +252,7 @@ class XpTransaction
             XpReason::SessionInvalidated,
             $credit->sourceId,
             $credit->discipline,
-            // Négative, comme le montant : la séance annulée cesse de peser sur les
-            // rendements décroissants de sa journée exactement comme elle cesse de compter
-            // en XP, et la somme du jour s'en charge sans cas particulier.
+            // Négative, comme le montant : la somme du jour s'en charge sans cas particulier.
             -$credit->durationSeconds,
             $credit->breakdown()->negated(),
             new AttributeGains(-$credit->strength, -$credit->endurance, -$credit->mobility, -$credit->dexterity),

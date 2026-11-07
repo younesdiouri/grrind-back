@@ -10,19 +10,13 @@ use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-/** @extends AbstractType<array{base_xp_per_hour: int, diminishing_returns: list<array{up_to_minutes: int, weight_percent: int}>, diminishing_returns_beyond_percent: int, heart_rate_bonus: list<array{from_bpm: int, bonus_percent: int}>}> */
+/** @extends AbstractType<array{base_xp_per_hour: int, heart_rate_bonus: list<array{from_bpm: int, bonus_percent: int}>}> */
 final class XpType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('base_xp_per_hour', IntegerType::class)
-            ->add('diminishing_returns', CollectionType::class, [
-                'entry_type' => DiminishingReturnType::class,
-                'allow_add' => true,
-                'allow_delete' => true,
-            ])
-            ->add('diminishing_returns_beyond_percent', IntegerType::class)
             ->add('heart_rate_bonus', CollectionType::class, [
                 'entry_type' => HeartRateTierType::class,
                 'allow_add' => true,
