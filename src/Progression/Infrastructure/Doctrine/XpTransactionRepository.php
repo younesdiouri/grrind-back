@@ -8,6 +8,7 @@ use App\Progression\Application\ListXpHistory;
 use App\Progression\Domain\DailyLoad;
 use App\Progression\Domain\LevelCurve;
 use App\Progression\Domain\PlayerRecord;
+use App\Progression\Domain\WeekTotals;
 use App\Progression\Domain\XpReason;
 use App\Progression\Domain\XpTransaction;
 use App\Shared\Application\GameRulesets;
@@ -65,33 +66,81 @@ class XpTransactionRepository extends ServiceEntityRepository
     public function attributeTotalsOf(Uuid $userId, ?DateTimeImmutable $at = null): AttributeGains
     {
         $week = AlamCalendar::runtime($this->rules)->week($at ?? $this->clock->now());
+
+        return $this->totalsBetween($userId, $week['start'], $week['reset'])->attributes;
+    }
+
+    /**
+     * Les sommes d'une fenêtre `[start, end[`, rangées par l'instant du sport (#348). Une
+     * séance importée cette semaine mais courue la semaine dernière compte pour la semaine
+     * dernière, comme pour le plafond quotidien.
+     *
+     * Les séances se comptent comme dans recordOf() : `+1` par crédit, `-1` par annulation.
+     */
+    public function totalsBetween(Uuid $userId, DateTimeImmutable $start, DateTimeImmutable $end): WeekTotals
+    {
         $row = $this->createQueryBuilder('t')
-            ->select('COALESCE(SUM(t.strength), 0) AS strength')
+            ->select('COALESCE(SUM(t.amount), 0) AS xp')
+            ->addSelect('COALESCE(SUM(CASE WHEN t.reason = :completed THEN 1 WHEN t.reason = :invalidated THEN -1 ELSE 0 END), 0) AS sessions')
+            ->addSelect('COALESCE(SUM(t.strength), 0) AS strength')
             ->addSelect('COALESCE(SUM(t.endurance), 0) AS endurance')
             ->addSelect('COALESCE(SUM(t.mobility), 0) AS mobility')
             ->addSelect('COALESCE(SUM(t.dexterity), 0) AS dexterity')
             ->where('t.userId = :userId')
             ->andWhere('t.occurredAt >= :start AND t.occurredAt < :end')
-            ->setParameter('start', $week['start'])
-            ->setParameter('end', $week['reset'])
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->setParameter('completed', XpReason::SessionCompleted)
+            ->setParameter('invalidated', XpReason::SessionInvalidated)
             ->setParameter('userId', $userId, UuidType::NAME)
             ->getQuery()
             ->getSingleResult();
 
         \assert(
             \is_array($row)
+            && is_numeric($row['xp'])
+            && is_numeric($row['sessions'])
             && is_numeric($row['strength'])
             && is_numeric($row['endurance'])
             && is_numeric($row['mobility'])
             && is_numeric($row['dexterity']),
         );
 
-        return new AttributeGains(
-            (int) $row['strength'],
-            (int) $row['endurance'],
-            (int) $row['mobility'],
-            (int) $row['dexterity'],
+        return new WeekTotals(
+            (int) $row['xp'],
+            max(0, (int) $row['sessions']),
+            new AttributeGains(
+                (int) $row['strength'],
+                (int) $row['endurance'],
+                (int) $row['mobility'],
+                (int) $row['dexterity'],
+            ),
         );
+    }
+
+    /**
+     * Toutes les écritures d'une fenêtre `[start, end[`, la plus récente d'abord, détail
+     * compris. Sans pagination : une semaine reste petite (#348).
+     *
+     * @return list<XpTransaction>
+     */
+    public function writtenBetween(Uuid $userId, DateTimeImmutable $start, DateTimeImmutable $end): array
+    {
+        /** @var list<XpTransaction> $transactions */
+        $transactions = $this->createQueryBuilder('t')
+            ->where('t.userId = :userId')
+            ->andWhere('t.occurredAt >= :start AND t.occurredAt < :end')
+            ->setParameter('userId', $userId, UuidType::NAME)
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->orderBy('t.occurredAt', 'DESC')
+            ->addOrderBy('t.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        $this->warmBreakdownsOf($transactions);
+
+        return $transactions;
     }
 
     /**

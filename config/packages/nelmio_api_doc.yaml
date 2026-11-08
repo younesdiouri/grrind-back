@@ -1784,6 +1784,44 @@ when@dev:
                                 items: { $ref: '#/components/schemas/XpTransaction' }
                             nextCursor: { type: string, nullable: true }
 
+                    WeekProgress:
+                        type: object
+                        description: |
+                            La semaine de jeu (#348) — **celle des caractéristiques**, remise à zéro le dimanche
+                            soir (Europe/Paris), pas la semaine civile du streak. Une jauge est « pleine » quand
+                            `current` égale `previous` ; elle peut déborder, le serveur ne plafonne rien.
+                            Tout se range par l'instant du sport : une séance de la semaine dernière importée
+                            cette semaine compte pour la semaine dernière.
+                        required: [startsAt, resetsAt, current, previous, entries]
+                        properties:
+                            startsAt: { type: string, format: date-time, description: "Début de la semaine en cours." }
+                            resetsAt: { type: string, format: date-time, description: "Prochaine remise à zéro." }
+                            current: { $ref: '#/components/schemas/WeekTotals' }
+                            previous:
+                                description: "La référence à battre. `null` sans semaine précédente ou sans gain : le client n'invente pas de cible."
+                                nullable: true
+                                allOf: [{ $ref: '#/components/schemas/WeekTotals' }]
+                            entries:
+                                type: array
+                                description: "Toutes les écritures de la semaine, `occurredAt` décroissant, sans pagination. `current` en est la somme exacte."
+                                items: { $ref: '#/components/schemas/XpTransaction' }
+
+                    WeekTotals:
+                        type: object
+                        required: [xp, sessions, attributes]
+                        properties:
+                            xp: { type: integer }
+                            sessions: { type: integer, description: "Séances créditées, nettes des annulations." }
+                            attributes:
+                                type: object
+                                description: "Mêmes sommes que `XpTransaction.attributes`."
+                                required: [strength, endurance, mobility, dexterity]
+                                properties:
+                                    strength: { type: integer }
+                                    endurance: { type: integer }
+                                    mobility: { type: integer }
+                                    dexterity: { type: integer }
+
                     # ————— Combat ——————————————————————————————————————————————————————
                     BattleFighter:
                         type: object

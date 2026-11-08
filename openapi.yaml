@@ -1157,6 +1157,21 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/progression/week:
+    get:
+      tags:
+        - Progression
+      summary: "La semaine de jeu (#348) : de taille bornée, donc servie d'un bloc, sans curseur."
+      operationId: get_progression_week
+      responses:
+        '200':
+          description: "La semaine des caractéristiques en cours, ses écritures, et les totaux de la semaine d'avant comme référence."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeekProgress'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/titles:
     get:
       tags:
@@ -4435,6 +4450,66 @@ components:
         nextCursor:
           type: string
           nullable: true
+      type: object
+    WeekProgress:
+      description: "La semaine de jeu (#348) — **celle des caractéristiques**, remise à zéro le dimanche\nsoir (Europe/Paris), pas la semaine civile du streak. Une jauge est « pleine » quand\n`current` égale `previous` ; elle peut déborder, le serveur ne plafonne rien.\nTout se range par l'instant du sport : une séance de la semaine dernière importée\ncette semaine compte pour la semaine dernière.\n"
+      required:
+        - startsAt
+        - resetsAt
+        - current
+        - previous
+        - entries
+      properties:
+        startsAt:
+          description: 'Début de la semaine en cours.'
+          type: string
+          format: date-time
+        resetsAt:
+          description: 'Prochaine remise à zéro.'
+          type: string
+          format: date-time
+        current:
+          $ref: '#/components/schemas/WeekTotals'
+        previous:
+          description: "La référence à battre. `null` sans semaine précédente ou sans gain : le client n'invente pas de cible."
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/WeekTotals'
+        entries:
+          description: 'Toutes les écritures de la semaine, `occurredAt` décroissant, sans pagination. `current` en est la somme exacte.'
+          type: array
+          items:
+            $ref: '#/components/schemas/XpTransaction'
+      type: object
+    WeekTotals:
+      required:
+        - xp
+        - sessions
+        - attributes
+      properties:
+        xp:
+          type: integer
+        sessions:
+          description: 'Séances créditées, nettes des annulations.'
+          type: integer
+        attributes:
+          description: 'Mêmes sommes que `XpTransaction.attributes`.'
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+          properties:
+            strength:
+              type: integer
+            endurance:
+              type: integer
+            mobility:
+              type: integer
+            dexterity:
+              type: integer
+          type: object
       type: object
     BattleFighter:
       description: "Un combattant tel qu'affiché. **`mitigationPercent`, `comboPercent` et\n`dodgePercent` sont résolus côté serveur**, jamais des taux que le client\nrecomposerait — même règle que `bonusPercent` sur une Risāla. Le domaine porte des\nmillièmes ; ce sont des pourcentages entiers, tronqués.\nPrécision 20 % contre esquive 30 % donne esquive effective 24 %, pas 10 %.\nLa résistance critique applique la même réduction relative à la chance de critique.\n"
