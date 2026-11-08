@@ -7,9 +7,11 @@ namespace App\Progression\UI\Http;
 use App\Progression\Application\ListXpHistory;
 use App\Progression\Application\ListXpHistoryHandler;
 use App\Progression\Application\ProgressionStateProvider;
+use App\Progression\Application\WeekProgressProvider;
 use App\Progression\Infrastructure\Translation\TitleTranslator;
 use App\Progression\UI\Http\Request\XpHistoryQuery;
 use App\Progression\UI\Http\Response\ProgressionResource;
+use App\Progression\UI\Http\Response\WeekProgressResource;
 use App\Progression\UI\Http\Response\XpHistoryPageResource;
 use App\Shared\UI\Http\Cursor;
 use OpenApi\Attributes as OA;
@@ -37,6 +39,7 @@ final readonly class ProgressionController
         private ProgressionStateProvider $states,
         private ListXpHistoryHandler $listHistory,
         private TitleTranslator $titles,
+        private WeekProgressProvider $weeks,
     ) {
     }
 
@@ -82,5 +85,21 @@ final readonly class ProgressionController
         ));
 
         return new JsonResponse(XpHistoryPageResource::from($page)->toArray());
+    }
+
+    /**
+     * La semaine de jeu (#348) : de taille bornée, donc servie d'un bloc, sans curseur.
+     */
+    #[Route('/api/progression/week', name: 'progression_week', methods: ['GET'])]
+    #[OA\Tag(name: 'Progression')]
+    #[OA\Response(
+        response: 200,
+        description: 'La semaine des caractéristiques en cours, ses écritures, et les totaux de la semaine d\'avant comme référence.',
+        content: new OA\JsonContent(ref: '#/components/schemas/WeekProgress'),
+    )]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    public function week(#[CurrentUser] UserInterface $user): JsonResponse
+    {
+        return new JsonResponse(WeekProgressResource::from($this->weeks->of(Uuid::fromString($user->getUserIdentifier()))));
     }
 }
