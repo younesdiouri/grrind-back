@@ -8,6 +8,7 @@ use App\Progression\Application\ListXpHistory;
 use App\Progression\Application\ListXpHistoryHandler;
 use App\Progression\Application\ProgressionStateProvider;
 use App\Progression\Application\WeekProgressProvider;
+use App\Progression\Application\WeekTrainingPlanProvider;
 use App\Progression\Infrastructure\Translation\TitleTranslator;
 use App\Progression\UI\Http\Request\XpHistoryQuery;
 use App\Progression\UI\Http\Response\ProgressionResource;
@@ -40,6 +41,7 @@ final readonly class ProgressionController
         private ListXpHistoryHandler $listHistory,
         private TitleTranslator $titles,
         private WeekProgressProvider $weeks,
+        private WeekTrainingPlanProvider $plans,
     ) {
     }
 
@@ -100,6 +102,9 @@ final readonly class ProgressionController
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     public function week(#[CurrentUser] UserInterface $user): JsonResponse
     {
-        return new JsonResponse(WeekProgressResource::from($this->weeks->of(Uuid::fromString($user->getUserIdentifier()))));
+        $userId = Uuid::fromString($user->getUserIdentifier());
+        $week = $this->weeks->of($userId);
+
+        return new JsonResponse(WeekProgressResource::from($week, $this->plans->forWeek($userId, $week)));
     }
 }

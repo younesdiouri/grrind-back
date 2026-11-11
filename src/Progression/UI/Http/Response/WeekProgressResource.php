@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Progression\UI\Http\Response;
 
 use App\Progression\Application\WeekProgress;
+use App\Progression\Application\WeekTrainingPlan;
+use App\Progression\Application\WeekTrainingSession;
 use App\Progression\Domain\WeekTotals;
 use App\Progression\Domain\XpTransaction;
 use DateTimeInterface;
@@ -19,7 +21,7 @@ final readonly class WeekProgressResource
     /**
      * @return array<string, mixed>
      */
-    public static function from(WeekProgress $week): array
+    public static function from(WeekProgress $week, ?WeekTrainingPlan $plan = null): array
     {
         return [
             'startsAt' => $week->startsAt->format(DateTimeInterface::ATOM),
@@ -27,6 +29,20 @@ final readonly class WeekProgressResource
             'current' => self::totals($week->current),
             'previous' => null === $week->previous ? null : self::totals($week->previous),
             'entries' => array_map(static fn (XpTransaction $t): array => XpTransactionResource::from($t)->toArray(), $week->entries),
+            'trainingPlan' => null === $plan ? null : [
+                'remaining' => $plan->remaining->toArray(),
+                'remainingAfter' => $plan->remainingAfter->toArray(),
+                'completesWeek' => 0 === $plan->remainingAfter->total(),
+                'calculatedAt' => $plan->calculatedAt->format(DateTimeInterface::ATOM),
+                'expiresAt' => $plan->expiresAt->format(DateTimeInterface::ATOM),
+                'rulesetVersion' => $plan->rulesetVersion,
+                'sessions' => array_map(static fn (WeekTrainingSession $s): array => [
+                    'discipline' => $s->discipline->value,
+                    'durationSeconds' => $s->durationSeconds,
+                    'estimatedXp' => $s->award->amount(),
+                    'estimatedGains' => $s->award->attributeGains->toArray(),
+                ], $plan->sessions),
+            ],
         ];
     }
 

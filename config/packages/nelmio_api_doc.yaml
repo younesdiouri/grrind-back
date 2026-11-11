@@ -1792,7 +1792,7 @@ when@dev:
                             `current` égale `previous` ; elle peut déborder, le serveur ne plafonne rien.
                             Tout se range par l'instant du sport : une séance de la semaine dernière importée
                             cette semaine compte pour la semaine dernière.
-                        required: [startsAt, resetsAt, current, previous, entries]
+                        required: [startsAt, resetsAt, current, previous, entries, trainingPlan]
                         properties:
                             startsAt: { type: string, format: date-time, description: "Début de la semaine en cours." }
                             resetsAt: { type: string, format: date-time, description: "Prochaine remise à zéro." }
@@ -1805,6 +1805,49 @@ when@dev:
                                 type: array
                                 description: "Toutes les écritures de la semaine, `occurredAt` décroissant, sans pagination. `current` en est la somme exacte."
                                 items: { $ref: '#/components/schemas/XpTransaction' }
+                            trainingPlan:
+                                nullable: true
+                                description: "Plan estimé pour les déficits hebdomadaires. Null sans entraînement crédité, référence ou déficit, ou sans séance utile avant expiration."
+                                allOf: [{ $ref: '#/components/schemas/WeekTrainingPlan' }]
+
+                    WeekTrainingPlan:
+                        type: object
+                        description: |
+                            Une ou deux disciplines distinctes, entre 10 et 60 min par pas de 5 min,
+                            bornées par les règles de durée publiées et le temps disponible aujourd'hui.
+                            Choisit le plan complet le plus court parmi ces candidats, sinon la meilleure
+                            réduction relative des déficits. Estimation solo avec bonus actifs et plafonds
+                            du jour ; sans supposer de distance, dénivelé, FC ou bonus ensemble.
+                            Aucun crédit n'est garanti : seules les séances réellement importées comptent.
+                        required: [remaining, remainingAfter, completesWeek, calculatedAt, expiresAt, rulesetVersion, sessions]
+                        properties:
+                            remaining: { $ref: '#/components/schemas/WeekTrainingAmounts' }
+                            remainingAfter: { $ref: '#/components/schemas/WeekTrainingAmounts' }
+                            completesWeek: { type: boolean, description: "Le plan estimé couvre les quatre déficits." }
+                            calculatedAt: { type: string, format: date-time }
+                            expiresAt: { type: string, format: date-time, description: "Minuit local ou remise à zéro de la semaine, la première borne atteinte." }
+                            rulesetVersion: { type: string }
+                            sessions:
+                                type: array
+                                minItems: 1
+                                maxItems: 2
+                                items:
+                                    type: object
+                                    required: [discipline, durationSeconds, estimatedXp, estimatedGains]
+                                    properties:
+                                        discipline: { $ref: '#/components/schemas/Discipline' }
+                                        durationSeconds: { type: integer, minimum: 600, maximum: 3600 }
+                                        estimatedXp: { type: integer, minimum: 1 }
+                                        estimatedGains: { $ref: '#/components/schemas/WeekTrainingAmounts' }
+
+                    WeekTrainingAmounts:
+                        type: object
+                        required: [strength, endurance, mobility, dexterity]
+                        properties:
+                            strength: { type: integer, minimum: 0 }
+                            endurance: { type: integer, minimum: 0 }
+                            mobility: { type: integer, minimum: 0 }
+                            dexterity: { type: integer, minimum: 0 }
 
                     WeekTotals:
                         type: object
