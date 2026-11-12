@@ -1172,6 +1172,29 @@ paths:
                 $ref: '#/components/schemas/WeekProgress'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/sports:
+    get:
+      tags:
+        - Entraînement
+      operationId: get_progression_sport_catalog
+      parameters:
+        -
+          name: If-None-Match
+          in: header
+          description: 'ETag du dernier catalogue dans cette langue.'
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Catalogue actif et barème de référence, filtrable localement. Revalider à chaque ouverture du guide.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SportCatalog'
+        '304':
+          description: 'Catalogue inchangé pour cet ETag et cette langue.'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/titles:
     get:
       tags:
@@ -3349,6 +3372,149 @@ components:
             $ref: '#/components/schemas/Workout'
         nextCursor:
           type: string
+          nullable: true
+      type: object
+    SportCatalog:
+      description: "Petit catalogue complet du snapshot publié, dans l'ordre publié des disciplines.\nFiltrer localement sur name et aliases. Une entrée représente une discipline ;\ntennis est un alias de RACKET_SPORTS, pas un barème supplémentaire.\nSeuls les mappings actifs vers une discipline active sont présents. Une activité\nabsente du mapping de son fournisseur est non prise en charge à l'import\n(UNSUPPORTED_ACTIVITY), pas un sport reconnu sans XP. Les sports de combat\nrestent hors catalogue tant que grrind-back#251 n'est pas traité.\n\nRevalider à chaque ouverture du guide avec If-None-Match. Cache privé sans\npériode de fraîcheur : chaque requête relit le pointeur publié. L'ETag porte\ntout le JSON traduit ; il change aussi pour un nouveau libellé, même quand\nrulesetVersion reste identique. Vary: Accept-Language.\n"
+      required:
+        - rulesetVersion
+        - revision
+        - reference
+        - disciplines
+      properties:
+        rulesetVersion:
+          description: 'Version de gameplay, commune au calcul et au snapshot ; exclut les traductions.'
+          type: string
+        revision:
+          description: 'Révision publiée, y compris les changements de présentation.'
+          type: integer
+        reference:
+          description: "Barème de référence pour 30 minutes de durée déjà retenue : journée\nsans XP préalable, sans distance, dénivelé, fréquence cardiaque,\nmodificateurs personnels ni bonus de groupe. Le plafond quotidien publié\ns'applique. Pas une estimation personnalisée ni un gain garanti :\nl'import arbitre aussi durée, ancienneté et chevauchements ; métriques,\nbonus et charge du jour peuvent changer le crédit réel.\n"
+          required:
+            - durationSeconds
+            - unit
+          properties:
+            durationSeconds:
+              description: 'Secondes de durée retenue, aucune équivalence en pas.'
+              type: integer
+              example: 1800
+            unit:
+              description: 'Les points de caractéristiques répartissent cette XP.'
+              type: string
+              enum:
+                - XP
+          type: object
+        disciplines:
+          type: array
+          items:
+            $ref: '#/components/schemas/SportCatalogEntry'
+      type: object
+    SportCatalogEntry:
+      required:
+        - discipline
+        - name
+        - aliases
+        - providerMappings
+        - creditsXp
+        - attributePercentages
+        - baseXp
+        - baseAttributeGains
+        - dailyCapXp
+      properties:
+        discipline:
+          $ref: '#/components/schemas/Discipline'
+        name:
+          description: 'Libellé publié dans la langue négociée par Accept-Language, repli anglais puis français.'
+          type: string
+        aliases:
+          description: 'Clés de sports et types fournisseurs actifs, uniques et triés, pour la recherche locale. Pas de synonymes ni de traductions inventés.'
+          type: array
+          items:
+            type: string
+          example:
+            - EXERCISE_TYPE_TENNIS
+            - tennis
+        providerMappings:
+          description: 'Prise en charge exacte par fournisseur : un alias présent chez Apple ne promet rien chez Health Connect.'
+          type: array
+          items:
+            required:
+              - source
+              - activityType
+              - sport
+            properties:
+              source:
+                type: string
+                enum:
+                  - APPLE_HEALTH
+                  - HEALTH_CONNECT
+              activityType:
+                type: string
+                example: tennis
+              sport:
+                description: 'Identité normalisée publiée, si renseignée ; sinon le type fournisseur reste recherchable.'
+                type: string
+                example: tennis
+                nullable: true
+            type: object
+        creditsXp:
+          description: "Une discipline reconnue peut ne pas créditer d'XP (WALKING aujourd'hui).\nLa marche quotidienne et les pas n'ont pas de gain XP par minute ou par\npas ; l'énergie active quotidienne peut bonifier la Vitality, dérivée\ndu profil. Aucune conversion ni promesse de Vitality dans ce catalogue.\n"
+          type: boolean
+        attributePercentages:
+          description: 'Répartition publiée en pourcents, somme 100 ; null pour une discipline sans XP.'
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+          properties:
+            strength:
+              type: integer
+              maximum: 100
+              minimum: 0
+            endurance:
+              type: integer
+              maximum: 100
+              minimum: 0
+            mobility:
+              type: integer
+              maximum: 100
+              minimum: 0
+            dexterity:
+              type: integer
+              maximum: 100
+              minimum: 0
+          type: object
+          nullable: true
+        baseXp:
+          description: 'XP de reference avec plafond publié, zéro si creditsXp=false.'
+          type: integer
+          minimum: 0
+        baseAttributeGains:
+          description: 'Points de référence calculés par le moteur, arrondi au plus fort reste ; somme égale à baseXp. Null si sans XP.'
+          required:
+            - strength
+            - endurance
+            - mobility
+            - dexterity
+          properties:
+            strength:
+              type: integer
+              minimum: 0
+            endurance:
+              type: integer
+              minimum: 0
+            mobility:
+              type: integer
+              minimum: 0
+            dexterity:
+              type: integer
+              minimum: 0
+          type: object
+          nullable: true
+        dailyCapXp:
+          description: 'Plafond quotidien de la discipline, pas une quantité garantie ; null si sans XP.'
+          type: integer
           nullable: true
       type: object
     WorkoutStats:
@@ -6318,7 +6484,7 @@ tags:
   -
     name: Progression
   -
-    name: Récompenses
-  -
     name: Entraînement
+  -
+    name: Récompenses
 
