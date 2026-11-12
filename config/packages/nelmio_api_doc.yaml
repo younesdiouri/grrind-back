@@ -1875,7 +1875,7 @@ when@dev:
                             `current` égale `previous` ; elle peut déborder, le serveur ne plafonne rien.
                             Tout se range par l'instant du sport : une séance de la semaine dernière importée
                             cette semaine compte pour la semaine dernière.
-                        required: [startsAt, resetsAt, current, previous, entries, trainingPlan]
+                        required: [startsAt, resetsAt, current, previous, entries, trainingPlan, trainingPlans]
                         properties:
                             startsAt: { type: string, format: date-time, description: "Début de la semaine en cours." }
                             resetsAt: { type: string, format: date-time, description: "Prochaine remise à zéro." }
@@ -1890,8 +1890,22 @@ when@dev:
                                 items: { $ref: '#/components/schemas/XpTransaction' }
                             trainingPlan:
                                 nullable: true
-                                description: "Plan estimé pour les déficits hebdomadaires. Null sans entraînement crédité, référence ou déficit, ou sans séance utile avant expiration."
+                                description: "Plan principal : identique à trainingPlans[0], conservé pour les clients existants. Null quand trainingPlans est vide."
                                 allOf: [{ $ref: '#/components/schemas/WeekTrainingPlan' }]
+                            trainingPlans:
+                                type: array
+                                maxItems: 3
+                                description: |
+                                    Choix alternatifs, principal en premier, à envisager séparément et non à cumuler.
+                                    Un seul meilleur plan par ensemble de sports ; chacun des choix retenus apporte
+                                    au moins une discipline absente des choix précédents. Une séance qui ne réduit
+                                    aucun déficit supplémentaire est écartée. Les plans complets passent avant les
+                                    partiels, puis même classement que le principal : durée minimale si complet,
+                                    réduction relative maximale des déficits puis durée minimale sinon.
+                                    Vide sans entraînement crédité, référence, déficit ou séance utile avant expiration
+                                    (dont aucun sport éligible). Aucun choix artificiel pour atteindre trois plans.
+                                    Même calculatedAt, expiresAt et rulesetVersion pour tous les choix.
+                                items: { $ref: '#/components/schemas/WeekTrainingPlan' }
 
                     WeekTrainingPlan:
                         type: object

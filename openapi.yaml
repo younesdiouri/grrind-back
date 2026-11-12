@@ -4655,6 +4655,7 @@ components:
         - previous
         - entries
         - trainingPlan
+        - trainingPlans
       properties:
         startsAt:
           description: 'Début de la semaine en cours.'
@@ -4678,11 +4679,17 @@ components:
           items:
             $ref: '#/components/schemas/XpTransaction'
         trainingPlan:
-          description: 'Plan estimé pour les déficits hebdomadaires. Null sans entraînement crédité, référence ou déficit, ou sans séance utile avant expiration.'
+          description: 'Plan principal : identique à trainingPlans[0], conservé pour les clients existants. Null quand trainingPlans est vide.'
           nullable: true
           allOf:
             -
               $ref: '#/components/schemas/WeekTrainingPlan'
+        trainingPlans:
+          description: "Choix alternatifs, principal en premier, à envisager séparément et non à cumuler.\nUn seul meilleur plan par ensemble de sports ; chacun des choix retenus apporte\nau moins une discipline absente des choix précédents. Une séance qui ne réduit\naucun déficit supplémentaire est écartée. Les plans complets passent avant les\npartiels, puis même classement que le principal : durée minimale si complet,\nréduction relative maximale des déficits puis durée minimale sinon.\nVide sans entraînement crédité, référence, déficit ou séance utile avant expiration\n(dont aucun sport éligible). Aucun choix artificiel pour atteindre trois plans.\nMême calculatedAt, expiresAt et rulesetVersion pour tous les choix.\n"
+          type: array
+          items:
+            $ref: '#/components/schemas/WeekTrainingPlan'
+          maxItems: 3
       type: object
     WeekTrainingPlan:
       description: "Une ou deux disciplines distinctes, entre 10 et 60 min par pas de 5 min,\nbornées par les règles de durée publiées et le temps disponible aujourd'hui.\nChoisit le plan complet le plus court parmi ces candidats, sinon la meilleure\nréduction relative des déficits. Estimation solo avec bonus actifs et plafonds\ndu jour ; sans supposer de distance, dénivelé, FC ou bonus ensemble.\nAucun crédit n'est garanti : seules les séances réellement importées comptent.\n"
