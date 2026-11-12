@@ -18,7 +18,7 @@ use Psr\Clock\ClockInterface;
  *
  * **Retire aussi le jeton de push de cette famille (#136, arbitrage B).** Une famille est un
  * appareil ; s'en déconnecter doit couper ses notifications sans que le client ait à s'en
- * souvenir. Même transaction que la révocation — voir {@see RefreshTokenRepository::transactional()}.
+ * souvenir. Même transaction que la révocation — voir {@see RefreshTokenRepository::transactionalFor()}.
  */
 final readonly class LogOutHandler
 {
@@ -41,11 +41,9 @@ final readonly class LogOutHandler
             return;
         }
 
-        $familyId = $token->familyId();
-        $now = $this->clock->now();
-
-        $this->refreshTokens->transactional(function () use ($familyId, $now): void {
-            $this->refreshTokens->revokeFamily($familyId, $now);
+        $this->refreshTokens->transactionalFor($token, function () use ($token): void {
+            $familyId = $token->familyId();
+            $this->refreshTokens->revokeFamily($familyId, $this->clock->now());
             $this->devices->discardFamily($familyId);
         });
     }

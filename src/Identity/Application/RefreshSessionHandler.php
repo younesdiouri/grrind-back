@@ -65,12 +65,21 @@ final readonly class RefreshSessionHandler
      */
     public function __invoke(RefreshSession $command): AuthenticatedUser
     {
-        $now = $this->clock->now();
         $presented = $this->find($command->refreshToken);
 
         if (null === $presented) {
             throw new InvalidRefreshToken();
         }
+
+        $authenticated = $this->refreshTokens->transactionalFor($presented, fn (): ?AuthenticatedUser => $this->refresh($presented));
+
+        // Le rejeu révoque avant de refuser : lever dans la transaction annulerait la révocation.
+        return $authenticated ?? throw new InvalidRefreshToken();
+    }
+
+    private function refresh(RefreshToken $presented): ?AuthenticatedUser
+    {
+        $now = $this->clock->now();
 
         if ($presented->isReplay()) {
             // Voir le docblock de la classe : impossible de distinguer le voleur du vrai
@@ -87,24 +96,20 @@ final readonly class RefreshSessionHandler
                 'verdict' => $this->replayVerdict($presented, $now),
             ]);
 
-            $this->refreshTokens->transactional(function () use ($familyId, $now): void {
-                $this->refreshTokens->revokeFamily($familyId, $now);
-                $this->devices->discardFamily($familyId);
-            });
+            $this->refreshTokens->revokeFamily($familyId, $now);
+            $this->devices->discardFamily($familyId);
 
-            throw new InvalidRefreshToken();
+            return null;
         }
 
         if (!$presented->isUsable($now)) {
-            throw new InvalidRefreshToken();
+            return null;
         }
 
         $secret = RefreshTokenSecret::generate();
         $rotated = $presented->rotate($secret, $now);
 
         $this->refreshTokens->add($rotated);
-        // Consommation de l'ancien et écriture du nouveau dans le même flush.
-        $this->refreshTokens->commit();
 
         $user = $presented->user();
 
