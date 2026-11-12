@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Training\Infrastructure\Doctrine;
 
 use App\Shared\Domain\Activity\WorkoutSource;
+use App\Shared\Domain\Timezone;
 use App\Training\Application\ListWorkouts;
 use App\Training\Domain\Workout;
+use App\Training\Domain\WorkoutStatsWindow;
 use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -206,6 +208,42 @@ class WorkoutRepository extends ServiceEntityRepository
     public function commit(): void
     {
         $this->getEntityManager()->flush();
+    }
+
+    /**
+     * Une requête bornée, sans hydrater les séances ni joindre le ledger (qui multiplierait
+     * les faits avec les bonus). L'index (user_id, started_at) reste utilisable : la conversion
+     * de fuseau ne touche que le GROUP BY, jamais les bornes de recherche.
+     * DQL ne fournit pas AT TIME ZONE : DBAL exécute ce SQL PostgreSQL paramétré.
+     * https://www.postgresql.org/docs/17/functions-datetime.html#FUNCTIONS-DATETIME-ZONECONVERT.
+     *
+     * @return list<array{date: string, discipline: string, seconds: int, sessions: int}>
+     */
+    public function statsByLocalDay(Uuid $userId, WorkoutStatsWindow $window, Timezone $timezone): array
+    {
+        /** @var list<array{date: string, discipline: string, seconds: int|string, sessions: int|string}> $rows */
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            'SELECT (started_at AT TIME ZONE :timezone)::date AS date, discipline,
+                    SUM(duration_seconds) AS seconds, COUNT(*) AS sessions
+             FROM workout
+             WHERE user_id = :userId
+               AND ((started_at >= :start AND started_at < :observedEnd)
+                 OR (started_at >= :previousStart AND started_at < :previousEnd))
+             GROUP BY 1, 2 ORDER BY 1, 2',
+            [
+                'timezone' => $timezone->identifier,
+                'userId' => $userId->toRfc4122(),
+                'start' => $window->start->format('c'),
+                'observedEnd' => $window->observedEnd->format('c'),
+                'previousStart' => $window->previousStart->format('c'),
+                'previousEnd' => $window->previousEnd->format('c'),
+            ],
+        );
+
+        return array_map(static fn (array $row): array => [
+            'date' => $row['date'], 'discipline' => $row['discipline'],
+            'seconds' => (int) $row['seconds'], 'sessions' => (int) $row['sessions'],
+        ], $rows);
     }
 
     /**

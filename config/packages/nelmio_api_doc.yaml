@@ -975,6 +975,89 @@ when@dev:
                                 items: { $ref: '#/components/schemas/Workout' }
                             nextCursor: { type: string, nullable: true }
 
+                    WorkoutStats:
+                        type: object
+                        description: |
+                            Volume civil dans le fuseau IANA du profil, relu à chaque requête.
+                            Semaine lundi-dimanche, mois et année calendaires, indépendants d'Alam.
+                            Toutes les bornes de fin sont exclues. `observedEnd` termine le jour courant,
+                            même si l'heure serveur est plus tôt. La comparaison commence au début de la
+                            période précédente et couvre `days` jours civils, plafonnés à sa fin ; ni durée
+                            fixe de 24 h, ni alignement des dates entre années bissextiles.
+                            Toute séance stockée compte une fois par UUID, avec sa durée mesurée entière
+                            attribuée à `startedAt`, y compris hors fenêtre de crédit XP. Aucun plafond XP,
+                            ledger, bonus ensemble, ligue ou note médicale n'entre dans ce volume.
+                            Référence : workoutStats.ts de l'app ; le fuseau du profil remplace celui du
+                            téléphone et les disciplines ex aequo sont départagées par leur clé.
+                            Correction des effets de bord JS quand minuit est supprimé par le DST :
+                            compter les dates civiles et réancrer chaque borne au début du jour valide,
+                            plutôt que propager 01 h aux jours suivants.
+                        required: [period, timezone, start, end, observedEnd, previousStart, previousEnd, days, current, previous, change, grade, daily, buckets, disciplines]
+                        properties:
+                            period: { type: string, enum: [week, month, year], description: "Semaine courante par défaut si le paramètre period est absent." }
+                            timezone: { type: string, example: Europe/Paris }
+                            start: { type: string, format: date-time, description: "Début inclus de la période courante, avec décalage local." }
+                            end: { type: string, format: date-time, description: "Fin exclue de la période civile complète." }
+                            observedEnd: { type: string, format: date-time, description: "Minuit local suivant le jour courant ; fin exclue des faits observés." }
+                            previousStart: { type: string, format: date-time }
+                            previousEnd: { type: string, format: date-time, description: "Fin exclue de la comparaison, au plus le début de la période courante." }
+                            days: { type: integer, minimum: 1, maximum: 366, description: "Jours civils observés, aujourd'hui inclus." }
+                            current: { $ref: '#/components/schemas/WorkoutStatsTotals' }
+                            previous: { $ref: '#/components/schemas/WorkoutStatsTotals' }
+                            change:
+                                type: integer
+                                nullable: true
+                                minimum: -100
+                                description: "Math.round((current.seconds / previous.seconds - 1) * 100), demis vers +∞. Null si previous.seconds = 0."
+                            grade:
+                                type: string
+                                enum: [A, B, C, D, E]
+                                nullable: true
+                                description: "Ratio brut current/previous : A ≥ 1.2, B ≥ 1, C ≥ 0.8, D ≥ 0.5, E en dessous. Null sans volume précédent. Mesure du volume uniquement."
+                            daily:
+                                type: array
+                                description: "Un jour par date observée, dans l'ordre, zéros inclus. Pour le calendrier ; aucun jour futur."
+                                items:
+                                    type: object
+                                    required: [date, seconds, sessions]
+                                    properties:
+                                        date: { type: string, format: date-time, description: "Début du jour dans le fuseau du profil, avec décalage." }
+                                        seconds: { type: integer, minimum: 0 }
+                                        sessions: { type: integer, minimum: 0 }
+                            buckets:
+                                type: array
+                                description: "Période complète en ordre croissant : 7 jours, 28–31 jours ou 12 mois. Zéros et points futurs explicites ; seules les séances avant observedEnd contribuent, même dans le mois courant d'une année. Les libellés restent formatés par le client."
+                                items:
+                                    type: object
+                                    required: [from, to, seconds, sessions, activeDays, isFuture]
+                                    properties:
+                                        from: { type: string, format: date-time }
+                                        to: { type: string, format: date-time, description: "Fin exclue du point." }
+                                        seconds: { type: integer, minimum: 0 }
+                                        sessions: { type: integer, minimum: 0 }
+                                        activeDays: { type: integer, minimum: 0 }
+                                        isFuture: { type: boolean, description: "Vrai si from ≥ observedEnd. Un mois partiellement observé vaut faux." }
+                            disciplines:
+                                type: array
+                                description: "Disciplines présentes dans la fenêtre courante, durée décroissante puis clé croissante à égalité. Vide sans séance."
+                                items:
+                                    type: object
+                                    required: [discipline, seconds, sessions, share]
+                                    properties:
+                                        discipline: { $ref: '#/components/schemas/Discipline' }
+                                        seconds: { type: integer, minimum: 0 }
+                                        sessions: { type: integer, minimum: 1 }
+                                        share: { type: number, minimum: 0, maximum: 1, description: "Part du volume courant, entre 0 et 1 ; zéro si le volume total vaut zéro." }
+
+                    WorkoutStatsTotals:
+                        type: object
+                        required: [seconds, sessions, activeDays, averageSeconds]
+                        properties:
+                            seconds: { type: integer, minimum: 0, description: "Somme de durationSeconds mesurées, sans écrêtage XP." }
+                            sessions: { type: integer, minimum: 0 }
+                            activeDays: { type: integer, minimum: 0, description: "Dates locales distinctes portant au moins une séance, toutes disciplines confondues." }
+                            averageSeconds: { type: number, minimum: 0, description: "seconds / sessions, sans arrondi ; zéro sans séance." }
+
                     SyncState:
                         type: object
                         description: |
