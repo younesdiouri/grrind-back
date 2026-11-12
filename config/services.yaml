@@ -436,6 +436,16 @@ when@test:
             arguments: ['now']
             public: true
 
+        # Fige uniquement la lecture des stats ; JWT, import et Messenger gardent leur horloge.
+        test.training_stats.clock:
+            class: Symfony\Component\Clock\MockClock
+            arguments: ['now']
+            public: true
+
+        App\Training\Application\WorkoutStatsProvider:
+            arguments:
+                $clock: '@test.training_stats.clock'
+
         App\Community\Application\AlamRuns:
             public: true
             arguments:

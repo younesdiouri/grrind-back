@@ -11,7 +11,9 @@ use DateTimeImmutable;
 /**
  * Calendrier civil des stats de volume (#352), indépendant de la semaine Alam.
  * Symfony fournit l'horloge, pas ces règles produit : elles reprennent statsWindow()
- * de l'app. Seul écart : le fuseau du profil remplace celui du téléphone.
+ * de l'app. Le fuseau du profil remplace celui du téléphone. Si le DST supprime
+ * minuit, on garde le début valide du jour et réancre les bornes suivantes à minuit,
+ * plutôt que propager 01 h comme les mutations Date JS de l'app.
  *
  * Toutes les fins sont exclues. On observe jusqu'au minuit qui termine aujourd'hui,
  * puis compare autant de jours civils depuis le début de la période précédente,
@@ -39,9 +41,14 @@ final readonly class WorkoutStatsWindow
             StatsPeriod::Month => $midnight->setDate((int) $midnight->format('Y'), (int) $midnight->format('m'), 1),
             StatsPeriod::Year => $midnight->setDate((int) $midnight->format('Y'), 1, 1),
         };
+        $start = $start->setTime(0, 0);
         $end = $start->modify('+1 '.$period->value)->setTime(0, 0);
         $observedEnd = $today->endsAt->setTimezone($timezone->toDateTimeZone());
-        $days = (int) $start->diff($observedEnd)->days;
+        // Si minuit n'existe pas, le début vaut 01 h : compter les dates, pas les heures.
+        $days = 0;
+        for ($day = $start; $day < $observedEnd; $day = $day->modify('+1 day')->setTime(0, 0)) {
+            ++$days;
+        }
         $previousStart = $start->modify('-1 '.$period->value)->setTime(0, 0);
 
         return new self($start, $end, $observedEnd, $previousStart, min($start, $previousStart->modify('+'.$days.' days')->setTime(0, 0)), $days);

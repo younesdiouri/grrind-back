@@ -1672,6 +1672,29 @@ paths:
                 $ref: '#/components/schemas/SyncState'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/workouts/stats:
+    get:
+      tags:
+        - Entraînement
+      operationId: get_training_workout_stats
+      parameters:
+        -
+          name: period
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/StatsPeriod'
+      responses:
+        '200':
+          description: 'Statistiques de volume du joueur courant dans son fuseau de profil.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 components:
   schemas:
     PushRouteType:
@@ -3327,6 +3350,178 @@ components:
         nextCursor:
           type: string
           nullable: true
+      type: object
+    WorkoutStats:
+      description: "Volume civil dans le fuseau IANA du profil, relu à chaque requête.\nSemaine lundi-dimanche, mois et année calendaires, indépendants d'Alam.\nToutes les bornes de fin sont exclues. `observedEnd` termine le jour courant,\nmême si l'heure serveur est plus tôt. La comparaison commence au début de la\npériode précédente et couvre `days` jours civils, plafonnés à sa fin ; ni durée\nfixe de 24 h, ni alignement des dates entre années bissextiles.\nToute séance stockée compte une fois par UUID, avec sa durée mesurée entière\nattribuée à `startedAt`, y compris hors fenêtre de crédit XP. Aucun plafond XP,\nledger, bonus ensemble, ligue ou note médicale n'entre dans ce volume.\nRéférence : workoutStats.ts de l'app ; le fuseau du profil remplace celui du\ntéléphone et les disciplines ex aequo sont départagées par leur clé.\nCorrection des effets de bord JS quand minuit est supprimé par le DST :\ncompter les dates civiles et réancrer chaque borne au début du jour valide,\nplutôt que propager 01 h aux jours suivants.\n"
+      required:
+        - period
+        - timezone
+        - start
+        - end
+        - observedEnd
+        - previousStart
+        - previousEnd
+        - days
+        - current
+        - previous
+        - change
+        - grade
+        - daily
+        - buckets
+        - disciplines
+      properties:
+        period:
+          description: 'Semaine courante par défaut si le paramètre period est absent.'
+          type: string
+          enum:
+            - week
+            - month
+            - year
+        timezone:
+          type: string
+          example: Europe/Paris
+        start:
+          description: 'Début inclus de la période courante, avec décalage local.'
+          type: string
+          format: date-time
+        end:
+          description: 'Fin exclue de la période civile complète.'
+          type: string
+          format: date-time
+        observedEnd:
+          description: 'Minuit local suivant le jour courant ; fin exclue des faits observés.'
+          type: string
+          format: date-time
+        previousStart:
+          type: string
+          format: date-time
+        previousEnd:
+          description: 'Fin exclue de la comparaison, au plus le début de la période courante.'
+          type: string
+          format: date-time
+        days:
+          description: "Jours civils observés, aujourd'hui inclus."
+          type: integer
+          maximum: 366
+          minimum: 1
+        current:
+          $ref: '#/components/schemas/WorkoutStatsTotals'
+        previous:
+          $ref: '#/components/schemas/WorkoutStatsTotals'
+        change:
+          description: 'Math.round((current.seconds / previous.seconds - 1) * 100), demis vers +∞. Null si previous.seconds = 0.'
+          type: integer
+          nullable: true
+          minimum: -100
+        grade:
+          description: 'Ratio brut current/previous : A ≥ 1.2, B ≥ 1, C ≥ 0.8, D ≥ 0.5, E en dessous. Null sans volume précédent. Mesure du volume uniquement.'
+          type: string
+          nullable: true
+          enum:
+            - A
+            - B
+            - C
+            - D
+            - E
+        daily:
+          description: "Un jour par date observée, dans l'ordre, zéros inclus. Pour le calendrier ; aucun jour futur."
+          type: array
+          items:
+            required:
+              - date
+              - seconds
+              - sessions
+            properties:
+              date:
+                description: 'Début du jour dans le fuseau du profil, avec décalage.'
+                type: string
+                format: date-time
+              seconds:
+                type: integer
+                minimum: 0
+              sessions:
+                type: integer
+                minimum: 0
+            type: object
+        buckets:
+          description: "Période complète en ordre croissant : 7 jours, 28–31 jours ou 12 mois. Zéros et points futurs explicites ; seules les séances avant observedEnd contribuent, même dans le mois courant d'une année. Les libellés restent formatés par le client."
+          type: array
+          items:
+            required:
+              - from
+              - to
+              - seconds
+              - sessions
+              - activeDays
+              - isFuture
+            properties:
+              from:
+                type: string
+                format: date-time
+              to:
+                description: 'Fin exclue du point.'
+                type: string
+                format: date-time
+              seconds:
+                type: integer
+                minimum: 0
+              sessions:
+                type: integer
+                minimum: 0
+              activeDays:
+                type: integer
+                minimum: 0
+              isFuture:
+                description: 'Vrai si from ≥ observedEnd. Un mois partiellement observé vaut faux.'
+                type: boolean
+            type: object
+        disciplines:
+          description: 'Disciplines présentes dans la fenêtre courante, durée décroissante puis clé croissante à égalité. Vide sans séance.'
+          type: array
+          items:
+            required:
+              - discipline
+              - seconds
+              - sessions
+              - share
+            properties:
+              discipline:
+                $ref: '#/components/schemas/Discipline'
+              seconds:
+                type: integer
+                minimum: 0
+              sessions:
+                type: integer
+                minimum: 1
+              share:
+                description: 'Part du volume courant, entre 0 et 1 ; zéro si le volume total vaut zéro.'
+                type: number
+                maximum: 1
+                minimum: 0
+            type: object
+      type: object
+    WorkoutStatsTotals:
+      required:
+        - seconds
+        - sessions
+        - activeDays
+        - averageSeconds
+      properties:
+        seconds:
+          description: 'Somme de durationSeconds mesurées, sans écrêtage XP.'
+          type: integer
+          minimum: 0
+        sessions:
+          type: integer
+          minimum: 0
+        activeDays:
+          description: 'Dates locales distinctes portant au moins une séance, toutes disciplines confondues.'
+          type: integer
+          minimum: 0
+        averageSeconds:
+          description: 'seconds / sessions, sans arrondi ; zéro sans séance.'
+          type: number
+          minimum: 0
       type: object
     SyncState:
       description: "De quoi demander la bonne fenêtre à HealthKit ou Health Connect.\n\n**Le curseur vient du serveur.** Le client peut garder sa date de dernière\nsynchronisation en local, et il le fera pour éviter un aller-retour au démarrage — mais\nil ne doit pas en *dépendre* : réinstallation, changement d'appareil, second appareil sur\nle même compte. Le cache local est une optimisation, pas la vérité.\n\n**La fenêtre est servie et pas codée en dur** : elle doit pouvoir bouger sans publication\nsur les stores. Une app qui demanderait trente jours pendant que le serveur en accepte\nsoixante enverrait moins que ce qu'elle pourrait.\n"
@@ -6023,6 +6218,17 @@ components:
           default: []
           maxItems: 2000
           minItems: 1
+      type: object
+    StatsPeriod:
+      type: string
+      enum:
+        - week
+        - month
+        - year
+    WorkoutStatsQuery:
+      properties:
+        period:
+          $ref: '#/components/schemas/StatsPeriod'
       type: object
   responses:
     BadRequest:
