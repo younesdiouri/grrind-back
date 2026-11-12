@@ -19,6 +19,10 @@ use Symfony\Component\Uid\Uuid;
  * Compare une ou deux disciplines distinctes, par pas de 5 min entre 10 et 60 min.
  * Le plan complet le plus court gagne ; sinon, la meilleure réduction relative des
  * déficits. Le vrai calculateur tranche les gains, avec bonus actifs et plafonds du jour.
+ * Garde le meilleur candidat par ensemble de sports, puis au plus trois choix classés :
+ * chacun apporte une discipline absente des choix précédents, sans séance de remplissage.
+ * Une seule génération de candidats et une lecture de charge par sport, quel que soit
+ * le nombre de choix. Le snapshot publié reste celui de l'opération courante.
  * Terrain, cardio et bonus ensemble inconnus ne sont jamais inventés.
  */
 final readonly class WeekTrainingPlanProvider
@@ -36,12 +40,18 @@ final readonly class WeekTrainingPlanProvider
 
     public function forWeek(Uuid $userId, WeekProgress $week): ?WeekTrainingPlan
     {
+        return $this->plansForWeek($userId, $week)[0] ?? null;
+    }
+
+    /** @return list<WeekTrainingPlan> Le principal en premier ; vide sans solution utile. */
+    public function plansForWeek(Uuid $userId, WeekProgress $week): array
+    {
         if (null === $week->previous || $week->current->sessions <= 0) {
-            return null;
+            return [];
         }
         $remaining = self::deficit($week->previous->attributes, $week->current->attributes);
         if (0 === $remaining->total()) {
-            return null;
+            return [];
         }
         $now = $this->clock->now();
         $day = LocalDay::containing($now, $this->timezones->of($userId));
@@ -62,29 +72,40 @@ final readonly class WeekTrainingPlanProvider
                 }
             }
         }
-        $best = [];
-        $bestRemaining = $remaining;
-        $bestCoverage = 0.0;
-        $bestSeconds = \PHP_INT_MAX;
+        $bestBySports = [];
+        $order = 0;
         foreach ($candidates as $index => $first) {
-            $this->consider([$first], $remaining, $available, $best, $bestRemaining, $bestCoverage, $bestSeconds);
+            $this->consider([$first], $remaining, $available, $bestBySports, $order++);
             foreach (\array_slice($candidates, $index + 1) as $second) {
                 if ($first->discipline !== $second->discipline) {
-                    $this->consider([$first, $second], $remaining, $available, $best, $bestRemaining, $bestCoverage, $bestSeconds);
+                    $this->consider([$first, $second], $remaining, $available, $bestBySports, $order++);
                 }
             }
         }
 
-        return [] === $best ? null : new WeekTrainingPlan($remaining, $bestRemaining, $best, $now, $expires, $this->rules->version());
+        usort($bestBySports, static fn (array $a, array $b): int => $a['rank'] <=> $b['rank']);
+        $plans = [];
+        $seen = [];
+        $version = $this->rules->version();
+        foreach ($bestBySports as $candidate) {
+            if ([] === array_diff($candidate['sports'], $seen)) {
+                continue;
+            }
+            $plans[] = new WeekTrainingPlan($remaining, $candidate['after'], $candidate['sessions'], $now, $expires, $version);
+            $seen = array_unique([...$seen, ...$candidate['sports']]);
+            if (3 === \count($plans)) {
+                break;
+            }
+        }
+
+        return $plans;
     }
 
     /**
-     * @param non-empty-list<WeekTrainingSession> $sessions
-     * @param list<WeekTrainingSession>           $best
-     *
-     * @param-out list<WeekTrainingSession> $best
+     * @param non-empty-list<WeekTrainingSession>                                                                                                                     $sessions
+     * @param array<string, array{sessions: non-empty-list<WeekTrainingSession>, sports: list<string>, after: AttributeGains, rank: array{int, int|float, int, int}}> $bestBySports
      */
-    private function consider(array $sessions, AttributeGains $remaining, int $available, array &$best, AttributeGains &$bestRemaining, float &$bestCoverage, int &$bestSeconds): void
+    private function consider(array $sessions, AttributeGains $remaining, int $available, array &$bestBySports, int $order): void
     {
         $seconds = array_sum(array_map(static fn (WeekTrainingSession $s): int => $s->durationSeconds, $sessions));
         if ($seconds > $available) {
@@ -94,6 +115,11 @@ final readonly class WeekTrainingPlanProvider
         foreach ($sessions as $session) {
             $after = self::deficit($after, $session->award->attributeGains);
         }
+        // Ajouter un sport qui ne réduit aucun déficit de plus ne crée pas une alternative.
+        if (2 === \count($sessions) && (self::deficit($remaining, $sessions[0]->award->attributeGains) == $after
+            || self::deficit($remaining, $sessions[1]->award->attributeGains) == $after)) {
+            return;
+        }
         $coverage = 0.0;
         foreach ($remaining->toArray() as $attribute => $missing) {
             if ($missing > 0) {
@@ -101,16 +127,13 @@ final readonly class WeekTrainingPlanProvider
             }
         }
         $complete = 0 === $after->total();
-        $bestComplete = 0 === $bestRemaining->total();
-        $better = ($complete && !$bestComplete)
-            || ($complete === $bestComplete && ($complete
-                ? $seconds < $bestSeconds
-                : ($coverage > $bestCoverage || ($coverage === $bestCoverage && $seconds < $bestSeconds))));
-        if ($coverage > 0 && $better) {
-            $best = $sessions;
-            $bestRemaining = $after;
-            $bestCoverage = $coverage;
-            $bestSeconds = $seconds;
+        // L'ordre de parcours départage les égalités comme dans le plan unique d'origine.
+        $rank = [$complete ? 0 : 1, $complete ? $seconds : -$coverage, $seconds, $order];
+        $sports = array_map(static fn (WeekTrainingSession $s): string => $s->discipline->value, $sessions);
+        sort($sports);
+        $key = implode('+', $sports);
+        if ($coverage > 0 && (!isset($bestBySports[$key]) || $rank < $bestBySports[$key]['rank'])) {
+            $bestBySports[$key] = ['sessions' => $sessions, 'sports' => $sports, 'after' => $after, 'rank' => $rank];
         }
     }
 

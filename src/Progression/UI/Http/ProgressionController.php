@@ -105,6 +105,6 @@ final readonly class ProgressionController
         $userId = Uuid::fromString($user->getUserIdentifier());
         $week = $this->weeks->of($userId);
 
-        return new JsonResponse(WeekProgressResource::from($week, $this->plans->forWeek($userId, $week)));
+        return new JsonResponse(WeekProgressResource::from($week, $this->plans->plansForWeek($userId, $week)));
     }
 }
