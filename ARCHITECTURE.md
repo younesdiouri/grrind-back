@@ -174,9 +174,12 @@ sequenceDiagram
         DB-->>T: réponse figée
         T-->>C: le même SyncSummary qu'au premier appel
     else première fois
-        T->>T: trie par startedAt · écarte doublons,<br/>types inconnus, durées sous le plancher
-        T->>T: départage les chevauchements du lot<br/><i>le plus complet gagne</i>
+        T->>T: trie par startedAt
         rect rgb(222,240,222)
+            T->>DB: BEGIN · 🔒 verrou d'import par compte
+            T->>DB: lit les doublons sous verrou
+            T->>T: écarte doublons, types inconnus, durées sous le plancher<br/>départage les chevauchements du lot · le plus complet gagne
+            T->>DB: lit les créneaux occupés sous verrou
             loop chaque workout, dans l'ordre chronologique
                 T->>DB: INSERT workout
                 alt hors fenêtre d'antériorité
@@ -205,8 +208,9 @@ Quatre choses que ce schéma dit et qu'il faut avoir en tête :
 - **L'ordre chronologique n'est pas cosmétique.** Le plafond quotidien se calcule sur ce que le
   joueur a déjà gagné ce jour-là, donc la charge du jour se relit à chaque itération. Le
   même lot envoyé dans un autre ordre doit donner le même ledger.
-- **Le verrou est pris une fois** et tenu jusqu'au COMMIT — un verrou de ligne est ré-entrant
-  dans une transaction. C'est lui qui sérialise deux appareils du même compte.
+- **Le verrou d'import précède les lectures** de doublons/créneaux et les écritures, même
+  pour les archives et disciplines sans XP. Le verrou de progression vient ensuite au
+  premier crédit ; les deux tiennent jusqu'au COMMIT et sérialisent deux appareils du compte.
 - **L'`Idempotency-Key` ne fait pas doublon avec l'unicité `(user, source, externalId)`.**
   Celle-ci empêche le double crédit ; celle-là rend la **réponse** d'origine. Sans elle, un
   client qui rejoue reçoit une synchronisation vide au lieu de sa mise en scène — l'XP serait

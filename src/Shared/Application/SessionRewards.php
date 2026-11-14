@@ -39,8 +39,8 @@ interface SessionRewards
      *
      * Appelé **N fois** dans un lot, et c'est sans conséquence sur le verrou : un verrou de
      * ligne est ré-entrant dans une transaction, donc il est pris au premier workout et
-     * tenu jusqu'au COMMIT. Deux synchronisations concurrentes du même compte s'attendent
-     * une fois, pas dix.
+     * tenu jusqu'au COMMIT. Training a déjà sérialisé les imports du compte avant leurs
+     * lectures d'arbitrage ; ce verrou protège aussi la progression contre ses autres écrivains.
      *
      * L'argument est l'événement lui-même, et non un DTO jumeau : il porte déjà exactement
      * ce qu'il faut — qui, quelle discipline, quelle durée **retenue**, et surtout **quand**

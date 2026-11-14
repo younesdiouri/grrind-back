@@ -31,10 +31,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * lui-même ; et un échec au septième qui laisserait six crédits en base et le joueur avec
  * la moitié de sa récompense, sans moyen de rejouer proprement.
  *
- * **Un seul verrou.** Il est posé par `SessionRewards` au premier workout crédité — un
- * verrou de ligne est ré-entrant dans une transaction — et tenu jusqu'au COMMIT. C'est lui
- * qui sérialise deux synchronisations concurrentes : deux appareils du même compte, ou
- * l'app relancée pendant qu'une synchronisation tournait encore.
+ * **Le verrou d'import précède l'arbitrage.** `WorkoutRepository` le prend par compte dès
+ * l'ouverture de la transaction, avant toute lecture de doublons/créneaux ou écriture,
+ * archives et disciplines sans XP comprises. `SessionRewards` prend ensuite le verrou
+ * de progression au premier crédit ; les deux tiennent jusqu'au COMMIT extérieur.
+ * Verrouiller seulement au crédit laisserait deux appareils admettre le même effort.
  *
  * ————— L'ordre chronologique n'est pas cosmétique ——————————————————————————————————————
  *
@@ -100,7 +101,7 @@ final readonly class ImportWorkoutsHandler
             static fn (ImportedWorkout $left, ImportedWorkout $right): int => $left->startedAt <=> $right->startedAt,
         );
 
-        return $this->workouts->transactional(fn (): WorkoutImport => $this->credit($command, $candidates, $now));
+        return $this->workouts->transactional($command->userId, fn (): WorkoutImport => $this->credit($command, $candidates, $now));
     }
 
     /**
