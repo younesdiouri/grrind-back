@@ -347,6 +347,8 @@ when@test:
         # `ModifierContributor`, et c'est précisément ce qu'il sert à démontrer.
         App\Tests\Support\ProgrammableModifiers: ~
 
+        App\Tests\Support\CommitFaultMiddleware: ~
+
         # Publics pour que les tests les appellent sans passer par HTTP : la charge du jour
         # et le crédit se démontrent contre la vraie base, indépendamment de la route qui
         # les déclenche.

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Doctrine;
 
+use App\Shared\Domain\Idempotency\Exception\IdempotencyKeyInFlight;
 use App\Shared\Domain\Idempotency\IdempotencyRecord;
 use App\Shared\Domain\Idempotency\RecordStatus;
 use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
+use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -38,9 +41,10 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
      * Rend l'identifiant de la réservation si elle nous revient, `null` si une autre
      * requête la tient déjà.
      *
-     * Le `WHERE` de la clause de conflit fait le tri : une réservation vivante n'est pas
-     * touchée (aucune ligne rendue), une périmée est recyclée sur place — sans quoi il
-     * faudrait une purge avant de pouvoir réutiliser une clé.
+     * La réservation se sérialise sans attente, séparément de l'action. On lit les
+     * clés existantes avant tout INSERT (même DO NOTHING attendrait leur COMMIT),
+     * et le recyclage saute les lignes verrouillées. Un nouvel UUID empêche l'ancien
+     * détenteur expiré de compléter ou libérer la réservation qui l'a remplacé.
      */
     public function claim(Uuid $userId, string $key, string $requestFingerprint, DateTimeImmutable $now): ?Uuid
     {
@@ -48,23 +52,13 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
         // définition de la rétention.
         $reservation = IdempotencyRecord::reserve($userId, $key, $requestFingerprint, $now);
 
-        $claimed = $this->getEntityManager()->getConnection()->fetchOne(
-            <<<'SQL'
-                INSERT INTO shared_idempotency_key
-                    (id, user_id, idempotency_key, request_fingerprint, status, created_at, expires_at)
-                VALUES (:id, :userId, :key, :fingerprint, :status, :now, :expiresAt)
-                ON CONFLICT (user_id, idempotency_key) DO UPDATE SET
-                    request_fingerprint = EXCLUDED.request_fingerprint,
-                    status              = EXCLUDED.status,
-                    response_status     = NULL,
-                    response_headers    = NULL,
-                    response_body       = NULL,
-                    created_at          = EXCLUDED.created_at,
-                    expires_at          = EXCLUDED.expires_at
-                WHERE shared_idempotency_key.expires_at <= EXCLUDED.created_at
-                RETURNING id
-                SQL,
-            [
+        return $this->getEntityManager()->getConnection()->transactional(static function (Connection $connection) use ($reservation): ?Uuid {
+            // L'unicité SQL peut attendre un reçu non commis, même avec DO NOTHING.
+            // Ce verrou non bloquant ne couvre que la réservation, jamais l'action.
+            if (!$connection->fetchOne("SELECT pg_try_advisory_xact_lock(hashtext('shared.idempotency'), hashtext(?))", [$reservation->userId()->toRfc4122().':'.$reservation->key()])) {
+                throw new IdempotencyKeyInFlight($reservation->key());
+            }
+            $parameters = [
                 'id' => $reservation->id()->toRfc4122(),
                 'userId' => $reservation->userId()->toRfc4122(),
                 'key' => $reservation->key(),
@@ -72,14 +66,45 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
                 'status' => $reservation->status()->value,
                 'now' => $reservation->createdAt(),
                 'expiresAt' => $reservation->expiresAt(),
-            ],
-            [
-                'now' => Types::DATETIMETZ_IMMUTABLE,
-                'expiresAt' => Types::DATETIMETZ_IMMUTABLE,
-            ],
-        );
+            ];
+            $types = ['now' => Types::DATETIMETZ_IMMUTABLE, 'expiresAt' => Types::DATETIMETZ_IMMUTABLE];
+            $held = $connection->fetchOne('SELECT id FROM shared_idempotency_key WHERE user_id = ? AND idempotency_key = ?', [$parameters['userId'], $parameters['key']]);
+            $claimed = false;
+            if (false === $held) {
+                $claimed = $connection->fetchOne(
+                    <<<'SQL'
+                        INSERT INTO shared_idempotency_key
+                            (id, user_id, idempotency_key, request_fingerprint, status, created_at, expires_at)
+                        VALUES (:id, :userId, :key, :fingerprint, :status, :now, :expiresAt)
+                        ON CONFLICT (user_id, idempotency_key) DO NOTHING
+                        RETURNING id
+                        SQL,
+                    $parameters,
+                    $types,
+                );
+            }
 
-        return \is_string($claimed) ? Uuid::fromString($claimed) : null;
+            if (false === $claimed) {
+                $claimed = $connection->fetchOne(
+                    <<<'SQL'
+                        UPDATE shared_idempotency_key
+                        SET id = :id, request_fingerprint = :fingerprint, status = :status,
+                            response_status = NULL, response_headers = NULL, response_body = NULL,
+                            created_at = :now, expires_at = :expiresAt
+                        WHERE id IN (
+                            SELECT id FROM shared_idempotency_key
+                            WHERE user_id = :userId AND idempotency_key = :key AND expires_at <= :now
+                            FOR UPDATE SKIP LOCKED
+                        )
+                        RETURNING id
+                        SQL,
+                    $parameters,
+                    $types,
+                );
+            }
+
+            return \is_string($claimed) ? Uuid::fromString($claimed) : null;
+        });
     }
 
     /** La réservation vivante que `claim()` a refusé de nous donner. */
@@ -96,12 +121,12 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
      */
     public function complete(Uuid $id, int $status, array $headers, string $body): void
     {
-        $this->getEntityManager()->getConnection()->executeStatement(
+        $affected = $this->getEntityManager()->getConnection()->executeStatement(
             <<<'SQL'
                 UPDATE shared_idempotency_key
                 SET status = :status, response_status = :responseStatus,
                     response_headers = :headers, response_body = :body
-                WHERE id = :id
+                WHERE id = :id AND status = :inFlight
                 SQL,
             [
                 'status' => RecordStatus::Completed->value,
@@ -109,9 +134,13 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
                 'headers' => $headers,
                 'body' => $body,
                 'id' => $id->toRfc4122(),
+                'inFlight' => RecordStatus::InFlight->value,
             ],
             ['headers' => Types::JSON],
         );
+        if (1 !== $affected) {
+            throw new RuntimeException('La réservation idempotente a été perdue avant son reçu.');
+        }
     }
 
     /**
@@ -121,8 +150,8 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
     public function release(Uuid $id): void
     {
         $this->getEntityManager()->getConnection()->executeStatement(
-            'DELETE FROM shared_idempotency_key WHERE id = :id',
-            ['id' => $id->toRfc4122()],
+            'DELETE FROM shared_idempotency_key WHERE id = :id AND status = :inFlight',
+            ['id' => $id->toRfc4122(), 'inFlight' => RecordStatus::InFlight->value],
         );
     }
 }

@@ -174,9 +174,10 @@ sequenceDiagram
         DB-->>T: réponse figée
         T-->>C: le même SyncSummary qu'au premier appel
     else première fois
-        T->>T: trie par startedAt
         rect rgb(222,240,222)
-            T->>DB: BEGIN · 🔒 verrou d'import par compte
+            T->>DB: BEGIN HTTP
+            T->>T: trie par startedAt
+            T->>DB: SAVEPOINT métier · 🔒 verrou d'import par compte
             T->>DB: lit les doublons sous verrou
             T->>T: écarte doublons, types inconnus, durées sous le plancher<br/>départage les chevauchements du lot · le plus complet gagne
             T->>DB: lit les créneaux occupés sous verrou
@@ -191,8 +192,9 @@ sequenceDiagram
                     T->>OB: WorkoutImported
                 end
             end
+            T->>DB: RELEASE SAVEPOINT · fige le SyncSummary idempotent
         end
-        Note over T,OB: un seul COMMIT. Les workouts, leur XP et leurs<br/>événements — ou rien du tout.
+        Note over T,OB: un seul COMMIT. Workouts, XP, événements et reçu HTTP — ou rien du tout.
         T-->>C: 200 — SyncSummary
     end
 
@@ -215,6 +217,16 @@ Quatre choses que ce schéma dit et qu'il faut avoir en tête :
   Celle-ci empêche le double crédit ; celle-là rend la **réponse** d'origine. Sans elle, un
   client qui rejoue reçoit une synchronisation vide au lieu de sa mise en scène — l'XP serait
   juste, l'animation perdue.
+
+Pour les routes `#[Idempotent]`, `IdempotencyListener` encadre le contrôleur et la
+matérialisation de sa réponse via `kernel.controller_arguments` (#366). La transaction
+DBAL extérieure utilise la connexion ORM/outbox ; les transactions métier restent des
+savepoints et leurs verrous tiennent jusqu'au reçu et au COMMIT. Un refus se fige après
+rollback ; une panne libère seulement une réservation dont le rollback est confirmé.
+Une panne HTTP après COMMIT ne touche plus au reçu. Si l'accusé du COMMIT se perd,
+la connexion se ferme sans effacer la clé : reçu rejouable si acquis, sinon `IN_FLIGHT`
+jusqu'à la rétention existante de 24 h. Le verrou non bloquant de réservation est bref,
+distinct des verrous métier ; le recyclage saute les reçus verrouillés.
 
 Un workout n'a **pas d'état** : il naît terminé. Ce qui avait un cycle de vie, c'était la séance
 chronométrée ; le fait rapporté par une montre est déjà passé quand il arrive. Ce qui reste, ce

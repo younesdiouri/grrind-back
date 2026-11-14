@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 use App\Kernel;
+use App\Tests\Support\CommitFaultMiddleware;
 use App\Tests\Support\ProgrammableModifiers;
 use App\Training\Domain\Workout;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\Events;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\KernelEvents;
 
 require dirname(__DIR__).'/bootstrap.php';
 
@@ -46,6 +49,9 @@ $listener = new class {
 
     public function onFlush(OnFlushEventArgs $event): void
     {
+        if (null !== CommitFaultMiddleware::$beforeCommit) {
+            return;
+        }
         foreach ($event->getObjectManager()->getUnitOfWork()->getScheduledEntityInsertions() as $entity) {
             if (!$this->paused && $entity instanceof Workout) {
                 $this->paused = true;
@@ -60,6 +66,13 @@ $line = fgets(\STDIN);
 assert(is_string($line));
 $input = json_decode($line, true, 512, \JSON_THROW_ON_ERROR);
 assert(is_array($input));
+if ('receipt' === ($input['pauseAt'] ?? null)) {
+    $dispatcher = $kernel->getContainer()->get('event_dispatcher');
+    assert($dispatcher instanceof EventDispatcherInterface);
+    $dispatcher->addListener(KernelEvents::CONTROLLER_ARGUMENTS, static function (): void {
+        CommitFaultMiddleware::$beforeCommit = static fn () => barrier('receipt');
+    });
+}
 if (isset($input['failAfter'])) {
     assert(is_int($input['failAfter']));
     ProgrammableModifiers::failAfter($input['failAfter']);

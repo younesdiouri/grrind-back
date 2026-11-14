@@ -10,24 +10,32 @@ use App\Shared\Domain\Idempotency\Exception\IdempotencyKeyReused;
 use App\Shared\Domain\Idempotency\IdempotencyRecord;
 use App\Shared\Domain\Idempotency\RecordStatus;
 use App\Shared\Infrastructure\Doctrine\IdempotencyRecordRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
 use Psr\Clock\ClockInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\ControllerArgumentsEvent;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Uid\Uuid;
+use Throwable;
 
 /**
  * Fait tenir la promesse de {@see Idempotent} : une clé, une écriture, une réponse.
  *
- * Deux temps. Avant le contrôleur on **réserve** la clé, et si elle est déjà prise on
- * tranche sans exécuter : rejeu à rendre, requête concurrente à refuser, ou clé recyclée
- * sur un autre contenu. Après, on **fige** la réponse produite — ou on relâche la clé si
- * rien n'a pu être écrit.
+ * La réservation est visible avant l'action. `kernel.controller_arguments` encadre
+ * ensuite le vrai contrôleur, sa sérialisation et le reçu dans une transaction DBAL
+ * sur la connexion de l'ORM et de l'outbox. Les transactions métier deviennent des
+ * savepoints ; leurs verrous tiennent jusqu'à ce COMMIT extérieur (#366).
+ * https://symfony.com/doc/current/components/http_kernel.html
+ * https://www.doctrine-project.org/projects/doctrine-dbal/en/4.4/reference/transactions.html
+ *
+ * `kernel.response` ne traite plus que les refus après rollback et les erreurs avant
+ * l'action. Une panne HTTP après COMMIT ne peut donc ni effacer ni réécrire le reçu.
  *
  * L'accroche est sur `kernel.controller` et non `kernel.request` : c'est le premier
  * moment où le contrôleur visé est connu, donc où ses attributs sont lisibles.
@@ -48,7 +56,21 @@ final readonly class IdempotencyListener
         private IdempotencyRecordRepository $records,
         private Security $security,
         private ClockInterface $clock,
+        private EntityManagerInterface $em,
     ) {
+    }
+
+    #[AsEventListener(event: KernelEvents::CONTROLLER_ARGUMENTS)]
+    public function protect(ControllerArgumentsEvent $event): void
+    {
+        $request = $event->getRequest();
+        $reservation = $request->attributes->get(self::RESERVATION);
+        if (!$event->isMainRequest() || !$reservation instanceof Uuid) {
+            return;
+        }
+
+        $controller = $event->getController();
+        $event->setController(fn (mixed ...$arguments): Response => $this->transact($controller, $arguments, $request, $reservation));
     }
 
     /**
@@ -111,10 +133,68 @@ final readonly class IdempotencyListener
         // un refus métier, lui, est une réponse à part entière et se rejoue tel quel.
         if ($status >= Response::HTTP_INTERNAL_SERVER_ERROR) {
             $this->records->release($reservation);
+            $event->getRequest()->attributes->remove(self::RESERVATION);
 
             return;
         }
 
+        $this->complete($reservation, $response);
+        $event->getRequest()->attributes->remove(self::RESERVATION);
+    }
+
+    /** @param array<mixed> $arguments */
+    private function transact(callable $controller, array $arguments, Request $request, Uuid $reservation): Response
+    {
+        $connection = $this->em->getConnection();
+        if (0 !== $connection->getTransactionNestingLevel()) {
+            throw new LogicException('La transaction HTTP idempotente doit être extérieure aux transactions métier.');
+        }
+
+        $connection->beginTransaction();
+        // Le chemin d'erreur ne retrouve cette clé qu'après un rollback confirmé.
+        $request->attributes->remove(self::RESERVATION);
+        try {
+            $response = $controller(...$arguments);
+            if (!$response instanceof Response) {
+                throw new LogicException('Un contrôleur idempotent doit matérialiser sa réponse dans la transaction.');
+            }
+            if ($response->getStatusCode() >= Response::HTTP_BAD_REQUEST) {
+                $connection->rollBack();
+                $this->em->clear();
+                $request->attributes->set(self::RESERVATION, $reservation);
+
+                return $response;
+            }
+            $this->em->flush();
+            $this->complete($reservation, $response);
+        } catch (Throwable $error) {
+            try {
+                $connection->rollBack();
+            } catch (Throwable $rollbackError) {
+                $connection->close();
+                $this->em->close();
+                throw $rollbackError;
+            }
+            $this->em->clear();
+            $request->attributes->set(self::RESERVATION, $reservation);
+            throw $error;
+        }
+
+        try {
+            $connection->commit();
+        } catch (Throwable $error) {
+            // COMMIT sans accusé : résultat incertain. Fermer défait ce qui n'a pas
+            // été acquis ; ne jamais supprimer un reçu potentiellement déjà commis.
+            $connection->close();
+            $this->em->close();
+            throw $error;
+        }
+
+        return $response;
+    }
+
+    private function complete(Uuid $reservation, Response $response): void
+    {
         $headers = [];
         foreach (self::REPLAYED_HEADERS as $name) {
             $value = $response->headers->get($name);
@@ -124,7 +204,7 @@ final readonly class IdempotencyListener
             }
         }
 
-        $this->records->complete($reservation, $status, $headers, (string) $response->getContent());
+        $this->records->complete($reservation, $response->getStatusCode(), $headers, (string) $response->getContent());
     }
 
     private static function replay(IdempotencyRecord $record): Response
