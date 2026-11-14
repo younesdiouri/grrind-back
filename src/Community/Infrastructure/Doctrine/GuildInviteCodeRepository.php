@@ -50,6 +50,12 @@ class GuildInviteCodeRepository extends ServiceEntityRepository
         return $this->findOneBy(['code' => $code]);
     }
 
+    /** Relit l'état courant sous le verrou de guilde, même si le code était déjà chargé. */
+    public function refresh(GuildInviteCode $code): void
+    {
+        $this->getEntityManager()->refresh($code);
+    }
+
     public function commit(): void
     {
         $this->getEntityManager()->flush();

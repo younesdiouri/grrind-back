@@ -30,6 +30,10 @@ use Psr\Clock\ClockInterface;
  * collection d'adhésions soit chargée, donc le comptage porte sur un état que personne ne
  * peut plus changer avant le `COMMIT`.
  *
+ * L'invitation sert d'abord à trouver ce verrou. Son état et l'heure se relisent après
+ * l'attente : une révocation, une réémission ou l'expiration peuvent l'avoir invalidée.
+ * Rafraîchir l'objet est nécessaire, une seconde recherche garderait l'identity map.
+ *
  * L'index unique reste le dernier mot pour l'appartenance croisée : entre la lecture
  * d'adhésion et le `flush`, une seconde requête du **même joueur** vers une **autre**
  * guilde ne croise aucun verrou commun. Sa violation se traduit dans la même erreur.
@@ -57,12 +61,9 @@ final readonly class JoinGuildHandler
         }
 
         return $this->guilds->transactional(function () use ($command): Guild {
-            $now = $this->clock->now();
             $invite = $this->codes->ofCode($command->code);
 
-            // Inconnu, expiré, révoqué : une seule branche, une seule erreur. Les séparer
-            // ferait de la route un oracle qui dit quels codes existent.
-            if (null === $invite || !$invite->isUsableAt($now)) {
+            if (null === $invite) {
                 throw new InviteCodeNotUsable();
             }
 
@@ -71,6 +72,14 @@ final readonly class JoinGuildHandler
             $guild = $this->guilds->lockForUpdate($invite->guild()->id());
 
             if (null === $guild) {
+                throw new InviteCodeNotUsable();
+            }
+
+            $this->codes->refresh($invite);
+            $now = $this->clock->now();
+
+            // Inconnu, expiré, révoqué : la même erreur, sans donnée de guilde.
+            if (!$invite->isUsableAt($now)) {
                 throw new InviteCodeNotUsable();
             }
 
