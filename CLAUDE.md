@@ -247,10 +247,11 @@ le cas nominal, pas l'exception. Séquence, en une transaction :
 
 ```
 trier les workouts par startedAt croissant
-écarter ce qui se juge seul : doublon, activité non traduite, durée sous le plancher
-départager les chevauchements du lot : le plus complet gagne
 
 BEGIN
+  verrou transactionnel d'import par compte (Training), tenu jusqu'au COMMIT
+  écarter ce qui se juge seul : doublon, activité non traduite, durée sous le plancher
+  départager les chevauchements du lot : le plus complet gagne
   pour chaque workout, dans l'ordre :
       écarter s'il chevauche un workout déjà en base
       écrire le workout
@@ -278,9 +279,10 @@ joueur a déjà gagné ce jour-là, donc la charge du jour se relit à chaque it
 voyant ce que la boucle vient d'écrire. Le même lot envoyé dans un autre ordre doit donner le
 même ledger.
 
-Le verrou est pris une fois — un verrou de ligne est ré-entrant dans une transaction — et
-sérialise deux synchronisations concurrentes : deux appareils du même compte, ou l'app relancée
-pendant qu'une synchronisation tournait encore.
+Le verrou d'import est pris avant toute lecture de doublons/créneaux et toute écriture,
+archives et disciplines sans XP comprises. Il sérialise deux synchronisations du même compte.
+Le verrou de progression vient ensuite au premier crédit ; tous deux tiennent jusqu'au COMMIT.
+Le verrou XP seul arriverait trop tard pour empêcher deux imports d'admettre le même effort.
 
 Le `SyncSummary` est un payload unique conçu pour être **animé séquentiellement** : un
 `RewardSummary` par workout crédité, dans l'ordre chronologique, chacun portant son palier de

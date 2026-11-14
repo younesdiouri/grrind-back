@@ -53,10 +53,9 @@ class WorkoutRepository extends ServiceEntityRepository
      * proprement. Le sur-ensemble ramené est minuscule — au pire les mêmes lignes vues sous
      * l'autre source — et la comparaison exacte se fait sur la clé rendue.
      *
-     * **Ce n'est pas ce qui garantit l'unicité.** Entre ce SELECT et l'INSERT qui suit,
-     * deux synchronisations concurrentes passent toutes les deux ; c'est `uniq_workout_external`
-     * qui refuse la seconde, et le verrou du #89 qui les sérialise. Ici on évite d'écrire
-     * des doublons évidents, on ne les rend pas impossibles.
+     * L'import appelle cette lecture sous son verrou par compte : un concurrent voit le
+     * COMMIT précédent et écarte le doublon sans violation SQL qui annulerait son lot.
+     * `uniq_workout_external` reste le dernier garde-fou d'unicité en base.
      *
      * @param list<string> $externalIds
      *
@@ -277,8 +276,15 @@ class WorkoutRepository extends ServiceEntityRepository
     }
 
     /**
-     * Ce qui rend l'outbox atomique : l'`INSERT` de l'événement, écrit par le transport
-     * Doctrine sur cette connexion, partage le `COMMIT` de la séance.
+     * Sérialise l'import du compte AVANT ses lectures de doublons/créneaux et ses écritures,
+     * même sans XP ni workout préexistant. Un verrou de ligne sur une séance absente ne
+     * suffit pas ; le verrou transactionnel PostgreSQL reprend le mécanisme du dépôt.
+     * Il se libère au COMMIT comme au ROLLBACK, sans ligne ni migration supplémentaire.
+     * https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS.
+     *
+     * Ordre : verrou Training, puis progression au premier crédit, puis récompenses.
+     * Aucun chemin ne reprend le verrou Training depuis Progression ou Rewards.
+     * L'outbox partage toujours le COMMIT sur cette même connexion Doctrine.
      *
      * @template T
      *
@@ -286,8 +292,15 @@ class WorkoutRepository extends ServiceEntityRepository
      *
      * @return T
      */
-    public function transactional(callable $work): mixed
+    public function transactional(Uuid $userId, callable $work): mixed
     {
-        return $this->getEntityManager()->wrapInTransaction(static fn (): mixed => $work());
+        return $this->getEntityManager()->wrapInTransaction(function () use ($userId, $work): mixed {
+            $this->getEntityManager()->getConnection()->executeStatement(
+                "SELECT pg_advisory_xact_lock(hashtext('training.import'), hashtext(:userId))",
+                ['userId' => $userId->toRfc4122()],
+            );
+
+            return $work();
+        });
     }
 }
