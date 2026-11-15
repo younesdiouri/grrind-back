@@ -131,11 +131,33 @@ final class PlayerProfileTest extends ApiTestCase
             $mine = self::decode($this->get('/api/guilds/mine', $viewer->headers))['guild'];
             self::assertIsArray($mine);
             self::assertIsString($mine['id']);
+            self::assertSame(['symbol' => 'DUMBBELL', 'backgroundColor' => 'NIGHT', 'symbolColor' => 'CYAN'], $mine['emblem']);
             foreach ([$founder, $member] as $target) {
                 $body = self::decode($this->get('/api/players/'.$target->id->toRfc4122(), $viewer->headers));
-                self::assertSame(['id' => $mine['id'], 'name' => $mine['name']], $body['guild']);
+                self::assertSame(['id' => $mine['id'], 'name' => $mine['name'], 'emblem' => $mine['emblem']], $body['guild']);
                 self::assertSame(Response::HTTP_OK, $this->get('/api/guilds/'.$mine['id'], $viewer->headers)->getStatusCode());
             }
+        }
+    }
+
+    public function testTheSavedGuildEmblemIsVisibleOnProfilesWithoutChangingProgression(): void
+    {
+        [$founder, $member] = $this->guildOfTwo();
+        $before = self::decode($this->get('/api/players/'.$member->id->toRfc4122(), $founder->headers));
+        self::assertIsArray($before['guild']);
+        self::assertIsString($before['guild']['id']);
+        $emblem = ['symbol' => 'YOGA', 'backgroundColor' => 'COPPER', 'symbolColor' => 'NIGHT'];
+        $saved = $this->send('PATCH', '/api/guilds/'.$before['guild']['id'], ['emblem' => $emblem], $founder->headers);
+        self::assertSame(Response::HTTP_OK, $saved->getStatusCode(), (string) $saved->getContent());
+        self::assertSame($emblem, self::decode($saved)['emblem']);
+
+        foreach ([$founder, $member] as $viewer) {
+            $profile = self::decode($this->get('/api/players/'.$member->id->toRfc4122(), $viewer->headers));
+            self::assertSame([...$before['guild'], 'emblem' => $emblem], $profile['guild']);
+            unset($profile['guild']);
+            $unchanged = $before;
+            unset($unchanged['guild']);
+            self::assertSame($unchanged, $profile);
         }
     }
 

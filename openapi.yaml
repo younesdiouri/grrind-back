@@ -4359,6 +4359,7 @@ components:
       required:
         - id
         - name
+        - emblem
       properties:
         id:
           type: string
@@ -4366,6 +4367,8 @@ components:
         name:
           type: string
           example: 'Les Lève-Tôt'
+        emblem:
+          $ref: '#/components/schemas/GuildEmblem'
       type: object
     PlayerWeekProgress:
       description: "Radar du joueur ciblé, identique aux agrégats de son GET /api/progression/week.\nLe provider officiel utilise le calendrier Alam du ruleset publié : actuellement\n[dimanche 20 h, dimanche 20 h[ en Europe/Paris, avec changement d'heure civil.\nNi le fuseau de la cible ni celui du lecteur ne décalent cette semaine commune.\nBornes UTC explicites ; référence sur la fenêtre précédente du même calendrier.\nLes totaux suivent occurredAt (instant du sport), annulations et suppléments compris.\nSeulement des agrégats : aucune écriture, séance, discipline ou plan privé.\nLa Vitality du bloc Player conserve son calcul UTC existant (dette #184),\ndistinct de ces quatre caractéristiques hebdomadaires.\n"

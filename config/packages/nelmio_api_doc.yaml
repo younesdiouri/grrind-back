@@ -1622,10 +1622,11 @@ when@dev:
 
                     PlayerGuildIdentity:
                         type: object
-                        required: [id, name]
+                        required: [id, name, emblem]
                         properties:
                             id: { type: string, format: uuid }
                             name: { type: string, example: "Les Lève-Tôt" }
+                            emblem: { $ref: '#/components/schemas/GuildEmblem' }
 
                     PlayerWeekProgress:
                         type: object
