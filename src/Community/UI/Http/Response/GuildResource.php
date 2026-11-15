@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Community\UI\Http\Response;
 
 use App\Community\Domain\Guild;
+use App\Community\Domain\GuildEmblem;
 use App\Community\Domain\GuildRole;
 use DateTimeInterface;
 use Symfony\Component\Uid\Uuid;
@@ -30,6 +31,7 @@ final readonly class GuildResource
         public int $memberCount,
         public int $capacity,
         public GuildRole $role,
+        public GuildEmblem $emblem,
     ) {
     }
 
@@ -44,6 +46,7 @@ final readonly class GuildResource
             // Le resolver a déjà refusé un non-membre : arriver ici sans adhésion est
             // impossible, et le repli n'existe que pour que le type le dise.
             $guild->membershipOf($playerId)?->role() ?? GuildRole::Member,
+            $guild->emblem(),
         );
     }
 
@@ -59,6 +62,11 @@ final readonly class GuildResource
             'memberCount' => $this->memberCount,
             'capacity' => $this->capacity,
             'role' => $this->role->value,
+            'emblem' => [
+                'symbol' => $this->emblem->symbol->value,
+                'backgroundColor' => $this->emblem->backgroundColor->value,
+                'symbolColor' => $this->emblem->symbolColor->value,
+            ],
         ];
     }
 }

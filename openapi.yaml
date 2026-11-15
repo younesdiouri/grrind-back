@@ -552,10 +552,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GuildName'
+              $ref: '#/components/schemas/GuildUpdate'
       responses:
         '200':
-          description: 'La guilde renommée.'
+          description: 'Le nom et/ou l’emblème modifiés par le fondateur courant, autorisation et appartenance relues sous verrou. Les champs absents ou null sont conservés.'
           content:
             application/json:
               schema:
@@ -2659,6 +2659,7 @@ components:
       required:
         - id
         - name
+        - emblem
         - createdAt
         - memberCount
         - capacity
@@ -2670,6 +2671,8 @@ components:
         name:
           type: string
           maxLength: 40
+        emblem:
+          $ref: '#/components/schemas/GuildEmblem'
         createdAt:
           type: string
           format: date-time
@@ -2687,6 +2690,74 @@ components:
             - FOUNDER
             - MEMBER
       type: object
+    GuildEmblemColor:
+      description: "Palette GRRIND : NIGHT #050816, CHALK #EAF6FF, CYAN #35E4FF,\nMINT #75FFB2, AMETHYST #A98BFF, GLACIER #67D8FF,\nBLOSSOM #FF79CE, COPPER #FFB454. Aucune couleur libre.\n"
+      type: string
+      enum:
+        - NIGHT
+        - CHALK
+        - CYAN
+        - MINT
+        - AMETHYST
+        - GLACIER
+        - BLOSSOM
+        - COPPER
+    GuildEmblem:
+      description: "Composition complète sans upload ni couches. Exactement une des deux\ncouleurs doit être NIGHT, l'autre une des sept couleurs claires ;\nl'inversion est autorisée. Les autres paires sont refusées (422).\nC'est l'ensemble des paires de cette palette dont le contraste atteint 3:1.\nDéfaut, y compris pour les guildes existantes : DUMBBELL / NIGHT / CYAN.\n"
+      required:
+        - symbol
+        - backgroundColor
+        - symbolColor
+      properties:
+        symbol:
+          type: string
+          example: DUMBBELL
+          enum:
+            - DUMBBELL
+            - HEART
+            - YOGA
+            - BOLT
+        backgroundColor:
+          example: NIGHT
+          allOf:
+            -
+              $ref: '#/components/schemas/GuildEmblemColor'
+        symbolColor:
+          example: CYAN
+          allOf:
+            -
+              $ref: '#/components/schemas/GuildEmblemColor'
+      type: object
+    GuildUpdate:
+      description: "Modification par le fondateur courant uniquement. Appartenance et rôle\nsont relus sous le verrou de guilde, y compris après une succession.\nAu moins un champ non null est requis ; champs absents ou null = conservés.\nL'emblème fourni remplace les trois choix, aucun remplacement partiel.\n401 sans authentification, 403 pour un membre non fondateur,\n404 pour un tiers ou une guilde inconnue, 422 pour les valeurs invalides.\n"
+      properties:
+        name:
+          type: string
+          nullable: true
+          maxLength: 40
+          minLength: 1
+        emblem:
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/GuildEmblem'
+      type: object
+      anyOf:
+        -
+          required:
+            - name
+          properties:
+            name:
+              type: string
+              nullable: false
+          type: object
+        -
+          required:
+            - emblem
+          properties:
+            emblem:
+              $ref: '#/components/schemas/GuildEmblem'
+          type: object
     GuildInviteCode:
       description: "Le laissez-passer d'une guilde. Il **remplace l'annuaire au lieu de le\ncompléter** : aucune recherche de joueur n'existe, et une recherche par adresse\nrendrait l'API capable de confirmer qu'une adresse a un compte. Le code se\npartage hors de l'app, et seul un joueur déjà inscrit et connecté peut le\nconsommer.\n"
       required:
@@ -6002,12 +6073,19 @@ components:
           default: ''
           maxLength: 40
       type: object
-    RenameGuildRequest:
+    UpdateGuildRequest:
       properties:
         name:
           type: string
-          default: ''
+          nullable: true
+          default: null
           maxLength: 40
+        emblem:
+          oneOf:
+            -
+              $ref: '#/components/schemas/GuildEmblem'
+          nullable: true
+          default: null
       type: object
     JoinGuildRequest:
       properties:

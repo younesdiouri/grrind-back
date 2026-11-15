@@ -52,6 +52,9 @@ class Guild
     #[Assert\Length(max: self::NAME_MAX_LENGTH)]
     private string $name;
 
+    #[ORM\Embedded(class: GuildEmblem::class)]
+    private GuildEmblem $emblem;
+
     /**
      * Le fondateur *d'origine*, figé. Il ne suit pas la succession (#118) : c'est une
      * trace de qui a créé la guilde, pas la réponse à « qui la dirige aujourd'hui » —
@@ -82,6 +85,7 @@ class Guild
     {
         $this->id = $id;
         $this->name = trim($name);
+        $this->emblem = new GuildEmblem(GuildEmblemSymbol::Dumbbell, GuildEmblemColor::Night, GuildEmblemColor::Cyan);
         $this->createdBy = $createdBy;
         $this->createdAt = $now;
         $this->memberships = new ArrayCollection();
@@ -123,6 +127,16 @@ class Guild
     public function rename(string $name): void
     {
         $this->name = trim($name);
+    }
+
+    public function emblem(): GuildEmblem
+    {
+        return $this->emblem;
+    }
+
+    public function changeEmblem(GuildEmblem $emblem): void
+    {
+        $this->emblem = $emblem;
     }
 
     /**

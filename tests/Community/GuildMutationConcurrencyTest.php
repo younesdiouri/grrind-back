@@ -33,31 +33,31 @@ final class GuildMutationConcurrencyTest extends ApiTestCase
         parent::tearDown();
     }
 
-    /** @return iterable<string, array{string, string, array<string, string>, int}> */
+    /** @return iterable<string, array{string, string, array<string, mixed>, int}> */
     public static function mutations(): iterable
     {
         yield 'dissoudre' => ['DELETE', '', [], 204];
-        yield 'renommer' => ['PATCH', '', ['name' => 'Nouveau nom'], 200];
+        yield 'modifier l’identité' => ['PATCH', '', ['name' => 'Nouveau nom', 'emblem' => ['symbol' => 'BOLT', 'backgroundColor' => 'NIGHT', 'symbolColor' => 'COPPER']], 200];
         yield 'émettre' => ['POST', '/invite-code', [], 201];
         yield 'révoquer' => ['DELETE', '/invite-code', [], 204];
         yield 'exclure' => ['DELETE', '/members/HEIR', [], 204];
     }
 
-    /** @param array<string, string> $payload */
+    /** @param array<string, mixed> $payload */
     #[DataProvider('mutations')]
     public function testADepartedFounderCannotMutateAfterPassingTheVoter(string $method, string $suffix, array $payload, int $status): void
     {
         $this->assertFormerFounderRefused($method, $suffix, $payload, rejoin: false);
     }
 
-    /** @param array<string, string> $payload */
+    /** @param array<string, mixed> $payload */
     #[DataProvider('mutations')]
     public function testAFormerFounderWhoRejoinedIsForbiddenAfterPassingTheVoter(string $method, string $suffix, array $payload, int $status): void
     {
         $this->assertFormerFounderRefused($method, $suffix, $payload, rejoin: true);
     }
 
-    /** @param array<string, string> $payload */
+    /** @param array<string, mixed> $payload */
     #[DataProvider('mutations')]
     public function testTheCurrentFounderKeepsTheMutationAfterWaiting(string $method, string $suffix, array $payload, int $status): void
     {
@@ -70,6 +70,7 @@ final class GuildMutationConcurrencyTest extends ApiTestCase
         self::assertSame($status, $result['status'], json_encode($result, \JSON_THROW_ON_ERROR));
         if ('PATCH' === $method) {
             self::assertSame('Nouveau nom', $this->db()->fetchOne('SELECT name FROM community_guild WHERE id = ?', [$guildId]));
+            self::assertSame('BOLT', $this->db()->fetchOne('SELECT emblem_symbol FROM community_guild WHERE id = ?', [$guildId]));
         } elseif ('' === $suffix) {
             self::assertSame(0, $this->db()->fetchOne('SELECT COUNT(*) FROM community_guild WHERE id = ?', [$guildId]));
         } elseif (str_starts_with($suffix, '/members/')) {
@@ -79,7 +80,7 @@ final class GuildMutationConcurrencyTest extends ApiTestCase
         }
     }
 
-    /** @param array<string, string> $payload */
+    /** @param array<string, mixed> $payload */
     #[DataProvider('mutations')]
     public function testAGuildDissolvedAfterTheVoterStaysNotFound(string $method, string $suffix, array $payload, int $status): void
     {
@@ -118,7 +119,7 @@ final class GuildMutationConcurrencyTest extends ApiTestCase
         });
     }
 
-    /** @param array<string, string> $payload */
+    /** @param array<string, mixed> $payload */
     private function assertFormerFounderRefused(string $method, string $suffix, array $payload, bool $rejoin): void
     {
         [$founder, $heir, $guildId] = $this->prepareGuild();
@@ -137,6 +138,7 @@ final class GuildMutationConcurrencyTest extends ApiTestCase
         self::assertSame($rejoin ? 403 : 404, $result['status'], json_encode($result, \JSON_THROW_ON_ERROR));
         self::assertSame('https://grrind.app/problems/'.($rejoin ? 'forbidden' : 'guild-not-found'), $result['body']['type']);
         self::assertSame('Guilde privée', $this->db()->fetchOne('SELECT name FROM community_guild WHERE id = ?', [$guildId]));
+        self::assertSame('DUMBBELL', $this->db()->fetchOne('SELECT emblem_symbol FROM community_guild WHERE id = ?', [$guildId]));
         self::assertSame('FOUNDER', $this->db()->fetchOne('SELECT role FROM community_guild_membership WHERE player_id = ?', [$heir->id->toRfc4122()]));
         self::assertSame($rejoin ? 2 : 1, $this->db()->fetchOne('SELECT COUNT(*) FROM community_guild_membership WHERE guild_id = ?', [$guildId]));
         self::assertSame(1, $this->db()->fetchOne('SELECT COUNT(*) FROM community_guild_invite_code WHERE guild_id = ? AND revoked_at IS NULL', [$guildId]));
@@ -167,7 +169,7 @@ final class GuildMutationConcurrencyTest extends ApiTestCase
         return '/api/guilds/'.$guildId.str_replace('HEIR', $heir->id->toRfc4122(), $suffix);
     }
 
-    /** @param array<string, string> $payload */
+    /** @param array<string, mixed> $payload */
     private function authorizedMutation(Account $actor, string $method, string $uri, array $payload): InputStream
     {
         $input = new InputStream();
