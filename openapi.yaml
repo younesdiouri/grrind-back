@@ -752,7 +752,7 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Le profil public détaillé : identité et cercles de la liste des membres, inventaire public et statistiques résolues.'
+          description: 'Le profil autorisé : identité, cercles, inventaire public, statistiques résolues, agrégats radar et identité de guilde. Lien guilde vers l’écran existant (GET /api/guilds/mine).'
           content:
             application/json:
               schema:
@@ -4266,6 +4266,8 @@ components:
             - inventory
             - statistics
             - league
+            - week
+            - guild
           properties:
             league:
               $ref: '#/components/schemas/LeagueIdentity'
@@ -4273,7 +4275,52 @@ components:
               $ref: '#/components/schemas/PublicInventory'
             statistics:
               $ref: '#/components/schemas/PlayerStatistics'
+            week:
+              $ref: '#/components/schemas/PlayerWeekProgress'
+            guild:
+              description: "Guilde de la cible, ou null sans adhésion. Pour tous les profils autorisés (soi ou même guilde), c'est celle du lecteur : ouvrir l'écran existant alimenté par GET /api/guilds/mine. Aucun droit public supplémentaire."
+              nullable: true
+              allOf:
+                -
+                  $ref: '#/components/schemas/PlayerGuildIdentity'
           type: object
+    PlayerGuildIdentity:
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: 'Les Lève-Tôt'
+      type: object
+    PlayerWeekProgress:
+      description: "Radar du joueur ciblé, identique aux agrégats de son GET /api/progression/week.\nLe provider officiel utilise le calendrier Alam du ruleset publié : actuellement\n[dimanche 20 h, dimanche 20 h[ en Europe/Paris, avec changement d'heure civil.\nNi le fuseau de la cible ni celui du lecteur ne décalent cette semaine commune.\nBornes UTC explicites ; référence sur la fenêtre précédente du même calendrier.\nLes totaux suivent occurredAt (instant du sport), annulations et suppléments compris.\nSeulement des agrégats : aucune écriture, séance, discipline ou plan privé.\nLa Vitality du bloc Player conserve son calcul UTC existant (dette #184),\ndistinct de ces quatre caractéristiques hebdomadaires.\n"
+      required:
+        - startsAt
+        - resetsAt
+        - current
+        - previous
+      properties:
+        startsAt:
+          description: 'Début inclus de la semaine de jeu courante, en UTC.'
+          type: string
+          format: date-time
+        resetsAt:
+          description: 'Fin exclue et prochaine remise à zéro, en UTC.'
+          type: string
+          format: date-time
+        current:
+          $ref: '#/components/schemas/WeekTotals'
+        previous:
+          description: 'Totaux de la semaine précédente, ou null si son XP nette est nulle ou négative. Aucune cible inventée.'
+          nullable: true
+          allOf:
+            -
+              $ref: '#/components/schemas/WeekTotals'
+      type: object
     Inventory:
       description: "`GET /api/inventory`, et ce que `PUT`/`DELETE /api/inventory/equipment/{slot}`\nrendent après une mutation, pour un seul aller-retour — le sac, la doublure\néquipée par emplacement, la bourse.\n\n`equipment` porte toujours les sept emplacements d'`EquipmentSlot`, `null` pour\nceux qui sont vides — jamais une clé absente, qui forcerait le client à distinguer\n« pas encore chargé » de « rien ici ». `items` porte tout ce que le joueur possède,\néquipé compris : ce n'est pas une donnée à recouper contre `equipment`, c'est la\nmême ligne, vue sous un autre angle.\n"
       required:

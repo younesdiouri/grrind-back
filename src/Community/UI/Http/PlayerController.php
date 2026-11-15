@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Community\UI\Http;
 
 use App\Community\Domain\Exception\PlayerNotFound;
+use App\Community\Infrastructure\Doctrine\GuildMembershipRepository;
 use App\Community\UI\Http\Response\PlayerResource;
 use App\Shared\Application\PlayerLeagues;
 use App\Shared\Application\PlayerProfiles;
 use App\Shared\Application\PlayerProgressions;
 use App\Shared\Application\PlayerStatistics;
+use App\Shared\Application\PlayerWeekProgress;
 use App\Shared\Application\PublicInventories;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -36,6 +38,13 @@ use Symfony\Component\Uid\Uuid;
  * demande — « sommes-nous de la même guilde » — est une question à laquelle seul ce module
  * sait répondre. Elle n'est pas sous `/api/guilds` pour autant : le classement (Lot 6) aura
  * besoin du même profil, et l'enfermer dans la guilde obligerait à le republier ailleurs.
+ *
+ * Le radar (#360) lit les agrégats de la cible avec le provider de l'accueil : semaines
+ * d'Alam [dimanche 20 h, dimanche 20 h[ en Europe/Paris (ruleset publié), jamais le fuseau
+ * du lecteur ou de la cible. Les bornes sont servies en UTC, sans écritures ni plans privés.
+ * La Vitality existante reste en UTC pour les profils : dette #184, distincte de ce radar.
+ * La guilde liée est nécessairement celle du lecteur : soi-même ou même guilde seulement.
+ * L'écran existant et GET /api/guilds/mine suffisent, sans nouveau droit public (#358/#393).
  */
 final readonly class PlayerController
 {
@@ -45,6 +54,8 @@ final readonly class PlayerController
         private PlayerStatistics $statistics,
         private PublicInventories $inventories,
         private PlayerLeagues $leagues,
+        private PlayerWeekProgress $weeks,
+        private GuildMembershipRepository $memberships,
     ) {
     }
 
@@ -52,7 +63,7 @@ final readonly class PlayerController
     #[OA\Tag(name: 'Guildes')]
     #[OA\Response(
         response: 200,
-        description: 'Le profil public détaillé : identité et cercles de la liste des membres, inventaire public et statistiques résolues.',
+        description: 'Le profil autorisé : identité, cercles, inventaire public, statistiques résolues, agrégats radar et identité de guilde. Lien guilde vers l’écran existant (GET /api/guilds/mine).',
         content: new OA\JsonContent(ref: '#/components/schemas/PlayerDetail'),
     )]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
@@ -82,12 +93,15 @@ final readonly class PlayerController
         }
 
         $progression = $this->progressions->of([$id])[$id->toRfc4122()];
+        $guild = $this->memberships->ofPlayer($id)?->guild();
 
         return new JsonResponse([
             ...PlayerResource::from($id, $profile, $progression)->toArray(),
             'league' => $this->leagues->of([$id])[$id->toRfc4122()],
             'inventory' => $this->inventories->of($id),
             'statistics' => $this->statistics->of($id, $progression),
+            'week' => $this->weeks->of($id),
+            'guild' => null === $guild ? null : ['id' => $guild->id()->toRfc4122(), 'name' => $guild->name()],
         ]);
     }
 }

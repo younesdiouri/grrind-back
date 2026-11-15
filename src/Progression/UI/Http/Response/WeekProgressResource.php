@@ -28,13 +28,25 @@ final readonly class WeekProgressResource
         $trainingPlans = array_map(self::plan(...), $plans);
 
         return [
+            ...self::summary($week),
+            'entries' => array_map(static fn (XpTransaction $t): array => XpTransactionResource::from($t)->toArray(), $week->entries),
+            'trainingPlan' => $trainingPlans[0] ?? null,
+            'trainingPlans' => $trainingPlans,
+        ];
+    }
+
+    /**
+     * Seuls ces agrégats sont partagés sur le profil autorisé (#360).
+     *
+     * @return array<string, mixed>
+     */
+    public static function summary(WeekProgress $week): array
+    {
+        return [
             'startsAt' => $week->startsAt->format(DateTimeInterface::ATOM),
             'resetsAt' => $week->resetsAt->format(DateTimeInterface::ATOM),
             'current' => self::totals($week->current),
             'previous' => null === $week->previous ? null : self::totals($week->previous),
-            'entries' => array_map(static fn (XpTransaction $t): array => XpTransactionResource::from($t)->toArray(), $week->entries),
-            'trainingPlan' => $trainingPlans[0] ?? null,
-            'trainingPlans' => $trainingPlans,
         ];
     }
 

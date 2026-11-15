@@ -243,6 +243,7 @@ services:
     # flèche ne va de l'un à l'autre.
     App\Shared\Application\PlayerProfiles: '@App\Identity\Infrastructure\Doctrine\AccountPlayerProfiles'
     App\Shared\Application\PlayerProgressions: '@App\Progression\Infrastructure\Translation\TranslatedPlayerProgressions'
+    App\Shared\Application\PlayerWeekProgress: '@App\Progression\Infrastructure\PublicPlayerWeekProgress'
 
     # Le troisième et dernier port : `Training` clôt la séance, `Progression` la crédite, et
     # aucun des deux ne nomme l'autre. C'est ce câblage-là qui fait la transaction de
