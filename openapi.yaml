@@ -2703,7 +2703,7 @@ components:
         - BLOSSOM
         - COPPER
     GuildEmblem:
-      description: "Composition complète sans upload ni couches. Exactement une des deux\ncouleurs doit être NIGHT, l'autre une des sept couleurs claires ;\nl'inversion est autorisée. Les autres paires sont refusées (422).\nC'est l'ensemble des paires de cette palette dont le contraste atteint 3:1.\nDéfaut, y compris pour les guildes existantes : DUMBBELL / NIGHT / CYAN.\n"
+      description: "Composition complète sans upload ni couches. Les couleurs du fond et\ndu symbole sont indépendantes : toute paire des huit couleurs de la\npalette est autorisée, y compris deux couleurs claires ou identiques.\nLes choix sont sauvegardés et restitués tels quels, sans ajustement.\nDéfaut, y compris pour les guildes existantes : DUMBBELL / NIGHT / CYAN.\n"
       required:
         - symbol
         - backgroundColor

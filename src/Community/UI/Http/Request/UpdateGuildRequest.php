@@ -12,7 +12,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Champs absents ou null = inchangés ; un emblème fourni remplace ses trois choix.
- * Le Serializer impose les enums et les trois arguments, le Validator leur contraste.
+ * Le Serializer impose les enums et les trois arguments ; les couleurs sont indépendantes.
  *
  * @see https://symfony.com/doc/current/controller.html#mapping-request-payload
  */

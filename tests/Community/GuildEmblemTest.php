@@ -12,7 +12,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 final class GuildEmblemTest extends ApiTestCase
 {
     private const array DEFAULT = ['symbol' => 'DUMBBELL', 'backgroundColor' => 'NIGHT', 'symbolColor' => 'CYAN'];
-    private const array CUSTOM = ['symbol' => 'HEART', 'backgroundColor' => 'MINT', 'symbolColor' => 'NIGHT'];
+    private const array CUSTOM = ['symbol' => 'HEART', 'backgroundColor' => 'MINT', 'symbolColor' => 'BLOSSOM'];
 
     public function testTheDatabaseDefaultIsReadableForAGuildWithoutAnExplicitEmblem(): void
     {
@@ -65,6 +65,24 @@ final class GuildEmblemTest extends ApiTestCase
         self::assertSame(self::CUSTOM, self::decode($joined)['emblem']);
     }
 
+    public function testChangingOnlyTheSymbolColorAcceptsIdenticalColorsAndPreservesTheBackground(): void
+    {
+        $founder = $this->openAccount();
+        $guild = self::decode($this->post('/api/guilds', ['name' => 'Indépendante'], $founder->headers));
+        self::assertIsString($guild['id']);
+        $uri = '/api/guilds/'.$guild['id'];
+        self::assertSame(200, $this->send('PATCH', $uri, ['emblem' => self::CUSTOM], $founder->headers)->getStatusCode());
+
+        $identical = [...self::CUSTOM, 'symbolColor' => 'MINT'];
+        $updated = $this->send('PATCH', $uri, ['emblem' => $identical], $founder->headers);
+        self::assertSame(200, $updated->getStatusCode(), (string) $updated->getContent());
+        self::assertSame($identical, self::decode($updated)['emblem']);
+        self::assertSame($identical, self::decode($this->get($uri, $founder->headers))['emblem']);
+        $profile = self::decode($this->get('/api/players/'.$founder->id->toRfc4122(), $founder->headers));
+        self::assertIsArray($profile['guild']);
+        self::assertSame($identical, $profile['guild']['emblem']);
+    }
+
     /** @return iterable<string, array{array<string, mixed>}> */
     public static function invalidChanges(): iterable
     {
@@ -76,9 +94,6 @@ final class GuildEmblemTest extends ApiTestCase
         yield 'symbole null' => [['emblem' => ['symbol' => null] + self::CUSTOM]];
         yield 'fond null' => [['emblem' => ['backgroundColor' => null] + self::CUSTOM]];
         yield 'couleur symbole invalide' => [['emblem' => ['symbolColor' => 'RED'] + self::CUSTOM]];
-        yield 'même couleur' => [['emblem' => ['symbolColor' => 'MINT'] + self::CUSTOM]];
-        yield 'deux couleurs claires' => [['emblem' => ['symbolColor' => 'CHALK'] + self::CUSTOM]];
-        yield 'deux couleurs nuit' => [['emblem' => ['backgroundColor' => 'NIGHT', 'symbolColor' => 'NIGHT'] + self::CUSTOM]];
         yield 'nom blanc et emblème' => [['name' => ' ', 'emblem' => self::CUSTOM]];
     }
 

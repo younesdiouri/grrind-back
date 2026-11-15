@@ -146,7 +146,7 @@ final class PlayerProfileTest extends ApiTestCase
         $before = self::decode($this->get('/api/players/'.$member->id->toRfc4122(), $founder->headers));
         self::assertIsArray($before['guild']);
         self::assertIsString($before['guild']['id']);
-        $emblem = ['symbol' => 'YOGA', 'backgroundColor' => 'COPPER', 'symbolColor' => 'NIGHT'];
+        $emblem = ['symbol' => 'YOGA', 'backgroundColor' => 'MINT', 'symbolColor' => 'BLOSSOM'];
         $saved = $this->send('PATCH', '/api/guilds/'.$before['guild']['id'], ['emblem' => $emblem], $founder->headers);
         self::assertSame(Response::HTTP_OK, $saved->getStatusCode(), (string) $saved->getContent());
         self::assertSame($emblem, self::decode($saved)['emblem']);

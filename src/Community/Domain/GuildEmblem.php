@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Community\Domain;
 
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Trois choix atomiques, sans image ni couches. Dans la palette GRRIND retenue,
- * seules les paires NIGHT/autre atteignent un contraste de 3:1 ; l'inversion reste libre.
+ * Trois choix atomiques, sans image ni couches. Les deux couleurs sont indépendantes :
+ * toutes les paires de la palette sont conservées telles quelles, même identiques (#381).
  *
  * @see https://www.doctrine-project.org/projects/doctrine-orm/en/current/tutorials/embeddables.html
  */
@@ -24,11 +23,5 @@ final readonly class GuildEmblem
         #[ORM\Column(length: 16, enumType: GuildEmblemColor::class, options: ['default' => 'CYAN'])]
         public GuildEmblemColor $symbolColor,
     ) {
-    }
-
-    #[Assert\IsTrue(message: 'Une des deux couleurs doit être NIGHT et l’autre une couleur claire de la palette.')]
-    public function isContrasted(): bool
-    {
-        return (GuildEmblemColor::Night === $this->backgroundColor) !== (GuildEmblemColor::Night === $this->symbolColor);
     }
 }
