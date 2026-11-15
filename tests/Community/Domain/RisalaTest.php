@@ -16,6 +16,7 @@ use App\Shared\Domain\Activity\CreditingDisciplines;
 use App\Shared\Domain\Activity\Discipline;
 use DateTimeImmutable;
 use DateTimeZone;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
 
@@ -57,6 +58,26 @@ final class RisalaTest extends TestCase
         $this->expectException(RisalaTurnIsClosed::class);
 
         self::openTurn()->choose(Discipline::Climbing, self::crediting(), [], self::deadline());
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function sealedTurns(): iterable
+    {
+        yield 'SENT' => [true];
+        yield 'MISSED' => [false];
+    }
+
+    #[DataProvider('sealedTurns')]
+    public function testASealedTurnRefusesAChoiceEvenWithAnEarlierClock(bool $chosen): void
+    {
+        $risala = self::openTurn();
+        if ($chosen) {
+            $risala->choose(Discipline::Climbing, self::crediting(), [], self::beforeTheDeadline());
+        }
+        $risala->seal(self::rules(), senderIsStillAMember: true);
+
+        $this->expectException(RisalaTurnIsClosed::class);
+        $risala->choose(Discipline::Swimming, self::crediting(), [], self::beforeTheDeadline());
     }
 
     public function testADisciplineThatEarnsNothingIsRefused(): void
