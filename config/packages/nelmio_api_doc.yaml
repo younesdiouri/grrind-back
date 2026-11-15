@@ -414,7 +414,7 @@ when@dev:
 
                     Guild:
                         type: object
-                        required: [id, name, createdAt, memberCount, capacity, role]
+                        required: [id, name, emblem, createdAt, memberCount, capacity, role]
                         description: |
                             Une guilde, vue par l'un de ses membres. Elle **ne produit aucune valeur de
                             jeu** en v1 : ni XP, ni modificateur, ni loot. Elle réunit des joueurs, c'est
@@ -422,6 +422,7 @@ when@dev:
                         properties:
                             id: { type: string, format: uuid }
                             name: { type: string, maxLength: 40 }
+                            emblem: { $ref: '#/components/schemas/GuildEmblem' }
                             createdAt: { type: string, format: date-time }
                             memberCount: { type: integer, example: 12 }
                             capacity:
@@ -439,6 +440,57 @@ when@dev:
                                     décider quoi dessiner — le bouton « dissoudre » n'existe que pour le
                                     fondateur — jamais à autoriser : le serveur reste seul juge, et
                                     l'action est de toute façon revérifiée.
+
+                    GuildEmblemColor:
+                        type: string
+                        enum: [NIGHT, CHALK, CYAN, MINT, AMETHYST, GLACIER, BLOSSOM, COPPER]
+                        description: |
+                            Palette GRRIND : NIGHT #050816, CHALK #EAF6FF, CYAN #35E4FF,
+                            MINT #75FFB2, AMETHYST #A98BFF, GLACIER #67D8FF,
+                            BLOSSOM #FF79CE, COPPER #FFB454. Aucune couleur libre.
+
+                    GuildEmblem:
+                        type: object
+                        required: [symbol, backgroundColor, symbolColor]
+                        description: |
+                            Composition complète sans upload ni couches. Exactement une des deux
+                            couleurs doit être NIGHT, l'autre une des sept couleurs claires ;
+                            l'inversion est autorisée. Les autres paires sont refusées (422).
+                            C'est l'ensemble des paires de cette palette dont le contraste atteint 3:1.
+                            Défaut, y compris pour les guildes existantes : DUMBBELL / NIGHT / CYAN.
+                        properties:
+                            symbol:
+                                type: string
+                                enum: [DUMBBELL, HEART, YOGA, BOLT]
+                                example: DUMBBELL
+                            backgroundColor:
+                                allOf: [{ $ref: '#/components/schemas/GuildEmblemColor' }]
+                                example: NIGHT
+                            symbolColor:
+                                allOf: [{ $ref: '#/components/schemas/GuildEmblemColor' }]
+                                example: CYAN
+
+                    GuildUpdate:
+                        type: object
+                        description: |
+                            Modification par le fondateur courant uniquement. Appartenance et rôle
+                            sont relus sous le verrou de guilde, y compris après une succession.
+                            Au moins un champ non null est requis ; champs absents ou null = conservés.
+                            L'emblème fourni remplace les trois choix, aucun remplacement partiel.
+                            401 sans authentification, 403 pour un membre non fondateur,
+                            404 pour un tiers ou une guilde inconnue, 422 pour les valeurs invalides.
+                        anyOf:
+                            - required: [name]
+                              properties:
+                                  name: { type: string, nullable: false }
+                            - required: [emblem]
+                              properties:
+                                  emblem: { $ref: '#/components/schemas/GuildEmblem' }
+                        properties:
+                            name: { type: string, nullable: true, minLength: 1, maxLength: 40 }
+                            emblem:
+                                allOf: [{ $ref: '#/components/schemas/GuildEmblem' }]
+                                nullable: true
 
                     GuildInviteCode:
                         type: object

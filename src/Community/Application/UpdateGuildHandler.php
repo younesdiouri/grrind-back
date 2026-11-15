@@ -9,7 +9,7 @@ use App\Community\Infrastructure\Doctrine\GuildRepository;
 use App\Community\Infrastructure\Security\GuildMutationAuthorization;
 use App\Community\Infrastructure\Security\GuildVoter;
 
-final readonly class RenameGuildHandler
+final readonly class UpdateGuildHandler
 {
     public function __construct(
         private GuildRepository $guilds,
@@ -17,11 +17,16 @@ final readonly class RenameGuildHandler
     ) {
     }
 
-    public function __invoke(RenameGuild $command): Guild
+    public function __invoke(UpdateGuild $command): Guild
     {
         return $this->guilds->transactional(function () use ($command): Guild {
             $guild = $this->authorization->lock($command->guild->id(), $command->actorId, GuildVoter::EDIT);
-            $guild->rename($command->name);
+            if (null !== $command->name) {
+                $guild->rename($command->name);
+            }
+            if (null !== $command->emblem) {
+                $guild->changeEmblem($command->emblem);
+            }
 
             $this->guilds->commit();
 

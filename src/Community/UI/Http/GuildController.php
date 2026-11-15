@@ -8,13 +8,13 @@ use App\Community\Application\DissolveGuild;
 use App\Community\Application\DissolveGuildHandler;
 use App\Community\Application\FoundGuild;
 use App\Community\Application\FoundGuildHandler;
-use App\Community\Application\RenameGuild;
-use App\Community\Application\RenameGuildHandler;
+use App\Community\Application\UpdateGuild;
+use App\Community\Application\UpdateGuildHandler;
 use App\Community\Domain\Guild;
 use App\Community\Domain\GuildRules;
 use App\Community\Infrastructure\Security\GuildVoter;
 use App\Community\UI\Http\Request\FoundGuildRequest;
-use App\Community\UI\Http\Request\RenameGuildRequest;
+use App\Community\UI\Http\Request\UpdateGuildRequest;
 use App\Community\UI\Http\Response\GuildResource;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,7 +27,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * La vie d'une guilde : la fonder, la renommer, la dissoudre.
+ * La vie d'une guilde : la fonder, modifier son identité, la dissoudre.
  *
  * **Aucun `if` d'autorisation dans ce fichier**, et c'est la propriété qu'il faut garder.
  * Deux mécanismes s'en chargent, et ils ne rendent pas le même code :
@@ -46,7 +46,7 @@ final readonly class GuildController
 {
     public function __construct(
         private FoundGuildHandler $foundGuild,
-        private RenameGuildHandler $renameGuild,
+        private UpdateGuildHandler $updateGuild,
         private DissolveGuildHandler $dissolveGuild,
         private GuildRules $rules,
     ) {
@@ -89,28 +89,28 @@ final readonly class GuildController
     #[Route('/api/guilds/{id}', name: 'community_guild_rename', methods: ['PATCH'])]
     #[IsGranted(GuildVoter::EDIT, subject: 'guild')]
     #[OA\Tag(name: 'Guildes')]
-    #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/GuildName'))]
+    #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/GuildUpdate'))]
     #[OA\Response(
         response: 200,
-        description: 'La guilde renommée.',
+        description: 'Le nom et/ou l’emblème modifiés par le fondateur courant, autorisation et appartenance relues sous verrou. Les champs absents ou null sont conservés.',
         content: new OA\JsonContent(ref: '#/components/schemas/Guild'),
     )]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
     #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
     #[OA\Response(response: 422, ref: '#/components/responses/UnprocessableEntity')]
-    public function rename(
+    public function update(
         #[CurrentUser]
         UserInterface $user,
         #[VisibleGuild]
         Guild $guild,
         #[MapRequestPayload]
-        RenameGuildRequest $request,
+        UpdateGuildRequest $request,
     ): JsonResponse {
-        $renamed = ($this->renameGuild)(new RenameGuild($guild, Uuid::fromString($user->getUserIdentifier()), $request->name));
+        $updated = ($this->updateGuild)(new UpdateGuild($guild, Uuid::fromString($user->getUserIdentifier()), $request->name, $request->emblem));
 
         return new JsonResponse(
-            GuildResource::from($renamed, Uuid::fromString($user->getUserIdentifier()), $this->rules->maximumMembers())->toArray(),
+            GuildResource::from($updated, Uuid::fromString($user->getUserIdentifier()), $this->rules->maximumMembers())->toArray(),
         );
     }
 
