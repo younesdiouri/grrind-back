@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Community\Application;
 
 use App\Community\Domain\Exception\FounderCannotExcludeHimself;
-use App\Community\Domain\Exception\GuildNotFound;
 use App\Community\Domain\Exception\PlayerIsNotAMember;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
+use App\Community\Infrastructure\Security\GuildMutationAuthorization;
+use App\Community\Infrastructure\Security\GuildVoter;
 
 /**
  * Le fondateur exclut un membre.
@@ -26,8 +27,10 @@ use App\Community\Infrastructure\Doctrine\GuildRepository;
  */
 final readonly class ExcludeMemberHandler
 {
-    public function __construct(private GuildRepository $guilds)
-    {
+    public function __construct(
+        private GuildRepository $guilds,
+        private GuildMutationAuthorization $authorization,
+    ) {
     }
 
     /**
@@ -36,15 +39,11 @@ final readonly class ExcludeMemberHandler
      */
     public function __invoke(ExcludeMember $command): void
     {
-        if ($command->founderId->equals($command->excludedId)) {
-            throw new FounderCannotExcludeHimself();
-        }
-
         $this->guilds->transactional(function () use ($command): void {
-            $guild = $this->guilds->lockForUpdate($command->guild->id());
+            $guild = $this->authorization->lock($command->guild->id(), $command->actorId, GuildVoter::KICK);
 
-            if (null === $guild) {
-                throw new GuildNotFound();
+            if ($command->actorId->equals($command->excludedId)) {
+                throw new FounderCannotExcludeHimself();
             }
 
             // `part()` sait dissoudre une guilde vide, mais il ne peut pas y arriver ici :

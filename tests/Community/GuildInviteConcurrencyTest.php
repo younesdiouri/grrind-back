@@ -57,11 +57,11 @@ final class GuildInviteConcurrencyTest extends ApiTestCase
         if ('revoke' === $action) {
             $handler = self::getContainer()->get(RevokeInviteCodeHandler::class);
             self::assertInstanceOf(RevokeInviteCodeHandler::class, $handler);
-            $handler(new RevokeInviteCode($guild));
+            $handler(new RevokeInviteCode($guild, $guild->createdBy()));
         } elseif ('reissue' === $action) {
             $handler = self::getContainer()->get(IssueInviteCodeHandler::class);
             self::assertInstanceOf(IssueInviteCodeHandler::class, $handler);
-            $replacement = $handler(new IssueInviteCode($guild))->code();
+            $replacement = $handler(new IssueInviteCode($guild, $guild->createdBy()))->code();
         }
 
         // expires_at est fixé à cette date avant le démarrage du join, sans le modifier ici.

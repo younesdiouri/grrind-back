@@ -8,15 +8,13 @@ use App\Community\Domain\Guild;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * La guilde arrive déjà chargée et déjà autorisée — `#[VisibleGuild]` a rendu le 404,
- * `#[IsGranted(GUILD_KICK)]` le 403. Restent les deux identifiants : qui exclut, et qui
- * est exclu. Le premier vient du jeton.
+ * L'acteur vient du jeton ; son droit d'exclure est revalidé sous verrou après le voter HTTP.
  */
 final readonly class ExcludeMember
 {
     public function __construct(
         public Guild $guild,
-        public Uuid $founderId,
+        public Uuid $actorId,
         public Uuid $excludedId,
     ) {
     }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Community\Application;
 
 use App\Community\Infrastructure\Doctrine\GuildRepository;
+use App\Community\Infrastructure\Security\GuildMutationAuthorization;
+use App\Community\Infrastructure\Security\GuildVoter;
 
 /**
  * Dissoudre une guilde : elle et toutes ses adhésions partent dans la **même**
@@ -19,14 +21,17 @@ use App\Community\Infrastructure\Doctrine\GuildRepository;
  */
 final readonly class DissolveGuildHandler
 {
-    public function __construct(private GuildRepository $guilds)
-    {
+    public function __construct(
+        private GuildRepository $guilds,
+        private GuildMutationAuthorization $authorization,
+    ) {
     }
 
     public function __invoke(DissolveGuild $command): void
     {
         $this->guilds->transactional(function () use ($command): void {
-            $this->guilds->dissolve($command->guild);
+            $guild = $this->authorization->lock($command->guild->id(), $command->actorId, GuildVoter::DISSOLVE);
+            $this->guilds->dissolve($guild);
             $this->guilds->commit();
         });
     }
