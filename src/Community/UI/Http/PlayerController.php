@@ -101,7 +101,11 @@ final readonly class PlayerController
             'inventory' => $this->inventories->of($id),
             'statistics' => $this->statistics->of($id, $progression),
             'week' => $this->weeks->of($id),
-            'guild' => null === $guild ? null : ['id' => $guild->id()->toRfc4122(), 'name' => $guild->name()],
+            'guild' => null === $guild ? null : [
+                'id' => $guild->id()->toRfc4122(),
+                'name' => $guild->name(),
+                'emblem' => $guild->emblem(),
+            ],
         ]);
     }
 }

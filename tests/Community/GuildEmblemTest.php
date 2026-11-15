@@ -24,6 +24,10 @@ final class GuildEmblemTest extends ApiTestCase
         $db->insert('community_guild_membership', ['id' => '019a844d-bb21-7000-8000-000000000358', 'guild_id' => $id, 'player_id' => $founder->id->toRfc4122(), 'role' => 'FOUNDER', 'joined_at' => '2026-11-01 00:00:00+00']);
 
         self::assertSame(self::DEFAULT, self::decode($this->get('/api/guilds/'.$id, $founder->headers))['emblem']);
+        self::assertSame(
+            ['id' => $id, 'name' => 'Ancienne guilde', 'emblem' => self::DEFAULT],
+            self::decode($this->get('/api/players/'.$founder->id->toRfc4122(), $founder->headers))['guild'],
+        );
     }
 
     public function testTheFounderSavesAnEmblemAndNameUpdatesPreserveIt(): void
