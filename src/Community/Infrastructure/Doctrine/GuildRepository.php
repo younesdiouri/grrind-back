@@ -7,8 +7,10 @@ namespace App\Community\Infrastructure\Doctrine;
 use App\Community\Domain\Guild;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\TransactionRequiredException;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -43,13 +45,15 @@ class GuildRepository extends ServiceEntityRepository
      *
      * **L'ordre compte** : le verrou se prend *avant* de toucher aux adhésions, sinon la
      * collection est chargée sur un état d'avant et le comptage porte sur des lignes
-     * périmées. Le `refresh()` le garantit même si l'entité traînait déjà dans l'unité de
-     * travail — ce qui est le cas courant ici, le code d'invitation ayant été lu en
-     * premier et portant sa guilde.
+     * périmées. La relecture avec HINT_REFRESH recharge aussi les rôles des adhésions
+     * déjà managées : rafraîchir la guilde seule laisse leur ancien rôle dans l'identity
+     * map après une succession (#368). Elle constate aussi une dissolution pendant l'attente.
      *
      * Le verrou porte sur *une ligne* : deux guildes différentes ne s'attendent jamais.
      *
      * @throws TransactionRequiredException hors transaction : un verrou qui se relâche aussitôt ne verrouille rien
+     *
+     * @see https://www.doctrine-project.org/projects/doctrine-orm/en/current/reference/dql-doctrine-query-language.html#query-hints
      */
     public function lockForUpdate(Uuid $id): ?Guild
     {
@@ -59,7 +63,15 @@ class GuildRepository extends ServiceEntityRepository
             return null;
         }
 
-        $this->getEntityManager()->refresh($guild);
+        /** @var Guild|null $guild */
+        $guild = $this->createQueryBuilder('g')
+            ->addSelect('m')
+            ->leftJoin('g.memberships', 'm')
+            ->where('g.id = :id')
+            ->setParameter('id', $id, UuidType::NAME)
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
 
         return $guild;
     }

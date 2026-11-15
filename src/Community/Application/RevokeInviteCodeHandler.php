@@ -6,6 +6,8 @@ namespace App\Community\Application;
 
 use App\Community\Infrastructure\Doctrine\GuildInviteCodeRepository;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
+use App\Community\Infrastructure\Security\GuildMutationAuthorization;
+use App\Community\Infrastructure\Security\GuildVoter;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -23,6 +25,7 @@ final readonly class RevokeInviteCodeHandler
 {
     public function __construct(
         private GuildRepository $guilds,
+        private GuildMutationAuthorization $authorization,
         private GuildInviteCodeRepository $codes,
         private ClockInterface $clock,
     ) {
@@ -31,7 +34,7 @@ final readonly class RevokeInviteCodeHandler
     public function __invoke(RevokeInviteCode $command): void
     {
         $this->guilds->transactional(function () use ($command): void {
-            $guild = $this->guilds->lockForUpdate($command->guild->id()) ?? $command->guild;
+            $guild = $this->authorization->lock($command->guild->id(), $command->actorId, GuildVoter::EDIT);
 
             $this->codes->liveCodeOf($guild)?->revoke($this->clock->now());
             $this->codes->commit();

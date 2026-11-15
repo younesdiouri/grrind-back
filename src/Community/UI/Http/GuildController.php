@@ -107,7 +107,7 @@ final readonly class GuildController
         #[MapRequestPayload]
         RenameGuildRequest $request,
     ): JsonResponse {
-        $renamed = ($this->renameGuild)(new RenameGuild($guild, $request->name));
+        $renamed = ($this->renameGuild)(new RenameGuild($guild, Uuid::fromString($user->getUserIdentifier()), $request->name));
 
         return new JsonResponse(
             GuildResource::from($renamed, Uuid::fromString($user->getUserIdentifier()), $this->rules->maximumMembers())->toArray(),
@@ -124,9 +124,13 @@ final readonly class GuildController
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
     #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
-    public function dissolve(#[VisibleGuild] Guild $guild): JsonResponse
-    {
-        ($this->dissolveGuild)(new DissolveGuild($guild));
+    public function dissolve(
+        #[CurrentUser]
+        UserInterface $user,
+        #[VisibleGuild]
+        Guild $guild,
+    ): JsonResponse {
+        ($this->dissolveGuild)(new DissolveGuild($guild, Uuid::fromString($user->getUserIdentifier())));
 
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }

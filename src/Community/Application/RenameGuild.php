@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Community\Application;
 
 use App\Community\Domain\Guild;
+use Symfony\Component\Uid\Uuid;
 
 /**
- * La guilde arrive **déjà chargée et déjà autorisée** — le resolver a rendu le 404,
- * `#[IsGranted]` le 403. Le handler n'a plus de décision d'accès à prendre, et c'est ce
- * qui garantit qu'il n'en prendra pas une deuxième, différente.
+ * L'autorisation HTTP peut précéder une succession : le handler la rejoue sous verrou
+ * pour cet acteur, avec le même voter.
  */
 final readonly class RenameGuild
 {
     public function __construct(
         public Guild $guild,
+        public Uuid $actorId,
         public string $name,
     ) {
     }

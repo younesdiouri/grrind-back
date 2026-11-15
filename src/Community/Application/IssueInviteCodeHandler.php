@@ -8,6 +8,8 @@ use App\Community\Domain\GuildInviteCode;
 use App\Community\Domain\GuildRules;
 use App\Community\Infrastructure\Doctrine\GuildInviteCodeRepository;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
+use App\Community\Infrastructure\Security\GuildMutationAuthorization;
+use App\Community\Infrastructure\Security\GuildVoter;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -24,6 +26,7 @@ final readonly class IssueInviteCodeHandler
 {
     public function __construct(
         private GuildRepository $guilds,
+        private GuildMutationAuthorization $authorization,
         private GuildInviteCodeRepository $codes,
         private GuildRules $rules,
         private ClockInterface $clock,
@@ -33,7 +36,7 @@ final readonly class IssueInviteCodeHandler
     public function __invoke(IssueInviteCode $command): GuildInviteCode
     {
         return $this->guilds->transactional(function () use ($command): GuildInviteCode {
-            $guild = $this->guilds->lockForUpdate($command->guild->id()) ?? $command->guild;
+            $guild = $this->authorization->lock($command->guild->id(), $command->actorId, GuildVoter::EDIT);
             $now = $this->clock->now();
 
             $live = $this->codes->liveCodeOf($guild);

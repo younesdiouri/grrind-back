@@ -62,9 +62,13 @@ final readonly class GuildInviteController
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
     #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
-    public function issue(#[VisibleGuild] Guild $guild): JsonResponse
-    {
-        $code = ($this->issueInviteCode)(new IssueInviteCode($guild));
+    public function issue(
+        #[CurrentUser]
+        UserInterface $user,
+        #[VisibleGuild]
+        Guild $guild,
+    ): JsonResponse {
+        $code = ($this->issueInviteCode)(new IssueInviteCode($guild, Uuid::fromString($user->getUserIdentifier())));
 
         return new JsonResponse(InviteCodeResource::from($code)->toArray(), Response::HTTP_CREATED);
     }
@@ -79,9 +83,13 @@ final readonly class GuildInviteController
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
     #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
-    public function revoke(#[VisibleGuild] Guild $guild): JsonResponse
-    {
-        ($this->revokeInviteCode)(new RevokeInviteCode($guild));
+    public function revoke(
+        #[CurrentUser]
+        UserInterface $user,
+        #[VisibleGuild]
+        Guild $guild,
+    ): JsonResponse {
+        ($this->revokeInviteCode)(new RevokeInviteCode($guild, Uuid::fromString($user->getUserIdentifier())));
 
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }
