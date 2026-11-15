@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Community\Application;
 
+use App\Community\Domain\Exception\GuildNotFound;
 use App\Community\Domain\Exception\RisalaTurnIsNotOpen;
 use App\Community\Domain\Exception\RisalaTurnIsNotYours;
 use App\Community\Domain\Guild;
 use App\Community\Domain\Risala;
+use App\Community\Infrastructure\Doctrine\GuildRepository;
 use App\Community\Infrastructure\Doctrine\RisalaRepository;
 use App\Shared\Domain\Activity\CreditingDisciplines;
 use App\Shared\Domain\Activity\Discipline;
@@ -23,11 +25,9 @@ use Psr\Clock\ClockInterface;
  * qu'ils portent sur l'objet lui-même et qu'un contrôleur qui les rejouerait finirait par
  * diverger de lui.
  *
- * **Aucun verrou.** Deux requêtes concurrentes du même joueur écriraient la même valeur, et
- * l'ordre entre deux choix différents du même joueur est celui qu'il a lui-même provoqué :
- * `PUT` deux fois donne le dernier, ce que le verbe promet. Le seul écrit concurrent qui
- * compte est celui de la bascule, et elle prend le verrou de la guilde — un choix qui
- * arriverait pendant qu'elle scelle est refusé par l'échéance, pas par une course.
+ * Le choix et la bascule partagent la transaction et le verrou de guilde : un choix
+ * validé sur DRAWN ne doit jamais être écrit après SENT/MISSED. Après l'attente, adhésion,
+ * tour et heure se relisent ; l'identity map et l'heure d'entrée ne font pas autorité.
  */
 final readonly class ChooseRisalaHandler
 {
@@ -36,24 +36,33 @@ final readonly class ChooseRisalaHandler
         private RisalaRepository $risalat,
         private CreditingDisciplines $crediting,
         private ClockInterface $clock,
+        private GuildRepository $guilds,
     ) {
     }
 
     public function __invoke(ChooseRisala $command): RisalatBoard
     {
-        $guild = $this->board->guildOf($command->playerId);
-        $now = $this->clock->now();
+        $guildId = $this->board->guildOf($command->playerId)->id();
 
-        $turn = $this->risalat->openTurnOf($guild) ?? throw new RisalaTurnIsNotOpen();
+        return $this->guilds->transactional(function () use ($command, $guildId): RisalatBoard {
+            $guild = $this->guilds->lockForUpdate($guildId) ?? throw new GuildNotFound();
 
-        if (!$turn->senderId()->equals($command->playerId)) {
-            throw new RisalaTurnIsNotYours();
-        }
+            if (!$guild->hasMember($command->playerId)) {
+                throw new GuildNotFound();
+            }
 
-        $turn->choose($command->discipline, $this->crediting, $this->challengedIn($guild, $now), $now);
-        $this->risalat->commit();
+            $turn = $this->risalat->openTurnOf($guild) ?? throw new RisalaTurnIsNotOpen();
 
-        return $this->board->of($command->playerId);
+            if (!$turn->senderId()->equals($command->playerId)) {
+                throw new RisalaTurnIsNotYours();
+            }
+
+            $now = $this->clock->now();
+            $turn->choose($command->discipline, $this->crediting, $this->challengedIn($guild, $now), $now);
+            $this->risalat->commit();
+
+            return $this->board->of($command->playerId);
+        });
     }
 
     /**

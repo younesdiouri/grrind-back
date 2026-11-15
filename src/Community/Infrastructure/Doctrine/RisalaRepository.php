@@ -11,6 +11,7 @@ use App\Community\Domain\RisalaStatus;
 use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Uid\Uuid;
@@ -33,10 +34,25 @@ class RisalaRepository extends ServiceEntityRepository
     /**
      * Le tour ouvert d'une guilde, s'il y en a un. L'index unique partiel garantit qu'il n'y
      * en a jamais deux — voir le docblock de {@see Risala}.
+     *
+     * Relu même s'il est déjà managé : après le verrou de guilde, choix et révélation
+     * doivent voir le dernier choix commis, pas celui chargé avant l'attente (#369).
+     *
+     * @see https://www.doctrine-project.org/projects/doctrine-orm/en/current/reference/dql-doctrine-query-language.html#query-hints
      */
     public function openTurnOf(Guild $guild): ?Risala
     {
-        return $this->findOneBy(['guild' => $guild, 'status' => RisalaStatus::Drawn]);
+        /** @var Risala|null $turn */
+        $turn = $this->createQueryBuilder('r')
+            ->where('r.guild = :guild')
+            ->andWhere('r.status = :drawn')
+            ->setParameter('guild', $guild)
+            ->setParameter('drawn', RisalaStatus::Drawn)
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
+
+        return $turn;
     }
 
     /**
