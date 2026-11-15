@@ -1557,11 +1557,45 @@ when@dev:
                         allOf:
                             - $ref: '#/components/schemas/Player'
                             - type: object
-                              required: [inventory, statistics, league]
+                              required: [inventory, statistics, league, week, guild]
                               properties:
                                   league: { $ref: '#/components/schemas/LeagueIdentity' }
                                   inventory: { $ref: '#/components/schemas/PublicInventory' }
                                   statistics: { $ref: '#/components/schemas/PlayerStatistics' }
+                                  week: { $ref: '#/components/schemas/PlayerWeekProgress' }
+                                  guild:
+                                      nullable: true
+                                      description: "Guilde de la cible, ou null sans adhésion. Pour tous les profils autorisés (soi ou même guilde), c'est celle du lecteur : ouvrir l'écran existant alimenté par GET /api/guilds/mine. Aucun droit public supplémentaire."
+                                      allOf: [{ $ref: '#/components/schemas/PlayerGuildIdentity' }]
+
+                    PlayerGuildIdentity:
+                        type: object
+                        required: [id, name]
+                        properties:
+                            id: { type: string, format: uuid }
+                            name: { type: string, example: "Les Lève-Tôt" }
+
+                    PlayerWeekProgress:
+                        type: object
+                        description: |
+                            Radar du joueur ciblé, identique aux agrégats de son GET /api/progression/week.
+                            Le provider officiel utilise le calendrier Alam du ruleset publié : actuellement
+                            [dimanche 20 h, dimanche 20 h[ en Europe/Paris, avec changement d'heure civil.
+                            Ni le fuseau de la cible ni celui du lecteur ne décalent cette semaine commune.
+                            Bornes UTC explicites ; référence sur la fenêtre précédente du même calendrier.
+                            Les totaux suivent occurredAt (instant du sport), annulations et suppléments compris.
+                            Seulement des agrégats : aucune écriture, séance, discipline ou plan privé.
+                            La Vitality du bloc Player conserve son calcul UTC existant (dette #184),
+                            distinct de ces quatre caractéristiques hebdomadaires.
+                        required: [startsAt, resetsAt, current, previous]
+                        properties:
+                            startsAt: { type: string, format: date-time, description: "Début inclus de la semaine de jeu courante, en UTC." }
+                            resetsAt: { type: string, format: date-time, description: "Fin exclue et prochaine remise à zéro, en UTC." }
+                            current: { $ref: '#/components/schemas/WeekTotals' }
+                            previous:
+                                nullable: true
+                                description: "Totaux de la semaine précédente, ou null si son XP nette est nulle ou négative. Aucune cible inventée."
+                                allOf: [{ $ref: '#/components/schemas/WeekTotals' }]
 
                     Inventory:
                         type: object

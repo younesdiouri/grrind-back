@@ -6,11 +6,17 @@ namespace App\Tests\Community;
 
 use App\Progression\Application\GrantXp;
 use App\Progression\Application\GrantXpHandler;
+use App\Progression\Domain\XpReason;
+use App\Progression\Domain\XpTransaction;
+use App\Progression\Infrastructure\Doctrine\XpTransactionRepository;
 use App\Rewards\Infrastructure\Doctrine\InventoryItemRepository;
+use App\Shared\Application\GameRulesets;
 use App\Shared\Domain\Activity\Discipline;
+use App\Shared\Domain\Alam\AlamCalendar;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
 use DateTimeImmutable;
+use DateTimeInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
 
@@ -49,6 +55,88 @@ final class PlayerProfileTest extends ApiTestCase
             Response::HTTP_OK,
             $this->get('/api/players/'.$loner->id->toRfc4122(), $loner->headers)->getStatusCode(),
         );
+    }
+
+    public function testAnEmptyProfileHasNoGuildOrWeekReference(): void
+    {
+        $player = $this->openAccount();
+        $body = self::decode($this->get('/api/players/'.$player->id->toRfc4122(), $player->headers));
+        $home = self::decode($this->get('/api/progression/week', $player->headers));
+
+        self::assertNull($body['guild']);
+        self::assertIsArray($body['week']);
+        self::assertSame(['startsAt', 'resetsAt', 'current', 'previous'], array_keys($body['week']));
+        self::assertSame(array_intersect_key($home, $body['week']), $body['week']);
+        self::assertSame(['xp' => 0, 'sessions' => 0, 'attributes' => ['strength' => 0, 'endurance' => 0, 'mobility' => 0, 'dexterity' => 0]], $body['week']['current']);
+        self::assertNull($body['week']['previous']);
+    }
+
+    public function testATeammatesRadarMatchesHisHomeWithoutPrivateEntries(): void
+    {
+        [$founder, $member] = $this->guildOfTwo();
+        self::assertSame(Response::HTTP_OK, $this->send('PATCH', '/api/me', ['timezone' => 'Pacific/Honolulu'], $member->headers)->getStatusCode());
+        self::assertSame(Response::HTTP_OK, $this->send('PATCH', '/api/me', ['timezone' => 'Asia/Tokyo'], $founder->headers)->getStatusCode());
+        $rules = self::getContainer()->get(GameRulesets::class);
+        self::assertInstanceOf(GameRulesets::class, $rules);
+        $window = AlamCalendar::runtime($rules)->week(new DateTimeImmutable());
+        $grant = self::getContainer()->get(GrantXpHandler::class);
+        self::assertInstanceOf(GrantXpHandler::class, $grant);
+        // Les bornes sont celles du sport, même si tous ces crédits sont importés maintenant.
+        $previousSession = Uuid::v7();
+        ($grant)(new GrantXp($member->id, $previousSession, Discipline::Running, 1800, $window['start']->modify('-1 second')));
+        ($grant)(new GrantXp($member->id, Uuid::v7(), Discipline::Cycling, 1200, $window['start']));
+        $cancelled = Uuid::v7();
+        ($grant)(new GrantXp($member->id, $cancelled, Discipline::Running, 600, $window['start']->modify('+1 minute')));
+        $ledger = self::getContainer()->get(XpTransactionRepository::class);
+        self::assertInstanceOf(XpTransactionRepository::class, $ledger);
+        $credit = $ledger->recordedFor($cancelled, XpReason::SessionCompleted);
+        self::assertInstanceOf(XpTransaction::class, $credit);
+        $ledger->add(XpTransaction::reversalOf($credit));
+        $ledger->commit();
+        // Le lecteur n'alimente jamais le radar de la cible.
+        ($grant)(new GrantXp($founder->id, Uuid::v7(), Discipline::Running, 3600, $window['start']));
+
+        $home = self::decode($this->get('/api/progression/week', $member->headers));
+        $body = self::decode($this->get('/api/players/'.$member->id->toRfc4122(), $founder->headers));
+        self::assertIsArray($body['week']);
+        self::assertSame(['startsAt', 'resetsAt', 'current', 'previous'], array_keys($body['week']));
+        self::assertSame(array_intersect_key($home, $body['week']), $body['week']);
+        self::assertSame($window['start']->format(DateTimeInterface::ATOM), $body['week']['startsAt']);
+        self::assertSame($window['reset']->format(DateTimeInterface::ATOM), $body['week']['resetsAt']);
+        self::assertIsArray($body['week']['current']);
+        self::assertIsArray($body['week']['previous']);
+        self::assertSame(1, $body['week']['current']['sessions']);
+        self::assertSame(1, $body['week']['previous']['sessions']);
+        self::assertIsArray($home['entries']);
+        self::assertCount(3, $home['entries']);
+        self::assertSame(['xp', 'sessions', 'attributes'], array_keys($body['week']['current']));
+        self::assertSame(['xp', 'sessions', 'attributes'], array_keys($body['week']['previous']));
+        self::assertArrayNotHasKey('entries', $body);
+        self::assertArrayNotHasKey('trainingPlans', $body);
+
+        $previousCredit = $ledger->recordedFor($previousSession, XpReason::SessionCompleted);
+        self::assertInstanceOf(XpTransaction::class, $previousCredit);
+        $ledger->add(XpTransaction::reversalOf($previousCredit));
+        $ledger->commit();
+        $withoutReference = self::decode($this->get('/api/players/'.$member->id->toRfc4122(), $founder->headers));
+        self::assertIsArray($withoutReference['week']);
+        self::assertNull($withoutReference['week']['previous'], 'Une référence entièrement annulée ne donne aucune cible.');
+        self::assertSame($body['week']['current'], $withoutReference['week']['current']);
+    }
+
+    public function testEveryVisibleGuildLinkOpensTheReadersExistingGuild(): void
+    {
+        [$founder, $member] = $this->guildOfTwo();
+        foreach ([$founder, $member] as $viewer) {
+            $mine = self::decode($this->get('/api/guilds/mine', $viewer->headers))['guild'];
+            self::assertIsArray($mine);
+            self::assertIsString($mine['id']);
+            foreach ([$founder, $member] as $target) {
+                $body = self::decode($this->get('/api/players/'.$target->id->toRfc4122(), $viewer->headers));
+                self::assertSame(['id' => $mine['id'], 'name' => $mine['name']], $body['guild']);
+                self::assertSame(Response::HTTP_OK, $this->get('/api/guilds/'.$mine['id'], $viewer->headers)->getStatusCode());
+            }
+        }
     }
 
     public function testATeammateIsVisible(): void
@@ -128,12 +216,17 @@ final class PlayerProfileTest extends ApiTestCase
     public function testAStrangerIsNotVisible(): void
     {
         $stranger = $this->openAccount('dan@grrind.app', 'Dan');
+        self::assertSame(Response::HTTP_CREATED, $this->post('/api/guilds', ['name' => 'Autre guilde'], $stranger->headers)->getStatusCode());
         [$founder] = $this->guildOfTwo();
 
         $response = $this->get('/api/players/'.$founder->id->toRfc4122(), $stranger->headers);
 
         self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
         self::assertSame('https://grrind.app/problems/player-not-found', self::decode($response)['type']);
+        $guild = self::decode($this->get('/api/guilds/mine', $founder->headers))['guild'];
+        self::assertIsArray($guild);
+        self::assertIsString($guild['id']);
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->get('/api/guilds/'.$guild['id'], $stranger->headers)->getStatusCode());
     }
 
     /**
@@ -227,7 +320,7 @@ final class PlayerProfileTest extends ApiTestCase
         self::assertArrayNotHasKey('statistics', $inList);
         self::assertSame($alone['league'], $inList['league']);
         unset($inList['headEquipment'], $inList['accessoryEquipment']);
-        unset($alone['inventory'], $alone['statistics']);
+        unset($alone['inventory'], $alone['statistics'], $alone['week'], $alone['guild']);
         self::assertSame($alone, $inList);
     }
 
