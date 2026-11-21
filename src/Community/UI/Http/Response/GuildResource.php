@@ -32,6 +32,7 @@ final readonly class GuildResource
         public int $capacity,
         public GuildRole $role,
         public GuildEmblem $emblem,
+        public bool $recruitmentOpen,
     ) {
     }
 
@@ -47,6 +48,7 @@ final readonly class GuildResource
             // impossible, et le repli n'existe que pour que le type le dise.
             $guild->membershipOf($playerId)?->role() ?? GuildRole::Member,
             $guild->emblem(),
+            $guild->recruitmentOpen,
         );
     }
 
@@ -61,6 +63,7 @@ final readonly class GuildResource
             'createdAt' => $this->createdAt,
             'memberCount' => $this->memberCount,
             'capacity' => $this->capacity,
+            'recruitmentOpen' => $this->recruitmentOpen,
             'role' => $this->role->value,
             'emblem' => [
                 'symbol' => $this->emblem->symbol->value,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Community\Application;
 
 use App\Community\Domain\Guild;
+use App\Community\Infrastructure\Doctrine\GuildApplicationRepository;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
 use App\Community\Infrastructure\Security\GuildMutationAuthorization;
 use App\Community\Infrastructure\Security\GuildVoter;
@@ -13,6 +14,7 @@ final readonly class UpdateGuildHandler
 {
     public function __construct(
         private GuildRepository $guilds,
+        private GuildApplicationRepository $applications,
         private GuildMutationAuthorization $authorization,
     ) {
     }
@@ -28,6 +30,12 @@ final readonly class UpdateGuildHandler
                 $guild->changeEmblem($command->emblem);
             }
 
+            if (null !== $command->recruitmentOpen) {
+                $guild->setRecruitmentOpen($command->recruitmentOpen);
+                if (!$command->recruitmentOpen) {
+                    $this->applications->withdrawForGuild($guild->id());
+                }
+            }
             $this->guilds->commit();
 
             return $guild;

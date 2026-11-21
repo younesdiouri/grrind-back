@@ -9,6 +9,7 @@ use App\Community\Domain\Exception\InviteCodeNotUsable;
 use App\Community\Domain\Exception\PlayerAlreadyInAGuild;
 use App\Community\Domain\Guild;
 use App\Community\Domain\GuildRules;
+use App\Community\Infrastructure\Doctrine\GuildApplicationRepository;
 use App\Community\Infrastructure\Doctrine\GuildInviteCodeRepository;
 use App\Community\Infrastructure\Doctrine\GuildMembershipRepository;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
@@ -34,14 +35,15 @@ use Psr\Clock\ClockInterface;
  * l'attente : une révocation, une réémission ou l'expiration peuvent l'avoir invalidée.
  * Rafraîchir l'objet est nécessaire, une seconde recherche garderait l'identity map.
  *
- * L'index unique reste le dernier mot pour l'appartenance croisée : entre la lecture
- * d'adhésion et le `flush`, une seconde requête du **même joueur** vers une **autre**
- * guilde ne croise aucun verrou commun. Sa violation se traduit dans la même erreur.
+ * Le verrou du candidat suit celui de la guilde. Il sérialise ses entrées dans
+ * des guildes différentes et le retrait de ses candidatures (#358). Le code et
+ * l’heure se relisent après ces deux attentes.
  */
 final readonly class JoinGuildHandler
 {
     public function __construct(
         private GuildRepository $guilds,
+        private GuildApplicationRepository $applications,
         private GuildInviteCodeRepository $codes,
         private GuildMembershipRepository $memberships,
         private GuildRules $rules,
@@ -75,6 +77,7 @@ final readonly class JoinGuildHandler
                 throw new InviteCodeNotUsable();
             }
 
+            $this->applications->lockPlayer($command->playerId);
             $this->codes->refresh($invite);
             $now = $this->clock->now();
 
@@ -83,6 +86,9 @@ final readonly class JoinGuildHandler
                 throw new InviteCodeNotUsable();
             }
 
+            if (null !== $this->memberships->ofPlayer($command->playerId)) {
+                throw new PlayerAlreadyInAGuild();
+            }
             $guild->admit($command->playerId, $this->rules, $now);
 
             try {
@@ -90,6 +96,8 @@ final readonly class JoinGuildHandler
             } catch (UniqueConstraintViolationException) {
                 throw new PlayerAlreadyInAGuild();
             }
+
+            $this->applications->withdrawForPlayer($command->playerId);
 
             return $guild;
         });

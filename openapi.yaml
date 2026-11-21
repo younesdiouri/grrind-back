@@ -4,6 +4,40 @@ info:
   description: "L'API de GRRIND — le sport en RPG : XP, niveaux, titres, arbres de compétences, loot, séries.\n\n**Le serveur arbitre l'horloge.** L'import accepte les bornes du **fournisseur santé** — une\nséance a eu lieu avant que Grrind en entende parler, aucune horloge serveur n'existe pour un\nfait passé. Ce qu'il n'accepte pas, c'est une **durée** : elle se recalcule des deux bornes.\nLe reste de l'arbitrage — fenêtre d'antériorité, chevauchements, plancher et plafond — refuse\nce qui ne tient pas debout.\n\n**Les écritures de jeu sont idempotentes.** Les routes qui accordent quelque chose exigent un\nen-tête `Idempotency-Key` : un client mobile rejoue ses requêtes, et le rejeu rend la réponse\nd'origine sans rien réexécuter.\n\n**Les erreurs sont en `application/problem+json`** (RFC 9457). Le membre `type` est un\nidentifiant stable sur lequel un client peut brancher un comportement ; le `detail` est du\ntexte, il peut changer.\n"
   version: 1.0.0
 paths:
+  /api/guilds/directory:
+    get:
+      tags:
+        - Guildes
+      operationId: get_guild_recruitment_directory
+      parameters:
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+            minimum: 1
+        -
+          name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+      responses:
+        '200':
+          description: 'Annuaire des guildes ouvertes.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildDirectoryPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   '/api/players/{id}/battles':
     post:
       tags:
@@ -587,7 +621,7 @@ paths:
               $ref: '#/components/schemas/GuildUpdate'
       responses:
         '200':
-          description: 'Le nom et/ou l’emblème modifiés par le fondateur courant, autorisation et appartenance relues sous verrou. Les champs absents ou null sont conservés.'
+          description: 'Les paramètres de guilde modifiés par le fondateur courant, autorisation et appartenance relues sous verrou. Les champs absents ou null sont conservés.'
           content:
             application/json:
               schema:
@@ -750,6 +784,203 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+  '/api/guilds/{id}/preview':
+    get:
+      tags:
+        - Guildes
+      operationId: get_guild_recruitment_preview
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Aperçu de guilde visible au lecteur.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicGuild'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  '/api/guilds/{id}/applications':
+    get:
+      tags:
+        - Guildes
+      operationId: get_guild_recruitment_inbox
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+            minimum: 1
+        -
+          name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+      responses:
+        '200':
+          description: 'Candidatures en attente réservées au meneur.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildApplicationPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    post:
+      tags:
+        - Guildes
+      operationId: post_guild_recruitment_submit
+      parameters:
+        -
+          $ref: '#/components/parameters/IdempotencyKey'
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Candidature en attente. Un rejeu avec la même clé rend le reçu initial.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildApplication'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          description: 'Clé d’idempotence absente ou invalide.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /api/guild-applications/mine:
+    get:
+      tags:
+        - Guildes
+      operationId: get_guild_recruitment_mine
+      parameters:
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+            minimum: 1
+        -
+          name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+            default: null
+      responses:
+        '200':
+          description: 'Historique des candidatures du joueur connecté.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildApplicationPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  '/api/guilds/{id}/applications/{applicationId}/accept':
+    post:
+      tags:
+        - Guildes
+      operationId: post_guild_recruitment_accept
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Admet le candidat et retire ses autres candidatures.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildApplication'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  '/api/guilds/{id}/applications/{applicationId}/reject':
+    post:
+      tags:
+        - Guildes
+      operationId: post_guild_recruitment_reject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Refuse la candidature.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildApplication'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /api/guilds/mine/weekly-leaderboard:
     get:
       tags:
@@ -2583,6 +2814,8 @@ components:
             - 'https://grrind.app/problems/social-profile-incomplete'
             - 'https://grrind.app/problems/title-unknown'
             - 'https://grrind.app/problems/title-not-unlocked'
+            - 'https://grrind.app/problems/application-not-found'
+            - 'https://grrind.app/problems/application-already-decided'
             - 'https://grrind.app/problems/guild-is-full'
             - 'https://grrind.app/problems/player-already-in-a-guild'
             - 'https://grrind.app/problems/guild-not-found'
@@ -2707,6 +2940,7 @@ components:
         - memberCount
         - capacity
         - role
+        - recruitmentOpen
       properties:
         id:
           type: string
@@ -2726,12 +2960,95 @@ components:
           description: "La capacité vient de l'équilibrage du serveur et voyage avec la\nréponse : l'écran affiche « 12 / 30 », et embarquer le dénominateur\ndans l'app obligerait à repasser par l'App Store pour le corriger.\n"
           type: integer
           example: 30
+        recruitmentOpen:
+          type: boolean
         role:
           description: "Le rôle de **l'appelant**, pas une propriété de la guilde. Il sert à\ndécider quoi dessiner — le bouton « dissoudre » n'existe que pour le\nfondateur — jamais à autoriser : le serveur reste seul juge, et\nl'action est de toute façon revérifiée.\n"
           type: string
           enum:
             - FOUNDER
             - MEMBER
+      type: object
+    PublicGuild:
+      required:
+        - id
+        - name
+        - emblem
+        - memberCount
+        - capacity
+        - recruitmentOpen
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        emblem:
+          $ref: '#/components/schemas/GuildEmblem'
+        memberCount:
+          type: integer
+        capacity:
+          type: integer
+        recruitmentOpen:
+          type: boolean
+      type: object
+    GuildApplication:
+      required:
+        - id
+        - guildId
+        - guildName
+        - playerId
+        - displayName
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        guildId:
+          type: string
+          format: uuid
+        guildName:
+          type: string
+        playerId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        status:
+          type: string
+          enum:
+            - PENDING
+            - ACCEPTED
+            - REJECTED
+            - WITHDRAWN
+      type: object
+    GuildDirectoryPage:
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicGuild'
+        nextCursor:
+          type: string
+          format: uuid
+          nullable: true
+      type: object
+    GuildApplicationPage:
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuildApplication'
+        nextCursor:
+          type: string
+          format: uuid
+          nullable: true
       type: object
     GuildEmblemColor:
       description: "Palette GRRIND : NIGHT #050816, CHALK #EAF6FF, CYAN #35E4FF,\nMINT #75FFB2, AMETHYST #A98BFF, GLACIER #67D8FF,\nBLOSSOM #FF79CE, COPPER #FFB454. Aucune couleur libre.\n"
@@ -2774,6 +3091,9 @@ components:
     GuildUpdate:
       description: "Modification par le fondateur courant uniquement. Appartenance et rôle\nsont relus sous le verrou de guilde, y compris après une succession.\nAu moins un champ non null est requis ; champs absents ou null = conservés.\nL'emblème fourni remplace les trois choix, aucun remplacement partiel.\n401 sans authentification, 403 pour un membre non fondateur,\n404 pour un tiers ou une guilde inconnue, 422 pour les valeurs invalides.\n"
       properties:
+        recruitmentOpen:
+          type: boolean
+          nullable: true
         name:
           type: string
           nullable: true
@@ -2786,6 +3106,13 @@ components:
               $ref: '#/components/schemas/GuildEmblem'
       type: object
       anyOf:
+        -
+          required:
+            - recruitmentOpen
+          properties:
+            recruitmentOpen:
+              type: boolean
+          type: object
         -
           required:
             - name
@@ -2802,7 +3129,7 @@ components:
               $ref: '#/components/schemas/GuildEmblem'
           type: object
     GuildInviteCode:
-      description: "Le laissez-passer d'une guilde. Il **remplace l'annuaire au lieu de le\ncompléter** : aucune recherche de joueur n'existe, et une recherche par adresse\nrendrait l'API capable de confirmer qu'une adresse a un compte. Le code se\npartage hors de l'app, et seul un joueur déjà inscrit et connecté peut le\nconsommer.\n"
+      description: "Un code permet une adhésion directe, même lorsque le recrutement par\ncandidature est fermé. Le code se\npartage hors de l'app, et seul un joueur déjà inscrit et connecté peut le\nconsommer.\n"
       required:
         - code
         - expiresAt
@@ -6029,6 +6356,18 @@ components:
           items:
             $ref: '#/components/schemas/Enemy'
       type: object
+    RecruitmentPageQuery:
+      properties:
+        limit:
+          type: integer
+          default: 20
+          maximum: 50
+          minimum: 1
+        cursor:
+          type: string
+          nullable: true
+          default: null
+      type: object
     FightBattleRequest:
       properties:
         enemy:
@@ -6135,6 +6474,10 @@ components:
           oneOf:
             -
               $ref: '#/components/schemas/GuildEmblem'
+          nullable: true
+          default: null
+        recruitmentOpen:
+          type: boolean
           nullable: true
           default: null
       type: object
@@ -6642,13 +6985,13 @@ security:
     bearerAuth: []
 tags:
   -
+    name: Guildes
+  -
     name: Combat
   -
     name: Alam
   -
     name: 'Chat de guilde'
-  -
-    name: Guildes
   -
     name: Engagement
   -

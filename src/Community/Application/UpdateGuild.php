@@ -19,6 +19,7 @@ final readonly class UpdateGuild
         public Uuid $actorId,
         public ?string $name = null,
         public ?GuildEmblem $emblem = null,
+        public ?bool $recruitmentOpen = null,
     ) {
     }
 }
