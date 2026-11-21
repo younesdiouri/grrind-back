@@ -9,7 +9,7 @@ use DateTimeInterface;
 
 final class GuildMessageResource
 {
-    /** @return array<string, string|null> */
+    /** @return array<string, string|int|null> */
     public static function from(GuildMessage $message): array
     {
         return [
@@ -19,6 +19,8 @@ final class GuildMessageResource
             'authorId' => $message->authorId()->toRfc4122(),
             'text' => $message->text(),
             'createdAt' => $message->createdAt()->format(DateTimeInterface::ATOM),
+            'audioDurationMs' => $message->audioDurationMs(),
+            'audioUrl' => null === $message->audioKey() ? null : '/api/guilds/'.$message->guild()->id()->toRfc4122().'/chat/messages/'.$message->id()->toRfc4122().'/audio',
             'imageUrl' => null === $message->imageKey() ? null : '/api/guilds/'.$message->guild()->id()->toRfc4122().'/chat/messages/'.$message->id()->toRfc4122().'/image',
         ];
     }

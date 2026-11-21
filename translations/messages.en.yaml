@@ -9,5 +9,6 @@ risala_turn:
     title: 'Your turn'
     body: '📜 Choose your guild’s Risāla before %deadline%'
 guild_chat:
+    audio: '💬 %author% sent a voice message'
     message: '💬 %author%: %text%'
     image: '💬 %author% sent an image'

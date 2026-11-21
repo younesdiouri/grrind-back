@@ -17,6 +17,8 @@ final readonly class SendChatMessageRequest
         public string $text = '',
         #[OA\Property(type: 'string', format: 'binary', nullable: true)]
         public ?UploadedFile $image = null,
+        #[OA\Property(type: 'string', format: 'binary', nullable: true)]
+        public ?UploadedFile $audio = null,
     ) {
     }
 }

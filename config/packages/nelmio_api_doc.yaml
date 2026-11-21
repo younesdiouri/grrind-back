@@ -194,7 +194,7 @@ when@dev:
                             craftedAt: { type: string, format: date-time }
                     GuildMessage:
                         type: object
-                        required: [id, clientId, cursor, authorId, text, createdAt, imageUrl]
+                        required: [id, clientId, cursor, authorId, text, createdAt, imageUrl, audioUrl, audioDurationMs]
                         properties:
                             id: { type: string, format: uuid }
                             clientId: { type: string, format: uuid }
@@ -203,6 +203,8 @@ when@dev:
                             text: { type: string }
                             createdAt: { type: string, format: date-time }
                             imageUrl: { type: string, nullable: true }
+                            audioUrl: { type: string, nullable: true, description: "Chemin privé WAV, à lire avec le jeton du membre." }
+                            audioDurationMs: { type: integer, nullable: true, minimum: 1, maximum: 60000 }
                     # ————— Le vocabulaire des erreurs ——————————————————————————————————
                     ProblemDetails:
                         type: object

@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(name: 'app:chat:cleanup', description: 'Supprime les images de chat sans message, sur la machine portant le volume.')]
+#[AsCommand(name: 'app:chat:cleanup', description: 'Supprime les pièces jointes du chat sans message, sur la machine portant le volume.')]
 final class ChatCleanupCommand extends Command
 {
     public function __construct(private readonly CleanupChatImages $cleanup)

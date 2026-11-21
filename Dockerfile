@@ -13,7 +13,7 @@ FROM dunglas/frankenphp:1.13.2-php8.4.27 AS base
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git unzip \
+        git unzip ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 RUN install-php-extensions \

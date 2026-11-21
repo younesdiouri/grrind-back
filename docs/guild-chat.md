@@ -19,7 +19,10 @@ Les erreurs applicatives suivent `application/problem+json` et `openapi.yaml`.
 - Image, seule ou accompagnée : `multipart/form-data` avec `clientId`, `text`
   facultatif et un fichier `image`. Ne pas fixer la boundary à la main : laisser
   le client HTTP composer son Content-Type.
-- Au moins un contenu, une seule image. Aucun chemin local, URL externe ou tableau
+- Vocal seul ou accompagné de texte, dans le champ multipart `audio`. Le preset natif
+  `RecordingPresets.HIGH_QUALITY` d’Expo Audio SDK 57 produit le M4A/AAC accepté.
+  Limites de 2 097 152 octets et 60 000 ms de son décodé.
+- Au moins un contenu et au plus une pièce jointe (image ou audio). Aucun chemin local, URL externe ou tableau
   d'images accepté. Les noms de fichier envoyés par le téléphone ne sont pas conservés.
 - Texte brut UTF-8, sans interprétation HTML/Markdown ; espaces de bord retirés.
   Afficher comme texte, jamais dans une WebView qui interprète du HTML.
@@ -37,7 +40,9 @@ Réponse 201, également lors d'un rejeu identique :
   "authorId": "<UUID joueur>",
   "text": "Bonjour",
   "createdAt": "2026-09-09T16:00:00+00:00",
-  "imageUrl": "/api/guilds/<guilde>/chat/messages/<message>/image"
+  "imageUrl": "/api/guilds/<guilde>/chat/messages/<message>/image",
+  "audioUrl": null,
+  "audioDurationMs": null
 }
 ```
 
@@ -70,6 +75,19 @@ Les positions sont attribuées sous le verrou de guilde qui couvre le COMMIT :
 une transaction lente ne peut pas apparaître derrière un curseur déjà consommé.
 Dédupliquer l'affichage par `id` ; ne pas déduire le nombre de messages du nombre
 de signaux Mercure.
+
+### Lecture audio
+
+`audioUrl` et `audioDurationMs` sont renseignés ensemble. Le premier est un chemin
+relatif à l’API, le second une durée entière en millisecondes. Le lecteur fournit
+le JWT dans le header Authorization sur chaque GET, y compris avec Range. Réponse
+WAV mono PCM 16 kHz, 200 ou 206, avec `Cache-Control: private, no-store`.
+
+Le serveur distingue média invalide (422), session invalide (401), guilde ou
+message inaccessible (404). Si la connexion tombe avant la réponse d’envoi,
+rejouer avec le même clientId et le même fichier. Le refus du microphone vient
+de la plateforme avant l’envoi. Les fixtures `tests/Fixtures/chat/voice.m4a`
+et `over-limit.m4a` contiennent un ton synthétique et 61 secondes de silence.
 
 ### Images et temps réel
 
@@ -159,7 +177,7 @@ avec une politique de rétention avant de leur donner de la valeur. La commande 
 nettoyage ne sait pas recréer un fichier référencé mais perdu.
 
 Avant plusieurs machines web ou le passage AWS : copier les objets vers S3 en
-conservant leurs clés UUID relatives, remplacer `ChatImageStorage` et le verrou
+conservant leurs clés UUID relatives, remplacer `ChatAttachmentStorage` et le verrou
 local/nettoyage par une stratégie adaptée au stockage objet, puis basculer les
 lectures après vérification des copies. Aucun domaine Fly ni chemin absolu n'est
 persisté dans les messages. S3 et ce déploiement restent hors du ticket.

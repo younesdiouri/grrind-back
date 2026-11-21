@@ -9,9 +9,9 @@ namespace App\Community\Application;
  * remplacement du volume Fly par S3 sans modifier les messages ni les routes privées.
  * Les contenus réencodés sont bornés à 5 Mio ; la lecture mémoire reste donc bornée.
  */
-interface ChatImageStorage
+interface ChatAttachmentStorage
 {
-    public function store(string $contents): string;
+    public function store(PreparedChatAttachment $attachment): string;
 
     public function read(string $key): string;
 

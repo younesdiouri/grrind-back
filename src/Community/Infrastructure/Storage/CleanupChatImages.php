@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Community\Infrastructure\Storage;
 
-use App\Community\Application\ChatImageStorage;
+use App\Community\Application\ChatAttachmentStorage;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\Lock\LockFactory;
@@ -17,7 +17,7 @@ use Symfony\Component\Lock\LockFactory;
  */
 final readonly class CleanupChatImages
 {
-    public function __construct(private ChatImageStorage $images, private Connection $connection, #[Target('chat_storage')] private LockFactory $storageLocks)
+    public function __construct(private ChatAttachmentStorage $images, private Connection $connection, #[Target('chat_storage')] private LockFactory $storageLocks)
     {
     }
 
@@ -28,7 +28,7 @@ final readonly class CleanupChatImages
         $count = 0;
         try {
             foreach ($this->images->keys() as $key) {
-                if (false === $this->connection->fetchOne('SELECT 1 FROM community_guild_message WHERE image_key = ?', [$key])) {
+                if (false === $this->connection->fetchOne('SELECT 1 FROM community_guild_message WHERE image_key = ? OR audio_key = ?', [$key, $key])) {
                     $this->images->delete($key);
                     ++$count;
                 }

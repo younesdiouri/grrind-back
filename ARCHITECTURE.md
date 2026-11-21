@@ -714,7 +714,7 @@ Le chat de guilde (#275) utilise la même outbox : transaction du message →
 le joint par HTTP, et le hub ne publie qu'un signal sans contenu privé. Les
 clients relisent PostgreSQL par l'API, qui revérifie l'adhésion ; les anciennes
 connexions ne conservent donc aucun accès au contenu après un départ. Les images
-restent privées sur le volume local, derrière `ChatImageStorage`, et leur nettoyage
+restent privées sur le volume local, derrière `ChatAttachmentStorage`, et leur nettoyage
 est exécuté sur la machine web. [Contrat et exploitation](docs/guild-chat.md).
 
 ```mermaid
