@@ -13,7 +13,7 @@ FROM dunglas/frankenphp:1.13.2-php8.4.27 AS base
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git unzip ffmpeg \
+        git unzip \
     && rm -rf /var/lib/apt/lists/*
 
 RUN install-php-extensions \
@@ -24,6 +24,9 @@ RUN install-php-extensions \
         gd \
         exif \
         apcu
+
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer/composer:2-bin /composer /usr/bin/composer
 COPY docker/frankenphp/Caddyfile /etc/frankenphp/Caddyfile
