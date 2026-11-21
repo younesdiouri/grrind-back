@@ -118,6 +118,11 @@ make down
 
 Si une commande manque au Makefile, on l'ajoute au Makefile — on ne contourne pas.
 
+Sur ce poste, lancer les commandes Docker depuis le checkout backend principal. Le projet Compose
+`grrind-back` partage son API sur le port 8080 avec le simulateur et utilise `grrind_test` pour
+PHPUnit. Les tickets réutilisent cet environnement. Pour tester une autre branche, la sélectionner
+dans le checkout monté dans les conteneurs et conserver le même nom de projet Compose.
+
 **La seule exception est `flyctl`**, et c'en est une vraie : il pilote une infrastructure
 distante, pas le code local. Le déployer par Docker n'achèterait rien et ajouterait une
 couche entre la commande et ce qu'elle fait. Il tourne donc sur l'hôte, et c'est le seul.
