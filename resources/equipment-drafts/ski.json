@@ -1,0 +1,137 @@
+[
+  {
+    "key": "SKI_HELMET",
+    "active": false,
+    "kind": "EQUIPMENT",
+    "rarity": "COMMON",
+    "slot": "HEAD",
+    "weapon_type": null,
+    "price_coins": 10,
+    "sell_price_coins": 5,
+    "modifiers": [
+      {
+        "type": "GUARD_BONUS",
+        "value": 30
+      }
+    ],
+    "shop": {
+      "available": false
+    },
+    "translations": {
+      "fr": {
+        "name": "La Tête de piste"
+      },
+      "en": {
+        "name": "Ski Helmet"
+      }
+    }
+  },
+  {
+    "key": "SKI_BEANIE",
+    "active": false,
+    "kind": "EQUIPMENT",
+    "rarity": "COMMON",
+    "slot": "HEAD",
+    "weapon_type": null,
+    "price_coins": 10,
+    "sell_price_coins": 5,
+    "modifiers": [
+      {
+        "type": "CRITICAL_CHANCE_BONUS",
+        "value": 20
+      }
+    ],
+    "shop": {
+      "available": false
+    },
+    "translations": {
+      "fr": {
+        "name": "Le Bonnet de descente"
+      },
+      "en": {
+        "name": "Downhill Beanie"
+      }
+    }
+  },
+  {
+    "key": "SKI_PANTS",
+    "active": false,
+    "kind": "EQUIPMENT",
+    "rarity": "COMMON",
+    "slot": "LEGS",
+    "weapon_type": null,
+    "price_coins": 15,
+    "sell_price_coins": 7,
+    "modifiers": [
+      {
+        "type": "DODGE_BONUS",
+        "value": 30
+      }
+    ],
+    "shop": {
+      "available": false
+    },
+    "translations": {
+      "fr": {
+        "name": "Le Tout-Schuss"
+      },
+      "en": {
+        "name": "Downhill Pants"
+      }
+    }
+  },
+  {
+    "key": "SKI_JACKET",
+    "active": false,
+    "kind": "EQUIPMENT",
+    "rarity": "COMMON",
+    "slot": "CHEST",
+    "weapon_type": null,
+    "price_coins": 10,
+    "sell_price_coins": 5,
+    "modifiers": [
+      {
+        "type": "GUARD_BONUS",
+        "value": 30
+      }
+    ],
+    "shop": {
+      "available": false
+    },
+    "translations": {
+      "fr": {
+        "name": "La Doudoune de slalom"
+      },
+      "en": {
+        "name": "Slalom Jacket"
+      }
+    }
+  },
+  {
+    "key": "SKI_POLE",
+    "active": false,
+    "kind": "EQUIPMENT",
+    "rarity": "COMMON",
+    "slot": "WEAPON",
+    "weapon_type": "SWORD",
+    "price_coins": 25,
+    "sell_price_coins": 12,
+    "modifiers": [
+      {
+        "type": "DAMAGE_BONUS",
+        "value": 2
+      }
+    ],
+    "shop": {
+      "available": false
+    },
+    "translations": {
+      "fr": {
+        "name": "Le Planté de bâton"
+      },
+      "en": {
+        "name": "Ski Pole"
+      }
+    }
+  }
+]

@@ -184,3 +184,27 @@ l'app (2 094 triangles), rendu avec le script de provenance. La provisionner sur
 Fly avant la migration selon les commandes ci-dessus. L'app relie la clé à la coiffe déjà
 embarquée : cheveux et bandeau masqués tant qu'elle est portée, apparence sauvegardée intacte.
 Profils, portraits de guilde et snapshots de combat utilisent cette même référence HEAD.
+
+## Panoplie de ski en préparation (#356)
+
+[Les cinq définitions serveur](../resources/equipment-drafts/ski.json) fixent les noms,
+prix et bonus approuvés. Les clés de rendu sont celles des objets achetés et équipés.
+Chaque ticket artistique utilise la correspondance suivante.
+
+| Ticket app | Clé stable | Slot | Type d’arme |
+| --- | --- | --- | --- |
+| [#397](https://github.com/younesdiouri/grrind-app/issues/397) | `SKI_HELMET` | HEAD | — |
+| [#398](https://github.com/younesdiouri/grrind-app/issues/398) | `SKI_BEANIE` | HEAD | — |
+| [#399](https://github.com/younesdiouri/grrind-app/issues/399) | `SKI_PANTS` | LEGS | — |
+| [#400](https://github.com/younesdiouri/grrind-app/issues/400) | `SKI_JACKET` | CHEST | — |
+| [#401](https://github.com/younesdiouri/grrind-app/issues/401) | `SKI_POLE` | WEAPON | SWORD |
+
+Le casque et le bonnet se remplacent en HEAD. Le casque porté avec la veste ajoute
+60 millièmes de garde avant plafond. Le bâton réutilise SWORD. La mesure de la prise
+sur le rig détermine les clips natifs compatibles.
+
+Le fichier reste hors du circuit de publication. Chaque objet est désactivé et fermé
+à la vente. Après validation de son rendu natif et de son mapping, une publication
+explicite pourra l’ouvrir en boutique au niveau 1, en rareté COMMON et hors loot.
+Les clients continuent de recevoir le catalogue publié et les replays conservent
+leurs références figées.
