@@ -92,7 +92,7 @@ final readonly class GuildController
     #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/GuildUpdate'))]
     #[OA\Response(
         response: 200,
-        description: 'Le nom et/ou l’emblème modifiés par le fondateur courant, autorisation et appartenance relues sous verrou. Les champs absents ou null sont conservés.',
+        description: 'Les paramètres de guilde modifiés par le fondateur courant, autorisation et appartenance relues sous verrou. Les champs absents ou null sont conservés.',
         content: new OA\JsonContent(ref: '#/components/schemas/Guild'),
     )]
     #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
@@ -107,7 +107,7 @@ final readonly class GuildController
         #[MapRequestPayload]
         UpdateGuildRequest $request,
     ): JsonResponse {
-        $updated = ($this->updateGuild)(new UpdateGuild($guild, Uuid::fromString($user->getUserIdentifier()), $request->name, $request->emblem));
+        $updated = ($this->updateGuild)(new UpdateGuild($guild, Uuid::fromString($user->getUserIdentifier()), $request->name, $request->emblem, $request->recruitmentOpen));
 
         return new JsonResponse(
             GuildResource::from($updated, Uuid::fromString($user->getUserIdentifier()), $this->rules->maximumMembers())->toArray(),

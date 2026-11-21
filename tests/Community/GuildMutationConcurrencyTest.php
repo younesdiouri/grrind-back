@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Community;
 
+use App\Community\Application\FoundGuild;
+use App\Community\Application\FoundGuildHandler;
+use App\Community\Application\GuildRecruitment;
 use App\Community\Application\LeaveGuild;
 use App\Community\Application\LeaveGuildHandler;
 use App\Community\Domain\Guild;
@@ -31,6 +34,73 @@ final class GuildMutationConcurrencyTest extends ApiTestCase
             $this->lockedConnection->rollBack();
         }
         parent::tearDown();
+    }
+
+    public function testConcurrentSubmissionsReturnOnePendingApplication(): void
+    {
+        [$founder, , $guildId] = $this->prepareGuild();
+        $uri = '/api/guilds/'.$guildId;
+        self::assertSame(200, $this->send('PATCH', $uri, ['recruitmentOpen' => true], $founder->headers)->getStatusCode());
+        $player = $this->openAccount('recruit@example.org', 'Candidate');
+        $input = $this->authorizedMutation($player, 'POST', $uri.'/applications', []);
+        $this->lockGuild($guildId);
+        $this->resumeUntilBlocked($input);
+        $service = self::getContainer()->get(GuildRecruitment::class);
+        self::assertInstanceOf(GuildRecruitment::class, $service);
+        $first = $service->submit(Uuid::fromString($guildId), $player->id);
+        $result = $this->finishMutation($input);
+        self::assertSame(200, $result['status']);
+        self::assertSame($first->id->toRfc4122(), $result['body']['id']);
+        self::assertSame(1, $this->db()->fetchOne('SELECT COUNT(*) FROM community_guild_application'));
+    }
+
+    /** @return iterable<string, array{string, int}> */
+    public static function recruitmentConflicts(): iterable
+    {
+        yield 'dernière place prise' => ['full', 409];
+        yield 'fondation ailleurs' => ['found', 409];
+        yield 'transmission du rôle' => ['succession', 404];
+        yield 'rejet déjà enregistré' => ['reject', 409];
+    }
+
+    #[DataProvider('recruitmentConflicts')]
+    public function testAcceptanceRechecksChangesCommittedWhileWaiting(string $change, int $status): void
+    {
+        [$founder, , $guildId] = $this->prepareGuild();
+        $uri = '/api/guilds/'.$guildId;
+        self::assertSame(200, $this->send('PATCH', $uri, ['recruitmentOpen' => true], $founder->headers)->getStatusCode());
+        $player = $this->openAccount('recruit@example.org', 'Candidate');
+        $application = self::decode($this->post($uri.'/applications', [], $player->headers + ['Idempotency-Key' => 'apply']))['id'];
+        self::assertIsString($application);
+        $input = $this->authorizedMutation($founder, 'POST', $uri.'/applications/'.$application.'/accept', []);
+        [$guilds, $guild] = $this->lockGuild($guildId);
+        $this->resumeUntilBlocked($input);
+        if ('full' === $change) {
+            while ($guild->size() < 30) {
+                $guild->admit(Uuid::v7(), new GuildRules(30, 48), new DateTimeImmutable());
+            }
+            $guilds->commit();
+        } elseif ('found' === $change) {
+            $found = self::getContainer()->get(FoundGuildHandler::class);
+            self::assertInstanceOf(FoundGuildHandler::class, $found);
+            $found(new FoundGuild($player->id, 'Autre guilde'));
+        } elseif ('succession' === $change) {
+            $leave = self::getContainer()->get(LeaveGuildHandler::class);
+            self::assertInstanceOf(LeaveGuildHandler::class, $leave);
+            $leave(new LeaveGuild($founder->id));
+        } else {
+            $service = self::getContainer()->get(GuildRecruitment::class);
+            self::assertInstanceOf(GuildRecruitment::class, $service);
+            $service->decide($guild->id(), $founder->id, Uuid::fromString($application), false);
+        }
+        $result = $this->finishMutation($input);
+        self::assertSame($status, $result['status'], json_encode($result, \JSON_THROW_ON_ERROR));
+        self::assertSame(0, $this->db()->fetchOne('SELECT COUNT(*) FROM community_guild_membership WHERE guild_id = ? AND player_id = ?', [$guildId, $player->id->toRfc4122()]));
+        self::assertSame(match ($change) {
+            'found' => 'WITHDRAWN',
+            'reject' => 'REJECTED',
+            default => 'PENDING',
+        }, $this->db()->fetchOne('SELECT status FROM community_guild_application WHERE id = ?', [$application]));
     }
 
     /** @return iterable<string, array{string, string, array<string, mixed>, int}> */

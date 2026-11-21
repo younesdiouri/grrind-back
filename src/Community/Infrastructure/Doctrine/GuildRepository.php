@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Community\Infrastructure\Doctrine;
 
+use App\Community\Application\PublicGuild;
 use App\Community\Domain\Guild;
+use App\Community\Domain\GuildMembership;
+use App\Community\Domain\GuildApplication;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\TransactionRequiredException;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bridge\Doctrine\Types\UuidType;
@@ -85,7 +89,34 @@ class GuildRepository extends ServiceEntityRepository
      */
     public function dissolve(Guild $guild): void
     {
+        $this->getEntityManager()->getRepository(GuildApplication::class)->withdrawForGuild($guild->id());
         $this->getEntityManager()->remove($guild);
+    }
+
+    private function previews(): QueryBuilder
+    {
+        return $this->createQueryBuilder('g')
+            ->select('NEW '.PublicGuild::class.'(g.id, g.name, g.emblem.symbol, g.emblem.backgroundColor, g.emblem.symbolColor, g.recruitmentOpen, COUNT(m.id))')
+            ->leftJoin('g.memberships', 'm')->groupBy('g.id');
+    }
+
+    /** @return list<PublicGuild> */
+    public function directory(?string $cursor, int $size): array
+    {
+        $query = $this->previews()->where('g.recruitmentOpen = true')->orderBy('g.id', 'DESC')->setMaxResults($size);
+        if (null !== $cursor) {
+            $query->andWhere('g.id < :cursor')->setParameter('cursor', Uuid::fromString($cursor), UuidType::NAME);
+        }
+
+        return $query->getQuery()->getResult();
+    }
+
+    public function preview(Uuid $id, Uuid $player): ?PublicGuild
+    {
+        return $this->previews()->where('g.id = :id')
+            ->andWhere('g.recruitmentOpen = true OR EXISTS (SELECT own.id FROM '.GuildMembership::class.' own WHERE own.guild = g AND own.playerId = :player)')
+            ->setParameter('id', $id, UuidType::NAME)->setParameter('player', $player, UuidType::NAME)
+            ->getQuery()->getOneOrNullResult();
     }
 
     public function commit(): void

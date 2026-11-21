@@ -25,13 +25,14 @@ final readonly class UpdateGuildRequest
         #[OA\Property(ref: '#/components/schemas/GuildEmblem', nullable: true)]
         #[Assert\Valid]
         public ?GuildEmblem $emblem = null,
+        public ?bool $recruitmentOpen = null,
     ) {
     }
 
     #[Ignore]
-    #[Assert\IsTrue(message: 'Fournissez un nom ou un emblème.')]
+    #[Assert\IsTrue(message: 'Fournissez au moins un champ à modifier.')]
     public function hasChange(): bool
     {
-        return null !== $this->name || null !== $this->emblem;
+        return null !== $this->name || null !== $this->emblem || null !== $this->recruitmentOpen;
     }
 }

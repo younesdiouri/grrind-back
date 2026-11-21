@@ -7,6 +7,7 @@ namespace App\Community\Application;
 use App\Community\Domain\Exception\PlayerAlreadyInAGuild;
 use App\Community\Domain\Guild;
 use App\Community\Infrastructure\Doctrine\GuildMembershipRepository;
+use App\Community\Infrastructure\Doctrine\GuildApplicationRepository;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Psr\Clock\ClockInterface;
@@ -25,6 +26,7 @@ final readonly class FoundGuildHandler
 {
     public function __construct(
         private GuildRepository $guilds,
+        private GuildApplicationRepository $applications,
         private GuildMembershipRepository $memberships,
         private ClockInterface $clock,
     ) {
@@ -35,20 +37,25 @@ final readonly class FoundGuildHandler
      */
     public function __invoke(FoundGuild $command): Guild
     {
-        if (null !== $this->memberships->ofPlayer($command->founderId)) {
-            throw new PlayerAlreadyInAGuild();
-        }
+        return $this->guilds->transactional(function () use ($command): Guild {
+            $this->applications->lockPlayer($command->founderId);
+            if (null !== $this->memberships->ofPlayer($command->founderId)) {
+                throw new PlayerAlreadyInAGuild();
+            }
 
-        $guild = Guild::found($command->name, $command->founderId, $this->clock->now());
+            $guild = Guild::found($command->name, $command->founderId, $this->clock->now());
 
-        $this->guilds->add($guild);
+            $this->guilds->add($guild);
 
-        try {
-            $this->guilds->commit();
-        } catch (UniqueConstraintViolationException) {
-            throw new PlayerAlreadyInAGuild();
-        }
+            try {
+                $this->guilds->commit();
+            } catch (UniqueConstraintViolationException) {
+                throw new PlayerAlreadyInAGuild();
+            }
 
-        return $guild;
+            $this->applications->withdrawForPlayer($command->founderId);
+
+            return $guild;
+        });
     }
 }

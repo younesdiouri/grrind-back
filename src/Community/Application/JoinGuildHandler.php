@@ -11,6 +11,7 @@ use App\Community\Domain\Guild;
 use App\Community\Domain\GuildRules;
 use App\Community\Infrastructure\Doctrine\GuildInviteCodeRepository;
 use App\Community\Infrastructure\Doctrine\GuildMembershipRepository;
+use App\Community\Infrastructure\Doctrine\GuildApplicationRepository;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Psr\Clock\ClockInterface;
@@ -42,6 +43,7 @@ final readonly class JoinGuildHandler
 {
     public function __construct(
         private GuildRepository $guilds,
+        private GuildApplicationRepository $applications,
         private GuildInviteCodeRepository $codes,
         private GuildMembershipRepository $memberships,
         private GuildRules $rules,
@@ -83,6 +85,10 @@ final readonly class JoinGuildHandler
                 throw new InviteCodeNotUsable();
             }
 
+            $this->applications->lockPlayer($command->playerId);
+            if (null !== $this->memberships->ofPlayer($command->playerId)) {
+                throw new PlayerAlreadyInAGuild();
+            }
             $guild->admit($command->playerId, $this->rules, $now);
 
             try {
@@ -90,6 +96,8 @@ final readonly class JoinGuildHandler
             } catch (UniqueConstraintViolationException) {
                 throw new PlayerAlreadyInAGuild();
             }
+
+            $this->applications->withdrawForPlayer($command->playerId);
 
             return $guild;
         });

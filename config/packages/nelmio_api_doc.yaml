@@ -275,6 +275,8 @@ when@dev:
                                     # qui la refuse, et il peut changer sans que le client s'y prenne
                                     # autrement. `guild-is-full` porte sa capacité en membre
                                     # d'extension, pour que l'app puisse l'écrire dans la phrase.
+                                    - https://grrind.app/problems/application-not-found
+                                    - https://grrind.app/problems/application-already-decided
                                     - https://grrind.app/problems/guild-is-full
                                     - https://grrind.app/problems/player-already-in-a-guild
                                     - https://grrind.app/problems/guild-not-found
@@ -416,7 +418,7 @@ when@dev:
 
                     Guild:
                         type: object
-                        required: [id, name, emblem, createdAt, memberCount, capacity, role]
+                        required: [id, name, emblem, createdAt, memberCount, capacity, role, recruitmentOpen]
                         description: |
                             Une guilde, vue par l'un de ses membres. Elle **ne produit aucune valeur de
                             jeu** en v1 : ni XP, ni modificateur, ni loot. Elle réunit des joueurs, c'est
@@ -434,6 +436,7 @@ when@dev:
                                     La capacité vient de l'équilibrage du serveur et voyage avec la
                                     réponse : l'écran affiche « 12 / 30 », et embarquer le dénominateur
                                     dans l'app obligerait à repasser par l'App Store pour le corriger.
+                            recruitmentOpen: { type: boolean }
                             role:
                                 type: string
                                 enum: [FOUNDER, MEMBER]
@@ -442,6 +445,46 @@ when@dev:
                                     décider quoi dessiner — le bouton « dissoudre » n'existe que pour le
                                     fondateur — jamais à autoriser : le serveur reste seul juge, et
                                     l'action est de toute façon revérifiée.
+
+                    PublicGuild:
+                        type: object
+                        required: [id, name, emblem, memberCount, capacity, recruitmentOpen]
+                        properties:
+                            id: { type: string, format: uuid }
+                            name: { type: string }
+                            emblem: { $ref: '#/components/schemas/GuildEmblem' }
+                            memberCount: { type: integer }
+                            capacity: { type: integer }
+                            recruitmentOpen: { type: boolean }
+
+                    GuildApplication:
+                        type: object
+                        required: [id, guildId, guildName, playerId, displayName, status]
+                        properties:
+                            id: { type: string, format: uuid }
+                            guildId: { type: string, format: uuid }
+                            guildName: { type: string }
+                            playerId: { type: string, format: uuid }
+                            displayName: { type: string }
+                            status: { type: string, enum: [PENDING, ACCEPTED, REJECTED, WITHDRAWN] }
+
+                    GuildDirectoryPage:
+                        type: object
+                        required: [items, nextCursor]
+                        properties:
+                            items:
+                                type: array
+                                items: { $ref: '#/components/schemas/PublicGuild' }
+                            nextCursor: { type: string, format: uuid, nullable: true }
+
+                    GuildApplicationPage:
+                        type: object
+                        required: [items, nextCursor]
+                        properties:
+                            items:
+                                type: array
+                                items: { $ref: '#/components/schemas/GuildApplication' }
+                            nextCursor: { type: string, format: uuid, nullable: true }
 
                     GuildEmblemColor:
                         type: string
@@ -482,9 +525,13 @@ when@dev:
                             401 sans authentification, 403 pour un membre non fondateur,
                             404 pour un tiers ou une guilde inconnue, 422 pour les valeurs invalides.
                         anyOf:
+                            - required: [recruitmentOpen]
+                              properties:
+                                  recruitmentOpen: { type: boolean }
                             - required: [name]
                               properties:
-                                  name: { type: string, nullable: false }
+                                  recruitmentOpen: { type: boolean, nullable: true }
+                            name: { type: string, nullable: false }
                             - required: [emblem]
                               properties:
                                   emblem: { $ref: '#/components/schemas/GuildEmblem' }

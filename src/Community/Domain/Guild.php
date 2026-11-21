@@ -52,6 +52,14 @@ class Guild
     #[Assert\Length(max: self::NAME_MAX_LENGTH)]
     private string $name;
 
+    #[ORM\Column(options: ['default' => false])]
+    public private(set) bool $recruitmentOpen = false;
+
+    public function setRecruitmentOpen(bool $open): void
+    {
+        $this->recruitmentOpen = $open;
+    }
+
     #[ORM\Embedded(class: GuildEmblem::class)]
     private GuildEmblem $emblem;
 

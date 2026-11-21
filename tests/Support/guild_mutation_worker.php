@@ -54,6 +54,7 @@ try {
     $request = Request::create($input['uri'], $input['method'], server: [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_AUTHORIZATION' => $input['authorization'],
+        'HTTP_IDEMPOTENCY_KEY' => 'concurrent-mutation',
     ], content: json_encode($input['payload'], \JSON_THROW_ON_ERROR));
     $response = $kernel->handle($request);
     echo 'result:'.json_encode([
