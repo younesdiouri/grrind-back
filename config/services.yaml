@@ -35,7 +35,7 @@ services:
     App\Shared\Application\StreakChests: '@App\Rewards\Infrastructure\Drop\StreakChestGrants'
     App\Shared\Application\TogetherRewards: '@App\Progression\Infrastructure\TogetherXpRewards'
 
-    App\Community\Application\ChatImageStorage: '@App\Community\Infrastructure\Storage\LocalChatImageStorage'
+    App\Community\Application\ChatAttachmentStorage: '@App\Community\Infrastructure\Storage\LocalChatAttachmentStorage'
 
     App\Identity\Application\SocialProfileResolver: '@App\Identity\Infrastructure\OAuth\LeagueSocialProfileResolver'
     App\Shared\Application\GameRulesets: '@App\Shared\Infrastructure\Config\DatabaseGameRulesets'

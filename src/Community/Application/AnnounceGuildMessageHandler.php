@@ -116,7 +116,7 @@ final readonly class AnnounceGuildMessageHandler
         $locale = $this->locales->localeOf($recipient);
         $text = trim($message->text());
         $body = '' === $text
-            ? $this->translator->trans('guild_chat.image', ['%author%' => $authorName], 'messages', $locale)
+            ? $this->translator->trans(null === $message->audioKey() ? 'guild_chat.image' : 'guild_chat.audio', ['%author%' => $authorName], 'messages', $locale)
             : $this->translator->trans('guild_chat.message', ['%author%' => $authorName, '%text%' => self::shortened($text)], 'messages', $locale);
 
         return new PushNotification(

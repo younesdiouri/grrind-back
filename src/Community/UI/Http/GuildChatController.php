@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Community\UI\Http;
 
-use App\Community\Application\ChatImageStorage;
+use App\Community\Application\ChatAttachmentStorage;
 use App\Community\Application\SendGuildMessage;
 use App\Community\Domain\Guild;
 use App\Community\Infrastructure\Doctrine\GuildMessageRepository;
+use App\Community\Infrastructure\Storage\ChatAudioProcessor;
 use App\Community\Infrastructure\Storage\ChatImageProcessor;
 use App\Community\UI\Http\Request\ChatHistoryRequest;
 use App\Community\UI\Http\Request\SendChatMessageRequest;
 use App\Community\UI\Http\Response\GuildMessageResource;
 use LogicException;
 use OpenApi\Attributes as OA;
+use SplTempFileObject;
 use Symfony\Component\ExpressionLanguage\Expression;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -38,7 +41,8 @@ final readonly class GuildChatController
         private GuildMessageRepository $messages,
         private int $chatTextMaxLength,
         private ChatImageProcessor $processor,
-        private ChatImageStorage $images,
+        private ChatAudioProcessor $audioProcessor,
+        private ChatAttachmentStorage $images,
         private ValidatorInterface $validator,
     ) {
     }
@@ -54,7 +58,8 @@ final readonly class GuildChatController
         new OA\MediaType(mediaType: 'multipart/form-data', schema: new OA\Schema(required: ['clientId'], properties: [
             new OA\Property(property: 'clientId', type: 'string', format: 'uuid'),
             new OA\Property(property: 'text', type: 'string'),
-            new OA\Property(property: 'image', type: 'string', format: 'binary', description: 'Un JPEG, PNG ou WebP réel ; 5 Mio / 20 mégapixels par défaut. Texte ou image requis.'),
+            new OA\Property(property: 'image', type: 'string', format: 'binary', description: 'Un JPEG, PNG ou WebP réel ; 5 Mio / 20 mégapixels par défaut. Une seule pièce jointe.'),
+            new OA\Property(property: 'audio', type: 'string', format: 'binary', description: 'Une piste AAC dans un fichier M4A, 2 Mio et 60 secondes maximum. Exclusif avec image. Texte facultatif avec un média.'),
         ])),
     ])]
     #[OA\Response(response: 201, description: 'Message enregistré ou rejoué.', content: new OA\JsonContent(ref: '#/components/schemas/GuildMessage'))]
@@ -73,11 +78,14 @@ final readonly class GuildChatController
         Request $request,
     ): JsonResponse {
         // Seul le fichier multipart de PHP est admissible, jamais un objet décrit en JSON.
-        if ($input->image !== $request->files->get('image')) {
-            throw new UnprocessableEntityHttpException('Une image exige un fichier multipart.');
+        if ($input->image !== $request->files->get('image') || $input->audio !== $request->files->get('audio')) {
+            throw new UnprocessableEntityHttpException('Une pièce jointe exige un fichier multipart.');
+        }
+        if (null !== $input->image && null !== $input->audio) {
+            throw new UnprocessableEntityHttpException('Une seule pièce jointe est autorisée.');
         }
         $text = trim($input->text);
-        if (('' === $text && null === $input->image) || str_contains($text, "\0")) {
+        if (('' === $text && null === $input->image && null === $input->audio) || str_contains($text, "\0")) {
             throw new UnprocessableEntityHttpException('Le texte est vide ou dépasse la limite autorisée.');
         }
         if ($this->chatTextMaxLength < 1) {
@@ -88,9 +96,13 @@ final readonly class GuildChatController
             throw new ValidationFailedException($input, $violations);
         }
 
-        $image = null === $input->image ? null : $this->processor->prepare($input->image);
+        $attachment = match (true) {
+            null !== $input->audio => $this->audioProcessor->prepare($input->audio),
+            null !== $input->image => $this->processor->prepare($input->image),
+            default => null,
+        };
 
-        return new JsonResponse(GuildMessageResource::from($this->send->send($guild->id(), Uuid::fromString($user->getUserIdentifier()), Uuid::fromString($input->clientId), $text, $image)), 201, ['Cache-Control' => 'private, no-store']);
+        return new JsonResponse(GuildMessageResource::from($this->send->send($guild->id(), Uuid::fromString($user->getUserIdentifier()), Uuid::fromString($input->clientId), $text, $attachment)), 201, ['Cache-Control' => 'private, no-store']);
     }
 
     #[Route('/api/guilds/{id}/chat/messages/{messageId}/image', name: 'community_chat_image', methods: ['GET'])]
@@ -105,6 +117,24 @@ final readonly class GuildChatController
         }
 
         return new Response($this->images->read($key), headers: ['Content-Type' => 'image/webp', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    #[Route('/api/guilds/{id}/chat/messages/{messageId}/audio', name: 'community_chat_audio', methods: ['GET'])]
+    #[OA\Tag(name: 'Chat de guilde')]
+    #[OA\Response(response: 200, description: 'Vocal privé, PCM mono 16 kHz.', content: new OA\MediaType(mediaType: 'audio/wav', schema: new OA\Schema(type: 'string', format: 'binary')))]
+    #[OA\Response(response: 206, description: 'Plage demandée par le lecteur audio.')]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    public function audio(#[VisibleGuild] Guild $guild, string $messageId): BinaryFileResponse
+    {
+        $message = Uuid::isValid($messageId) ? $this->messages->findOneBy(['id' => Uuid::fromString($messageId), 'guild' => $guild]) : null;
+        if (null === $message || null === $key = $message->audioKey()) {
+            throw new NotFoundHttpException();
+        }
+        $file = new SplTempFileObject();
+        $file->fwrite($this->images->read($key));
+
+        return new BinaryFileResponse($file, headers: ['Content-Type' => 'audio/wav', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff'], public: false);
     }
 
     #[Route('/api/guilds/{id}/chat/messages', name: 'community_chat_history', methods: ['GET'])]

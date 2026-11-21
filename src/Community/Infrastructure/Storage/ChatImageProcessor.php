@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Community\Infrastructure\Storage;
 
-use App\Community\Application\PreparedChatImage;
+use App\Community\Application\PreparedChatAttachment;
 use LogicException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -26,7 +26,7 @@ final readonly class ChatImageProcessor
     {
     }
 
-    public function prepare(UploadedFile $upload): PreparedChatImage
+    public function prepare(UploadedFile $upload): PreparedChatAttachment
     {
         if ($this->chatImageMaxBytes < 1 || $this->chatImageMaxPixels < 1) {
             throw new LogicException('Les limites des images doivent être positives.');
@@ -74,7 +74,7 @@ final readonly class ChatImageProcessor
                 throw new UnprocessableEntityHttpException('Image réencodée trop volumineuse.');
             }
 
-            return new PreparedChatImage($encoded, hash('sha256', $contents));
+            return new PreparedChatAttachment($encoded, hash('sha256', $contents));
         } finally {
             fclose($stream);
         }

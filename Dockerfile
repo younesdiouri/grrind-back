@@ -25,6 +25,9 @@ RUN install-php-extensions \
         exif \
         apcu
 
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=composer/composer:2-bin /composer /usr/bin/composer
 COPY docker/frankenphp/Caddyfile /etc/frankenphp/Caddyfile
 

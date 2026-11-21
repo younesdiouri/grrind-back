@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Community\Infrastructure\Storage;
 
-use App\Community\Application\ChatImageStorage;
+use App\Community\Application\ChatAttachmentStorage;
+use App\Community\Application\PreparedChatAttachment;
 use InvalidArgumentException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
@@ -12,16 +13,16 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Uid\Uuid;
 
 /** Répertoire hors public/, dédié au chat : les illustrations du jeu n'y donnent pas accès. */
-final readonly class LocalChatImageStorage implements ChatImageStorage
+final readonly class LocalChatAttachmentStorage implements ChatAttachmentStorage
 {
     public function __construct(private string $chatImageDirectory, private Filesystem $filesystem)
     {
     }
 
-    public function store(string $contents): string
+    public function store(PreparedChatAttachment $attachment): string
     {
-        $key = Uuid::v7()->toRfc4122().'.webp';
-        $this->filesystem->dumpFile($this->path($key), $contents);
+        $key = Uuid::v7()->toRfc4122().(null === $attachment->audioDurationMs ? '.webp' : '.wav');
+        $this->filesystem->dumpFile($this->path($key), $attachment->contents);
 
         return $key;
     }
@@ -46,14 +47,14 @@ final readonly class LocalChatImageStorage implements ChatImageStorage
         if (!is_dir($this->chatImageDirectory)) {
             return;
         }
-        foreach (new Finder()->files()->in($this->chatImageDirectory)->depth('== 0')->name('/^[a-f0-9-]{36}\.webp$/D') as $file) {
+        foreach (new Finder()->files()->in($this->chatImageDirectory)->depth('== 0')->name('/^[a-f0-9-]{36}\.(?:wav|webp)$/D') as $file) {
             yield $file->getFilename();
         }
     }
 
     private function path(string $key): string
     {
-        if (1 !== preg_match('/^[a-f0-9-]{36}\.webp$/D', $key)) {
+        if (1 !== preg_match('/^[a-f0-9-]{36}\.(?:wav|webp)$/D', $key)) {
             throw new InvalidArgumentException('Clé de pièce jointe invalide.');
         }
 

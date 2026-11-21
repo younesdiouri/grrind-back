@@ -418,7 +418,7 @@ paths:
                 -
                   $ref: '#/components/schemas/SendChatMessageRequest'
                 -
-                  properties: { clientId: { type: string, format: uuid }, text: { type: string }, image: { description: 'Un JPEG, PNG ou WebP réel ; 5 Mio / 20 mégapixels par défaut. Texte ou image requis.', type: string, format: binary } }
+                  properties: { clientId: { type: string, format: uuid }, text: { type: string }, image: { description: 'Un JPEG, PNG ou WebP réel ; 5 Mio / 20 mégapixels par défaut. Une seule pièce jointe.', type: string, format: binary }, audio: { description: 'Une piste AAC dans un fichier M4A, 2 Mio et 60 secondes maximum. Exclusif avec image. Texte facultatif avec un média.', type: string, format: binary } }
                   type: object
       responses:
         '201':
@@ -463,6 +463,38 @@ paths:
               schema:
                 type: string
                 format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+  '/api/guilds/{id}/chat/messages/{messageId}/audio':
+    get:
+      tags:
+        - 'Chat de guilde'
+      operationId: get_community_chat_audio
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Vocal privé, PCM mono 16 kHz.'
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: 'Plage demandée par le lecteur audio.'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
   /api/guilds:
@@ -2478,6 +2510,8 @@ components:
         - text
         - createdAt
         - imageUrl
+        - audioUrl
+        - audioDurationMs
       properties:
         id:
           type: string
@@ -2498,6 +2532,15 @@ components:
         imageUrl:
           type: string
           nullable: true
+        audioUrl:
+          description: 'Chemin privé WAV, à lire avec le jeton du membre.'
+          type: string
+          nullable: true
+        audioDurationMs:
+          type: integer
+          nullable: true
+          maximum: 60000
+          minimum: 1
       type: object
     ProblemDetails:
       description: "Une erreur, RFC 9457. `type` est l'identifiant stable de la panne ; `title` et\n`detail` sont du texte. Certaines erreurs ajoutent leurs propres membres — une\nviolation de validation donne `violations` — pour que le client se recale au lieu\nd'afficher un refus sec.\n"
@@ -6048,6 +6091,11 @@ components:
           type: string
           default: ''
         image:
+          type: string
+          format: binary
+          nullable: true
+          default: null
+        audio:
           type: string
           format: binary
           nullable: true

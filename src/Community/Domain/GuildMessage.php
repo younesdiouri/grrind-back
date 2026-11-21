@@ -44,6 +44,10 @@ class GuildMessage
         private DateTimeImmutable $createdAt,
         #[ORM\Column(length: 100, nullable: true)]
         private ?string $imageKey = null,
+        #[ORM\Column(length: 100, nullable: true)]
+        private ?string $audioKey = null,
+        #[ORM\Column(nullable: true)]
+        private ?int $audioDurationMs = null,
     ) {
         $this->id = Uuid::v7();
     }
@@ -86,6 +90,16 @@ class GuildMessage
     public function createdAt(): DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function audioKey(): ?string
+    {
+        return $this->audioKey;
+    }
+
+    public function audioDurationMs(): ?int
+    {
+        return $this->audioDurationMs;
     }
 
     public function imageKey(): ?string

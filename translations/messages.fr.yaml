@@ -9,5 +9,6 @@ risala_turn:
     title: 'À toi de jouer'
     body: '📜 Choisis la Risāla de ta guilde avant le %deadline%'
 guild_chat:
+    audio: '💬 %author% a envoyé un message vocal'
     message: '💬 %author% : %text%'
     image: '💬 %author% a envoyé une image'

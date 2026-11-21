@@ -23,24 +23,24 @@ final readonly class SendGuildMessage
         private GuildMessageRepository $messages,
         private MessageBusInterface $bus,
         private ClockInterface $clock,
-        private ChatImageStorage $images,
+        private ChatAttachmentStorage $attachments,
         #[Target('chat_storage')]
         private LockFactory $storageLocks,
     ) {
     }
 
-    public function send(Uuid $guildId, Uuid $authorId, Uuid $clientId, string $text, ?PreparedChatImage $image = null): GuildMessage
+    public function send(Uuid $guildId, Uuid $authorId, Uuid $clientId, string $text, ?PreparedChatAttachment $attachment = null): GuildMessage
     {
         $lock = $this->storageLocks->createLock('chat-images');
         // Le nettoyage attend le COMMIT : un fichier en cours d'envoi n'est pas orphelin.
         $lock->acquire(true);
         try {
-            return $this->guilds->transactional(function () use ($guildId, $authorId, $clientId, $text, $image): GuildMessage {
+            return $this->guilds->transactional(function () use ($guildId, $authorId, $clientId, $text, $attachment): GuildMessage {
                 $guild = $this->guilds->lockForUpdate($guildId);
                 if (null === $guild || !$guild->hasMember($authorId)) {
                     throw new GuildNotFound();
                 }
-                $fingerprint = hash('sha256', json_encode([$text, $image?->fingerprint], \JSON_THROW_ON_ERROR));
+                $fingerprint = hash('sha256', json_encode(null === $attachment?->audioDurationMs ? [$text, $attachment?->fingerprint] : [$text, 'audio', $attachment->fingerprint], \JSON_THROW_ON_ERROR));
                 $existing = $this->messages->replay($guild, $authorId, $clientId);
                 if (null !== $existing) {
                     if ($existing->fingerprint() !== $fingerprint) {
@@ -49,8 +49,8 @@ final readonly class SendGuildMessage
 
                     return $existing;
                 }
-                $key = null === $image ? null : $this->images->store($image->contents);
-                $message = new GuildMessage($guild, $authorId, $clientId, $this->messages->nextPosition($guild), $text, $fingerprint, $this->clock->now(), $key);
+                $key = null === $attachment ? null : $this->attachments->store($attachment);
+                $message = new GuildMessage($guild, $authorId, $clientId, $this->messages->nextPosition($guild), $text, $fingerprint, $this->clock->now(), null === $attachment?->audioDurationMs ? $key : null, null !== $attachment?->audioDurationMs ? $key : null, $attachment?->audioDurationMs);
                 $this->messages->add($message);
                 $this->bus->dispatch(new ChatChanged($guildId->toRfc4122()));
                 // Deux messages pour un même fait, et non un seul enrichi : `ChatChanged`
