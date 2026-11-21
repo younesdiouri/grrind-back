@@ -1,3 +1,5 @@
+name: grrind-back
+
 services:
   php:
     build:
