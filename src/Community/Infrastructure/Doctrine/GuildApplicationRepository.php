@@ -43,16 +43,6 @@ final class GuildApplicationRepository extends ServiceEntityRepository
         $this->withdraw('guildId', $guild);
     }
 
-    private function withdraw(string $field, Uuid $id): void
-    {
-        $this->createQueryBuilder('a')->update()->set('a.status', ':withdrawn')
-            ->where('a.'.$field.' = :id')->andWhere('a.status = :pending')
-            ->setParameter('id', $id, UuidType::NAME)
-            ->setParameter('pending', ApplicationStatus::Pending)
-            ->setParameter('withdrawn', ApplicationStatus::Withdrawn)
-            ->getQuery()->execute();
-    }
-
     /** @return list<GuildApplication> */
     public function page(Uuid $owner, bool $inbox, ?string $cursor, int $size): array
     {
@@ -65,12 +55,25 @@ final class GuildApplicationRepository extends ServiceEntityRepository
             $query->andWhere('a.id < :cursor')->setParameter('cursor', Uuid::fromString($cursor), UuidType::NAME);
         }
 
-        return $query->getQuery()->getResult();
+        /** @var list<GuildApplication> $rows */
+        $rows = $query->getQuery()->getResult();
+
+        return $rows;
     }
 
     /** Une admission dans une autre guilde peut avoir retiré cette demande pendant l'attente. */
     public function refresh(GuildApplication $application): void
     {
         $this->getEntityManager()->refresh($application);
+    }
+
+    private function withdraw(string $field, Uuid $id): void
+    {
+        $this->createQueryBuilder('a')->update()->set('a.status', ':withdrawn')
+            ->where('a.'.$field.' = :id')->andWhere('a.status = :pending')
+            ->setParameter('id', $id, UuidType::NAME)
+            ->setParameter('pending', ApplicationStatus::Pending)
+            ->setParameter('withdrawn', ApplicationStatus::Withdrawn)
+            ->getQuery()->execute();
     }
 }

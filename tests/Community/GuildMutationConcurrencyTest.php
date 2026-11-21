@@ -11,6 +11,7 @@ use App\Community\Application\LeaveGuild;
 use App\Community\Application\LeaveGuildHandler;
 use App\Community\Domain\Guild;
 use App\Community\Domain\GuildRules;
+use App\Community\Infrastructure\Doctrine\GuildApplicationRepository;
 use App\Community\Infrastructure\Doctrine\GuildRepository;
 use App\Tests\Support\Account;
 use App\Tests\Support\ApiTestCase;
@@ -52,6 +53,39 @@ final class GuildMutationConcurrencyTest extends ApiTestCase
         self::assertSame(200, $result['status']);
         self::assertSame($first->id->toRfc4122(), $result['body']['id']);
         self::assertSame(1, $this->db()->fetchOne('SELECT COUNT(*) FROM community_guild_application'));
+    }
+
+    public function testTwoLeadersAcceptTheSamePlayerAcrossGuilds(): void
+    {
+        [$first, , $firstId] = $this->prepareGuild();
+        $second = $this->openAccount('leader@example.org', 'Meneur');
+        $secondId = self::decode($this->post('/api/guilds', ['name' => 'Seconde'], $second->headers))['id'];
+        self::assertIsString($secondId);
+        $player = $this->openAccount('candidate@example.org', 'Candidate');
+        $applications = [];
+        foreach ([[$firstId, $first], [$secondId, $second]] as [$id, $leader]) {
+            $uri = '/api/guilds/'.$id;
+            self::assertSame(200, $this->send('PATCH', $uri, ['recruitmentOpen' => true], $leader->headers)->getStatusCode());
+            $application = self::decode($this->post($uri.'/applications', [], $player->headers + ['Idempotency-Key' => $id]))['id'];
+            self::assertIsString($application);
+            $applications[$id] = $application;
+        }
+
+        $input = $this->authorizedMutation($second, 'POST', '/api/guilds/'.$secondId.'/applications/'.$applications[$secondId].'/accept', []);
+        [, $guild] = $this->lockGuild($firstId);
+        $repository = self::getContainer()->get(GuildApplicationRepository::class);
+        self::assertInstanceOf(GuildApplicationRepository::class, $repository);
+        $repository->lockPlayer($player->id);
+        // Le second meneur détient déjà l'autre guilde et a lu la demande PENDING.
+        $this->resumeUntilBlocked($input);
+        $recruitment = self::getContainer()->get(GuildRecruitment::class);
+        self::assertInstanceOf(GuildRecruitment::class, $recruitment);
+        $recruitment->decide($guild->id(), $first->id, Uuid::fromString($applications[$firstId]), true);
+        $result = $this->finishMutation($input);
+        self::assertSame(409, $result['status']);
+        self::assertSame('https://grrind.app/problems/application-already-decided', $result['body']['type']);
+        self::assertSame([$firstId], $this->db()->fetchFirstColumn('SELECT guild_id FROM community_guild_membership WHERE player_id = ?', [$player->id->toRfc4122()]));
+        self::assertSame(['ACCEPTED', 'WITHDRAWN'], $this->db()->fetchFirstColumn('SELECT status FROM community_guild_application ORDER BY id'));
     }
 
     /** @return iterable<string, array{string, int}> */

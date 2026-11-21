@@ -530,12 +530,12 @@ when@dev:
                                   recruitmentOpen: { type: boolean }
                             - required: [name]
                               properties:
-                                  recruitmentOpen: { type: boolean, nullable: true }
-                            name: { type: string, nullable: false }
+                                  name: { type: string, nullable: false }
                             - required: [emblem]
                               properties:
                                   emblem: { $ref: '#/components/schemas/GuildEmblem' }
                         properties:
+                            recruitmentOpen: { type: boolean, nullable: true }
                             name: { type: string, nullable: true, minLength: 1, maxLength: 40 }
                             emblem:
                                 allOf: [{ $ref: '#/components/schemas/GuildEmblem' }]
@@ -545,9 +545,8 @@ when@dev:
                         type: object
                         required: [code, expiresAt]
                         description: |
-                            Le laissez-passer d'une guilde. Il **remplace l'annuaire au lieu de le
-                            compléter** : aucune recherche de joueur n'existe, et une recherche par adresse
-                            rendrait l'API capable de confirmer qu'une adresse a un compte. Le code se
+                            Un code permet une adhésion directe, même lorsque le recrutement par
+                            candidature est fermé. Le code se
                             partage hors de l'app, et seul un joueur déjà inscrit et connecté peut le
                             consommer.
                         properties:

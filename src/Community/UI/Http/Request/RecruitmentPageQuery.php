@@ -11,6 +11,7 @@ final readonly class RecruitmentPageQuery
     public function __construct(
         #[Assert\Range(min: 1, max: 50)]
         public int $limit = 20,
+        #[Assert\NotBlank(allowNull: true)]
         #[Assert\Uuid]
         public ?string $cursor = null,
     ) {
@@ -18,7 +19,9 @@ final readonly class RecruitmentPageQuery
 
     /**
      * @template T of array{id: string}
+     *
      * @param list<T> $rows
+     *
      * @return array{items: list<T>, nextCursor: ?string}
      */
     public function page(array $rows): array

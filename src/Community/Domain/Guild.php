@@ -26,11 +26,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  * pas par une porte dérobée qui lui serait propre. C'est ce qui permet de la brancher
  * sans rouvrir le moteur.
  *
- * **Le nom n'est pas unique, et ce n'est pas un oubli.** Aucune recherche de guilde
- * n'existe : on n'y entre que par un code d'invitation (#116), donc rien ne dépend de
- * pouvoir désigner une guilde par son nom. Une contrainte globale sur un nom libre est
- * un puits à cas particuliers — casse, accents, espaces doublés, homoglyphes — qu'on
- * paierait en frustration au moment de fonder, sans rien acheter.
+ * Le nom est libre. L’annuaire identifie chaque guilde par son UUID, même en cas d’homonymie.
  *
  * L'agrégat porte ses adhésions parce que ses deux règles — le plafond et « un joueur
  * n'entre qu'une fois » — se lisent sur l'ensemble, jamais sur une ligne seule. La
@@ -43,6 +39,9 @@ class Guild
 {
     public const int NAME_MAX_LENGTH = 40;
 
+    #[ORM\Column(options: ['default' => false])]
+    public private(set) bool $recruitmentOpen = false;
+
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME)]
     private Uuid $id;
@@ -51,14 +50,6 @@ class Guild
     #[Assert\NotBlank]
     #[Assert\Length(max: self::NAME_MAX_LENGTH)]
     private string $name;
-
-    #[ORM\Column(options: ['default' => false])]
-    public private(set) bool $recruitmentOpen = false;
-
-    public function setRecruitmentOpen(bool $open): void
-    {
-        $this->recruitmentOpen = $open;
-    }
 
     #[ORM\Embedded(class: GuildEmblem::class)]
     private GuildEmblem $emblem;
@@ -97,6 +88,11 @@ class Guild
         $this->createdBy = $createdBy;
         $this->createdAt = $now;
         $this->memberships = new ArrayCollection();
+    }
+
+    public function setRecruitmentOpen(bool $open): void
+    {
+        $this->recruitmentOpen = $open;
     }
 
     /**

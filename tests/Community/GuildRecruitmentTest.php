@@ -11,30 +11,6 @@ use Symfony\Component\Uid\Uuid;
 
 final class GuildRecruitmentTest extends ApiTestCase
 {
-    private function found(Account $owner, bool $open = true): string
-    {
-        $guild = self::decode($this->post('/api/guilds', ['name' => 'Guilde'], $owner->headers));
-        self::assertFalse($guild['recruitmentOpen']);
-        self::assertIsString($guild['id']);
-        $uri = '/api/guilds/'.$guild['id'];
-        if ($open) {
-            self::assertSame(200, $this->send('PATCH', $uri, ['recruitmentOpen' => true], $owner->headers)->getStatusCode());
-        }
-
-        return $uri;
-    }
-
-    private function apply(string $uri, Account $player, ?string $key = null): string
-    {
-        $response = $this->post($uri.'/applications', [], $player->headers + ['Idempotency-Key' => $key ?? Uuid::v7()->toRfc4122()]);
-        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
-        $application = self::decode($response);
-        self::assertSame('PENDING', $application['status']);
-        self::assertIsString($application['id']);
-
-        return $application['id'];
-    }
-
     public function testDirectoryPreviewPrivacyAndPagination(): void
     {
         $owner = $this->openAccount();
@@ -132,5 +108,29 @@ final class GuildRecruitmentTest extends ApiTestCase
         $history = self::decode($this->get('/api/guild-applications/mine', $player->headers))['items'];
         self::assertIsArray($history);
         self::assertSame('WITHDRAWN', array_column($history, 'status', 'id')[$id]);
+    }
+
+    private function found(Account $owner, bool $open = true): string
+    {
+        $guild = self::decode($this->post('/api/guilds', ['name' => 'Guilde'], $owner->headers));
+        self::assertFalse($guild['recruitmentOpen']);
+        self::assertIsString($guild['id']);
+        $uri = '/api/guilds/'.$guild['id'];
+        if ($open) {
+            self::assertSame(200, $this->send('PATCH', $uri, ['recruitmentOpen' => true], $owner->headers)->getStatusCode());
+        }
+
+        return $uri;
+    }
+
+    private function apply(string $uri, Account $player, ?string $key = null): string
+    {
+        $response = $this->post($uri.'/applications', [], $player->headers + ['Idempotency-Key' => $key ?? Uuid::v7()->toRfc4122()]);
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $application = self::decode($response);
+        self::assertSame('PENDING', $application['status']);
+        self::assertIsString($application['id']);
+
+        return $application['id'];
     }
 }

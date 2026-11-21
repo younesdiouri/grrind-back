@@ -6,8 +6,8 @@ namespace App\Community\Infrastructure\Doctrine;
 
 use App\Community\Application\PublicGuild;
 use App\Community\Domain\Guild;
-use App\Community\Domain\GuildMembership;
 use App\Community\Domain\GuildApplication;
+use App\Community\Domain\GuildMembership;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\Query;
@@ -93,13 +93,6 @@ class GuildRepository extends ServiceEntityRepository
         $this->getEntityManager()->remove($guild);
     }
 
-    private function previews(): QueryBuilder
-    {
-        return $this->createQueryBuilder('g')
-            ->select('NEW '.PublicGuild::class.'(g.id, g.name, g.emblem.symbol, g.emblem.backgroundColor, g.emblem.symbolColor, g.recruitmentOpen, COUNT(m.id))')
-            ->leftJoin('g.memberships', 'm')->groupBy('g.id');
-    }
-
     /** @return list<PublicGuild> */
     public function directory(?string $cursor, int $size): array
     {
@@ -108,15 +101,21 @@ class GuildRepository extends ServiceEntityRepository
             $query->andWhere('g.id < :cursor')->setParameter('cursor', Uuid::fromString($cursor), UuidType::NAME);
         }
 
-        return $query->getQuery()->getResult();
+        /** @var list<PublicGuild> $rows */
+        $rows = $query->getQuery()->getResult();
+
+        return $rows;
     }
 
     public function preview(Uuid $id, Uuid $player): ?PublicGuild
     {
-        return $this->previews()->where('g.id = :id')
+        /** @var PublicGuild|null $preview */
+        $preview = $this->previews()->where('g.id = :id')
             ->andWhere('g.recruitmentOpen = true OR EXISTS (SELECT own.id FROM '.GuildMembership::class.' own WHERE own.guild = g AND own.playerId = :player)')
             ->setParameter('id', $id, UuidType::NAME)->setParameter('player', $player, UuidType::NAME)
             ->getQuery()->getOneOrNullResult();
+
+        return $preview;
     }
 
     public function commit(): void
@@ -134,5 +133,12 @@ class GuildRepository extends ServiceEntityRepository
     public function transactional(callable $work): mixed
     {
         return $this->getEntityManager()->wrapInTransaction(static fn (): mixed => $work());
+    }
+
+    private function previews(): QueryBuilder
+    {
+        return $this->createQueryBuilder('g')
+            ->select('NEW '.PublicGuild::class.'(g.id, g.name, g.emblem.symbol, g.emblem.backgroundColor, g.emblem.symbolColor, g.recruitmentOpen, COUNT(m.id))')
+            ->leftJoin('g.memberships', 'm')->groupBy('g.id');
     }
 }
